@@ -1,0 +1,27 @@
+123123123
+123123123123
+2025-12-02 09:21:51,190 [1] INFO  server1.MainClass [39] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 09:21:57,479 [10] INFO  IEC61850_simulatorServer2.Display.LogDisplay [35] - [LogDisplay] 日志显示已启动 
+
+2025-12-02 09:23:56,733 [1] INFO  server1.MainClass [39] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 09:29:17,045 [1] INFO  server1.MainClass [39] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 09:30:56,084 [1] INFO  server1.MainClass [39] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 09:35:53,252 [1] INFO  server1.MainClass [39] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 09:36:03,129 [1] INFO  server1.MainClass [39] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 11:24:24,719 [1] INFO  server1.MainClass [44] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 11:24:56,544 [1] INFO  server1.MainClass [44] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 11:26:14,592 [1] INFO  server1.MainClass [44] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 11:34:58,916 [1] INFO  server1.MainClass [44] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 11:35:39,494 [1] INFO  server1.MainClass [44] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-02 11:42:07,384 [12] INFO  IEC61850_simulatorServer2.Display.LogDisplay [35] - [LogDisplay] 日志显示已启动 

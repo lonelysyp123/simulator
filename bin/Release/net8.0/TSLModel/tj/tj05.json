@@ -1,0 +1,640 @@
+{
+  "schema": "v1.0",
+  "profile": {
+    "productKey": "3",
+    "description": "tj05",
+    "protocolType": "Test"
+  },
+  "properties": [
+    {
+      "identifier": "deviceId",
+      "ref": "deviceId",
+      "name": "deviceId",
+      "description": "设备id",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "0",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "siteId",
+      "ref": "siteId",
+      "name": "siteId",
+      "description": "站点id",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "0",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "stationId",
+      "ref": "stationId",
+      "name": "stationId",
+      "description": "电站id",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "0",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "controllerExtinguisherStatus",
+      "ref": "controllerExtinguisherStatus",
+      "name": "controllerExtinguisherStatus",
+      "description": "灭火器状态 ",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+        "identifier": "controllerMaxWarningLevel",
+        "ref": "controllerMaxWarningLevel",
+        "name": "controllerMaxWarningLevel",
+        "description": "最高报警等级",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+      "identifier": "controllerFireAlertsButtonStatus",
+      "ref": "controllerFireAlertsButtonStatus",
+      "name": "controllerFireAlertsButtonStatus",
+      "description": "火灾报警按钮状态",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "controllerX15Status",
+      "ref": "controllerX15Status",
+      "name": "controllerX15Status",
+      "description": "X15状态 00:释放 01:按下",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "controllerX16Status",
+      "ref": "controllerX16Status",
+      "name": "controllerX16Status",
+      "description": "X16状态 00:释放 01:按下",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "controllerStartStatusSengByCAN",
+      "ref": "controllerStartStatusSengByCAN",
+      "name": "controllerStartStatusSengByCAN",
+      "description": "CAN发过来的启动状态 00:释放 01:按下",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "controllerStopStatusSengByCAN",
+      "ref": "controllerStopStatusSengByCAN",
+      "name": "controllerStopStatusSengByCAN",
+      "description": "CAN发过来的停止状态 00:释放 01:按下",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorCode",
+      "ref": "detectorCode",
+      "name": "detectorCode",
+      "description": "探测器编码",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorOnlineStatus",
+      "ref": "detectorOnlineStatus",
+      "name": "detectorOnlineStatus",
+      "description": "探测器在线状态 0x00 正常 0x01 掉线",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorSmokeTransFault",
+      "ref": "detectorSmokeTransFault",
+      "name": "detectorSmokeTransFault",
+      "description": "探测器烟雾传感器故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorNTCFault",
+      "ref": "detectorNTCFault",
+      "name": "detectorNTCFault",
+      "description": "探测器NTC故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorCOTransFault",
+      "ref": "detectorCOTransFault",
+      "name": "detectorCOTransFault",
+      "description": "探测器CO传感器故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorH2TransFault",
+      "ref": "detectorH2TransFault",
+      "name": "detectorH2TransFault",
+      "description": "探测器H2传感器故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorVOCTransFault",
+      "ref": "detectorVOCTransFault",
+      "name": "detectorVOCTransFault",
+      "description": "探测器VOC传感器故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorVDD5VFault",
+      "ref": "detectorVDD5VFault",
+      "name": "detectorVDD5VFault",
+      "description": "探测器VDD5V故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorFlashFault",
+      "ref": "detectorFlashFault",
+      "name": "detectorFlashFault",
+      "description": "探测器Flash故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorSmokeNo0Fault",
+      "ref": "detectorSmokeNo0Fault",
+      "name": "detectorSmokeNo0Fault",
+      "description": "探测器烟雾未调0故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorTotalFault",
+      "ref": "detectorTotalFault",
+      "name": "detectorTotalFault",
+      "description": "探测器总故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detector33VTransFault",
+      "ref": "detector33VTransFault",
+      "name": "detector33VTransFault",
+      "description": "探测器传感器模块3.3V故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorGNDFault",
+      "ref": "detectorGNDFault",
+      "name": "detectorGNDFault",
+      "description": "探测器GND故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorModuleDropFault",
+      "ref": "detectorModuleDropFault",
+      "name": "detectorModuleDropFault",
+      "description": "探测器传感器模块脱落故障",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+        "identifier": "detectorPuncturedValveFault",
+        "ref": "detectorPuncturedValveFault",
+        "name": "detectorPuncturedValveFault",
+        "description": "探测器刺破阀故障",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+        "identifier": "detectorWarningLevel",
+        "ref": "detectorWarningLevel",
+        "name": "detectorWarningLevel",
+        "description": "探测器告警等级",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+      "identifier": "detectorH2AlarmLv1",
+      "ref": "detectorH2AlarmLv1",
+      "name": "detectorH2AlarmLv1",
+      "description": "探测器氢气1级预警",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorCOAlarmLv1",
+      "ref": "detectorCOAlarmLv1",
+      "name": "detectorCOAlarmLv1",
+      "description": "探测器一氧化碳1级预警",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorSmokeTansAlarmLv1",
+      "ref": "detectorSmokeTansAlarmLv1",
+      "name": "detectorSmokeTansAlarmLv1",
+      "description": "探测器烟感1级预警",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorTempAlarmLv1",
+      "ref": "detectorTempAlarmLv1",
+      "name": "detectorTempAlarmLv1",
+      "description": "探测器温度1级预警",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorH2AlarmLv2",
+      "ref": "detectorH2AlarmLv2",
+      "name": "detectorH2AlarmLv2",
+      "description": "探测器氢气2级预警",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorCOAlarmLv2",
+      "ref": "detectorCOAlarmLv2",
+      "name": "detectorCOAlarmLv2",
+      "description": "探测器烟感2级预警",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorTempAlarmLv2",
+      "ref": "detectorTempAlarmLv2",
+      "name": "detectorTempAlarmLv2",
+      "description": "探测器温度2级预警",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorCOData",
+      "ref": "detectorCOData",
+      "name": "detectorCOData",
+      "description": "探测器CO数据",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "ppm",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorH2Data",
+      "ref": "detectorH2Data",
+      "name": "detectorH2Data",
+      "description": "探测器H2数据",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "ppm",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorVOCData",
+      "ref": "detectorVOCData",
+      "name": "detectorVOCData",
+      "description": "探测器VOC数据",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "ppm",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorSmokeData",
+      "ref": "detectorSmokeData",
+      "name": "detectorSmokeData",
+      "description": "探测器烟雾数据",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "db/m",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorTempData",
+      "ref": "detectorTempData",
+      "name": "detectorTempData",
+      "description": "探测器温度数据",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "℃",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorLevelInput",
+      "ref": "detectorLevelInput",
+      "name": "detectorLevelInput",
+      "description": "探测器高低电平输入",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorRelayStatus",
+      "ref": "detectorRelayStatus",
+      "name": "detectorRelayStatus",
+      "description": "探测器继电器状态",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorRelayOutputStatus",
+      "ref": "detectorRelayOutputStatus",
+      "name": "detectorRelayOutputStatus",
+      "description": "探测器继电器输出状态",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "detectorDeviceType",
+      "ref": "detectorDeviceType",
+      "name": "detectorDeviceType",
+      "description": "探测器设备种类",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    }
+  ]
+}

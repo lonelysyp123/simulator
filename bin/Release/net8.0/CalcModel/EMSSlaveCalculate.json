@@ -1,0 +1,53 @@
+{
+  "schema": "v1.0",
+  "profile": {
+    "productKey": "100",
+    "description": "EMS",
+    "protocolType": "Test"
+  },
+  "properties": [
+    {
+      "identifier": "EMSSlave",
+      "ref": [
+        "BMS.avgSoc",
+        "BMS.avgSoh",
+        "BMS.totalChgCoulomb",
+        "BMS.totalDischgCoulomb",
+        "BMS.onceChargeCapacity",
+        "BMS.onceDischargeCapacity",
+        "BMS.totalCharCount",
+        "BMS.totalDiscCount",
+        "BMS.batteryPackLoadVoltage",
+        "PCS.factorPower",
+        "PCS.activePower",
+        "PCS.reactivePower",
+        "PCS.apparentPower",
+        "PCS.currA",
+        "PCS.currB",
+        "PCS.currC",
+        "PCS.voltA",
+        "PCS.voltB",
+        "PCS.voltC",
+        "PCS.accuDischargEnergy",
+        "PCS.accuChargEnergy",
+        "PCS.accuDischargEnergyDay",
+        "PCS.accuChargEnergyDay",
+        "PCS.powerDC",
+        "PCS.voltDC",
+        "PCS.activePowerControlMode",
+        "PCS.reactivePowerControlMode",
+        "PCS.activePowerSetpo",
+        "PCS.reactivePowerSetpo",
+        "PCS.pFSetpo"
+      ],
+      "name": "EMSData",
+      "description": "从EMS数据聚合",
+      "access": "x",
+      "dataType": "",
+      "defaultValue": "",
+      "level": 1,
+      "specs": {
+      }                                                                                                                                                                                                                                                                                                                                                                   
+    }
+  ]
+}

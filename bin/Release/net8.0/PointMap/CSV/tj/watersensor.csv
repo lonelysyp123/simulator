@@ -1,0 +1,5 @@
+FunctionCode,Address,Size,Index,ParamName,Type,Min,Max,Expression,ReExpression,Unit,Comments,DefaultValue,DataOrder,SampleRate
+3,0,16,0,waterImmersionStatus1,System.Int16,,,,,,实时水浸状态1 0:正常 1:有水,,,
+3,32,16,0,waterImmersionStatus2,System.Int16,,,,,,实时水浸状态2 1:正常 2:有水,,,
+3,51,16,0,warningDelay,System.UInt16,,,,,,报警延时,0,,
+3,52,16,0,currentSensitivity,System.UInt16,0,1024,,,,当前灵敏度,102,,

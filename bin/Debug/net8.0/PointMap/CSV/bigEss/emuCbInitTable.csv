@@ -1,0 +1,6 @@
+﻿MeasurePoint,RcbName,RcbReference
+yc0-yc95,PCS1遥测,SiNengEmuLD1/LLN0.RP.urcbRelayAin01
+yx0-yx353,PCS1遥信,SiNengEmuLD1/LLN0.RP.urcbRelayDin01
+yc96-yc191,PCS2遥测,SiNengEmuLD2/LLN0.RP.urcbRelayAin01
+yx354-yx697,PCS2遥信,SiNengEmuLD2/LLN0.RP.urcbRelayDin01
+

@@ -1,0 +1,1945 @@
+{
+  "schema": "v1.0",
+  "profile": {
+    "productKey": "3",
+    "description": "sems",
+    "protocolType": "Test"
+  },
+  "properties": [
+    {
+      "identifier": "deviceId",
+      "ref": "",
+      "name": "deviceId",
+      "description": "设备id",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "0",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "siteId",
+      "ref": "",
+      "name": "siteId",
+      "description": "站点id",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "0",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "stationId",
+      "ref": "",
+      "name": "stationId",
+      "description": "电站id",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "0",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "avgSingleSOC",
+      "ref": "avgSingleSOC",
+      "name": "avgSingleSOC",
+      "description": "单体平均SOC(BMS获取)",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "%",
+        "min": 0.0,
+        "max": 105.0
+      }
+    },
+    {
+      "identifier": "avgSingleSOH",
+      "ref": "avgSingleSOH",
+      "name": "avgSingleSOH",
+      "description": "单体平均SOH(BMS获取)",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "%",
+        "min": 0.0,
+        "max": 100.0
+      }
+    },
+    {
+      "identifier": "accChargeCapacity",
+      "ref": "accChargeCapacity",
+      "name": "accChargeCapacity",
+      "description": "累计充电量(BMS获取)",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "KWh",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "accDischargeCapacity",
+      "ref": "accDischargeCapacity",
+      "name": "accDischargeCapacity",
+      "description": "累计放电量(BMS获取)",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "KWh",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "batteryPackLoadVoltage",
+      "ref": "batteryPackLoadVoltage",
+      "name": "batteryPackLoadVoltage",
+      "description": "电池组负载电压(BMS获取)",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": 0.0,
+        "max": 1500.0
+      }
+    },
+    {
+      "identifier": "totalPFOfACBus",
+      "ref": "totalPFOfACBus",
+      "name": "totalPFOfACBus",
+      "description": "交流母线总功率因数（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "totalActivePowerOfACBus",
+      "ref": "totalActivePowerOfACBus",
+      "name": "totalActivePowerOfACBus",
+      "description": "交流母线总有功功率（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "kW",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "totalReactivePowerOfACBus",
+      "ref": "totalReactivePowerOfACBus",
+      "name": "totalReactivePowerOfACBus",
+      "description": "交流母线总无功功率（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "kVAr",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "accumulativeDischargedEnergyThroughACPort",
+      "ref": "accumulativeDischargedEnergyThroughACPort",
+      "name": "accumulativeDischargedEnergyThroughACPort",
+      "description": "累计交流放电电量（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "kWh",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "accumulativeChargedEnergyThroughACPort",
+      "ref": "accumulativeChargedEnergyThroughACPort",
+      "name": "accumulativeChargedEnergyThroughACPort",
+      "description": "累计交流充电电量（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "kWh",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "dCPower",
+      "ref": "dCPower",
+      "name": "dCPower",
+      "description": "直流功率（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "kW",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "dCCurr",
+      "ref": "dCCurr",
+      "name": "dCCurr",
+      "description": "直流电流（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "A",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "dCInputVolt",
+      "ref": "dCInputVolt",
+      "name": "dCInputVolt",
+      "description": "直流输入电压（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "V",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "netADataState",
+      "ref": "netADataState",
+      "name": "netADataState",
+      "description": "数据A网状态",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+        "identifier": "netBDataState",
+        "ref": "netBDataState",
+        "name": "netBDataState",
+        "description": "数据B网状态",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+        "identifier": "netAControlState",
+        "ref": "netAControlState",
+        "name": "netAControlState",
+        "description": "控制A网状态",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+        "identifier": "netBControlState",
+        "ref": "netBControlState",
+        "name": "netBControlState",
+        "description": "控制B网状态",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+        "identifier": "totalStart",
+        "ref": "totalStart",
+        "name": "totalStart",
+        "description": "总开机1- 启动， 其他-无效（PCS获取）",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+        "identifier": "totalStop",
+        "ref": "totalStop",
+        "name": "totalStop",
+        "description": "总关机1- 停止， 其他-无效（PCS获取）",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+        "identifier": "clearError",
+        "ref": "clearError",
+        "name": "clearError",
+        "description": "清除故障1- 清除， 其他-无效（PCS获取）",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+        "identifier": "activePowerControlMode",
+        "ref": "activePowerControlMode",
+        "name": "activePowerControlMode",
+        "description": "有功控制模式0- 设置有功， 1- 电压-有功调节， 2- 频率-有功调节， 3- 电压&频率-有功调节， certification-default（PCS获取）",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+        "identifier": "reactivePowerControlMode",
+        "ref": "reactivePowerControlMode",
+        "name": "reactivePowerControlMode",
+        "description": "无功控制模式0- 禁用， 1- 设置无功， 2- 设置PF， 3- 电压-无功调节， 4- 有功-PF调节， 5- 有功-无功调节， certification-default（PCS获取）",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+      "identifier": "activePowerSetpo",
+      "ref": "activePowerSetpo",
+      "name": "activePowerSetpo",
+      "description": "有功功率设置-1400.0~1400.0， 单位: 0.1kW， 默认: 0; +: 充电， 功率从电网到电池， -: 放电， 功率从电池到电网. (RAM)（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "reactivePowerSetpo",
+      "ref": "reactivePowerSetpo",
+      "name": "reactivePowerSetpo",
+      "description": "无功功率设置-1400.0~1400.0， 单位: 0.1kVAr， 默认: 0; +: 滞后， -: 超前. (RAM)（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "pFSetpo",
+      "ref": "pFSetpo",
+      "name": "pFSetpo",
+      "description": "功率因数设置-1~+1， 单位: 0.01， 默认: 1; +: 滞后， -: 超前. (RAM)（PCS获取）",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+        "identifier": "masterHeart",
+        "ref": "masterHeart",
+        "name": "masterHeart",
+        "description": "主机心跳，主机检测到为0，连接正常并至1，从机检测到1，将其至0。",
+        "access": "r",
+        "dataType": "int",
+        "defaultValue": "",
+        "level": 2,
+        "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+        }
+    },
+    {
+      "identifier": "EMU1",
+      "ref": "EMU1",
+      "name": "EMU1",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU2",
+      "ref": "EMU2",
+      "name": "EMU2",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU3",
+      "ref": "EMU3",
+      "name": "EMU3",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU4",
+      "ref": "EMU4",
+      "name": "EMU4",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU5",
+      "ref": "EMU5",
+      "name": "EMU5",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU6",
+      "ref": "EMU6",
+      "name": "EMU6",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU7",
+      "ref": "EMU7",
+      "name": "EMU7",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU8",
+      "ref": "EMU8",
+      "name": "EMU8",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU9",
+      "ref": "EMU9",
+      "name": "EMU9",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU10",
+      "ref": "EMU10",
+      "name": "EMU10",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU11",
+      "ref": "EMU11",
+      "name": "EMU11",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU12",
+      "ref": "EMU12",
+      "name": "EMU12",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU13",
+      "ref": "EMU13",
+      "name": "EMU13",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU14",
+      "ref": "EMU14",
+      "name": "EMU14",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU15",
+      "ref": "EMU15",
+      "name": "EMU15",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU16",
+      "ref": "EMU16",
+      "name": "EMU16",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU17",
+      "ref": "EMU17",
+      "name": "EMU17",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU18",
+      "ref": "EMU18",
+      "name": "EMU18",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU19",
+      "ref": "EMU19",
+      "name": "EMU19",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU20",
+      "ref": "EMU20",
+      "name": "EMU20",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU21",
+      "ref": "EMU21",
+      "name": "EMU21",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU22",
+      "ref": "EMU22",
+      "name": "EMU22",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU23",
+      "ref": "EMU23",
+      "name": "EMU23",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU24",
+      "ref": "EMU24",
+      "name": "EMU24",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU25",
+      "ref": "EMU25",
+      "name": "EMU25",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU26",
+      "ref": "EMU26",
+      "name": "EMU26",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU27",
+      "ref": "EMU27",
+      "name": "EMU27",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU28",
+      "ref": "EMU28",
+      "name": "EMU28",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU29",
+      "ref": "EMU29",
+      "name": "EMU29",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU30",
+      "ref": "EMU30",
+      "name": "EMU30",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU31",
+      "ref": "EMU31",
+      "name": "EMU31",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU32",
+      "ref": "EMU32",
+      "name": "EMU32",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU33",
+      "ref": "EMU33",
+      "name": "EMU33",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU34",
+      "ref": "EMU34",
+      "name": "EMU34",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU35",
+      "ref": "EMU35",
+      "name": "EMU35",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU36",
+      "ref": "EMU36",
+      "name": "EMU36",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU37",
+      "ref": "EMU37",
+      "name": "EMU37",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU38",
+      "ref": "EMU38",
+      "name": "EMU38",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU39",
+      "ref": "EMU39",
+      "name": "EMU39",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU40",
+      "ref": "EMU40",
+      "name": "EMU40",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU41",
+      "ref": "EMU41",
+      "name": "EMU41",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU42",
+      "ref": "EMU42",
+      "name": "EMU42",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU43",
+      "ref": "EMU43",
+      "name": "EMU43",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU44",
+      "ref": "EMU44",
+      "name": "EMU44",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU45",
+      "ref": "EMU45",
+      "name": "EMU45",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU46",
+      "ref": "EMU46",
+      "name": "EMU46",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU47",
+      "ref": "EMU47",
+      "name": "EMU47",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU48",
+      "ref": "EMU48",
+      "name": "EMU48",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU49",
+      "ref": "EMU49",
+      "name": "EMU49",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU50",
+      "ref": "EMU50",
+      "name": "EMU50",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU51",
+      "ref": "EMU51",
+      "name": "EMU51",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU52",
+      "ref": "EMU52",
+      "name": "EMU52",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU53",
+      "ref": "EMU53",
+      "name": "EMU53",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU54",
+      "ref": "EMU54",
+      "name": "EMU54",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU55",
+      "ref": "EMU55",
+      "name": "EMU55",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU56",
+      "ref": "EMU56",
+      "name": "EMU56",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU57",
+      "ref": "EMU57",
+      "name": "EMU57",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU58",
+      "ref": "EMU58",
+      "name": "EMU58",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU59",
+      "ref": "EMU59",
+      "name": "EMU59",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU60",
+      "ref": "EMU60",
+      "name": "EMU60",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU61",
+      "ref": "EMU61",
+      "name": "EMU61",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU62",
+      "ref": "EMU62",
+      "name": "EMU62",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU63",
+      "ref": "EMU63",
+      "name": "EMU63",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU64",
+      "ref": "EMU64",
+      "name": "EMU64",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU65",
+      "ref": "EMU65",
+      "name": "EMU65",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU66",
+      "ref": "EMU66",
+      "name": "EMU66",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU67",
+      "ref": "EMU67",
+      "name": "EMU67",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU68",
+      "ref": "EMU68",
+      "name": "EMU68",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU69",
+      "ref": "EMU69",
+      "name": "EMU69",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU70",
+      "ref": "EMU70",
+      "name": "EMU70",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU71",
+      "ref": "EMU71",
+      "name": "EMU71",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU72",
+      "ref": "EMU72",
+      "name": "EMU72",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU73",
+      "ref": "EMU73",
+      "name": "EMU73",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU74",
+      "ref": "EMU74",
+      "name": "EMU74",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU75",
+      "ref": "EMU75",
+      "name": "EMU75",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU76",
+      "ref": "EMU76",
+      "name": "EMU76",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU77",
+      "ref": "EMU77",
+      "name": "EMU77",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU78",
+      "ref": "EMU78",
+      "name": "EMU78",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU79",
+      "ref": "EMU79",
+      "name": "EMU79",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU80",
+      "ref": "EMU80",
+      "name": "EMU80",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU81",
+      "ref": "EMU81",
+      "name": "EMU81",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU82",
+      "ref": "EMU82",
+      "name": "EMU82",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU83",
+      "ref": "EMU83",
+      "name": "EMU83",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU84",
+      "ref": "EMU84",
+      "name": "EMU84",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU85",
+      "ref": "EMU85",
+      "name": "EMU85",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU86",
+      "ref": "EMU86",
+      "name": "EMU86",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU87",
+      "ref": "EMU87",
+      "name": "EMU87",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU88",
+      "ref": "EMU88",
+      "name": "EMU88",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU89",
+      "ref": "EMU89",
+      "name": "EMU89",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU90",
+      "ref": "EMU90",
+      "name": "EMU90",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU91",
+      "ref": "EMU91",
+      "name": "EMU91",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU92",
+      "ref": "EMU92",
+      "name": "EMU92",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU93",
+      "ref": "EMU93",
+      "name": "EMU93",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU94",
+      "ref": "EMU94",
+      "name": "EMU94",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU95",
+      "ref": "EMU95",
+      "name": "EMU95",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU96",
+      "ref": "EMU96",
+      "name": "EMU96",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU97",
+      "ref": "EMU97",
+      "name": "EMU97",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU98",
+      "ref": "EMU98",
+      "name": "EMU98",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU99",
+      "ref": "EMU99",
+      "name": "EMU99",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "EMU100",
+      "ref": "EMU100",
+      "name": "EMU100",
+      "description": "EMU是否启用0=》不启用；1=》启用; 2=》启用但设备连接异常",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    }
+  ]
+}

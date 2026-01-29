@@ -1,0 +1,348 @@
+using NModbus;
+using NModbus.Device;
+using NModbus.IO;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using log4net;
+using NModbus.Data;
+using System.Threading;
+
+namespace IEC61850_simulatorServer2
+{
+    /// <summary>
+    /// Modbus Slave
+    /// </summary>
+    public class ModbusSlave
+    {
+        #region Const
+        private const int ADDRESS_LENGTH = 16;
+        private const int BYTE_LENGTH = 8;
+        private const int CTRLFUNCTIONCODE = 6;
+        #endregion
+
+        #region ReadOnly
+        private readonly MapEntry[]? rackPointMap;
+        private readonly MapEntry[] pointMap;
+        protected readonly CommunicatorBase communicator;
+        protected readonly DeviceInfoDto deviceInfoDto;
+        #endregion
+
+        protected IModbusSlaveNetwork? modbusSlaveNetwork;
+        private Dictionary<int, int> CtrlContinuerAddressGroup; // function code -> 6
+        private Dictionary<int, int>? CtrlContinuerAddressGroupForRack; // function code -> 6
+        ILog log = LogManager.GetLogger(typeof(ModbusSlave));
+        public ModbusSlave(DeviceInfoDto deviceInfoDto, List<MapEntry[]> pointMaps, CommunicatorBase communicator, int rackCount = 0)
+        {
+            this.communicator = communicator;
+            this.deviceInfoDto = deviceInfoDto;
+
+            pointMap = pointMaps[0];
+            CtrlContinuerAddressGroup = CalcContinuerAddress(pointMap);
+            if (rackCount > 0)
+            {
+                rackPointMap = pointMaps[1];
+                CtrlContinuerAddressGroupForRack = CalcContinuerAddress(rackPointMap);
+            }
+            
+        }
+
+        private Dictionary<int, int> CalcContinuerAddress(MapEntry[] pointMap)
+        {
+            Dictionary<int, int> addressLengthGroup = new Dictionary<int, int>();
+            var filtered = pointMap.Where(p => p.FunctionCode == 6).ToArray();
+            var continuerAddressGroup = filtered.OrderBy(p => p.Address).ToArray();
+            int currentSpanLength = 0; // 当前连续段累计的寄存器长度
+            int currentSpanItemCount = 0; // 当前连续段包含的点表条目数，因为有可能存在地址重复的点表条目或者是Size>ADDRESS_LENGTH的点表条目
+            for (int i = 0; i < continuerAddressGroup.Length; i++)
+            {
+                currentSpanItemCount++;
+                int addressNum = continuerAddressGroup[i].Size / ADDRESS_LENGTH;
+                if (addressNum == 0) addressNum = 1;
+                if (i <= 0 || continuerAddressGroup[i].Address != continuerAddressGroup[i - 1].Address)
+                {
+                    currentSpanLength += addressNum;
+                }
+
+                if (currentSpanLength < 120)
+                {
+                    if (i + 1 < continuerAddressGroup.Length)
+                    {
+                        if (continuerAddressGroup[i].Address + addressNum == continuerAddressGroup[i + 1].Address
+                        || continuerAddressGroup[i].Address == continuerAddressGroup[i + 1].Address)
+                        {
+                            continue;
+                        }
+                    }
+                }
+
+                var groupStartAddr = continuerAddressGroup[i + 1 - currentSpanItemCount].Address;
+                addressLengthGroup.Add(groupStartAddr, currentSpanLength);
+                currentSpanLength = 0;
+                currentSpanItemCount = 0;
+            }
+            return addressLengthGroup;
+        }
+
+        public virtual void DeviceConnect()
+        {
+            if (communicator is not null)
+                communicator.Connect();
+
+        }
+
+        public virtual void DeviceDisconnect()
+        {
+            if (communicator is not null)
+                communicator.Disconnect();
+        }
+
+        public virtual bool GetCommunicatorState()
+        {
+            return communicator.GetCommunicatorStatus() != 0;
+        }
+
+        // 优化读取方法，只读取外部能够修改的部分，也就是function code为3的
+        public Dictionary<string, object>? Read(byte slaveId = 1)
+        {
+            // 如果slaveid为1，则读取的是pointMap，否则读取rackPointMap
+            var pointMapToUse = slaveId == 1 ? pointMap : rackPointMap;
+            var ctrlContinuerAddressGroup = slaveId == 1 ? CtrlContinuerAddressGroup : CtrlContinuerAddressGroupForRack;
+
+            if (pointMapToUse == null || ctrlContinuerAddressGroup == null)
+            {
+                log.Error("Modbus Slave 读取数据失败，点表或连续地址段为空");
+                return null;
+            }
+
+            Dictionary<string, object> propertyDataGroup = new Dictionary<string, object>();
+            foreach (var continuerAddress in ctrlContinuerAddressGroup)
+            {
+                // 预筛功能码，避免内层重复 LINQ 分配
+                var candidates = pointMapToUse.Where(p => p.FunctionCode == CTRLFUNCTIONCODE).ToArray();
+                List<byte[]> data = ReadFunc((ushort)continuerAddress.Key, (ushort)continuerAddress.Value, CTRLFUNCTIONCODE, slaveId);
+                for (int i = 0; i < continuerAddress.Value; i++)
+                {
+                    byte[] bytes = data[i];
+                    var absoluteAddr = i + continuerAddress.Key;
+                    foreach (var entry in candidates)
+                    {
+                        if (!(entry.Address <= absoluteAddr && absoluteAddr < entry.Address + (entry.Size / ADDRESS_LENGTH == 0 ? 1 : entry.Size / ADDRESS_LENGTH))) continue;
+
+                        string? paramName = entry.ParamName;
+                        if (paramName == null) continue;
+                        if (propertyDataGroup.TryGetValue(paramName, out var existing))
+                        {
+                            var propertyData = (existing as byte[])!.ToList();
+                            propertyData.AddRange(bytes);
+                            propertyDataGroup[paramName] = propertyData.ToArray();
+                        }
+                        else
+                        {
+                            propertyDataGroup.Add(paramName, bytes);
+                        }
+                    }
+                }
+            }
+            return propertyDataGroup;
+        }
+
+        public byte[] Read(string paramName)
+        {
+            // 如果slaveid为1，则读取的是pointMap，否则读取rackPointMap
+            var pointMapToUse = pointMap;
+            if (pointMapToUse == null || paramName == null)
+            {
+                log.Error("Modbus Slave 读取数据失败，点表或连续地址段为空");
+                return null;
+            }
+            var entry = pointMapToUse.Where(p => p.ParamName == paramName).FirstOrDefault();
+            if (entry == null) return null;
+            // 预筛功能码，避免内层重复 LINQ 分配
+            List<byte[]> data = ReadFunc((ushort)entry.Address, 1, entry.FunctionCode, 1);
+            return data[0];
+        }
+
+        public bool Write(Dictionary<string, object> data, byte slaveId = 1)
+        {
+            // 如果slaveid为1，则写入的是pointMap，否则写入rackPointMap
+            var pointMapToUse = slaveId == 1 ? pointMap : rackPointMap;
+            if (pointMapToUse == null)
+            {
+                log.Error("Modbus Slave 写入数据失败，点表为空");
+                return false;
+            }
+            // 完成slave的自我数据写入
+            object actualValue = 0;
+            byte[] actualValArrary;
+            foreach (var item in data)
+            {
+                var pm = pointMapToUse.Where(p => p.ParamName == item.Key);
+                if (pm == null || pm.Count() == 0) continue;
+                var functionCode = pm.First().FunctionCode;
+                var currentAddress = pm.First().Address;
+                string? typeofPoint = null;
+                if (pm.First().Type == "int32")
+                {
+                    typeofPoint = "System.Int32";
+                }
+                else if (pm.First().Type == "u32")
+                {
+                    typeofPoint = "System.UInt32";
+                }
+                else if (pm.First().Type == "u16")
+                {
+                    typeofPoint = "System.UInt16";
+                }
+                else if (pm.First().Type == "int16")
+                {
+                    typeofPoint = "System.Int16";
+                }
+                if (typeofPoint == null)
+                {
+                    throw new Exception("数据类型未NULL");
+                }
+
+                actualValue = item.Value;
+
+                // 如果映射表中有 Scale 配置，则对数值进行放大/缩放后再转换为字节
+                var scale = pm.First().Scale;
+                object valueToConvert = actualValue;
+                try
+                {
+                    var d = Convert.ToSingle(actualValue) * scale; // 按 Scale 放大
+                    // 根据目标类型选用合适的数值类型传入 DataUnTranslation
+                    if (typeofPoint == "System.Int16")
+                    {
+                        valueToConvert = Convert.ToInt16(Math.Round(d));
+                    }
+                    else if (typeofPoint == "System.UInt16")
+                    {
+                        valueToConvert = Convert.ToUInt16(Math.Round(d));
+                    }
+                    else if (typeofPoint == "System.Int32")
+                    {
+                        valueToConvert = Convert.ToInt32(Math.Round(d));
+                    }
+                    else if (typeofPoint == "System.UInt32")
+                    {
+                        valueToConvert = Convert.ToUInt32(Math.Round(d));
+                    }
+                    else
+                    {
+                        valueToConvert = d;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.Warn($"Scale apply failed for {pm.First().ParamName}: {ex}");
+                    valueToConvert = actualValue;
+                }
+
+                actualValArrary = Common.DataUnTranslation(valueToConvert, typeofPoint);
+                //3、根据点表的定义字节顺序，排列字节数组
+                // 增加校验逻辑，当数组长度为4的时候才需要排序
+                byte[] itemdata;
+                if (actualValArrary.Length == 4)
+                {
+                    string dataOrder = "CDAB";
+                    itemdata = Common.ConverByteOrder(actualValArrary, dataOrder);
+                }
+                else
+                {
+                    string dataOrder = "AB";
+                    itemdata = Common.ConverByteOrder(actualValArrary, dataOrder);
+                }
+                WriteFunc(slaveId, (ushort)currentAddress, itemdata, itemdata.Length, functionCode);
+            }
+            return true;
+        }
+
+        private void WriteFunc(byte slaveId, ushort address, byte[] data, int num, int functionCode)
+        {
+            try
+            {
+                var modbusSlave = modbusSlaveNetwork?.GetSlave(slaveId);
+                if (functionCode == 1)
+                {
+                    bool[] values = new bool[data.Length];
+                    foreach (var item in data)
+                    {
+                        bool value = item == 1;
+                        values.Append(value);
+                    }
+                    modbusSlave?.DataStore.CoilDiscretes.WritePoints(address, values);
+                }
+                else if (functionCode == 2)
+                {
+                    bool[] values = new bool[data.Length];
+                    foreach (var item in data)
+                    {
+                        bool value = item == 1;
+                        values.Append(value);
+                    }
+                    modbusSlave?.DataStore.CoilInputs.WritePoints(address, values);
+                }
+                else if (functionCode == 3)
+                {
+                    var usdata = Common.ConvertBytesToUShorts(data);
+                    modbusSlave?.DataStore.HoldingRegisters.WritePoints(address, usdata);
+                }
+                else if (functionCode == 4)
+                {
+                    var usdata = Common.ConvertBytesToUShorts(data);
+                    modbusSlave?.DataStore.InputRegisters.WritePoints(address, usdata);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error("往设备" + deviceInfoDto.name + "写入数据失败,地址为" + address + "数据为" + data + "错误原因：" + ex.ToString());
+            }
+        }
+
+        private List<byte[]> ReadFunc(ushort address, ushort num, int functionCode, byte slaveId)
+        {
+            // if (functionCode != CTRLFUNCTIONCODE)
+            // {
+            //     throw new Exception("只支持读取功能码为6的寄存器");
+            // }
+            if (modbusSlaveNetwork == null) throw new Exception("modbusMaster is null");
+            var modbusSlave = modbusSlaveNetwork.GetSlave(slaveId);
+            List<ushort> ushorts = new List<ushort>();
+            ushort currentAddress = address;
+
+            while (num > 0)
+            {
+                ushort[] data;
+                ushort groupCount = Math.Min(num, (ushort)120);
+                if (functionCode == 3 || functionCode == CTRLFUNCTIONCODE)
+                {
+                    data = modbusSlave.DataStore.HoldingRegisters.ReadPoints(currentAddress, groupCount);
+                    ushorts.AddRange(data);
+                }
+                else if (functionCode == 4)
+                {
+                    data = modbusSlave.DataStore.InputRegisters.ReadPoints(currentAddress, groupCount);
+                    ushorts.AddRange(data);
+                }
+                else
+                {
+                    data = new ushort[0];
+                }
+                ushorts.AddRange(data);
+                currentAddress += groupCount;
+                num -= groupCount;
+            }
+
+            List<byte[]> ret = new List<byte[]>(ushorts.Count);
+            for (int i = 0; i < ushorts.Count; i++)
+            {
+                var objs = BitConverter.GetBytes(ushorts[i]);
+                ret.Add(objs);
+            }
+            return ret;
+        }
+    }
+}

@@ -1,0 +1,115 @@
+{
+  "schema": "v1.0",
+  "profile": {
+    "productKey": "3",
+    "description": "温湿度变送器",
+    "protocolType": "Test"
+  },
+  "properties": [
+    {
+      "identifier": "deviceId",
+      "ref": "deviceId",
+      "name": "deviceId",
+      "description": "设备id",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "0",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "siteId",
+      "ref": "siteId",
+      "name": "siteId",
+      "description": "站点id",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "0",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "stationId",
+      "ref": "stationId",
+      "name": "stationId",
+      "description": "电站id",
+      "access": "r",
+      "dataType": "int",
+      "defaultValue": "0",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "humidity",
+      "ref": "humidity",
+      "name": "humidity",
+      "description": "湿度实时值",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "temperature",
+      "ref": "temperature",
+      "name": "temperature",
+      "description": "温度实时值",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "humidityCalibrationValue",
+      "ref": "humidityCalibrationValue",
+      "name": "humidityCalibrationValue",
+      "description": "湿度校准值",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    },
+    {
+      "identifier": "temperatureCalibrationValue",
+      "ref": "temperatureCalibrationValue",
+      "name": "temperatureCalibrationValue",
+      "description": "温度校准值",
+      "access": "r",
+      "dataType": "double",
+      "defaultValue": "",
+      "level": 2,
+      "specs": {
+        "unit": "",
+        "min": "",
+        "max": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "IEC61850-simulatorServer2": {
+      "commandName": "Project",
+      "commandLineArgs": "--iedmode1 ./iedmodel/emumodel.cfg\r\n--simmodefile1 ./PointMap/CSV/bigEss/emu.csv\r\n--iedmode2 ./iedmodel/bmsmodel.cfg\r\n--simmodefile2 ./PointMap/CSV/bigEss/bms.csv\r\n--simmodefile21 ./PointMap/CSV/bigEss/bms1.csv\r\n--iedmode3 ./iedmodel/PCS005model.cfg\r\n--simmodefile3 ./PointMap/CSV/bigEss/pcsgoose1.csv\r\n--iedmode4 ./iedmodel/PCS006model.cfg\r\n--simmodefile4 ./PointMap/CSV/bigEss/pcsgoose2.csv\r\n--gooseIf 3\r\n--nogui true\r\n--esscount 1\r\n--essstartport 5600"
+    }
+  }
+}

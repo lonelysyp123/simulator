@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "dgSpecHash": "g32JXumTxwkYLadYfk/bhKi9gFaHL7JOioc23VdxrxEFgSeCjgamzTDphA+jNBc8l3sUyHoQzPfNk4EUjJQjhQ==",
+  "success": true,
+  "projectFilePath": "/Users/songyinpei/jobs/IEC61850-simulatorServer2/IEC61850-simulatorServer2.csproj",
+  "expectedPackageFiles": [
+    "/Users/songyinpei/.nuget/packages/csvhelper/32.0.0/csvhelper.32.0.0.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/log4net/2.0.17/log4net.2.0.17.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/microsoft.netcore.platforms/2.0.0/microsoft.netcore.platforms.2.0.0.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/nmodbus/3.0.81/nmodbus.3.0.81.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/spectre.console/0.47.0/spectre.console.0.47.0.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/system.configuration.configurationmanager/4.5.0/system.configuration.configurationmanager.4.5.0.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/system.memory/4.5.5/system.memory.4.5.5.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/system.security.accesscontrol/4.5.0/system.security.accesscontrol.4.5.0.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/system.security.cryptography.protecteddata/4.5.0/system.security.cryptography.protecteddata.4.5.0.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/system.security.permissions/4.5.0/system.security.permissions.4.5.0.nupkg.sha512",
+    "/Users/songyinpei/.nuget/packages/system.security.principal.windows/4.5.0/system.security.principal.windows.4.5.0.nupkg.sha512"
+  ],
+  "logs": []
+}

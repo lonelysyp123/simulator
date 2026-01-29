@@ -1,0 +1,22 @@
+{
+  "schema": "v1.0",
+  "profile": {
+    "productKey": "100",
+    "description": "EMS",
+    "protocolType": "Test"
+  },
+  "properties": [
+    {
+      "identifier": "FaultAlarmDialog",
+      "ref": [ "*.*Alarm", "*.*Fault" ],
+      "name": "FaultLog",
+      "description": "故障告警日志",
+      "access": "x",
+      "dataType": "FaultAlarmDialogEntity",
+      "defaultValue": "",
+      "level": 1,
+      "specs": {       
+      }
+    }
+  ]
+}

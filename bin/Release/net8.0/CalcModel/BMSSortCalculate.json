@@ -1,0 +1,22 @@
+{
+  "schema": "v1.0",
+  "profile": {
+    "productKey": "100",
+    "description": "EMS",
+    "protocolType": "Test"
+  },
+  "properties": [
+    {
+      "identifier": "BMSDataSort",
+      "ref": [ "singleSOH","singleVol","singleTemp","singleSOC"],
+      "name": "BMSDataSort",
+      "description": "BMS数据分类",
+      "access": "x",
+      "dataType": "",
+      "defaultValue": "399",
+      "level": 1,
+      "specs": {
+      }
+    }
+  ]
+}

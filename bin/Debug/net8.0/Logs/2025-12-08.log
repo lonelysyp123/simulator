@@ -1,0 +1,810 @@
+
+2025-12-08 14:11:15,598 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-08 14:11:18,032 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [146] - Device Connected, DeviceName : simBms 
+
+2025-12-08 14:11:18,033 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [249] - Started worker for modelType=4, count=7689 
+
+2025-12-08 14:11:18,034 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - All modelType workers started. 
+
+2025-12-08 14:11:18,035 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [285] - Worker 4 loop running with 7689 entries. 
+
+2025-12-08 14:11:18,035 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [166] - Control thread started. 
+
+2025-12-08 14:11:20,048 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [146] - Device Connected, DeviceName : simEmu 
+
+2025-12-08 14:11:20,050 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [249] - Started worker for modelType=4, count=105 
+
+2025-12-08 14:11:20,054 [8] INFO  IEC61850_simulatorServer2.ModbusSimServer [285] - Worker 4 loop running with 105 entries. 
+
+2025-12-08 14:11:20,059 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [285] - Worker 2 loop running with 5 entries. 
+
+2025-12-08 14:11:20,059 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [249] - Started worker for modelType=2, count=5 
+
+2025-12-08 14:11:20,061 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - All modelType workers started. 
+
+2025-12-08 14:11:20,065 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [166] - Control thread started. 
+
+2025-12-08 14:11:20,386 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt0 数据值更新为：0 
+
+2025-12-08 14:11:20,387 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt1 数据值更新为：0 
+
+2025-12-08 14:11:20,387 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt2 数据值更新为：0 
+
+2025-12-08 14:11:20,388 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt3 数据值更新为：0 
+
+2025-12-08 14:11:20,388 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt4 数据值更新为：0 
+
+2025-12-08 14:11:20,388 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt5 数据值更新为：0 
+
+2025-12-08 14:11:20,388 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt6 数据值更新为：0 
+
+2025-12-08 14:11:20,389 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt7 数据值更新为：0 
+
+2025-12-08 14:11:20,389 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt8 数据值更新为：0 
+
+2025-12-08 14:11:20,389 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt9 数据值更新为：0 
+
+2025-12-08 14:11:20,389 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt10 数据值更新为：0 
+
+2025-12-08 14:11:20,389 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt11 数据值更新为：0 
+
+2025-12-08 14:11:20,389 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt12 数据值更新为：0 
+
+2025-12-08 14:11:20,389 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt13 数据值更新为：0 
+
+2025-12-08 14:11:20,390 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt14 数据值更新为：0 
+
+2025-12-08 14:11:20,390 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt15 数据值更新为：0 
+
+2025-12-08 14:11:20,390 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt16 数据值更新为：0 
+
+2025-12-08 14:11:20,390 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt17 数据值更新为：0 
+
+2025-12-08 14:11:20,391 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt18 数据值更新为：0 
+
+2025-12-08 14:11:20,391 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt19 数据值更新为：0 
+
+2025-12-08 14:11:20,402 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:21,218 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:22,035 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt22 数据值更新为：0 
+
+2025-12-08 14:11:22,036 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt23 数据值更新为：0 
+
+2025-12-08 14:11:22,044 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:22,903 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:23,118 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:11:23,147 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc59: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:11:23,200 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc110: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:11:23,248 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc152: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:11:23,760 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:24,569 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:25,388 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:26,205 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:27,017 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:27,830 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:28,639 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt32 数据值更新为：0 
+
+2025-12-08 14:11:28,639 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt33 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt34 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt35 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt36 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt37 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt38 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt39 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt40 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt41 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt42 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt43 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt44 数据值更新为：0 
+
+2025-12-08 14:11:28,640 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt45 数据值更新为：0 
+
+2025-12-08 14:11:28,641 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt46 数据值更新为：0 
+
+2025-12-08 14:11:28,641 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt47 数据值更新为：0 
+
+2025-12-08 14:11:28,641 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt48 数据值更新为：0 
+
+2025-12-08 14:11:28,641 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt49 数据值更新为：0 
+
+2025-12-08 14:11:28,641 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt50 数据值更新为：0 
+
+2025-12-08 14:11:28,641 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt51 数据值更新为：0 
+
+2025-12-08 14:11:28,644 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:29,460 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:30,282 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:31,102 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:31,911 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:32,724 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:33,533 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:34,352 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:35,168 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:35,986 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:36,844 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:37,657 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:11:38,468 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yk01 数据值更新为：False 
+
+2025-12-08 14:11:38,469 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yk02 数据值更新为：False 
+
+2025-12-08 14:12:44,647 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-08 14:12:47,094 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [146] - Device Connected, DeviceName : simBms 
+
+2025-12-08 14:12:47,096 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [249] - Started worker for modelType=4, count=7689 
+
+2025-12-08 14:12:47,097 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - All modelType workers started. 
+
+2025-12-08 14:12:47,099 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [285] - Worker 4 loop running with 7689 entries. 
+
+2025-12-08 14:12:47,099 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [166] - Control thread started. 
+
+2025-12-08 14:12:49,106 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [146] - Device Connected, DeviceName : simEmu 
+
+2025-12-08 14:12:49,107 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [249] - Started worker for modelType=4, count=105 
+
+2025-12-08 14:12:49,108 [8] INFO  IEC61850_simulatorServer2.ModbusSimServer [285] - Worker 4 loop running with 105 entries. 
+
+2025-12-08 14:12:49,108 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [249] - Started worker for modelType=2, count=5 
+
+2025-12-08 14:12:49,110 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - All modelType workers started. 
+
+2025-12-08 14:12:49,110 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [285] - Worker 2 loop running with 5 entries. 
+
+2025-12-08 14:12:49,111 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [166] - Control thread started. 
+
+2025-12-08 14:12:49,427 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt0 数据值更新为：0 
+
+2025-12-08 14:12:49,428 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt1 数据值更新为：0 
+
+2025-12-08 14:12:49,428 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt2 数据值更新为：0 
+
+2025-12-08 14:12:49,428 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt3 数据值更新为：0 
+
+2025-12-08 14:12:49,428 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt4 数据值更新为：0 
+
+2025-12-08 14:12:49,429 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt5 数据值更新为：0 
+
+2025-12-08 14:12:49,429 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt6 数据值更新为：0 
+
+2025-12-08 14:12:49,429 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt7 数据值更新为：0 
+
+2025-12-08 14:12:49,429 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt8 数据值更新为：0 
+
+2025-12-08 14:12:49,429 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt9 数据值更新为：0 
+
+2025-12-08 14:12:49,429 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt10 数据值更新为：0 
+
+2025-12-08 14:12:49,429 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt11 数据值更新为：0 
+
+2025-12-08 14:12:49,430 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt12 数据值更新为：0 
+
+2025-12-08 14:12:49,430 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt13 数据值更新为：0 
+
+2025-12-08 14:12:49,430 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt14 数据值更新为：0 
+
+2025-12-08 14:12:49,430 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt15 数据值更新为：0 
+
+2025-12-08 14:12:49,430 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt16 数据值更新为：0 
+
+2025-12-08 14:12:49,430 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt17 数据值更新为：0 
+
+2025-12-08 14:12:49,430 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt18 数据值更新为：0 
+
+2025-12-08 14:12:49,430 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt19 数据值更新为：0 
+
+2025-12-08 14:12:49,441 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:50,255 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:51,068 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt22 数据值更新为：0 
+
+2025-12-08 14:12:51,069 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt23 数据值更新为：0 
+
+2025-12-08 14:12:51,075 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:51,929 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:52,169 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:12:52,223 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc59: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:12:52,272 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc110: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:12:52,322 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc152: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:12:52,786 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:53,594 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:54,412 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:55,224 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:56,034 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:56,843 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:57,652 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt32 数据值更新为：0 
+
+2025-12-08 14:12:57,652 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt33 数据值更新为：0 
+
+2025-12-08 14:12:57,652 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt34 数据值更新为：0 
+
+2025-12-08 14:12:57,652 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt35 数据值更新为：0 
+
+2025-12-08 14:12:57,652 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt36 数据值更新为：0 
+
+2025-12-08 14:12:57,652 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt37 数据值更新为：0 
+
+2025-12-08 14:12:57,652 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt38 数据值更新为：0 
+
+2025-12-08 14:12:57,652 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt39 数据值更新为：0 
+
+2025-12-08 14:12:57,652 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt40 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt41 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt42 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt43 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt44 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt45 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt46 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt47 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt48 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt49 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt50 数据值更新为：0 
+
+2025-12-08 14:12:57,653 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt51 数据值更新为：0 
+
+2025-12-08 14:12:57,656 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:58,471 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:12:59,291 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:00,110 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:00,969 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:01,780 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:02,594 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:03,409 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:04,227 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:05,042 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:05,874 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:06,688 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:13:07,498 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yk01 数据值更新为：False 
+
+2025-12-08 14:13:07,499 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yk02 数据值更新为：False 
+
+2025-12-08 14:13:14,192 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:13:14,202 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc59: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:17:42,678 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-08 14:17:45,095 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [146] - Device Connected, DeviceName : simBms 
+
+2025-12-08 14:17:45,095 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [249] - Started worker for modelType=4, count=7689 
+
+2025-12-08 14:17:45,097 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - All modelType workers started. 
+
+2025-12-08 14:17:45,098 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [285] - Worker 4 loop running with 7689 entries. 
+
+2025-12-08 14:17:45,098 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [166] - Control thread started. 
+
+2025-12-08 14:17:47,110 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [146] - Device Connected, DeviceName : simEmu 
+
+2025-12-08 14:17:47,111 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [249] - Started worker for modelType=4, count=105 
+
+2025-12-08 14:17:47,113 [8] INFO  IEC61850_simulatorServer2.ModbusSimServer [285] - Worker 4 loop running with 105 entries. 
+
+2025-12-08 14:17:47,115 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [285] - Worker 2 loop running with 5 entries. 
+
+2025-12-08 14:17:47,113 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [249] - Started worker for modelType=2, count=5 
+
+2025-12-08 14:17:47,116 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - All modelType workers started. 
+
+2025-12-08 14:17:47,118 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [166] - Control thread started. 
+
+2025-12-08 14:17:47,435 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt0 数据值更新为：0 
+
+2025-12-08 14:17:47,435 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt1 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt2 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt3 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt4 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt5 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt6 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt7 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt8 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt9 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt10 数据值更新为：0 
+
+2025-12-08 14:17:47,436 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt11 数据值更新为：0 
+
+2025-12-08 14:17:47,437 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt12 数据值更新为：0 
+
+2025-12-08 14:17:47,437 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt13 数据值更新为：0 
+
+2025-12-08 14:17:47,437 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt14 数据值更新为：0 
+
+2025-12-08 14:17:47,437 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt15 数据值更新为：0 
+
+2025-12-08 14:17:47,437 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt16 数据值更新为：0 
+
+2025-12-08 14:17:47,437 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt17 数据值更新为：0 
+
+2025-12-08 14:17:47,437 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt18 数据值更新为：0 
+
+2025-12-08 14:17:47,437 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt19 数据值更新为：0 
+
+2025-12-08 14:17:47,446 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:48,271 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:49,082 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt22 数据值更新为：0 
+
+2025-12-08 14:17:49,083 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt23 数据值更新为：0 
+
+2025-12-08 14:17:49,088 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:49,946 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:50,176 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:17:50,229 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc59: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:17:50,278 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc110: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:17:50,327 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc152: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:17:50,778 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:51,627 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:52,450 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:53,266 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:54,075 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:54,885 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:55,697 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt32 数据值更新为：0 
+
+2025-12-08 14:17:55,697 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt33 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt34 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt35 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt36 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt37 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt38 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt39 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt40 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt41 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt42 数据值更新为：0 
+
+2025-12-08 14:17:55,698 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt43 数据值更新为：0 
+
+2025-12-08 14:17:55,699 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt44 数据值更新为：0 
+
+2025-12-08 14:17:55,699 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt45 数据值更新为：0 
+
+2025-12-08 14:17:55,699 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt46 数据值更新为：0 
+
+2025-12-08 14:17:55,699 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt47 数据值更新为：0 
+
+2025-12-08 14:17:55,699 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt48 数据值更新为：0 
+
+2025-12-08 14:17:55,699 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt49 数据值更新为：0 
+
+2025-12-08 14:17:55,699 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt50 数据值更新为：0 
+
+2025-12-08 14:17:55,699 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yt51 数据值更新为：0 
+
+2025-12-08 14:17:55,702 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:56,512 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:57,327 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:58,149 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:59,003 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:17:59,817 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:18:00,635 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:18:01,456 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:18:02,277 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:18:03,096 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:18:03,954 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:18:04,765 [10] ERROR IEC61850_simulatorServer2.ModbusSimServer [221] - Control thread error 
+System.NullReferenceException: Object reference not set to an instance of an object.
+   at IEC61850_simulatorServer2.SimServer.SetExtIfVariableVal(String arg1, Object ctlVal) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 260
+   at IEC61850_simulatorServer2.ModbusSimServer.SetDataObjectByMesurePointName(String mesurePointName, Object value) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 569
+   at IEC61850_simulatorServer2.ModbusSimServer.<StartControlThread>b__22_0() in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 221
+
+2025-12-08 14:18:05,577 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yk01 数据值更新为：False 
+
+2025-12-08 14:18:05,578 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [570] - yk02 数据值更新为：False 
+
+2025-12-08 14:18:37,838 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:18:37,898 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc59: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:20:41,124 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-08 14:20:41,177 [8] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc59: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 

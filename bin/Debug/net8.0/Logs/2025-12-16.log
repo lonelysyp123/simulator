@@ -1,0 +1,440 @@
+
+2025-12-16 08:34:33,159 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 08:34:35,822 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 08:34:35,823 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 08:34:35,850 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 08:34:35,850 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 08:34:35,873 [8] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 08:34:37,918 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 08:34:37,918 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 08:34:37,919 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 08:34:37,919 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 08:34:37,944 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 08:34:37,944 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 08:34:37,970 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 08:34:40,982 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 08:37:26,178 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 08:37:28,768 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 08:37:28,768 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 08:37:28,794 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 08:37:28,796 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 08:37:28,796 [8] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 08:37:30,838 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 08:37:30,838 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 08:37:30,839 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 08:37:30,839 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 08:37:30,866 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 08:37:30,865 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 08:37:30,892 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 08:37:33,919 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 09:10:47,173 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 09:10:49,568 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 09:10:49,569 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 09:10:49,570 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:10:49,571 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 09:10:49,572 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:10:51,584 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 09:10:51,586 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 09:10:51,609 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 09:10:51,609 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 09:10:51,612 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:10:51,611 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 09:10:51,614 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:10:54,670 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 09:12:50,386 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 09:12:52,806 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 09:12:52,807 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 09:12:52,808 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:12:52,809 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 09:12:52,810 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:12:54,824 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 09:12:54,826 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 09:12:54,828 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 09:12:54,831 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 09:12:54,834 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:12:54,833 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 09:12:54,836 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:12:57,890 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 09:29:03,179 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 09:29:05,623 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 09:29:05,624 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 09:29:05,625 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:29:05,627 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 09:29:05,627 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:29:07,640 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 09:29:07,641 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 09:29:07,665 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 09:29:07,668 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 09:29:07,670 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:29:07,668 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 09:29:07,674 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:29:10,728 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 09:32:16,077 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 09:32:18,457 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 09:32:18,457 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 09:32:18,458 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:32:18,460 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 09:32:18,460 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:32:20,470 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 09:32:20,471 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 09:32:20,472 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 09:32:20,472 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 09:32:20,473 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:32:20,473 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 09:32:20,474 [12] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:32:23,534 [10] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 09:38:51,457 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 09:38:53,899 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 09:38:53,900 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 09:38:53,901 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:38:53,903 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 09:38:53,903 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:38:55,912 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 09:38:55,913 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 09:38:55,913 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 09:38:55,914 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 09:38:55,915 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 09:38:55,915 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 09:38:55,916 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 09:38:59,001 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 13:31:01,894 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 13:31:04,341 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 13:31:04,342 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 13:31:04,343 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 13:31:04,345 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 13:31:04,345 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 13:31:06,358 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 13:31:06,361 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 13:31:06,363 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 13:31:06,364 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 13:31:06,391 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 13:31:06,390 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 13:31:06,393 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 13:31:09,425 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 13:35:19,019 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 13:35:21,392 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 13:35:21,392 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 13:35:21,418 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 13:35:21,420 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 13:35:21,420 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 13:35:23,436 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 13:35:23,438 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 13:35:23,464 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 13:35:23,465 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 13:35:23,487 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 13:35:23,486 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 13:35:23,489 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 13:35:25,625 [6] ERROR IEC61850_simulatorServer2.ModbusSimServer [352] - Worker 4 loop error 
+System.InvalidOperationException: Collection was modified; enumeration operation may not execute.
+   at System.Collections.Generic.Dictionary`2.KeyCollection.Enumerator.MoveNext()
+   at IEC61850_simulatorServer2.EssSimModelApi.ObjectPathResolver.GetDictionaryValue(Object target, String key) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/EssSimModelApi/ObjectPathResolver.cs:line 273
+   at IEC61850_simulatorServer2.EssSimModelApi.ObjectPathResolver.GetIndexedPropertyValue(Object target, String propName, Int32 index) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/EssSimModelApi/ObjectPathResolver.cs:line 92
+   at IEC61850_simulatorServer2.EssSimModelApi.ObjectPathResolver.GetValue(Object target, String path) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/EssSimModelApi/ObjectPathResolver.cs:line 54
+   at IEC61850_simulatorServer2.SimServer.GetExtIfVariableVal(String arg1) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 254
+   at IEC61850_simulatorServer2.ModbusSimServer.GetModelValueStub(MapEntry entry) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 462
+   at IEC61850_simulatorServer2.ModbusSimServer.ModelWorkerLoop(String modelType, List`1 entries) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 352
+
+2025-12-16 13:35:26,538 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 13:41:59,417 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 13:42:01,763 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 13:42:01,763 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 13:42:01,764 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 13:42:01,766 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 13:42:01,766 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 13:42:03,776 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 13:42:03,777 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 13:42:03,779 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 13:42:03,805 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 13:42:03,779 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 13:42:03,806 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 13:42:03,808 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 13:42:06,864 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 14:08:54,202 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 14:08:56,579 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 14:08:56,580 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 14:08:56,581 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 14:08:56,582 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 14:08:56,583 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 14:08:58,592 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 14:08:58,593 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 14:08:58,616 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 14:08:58,617 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 14:08:58,643 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 14:08:58,642 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 14:08:58,644 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 14:09:01,678 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 14:09:31,454 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 14:09:33,854 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 14:09:33,855 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 14:09:33,856 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 14:09:33,857 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 14:09:33,858 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 14:09:35,870 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 14:09:35,871 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 14:09:35,875 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 14:09:35,879 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 14:09:35,878 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 14:09:35,880 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 14:09:35,885 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 14:09:38,939 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 14:10:09,409 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 14:10:11,862 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 14:10:11,863 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 14:10:11,864 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 14:10:11,865 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 14:10:11,866 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 14:10:13,879 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 14:10:13,881 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 14:10:13,907 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 14:10:13,908 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 14:10:13,913 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 14:10:13,914 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 14:10:13,920 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 14:10:16,963 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 
+
+2025-12-16 14:12:33,985 [1] INFO  IEC61850_simulatorServer2.MainClass [37] - [Program] 应用启动，log4net 配置已尝试加载 
+
+2025-12-16 14:12:39,806 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simBms 
+
+2025-12-16 14:12:39,807 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=7689 
+
+2025-12-16 14:12:39,808 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 14:12:39,809 [6] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 7689 entries. 
+
+2025-12-16 14:12:39,809 [7] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 14:12:41,821 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [147] - Device Connected, DeviceName : simEm 
+
+2025-12-16 14:12:41,822 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=4, count=19 
+
+2025-12-16 14:12:41,849 [9] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 4 loop running with 19 entries. 
+
+2025-12-16 14:12:41,849 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [251] - Started worker for modelType=2, count=3 
+
+2025-12-16 14:12:41,878 [1] INFO  IEC61850_simulatorServer2.ModbusSimServer [253] - All modelType workers started. 
+
+2025-12-16 14:12:41,877 [10] INFO  IEC61850_simulatorServer2.ModbusSimServer [283] - Worker 2 loop running with 3 entries. 
+
+2025-12-16 14:12:41,880 [11] INFO  IEC61850_simulatorServer2.ModbusSimServer [168] - Control thread started. 
+
+2025-12-16 14:12:44,038 [6] ERROR IEC61850_simulatorServer2.ModbusSimServer [352] - Worker 4 loop error 
+System.InvalidOperationException: Collection was modified; enumeration operation may not execute.
+   at System.Collections.Generic.Dictionary`2.KeyCollection.Enumerator.MoveNext()
+   at IEC61850_simulatorServer2.EssSimModelApi.ObjectPathResolver.GetDictionaryValue(Object target, String key) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/EssSimModelApi/ObjectPathResolver.cs:line 273
+   at IEC61850_simulatorServer2.EssSimModelApi.ObjectPathResolver.GetIndexedPropertyValue(Object target, String propName, Int32 index) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/EssSimModelApi/ObjectPathResolver.cs:line 92
+   at IEC61850_simulatorServer2.EssSimModelApi.ObjectPathResolver.GetValue(Object target, String path) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/EssSimModelApi/ObjectPathResolver.cs:line 54
+   at IEC61850_simulatorServer2.SimServer.GetExtIfVariableVal(String arg1) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/IedSimServer.cs:line 254
+   at IEC61850_simulatorServer2.ModbusSimServer.GetModelValueStub(MapEntry entry) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 462
+   at IEC61850_simulatorServer2.ModbusSimServer.ModelWorkerLoop(String modelType, List`1 entries) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusSimServer.cs:line 352
+
+2025-12-16 14:12:44,929 [9] WARN  IEC61850_simulatorServer2.ModbusWirter [234] - Scale apply failed for yc14: System.OverflowException: Value was either too large or too small for an Int32.
+   at System.Convert.ToInt32(Double value)
+   at IEC61850_simulatorServer2.ModbusWirter.Write(Dictionary`2 data) in /Users/songyinpei/jobs/IEC61850-simulatorServer2/ModbusWirter.cs:line 234 

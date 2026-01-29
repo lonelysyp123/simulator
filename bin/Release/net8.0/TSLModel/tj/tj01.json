@@ -1,0 +1,3028 @@
+{
+  "schema": "v1.0",
+  "profile": {
+    "productKey": "3",
+    "description": "tsl",
+    "protocolType": "Test"
+  },
+    "properties": [
+        {
+            "identifier": "deviceId",
+            "ref": "deviceId",
+            "name": "deviceId",
+            "description": "设备id",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 1
+        },
+        {
+            "identifier": "siteId",
+            "ref": "siteId",
+            "name": "siteId",
+            "description": "站点id",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 1
+        },
+        {
+            "identifier": "stationId",
+            "ref": "stationId",
+            "name": "stationId",
+            "description": "电站id",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 1
+        },
+        {
+            "identifier": "errorStatus",
+            "ref": "sysErrorStatus",
+            "name": "errorStatus",
+            "description": "系统故障状态1- 故障， 0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "warningStatus",
+            "ref": "sysWarningStatus",
+            "name": "warningStatus",
+            "description": "系统告警状态1- 告警， 0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "derateStatus",
+            "ref": "sysDeratingStatus",
+            "name": "derateStatus",
+            "description": "系统降额状态1- 降额， 0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "sysBootingStatus",
+            "ref": "sysBootingStatus",
+            "name": "sysBootingStatus",
+            "description": "系统启动中状态1- 启动中， 0- 否",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "gridConnectedState",
+            "ref": "sysGridtiedStatus",
+            "name": "gridConnectedState",
+            "description": "系统并网状态1- 并网， 0- 否",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "gridDisconnectedState",
+            "ref": "sysOffgridStatus",
+            "name": "gridDisconnectedState",
+            "description": "系统离网状态1- 离网， 0- 否",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "sysFailedStatus",
+            "ref": "sysFailedStatus",
+            "name": "sysFailedStatus",
+            "description": "系统失效状态1-失效，0-正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "onOffStatus",
+            "ref": "sysONOFFStatus",
+            "name": "onOffStatus",
+            "description": "系统启停状态1- 运行， 0- 停止",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "sysStandbyStatus",
+            "ref": "sysStandbyStatus",
+            "name": "sysStandbyStatus",
+            "description": "系统待机状态1- 待机， 0- 否",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "charg",
+            "ref": "sysChargingStatus",
+            "name": "charg",
+            "description": "系统充电状态1- 充电， 0- 否",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "discharg",
+            "ref": "sysDischargingStatus",
+            "name": "discharg",
+            "description": "系统放电状态1- 放电， 0- 否",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "battCharg",
+            "ref": "sysFullyChargedStatus",
+            "name": "battCharg",
+            "description": "系统充满状态1- 是， 0- 否",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "battDischarg",
+            "ref": "sysTotallyDischargedStatus",
+            "name": "battDischarg",
+            "description": "系统放空状态1- 是， 0- 否",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "equalizationChargStatus",
+            "ref": "sysConstantVoltToppingCharging",
+            "name": "equalizationChargStatus",
+            "description": "系统均充状态1- 是， 0- 否",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "ePOFault",
+            "ref": "ePOFault",
+            "name": "ePOFault",
+            "description": "紧急停机1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "calibrationParamFault",
+            "ref": "calibrationParamFault",
+            "name": "calibrationParamFault",
+            "description": "校准参数异常1- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "samplingZeroFault",
+            "ref": "samplingZeroFault",
+            "name": "samplingZeroFault",
+            "description": "采样零点异常1- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "flashFault",
+            "ref": "flashFault",
+            "name": "flashFault",
+            "description": "Flash异常1- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dSPInitFault",
+            "ref": "dSPInitFault",
+            "name": "dSPInitFault",
+            "description": "DSP初始化异常1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "monitorInitFault",
+            "ref": "monitorInitFault",
+            "name": "monitorInitFault",
+            "description": "监控初始化异常1- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dSPVersionFault",
+            "ref": "dSPVersionFault",
+            "name": "dSPVersionFault",
+            "description": "DSP版本异常1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "cPLDVersionFault",
+            "ref": "cPLDVersionFault",
+            "name": "cPLDVersionFault",
+            "description": "CPLD版本异常1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "hardwareVersionFault",
+            "ref": "hardwareVersionFault",
+            "name": "hardwareVersionFault",
+            "description": "硬件版本异常1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "iDReduplicatedFault",
+            "ref": "iDReduplicatedFault",
+            "name": "iDReduplicatedFault",
+            "description": "重号故障1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "masterConflictFault",
+            "ref": "masterConflictFault",
+            "name": "masterConflictFault",
+            "description": "主机冲突故障1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dSPParamMismatchFault",
+            "ref": "dSPParamMismatchFault",
+            "name": "dSPParamMismatchFault",
+            "description": "DSP参数设置不匹配1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "monitorParamMismatchAlarm",
+            "ref": "monitorParamMismatchAlarm",
+            "name": "monitorParamMismatchAlarm",
+            "description": "监控参数设置不匹配1- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "drm0ShutdownFault",
+            "ref": "drm0ShutdownFault",
+            "name": "drm0ShutdownFault",
+            "description": "Drm0 关机1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "cANACommFault",
+            "ref": "cANACommFault",
+            "name": "cANACommFault",
+            "description": "CANA通信故障1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "eMSCommConnectionTimeoutFault",
+            "ref": "eMSCommConnectionTimeoutFault",
+            "name": "eMSCommConnectionTimeoutFault",
+            "description": "EMS通信连接超时1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "bMSCommConnectionTimeoutFault",
+            "ref": "bMSCommConnectionTimeoutFault",
+            "name": "bMSCommConnectionTimeoutFault",
+            "description": "BMS通信连接超时1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "gridAmmeterCommTimeoutAlarm",
+            "ref": "gridAmmeterCommTimeoutAlarm",
+            "name": "gridAmmeterCommTimeoutAlarm",
+            "description": "电网电表通信超时1- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleFanFault1",
+            "ref": "moduleFanFault1",
+            "name": "moduleFanFault1",
+            "description": "模块风扇故障11- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "auxiliaryPowerFault1",
+            "ref": "auxiliaryPowerFault1",
+            "name": "auxiliaryPowerFault1",
+            "description": "辅助电源故障11- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "auxiliaryPowerFault2",
+            "ref": "auxiliaryPowerFault2",
+            "name": "auxiliaryPowerFault2",
+            "description": "辅助电源故障21- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "auxiliaryPowerFault3",
+            "ref": "auxiliaryPowerFault3",
+            "name": "auxiliaryPowerFault3",
+            "description": "辅助电源故障31- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleOverTemper1Fault",
+            "ref": "moduleOverTemper1Fault",
+            "name": "moduleOverTemper1Fault",
+            "description": "模块过温11- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleOverTemper2Fault",
+            "ref": "moduleOverTemper2Fault",
+            "name": "moduleOverTemper2Fault",
+            "description": "模块过温21- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "ambientOvertempFault",
+            "ref": "ambientOvertempFault",
+            "name": "ambientOvertempFault",
+            "description": "环境过温故障1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "ambientOvertempDeratingAlarm",
+            "ref": "ambientOvertempDeratingAlarm",
+            "name": "ambientOvertempDeratingAlarm",
+            "description": "环境过温降额1- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "batteryUnderEnergyFault",
+            "ref": "batteryUnderEnergyFault",
+            "name": "batteryUnderEnergyFault",
+            "description": "电池电量不足1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "bmsDryContactFault",
+            "ref": "bmsDryContactFault",
+            "name": "bmsDryContactFault",
+            "description": "BMS干节点故障1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrLimitAlarm1",
+            "ref": "moduleCurrLimitAlarm1",
+            "name": "moduleCurrLimitAlarm1",
+            "description": "模块限流告警11- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrLimitAlarm2",
+            "ref": "moduleCurrLimitAlarm2",
+            "name": "moduleCurrLimitAlarm2",
+            "description": "模块限流告警21- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrLimitAlarm3",
+            "ref": "moduleCurrLimitAlarm3",
+            "name": "moduleCurrLimitAlarm3",
+            "description": "模块限流告警31- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrLimitAlarm4",
+            "ref": "moduleCurrLimitAlarm4",
+            "name": "moduleCurrLimitAlarm4",
+            "description": "模块限流告警41- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrLimitAlarm5",
+            "ref": "moduleCurrLimitAlarm5",
+            "name": "moduleCurrLimitAlarm5",
+            "description": "模块限流告警51- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrLimitAlarm6",
+            "ref": "moduleCurrLimitAlarm6",
+            "name": "moduleCurrLimitAlarm6",
+            "description": "模块限流告警61- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrLimitAlarm7",
+            "ref": "moduleCurrLimitAlarm7",
+            "name": "moduleCurrLimitAlarm7",
+            "description": "模块限流告警71- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrFault1",
+            "ref": "moduleCurrFault1",
+            "name": "moduleCurrFault1",
+            "description": "模块电流异常11- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrFault2",
+            "ref": "moduleCurrFault2",
+            "name": "moduleCurrFault2",
+            "description": "模块电流异常21- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrFault3",
+            "ref": "moduleCurrFault3",
+            "name": "moduleCurrFault3",
+            "description": "模块电流异常31- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrFault4",
+            "ref": "moduleCurrFault4",
+            "name": "moduleCurrFault4",
+            "description": "模块电流异常41- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrFault5",
+            "ref": "moduleCurrFault5",
+            "name": "moduleCurrFault5",
+            "description": "模块电流异常51- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrFault6",
+            "ref": "moduleCurrFault6",
+            "name": "moduleCurrFault6",
+            "description": "模块电流异常61- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleCurrFault7",
+            "ref": "moduleCurrFault7",
+            "name": "moduleCurrFault7",
+            "description": "模块电流异常71- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCInputOverVoltFault",
+            "ref": "dCInputOverVoltFault",
+            "name": "dCInputOverVoltFault",
+            "description": "直流输入过压1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCInputUnderVoltFault",
+            "ref": "dCInputUnderVoltFault",
+            "name": "dCInputUnderVoltFault",
+            "description": "直流输入欠压1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCOverloadAlarm",
+            "ref": "dCOverloadAlarm",
+            "name": "dCOverloadAlarm",
+            "description": "直流过载报警1- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCOverloadTimeoutFault",
+            "ref": "dCOverloadTimeoutFault",
+            "name": "dCOverloadTimeoutFault",
+            "description": "直流过载超时1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCInputSoftStartFailedFault",
+            "ref": "dCInputSoftStartFailedFault",
+            "name": "dCInputSoftStartFailedFault",
+            "description": "直流输入软启动失败1- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCInputGalvanicBreakDeviceOpenCircuitFault",
+            "ref": "dCInputGalvanicBreakDeviceOpenCircuitFault",
+            "name": "dCInputGalvanicBreakDeviceOpenCircuitFault",
+            "description": "直流输入电控开关开路1- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCInputGalvanicBreakDeviceShortCircuitFault",
+            "ref": "dCInputGalvanicBreakDeviceShortCircuitFault",
+            "name": "dCInputGalvanicBreakDeviceShortCircuitFault",
+            "description": "直流输入电控开关短路1- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCInputSoftGalvanicBreakDeviceFault",
+            "ref": "dCInputSoftGalvanicBreakDeviceFault",
+            "name": "dCInputSoftGalvanicBreakDeviceFault",
+            "description": "直流输入软启电控开关故障1- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCBusOverVoltFault",
+            "ref": "dCBusOverVoltFault",
+            "name": "dCBusOverVoltFault",
+            "description": "直流母线过压1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCBusUnderVoltFault",
+            "ref": "dCBusUnderVoltFault",
+            "name": "dCBusUnderVoltFault",
+            "description": "直流母线欠压1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCBusVoltUnbalancedFault",
+            "ref": "dCBusVoltUnbalancedFault",
+            "name": "dCBusVoltUnbalancedFault",
+            "description": "直流母线电压不平衡1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "dCBusSoftStartFailedFault",
+            "ref": "dCBusSoftStartFailedFault",
+            "name": "dCBusSoftStartFailedFault",
+            "description": "直流母线软启动失败1- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "bMSShutdownFault",
+            "ref": "bMSShutdownFault",
+            "name": "bMSShutdownFault",
+            "description": "BMS关机故障1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCBusOverVoltFault",
+            "ref": "aCBusOverVoltFault",
+            "name": "aCBusOverVoltFault",
+            "description": "交流母线过压1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCBusUnderVoltFault",
+            "ref": "aCBusUnderVoltFault",
+            "name": "aCBusUnderVoltFault",
+            "description": "交流母线欠压1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCBusOverFrequencyFault",
+            "ref": "aCBusOverFrequencyFault",
+            "name": "aCBusOverFrequencyFault",
+            "description": "交流母线过频1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCBusUnderFrequencyFault",
+            "ref": "aCBusUnderFrequencyFault",
+            "name": "aCBusUnderFrequencyFault",
+            "description": "交流母线欠频1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCBusPhaseReversedFault",
+            "ref": "aCBusPhaseReversedFault",
+            "name": "aCBusPhaseReversedFault",
+            "description": "交流母线反序1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCBusVoltAsymmetricFault",
+            "ref": "aCBusVoltAsymmetricFault",
+            "name": "aCBusVoltAsymmetricFault",
+            "description": "交流母线电压不平衡1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCBusVoltFaultFault",
+            "ref": "aCBusVoltFaultFault",
+            "name": "aCBusVoltFaultFault",
+            "description": "交流母线电压异常1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCBusPhaseLostFault",
+            "ref": "aCBusPhaseLostFault",
+            "name": "aCBusPhaseLostFault",
+            "description": "交流母线缺相1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "islandingProtectionFault",
+            "ref": "islandingProtectionFault",
+            "name": "islandingProtectionFault",
+            "description": "孤岛保护1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "acOverloadAlarm",
+            "ref": "acOverloadAlarm",
+            "name": "acOverloadAlarm",
+            "description": "交流过载报警1- 告警，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "acOverloadTimeout",
+            "ref": "acOverloadTimeout",
+            "name": "acOverloadTimeout",
+            "description": "交流过载超时1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "acBusConnectionForbiddenFault",
+            "ref": "acBusConnectionForbiddenFault",
+            "name": "acBusConnectionForbiddenFault",
+            "description": "交流母线禁止接入1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "offgridVoltOscillationFault",
+            "ref": "offgridVoltOscillationFault",
+            "name": "offgridVoltOscillationFault",
+            "description": "离网电压震荡1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "onOffgridTogglingErrorFault",
+            "ref": "onOffgridTogglingErrorFault",
+            "name": "onOffgridTogglingErrorFault",
+            "description": "并离网切换错误1- 故障，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCSoftStartFailedFault",
+            "ref": "aCSoftStartFailedFault",
+            "name": "aCSoftStartFailedFault",
+            "description": "交流软启动失败1- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCGalvanicBreakDeviceOpenCircuitFault",
+            "ref": "aCGalvanicBreakDeviceOpenCircuitFault",
+            "name": "aCGalvanicBreakDeviceOpenCircuitFault",
+            "description": "交流电控开关开路1- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "aCGalvanicBreakDeviceShortCircuitFault",
+            "ref": "aCGalvanicBreakDeviceShortCircuitFault",
+            "name": "aCGalvanicBreakDeviceShortCircuitFault",
+            "description": "交流电控开关短路1- 失效，0- 正常",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "moduleTemper",
+            "ref": "",
+            "name": "moduleTemper",
+            "description": "模块温度",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "℃",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "tempAmbient",
+            "ref": "ambientTemper",
+            "name": "tempAmbient",
+            "description": "环境温度",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "℃",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "availableActivePowerCapacity",
+            "ref": "",
+            "name": "availableActivePowerCapacity",
+            "description": "可用有功容量",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kW",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "factorPower",
+            "ref": "totalPFOfACBus",
+            "name": "factorPower",
+            "description": "交流母线总功率因数",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "factorPowerA",
+            "ref": "l1PFOfACBus",
+            "name": "factorPowerA",
+            "description": "交流母线A相功率因数",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "factorPowerB",
+            "ref": "l2PFOfACBus",
+            "name": "factorPowerB",
+            "description": "交流母线B相功率因数",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "factorPowerC",
+            "ref": "l3PFOfACBus",
+            "name": "factorPowerC",
+            "description": "交流母线C相功率因数",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "activePower",
+            "ref": "totalActivePowerOfACBus",
+            "name": "activePower",
+            "description": "交流母线总有功功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kW",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "activePowerA",
+            "ref": "l1ActivePowerOfACBus",
+            "name": "activePowerA",
+            "description": "交流母线A相有功功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kW",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "activePowerB",
+            "ref": "l2ActivePowerOfACBus",
+            "name": "activePowerB",
+            "description": "交流母线B相有功功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kW",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "activePowerC",
+            "ref": "l3ActivePowerOfACBus",
+            "name": "activePowerC",
+            "description": "交流母线C相有功功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kW",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "reactivePower",
+            "ref": "totalReactivePowerOfACBus",
+            "name": "reactivePower",
+            "description": "交流母线总无功功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kVAr",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "reactivePowerA",
+            "ref": "l1ReactivePowerOfACBus",
+            "name": "reactivePowerA",
+            "description": "交流母线A相无功功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kVAr",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "reactivePowerB",
+            "ref": "l2ReactivePowerOfACBus",
+            "name": "reactivePowerB",
+            "description": "交流母线B相无功功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kVAr",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "reactivePowerC",
+            "ref": "l3ReactivePowerOfACBus",
+            "name": "reactivePowerC",
+            "description": "交流母线C相无功功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kVAr",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "apparentPower",
+            "ref": "totalApparentPowerOfACBus",
+            "name": "apparentPower",
+            "description": "交流母线总视在功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kVA",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "apparentPowerA",
+            "ref": "l1ApparentPowerOfACBus",
+            "name": "apparentPowerA",
+            "description": "交流母线A相视在功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kVA",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "apparentPowerB",
+            "ref": "l2ApparentPowerOfACBus",
+            "name": "apparentPowerB",
+            "description": "交流母线B相视在功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kVA",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "apparentPowerC",
+            "ref": "l3ApparentPowerOfACBus",
+            "name": "apparentPowerC",
+            "description": "交流母线C相视在功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kVA",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "currA",
+            "ref": "l1CurrOfACBus",
+            "name": "currA",
+            "description": "交流母线A相电流",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "A",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "currB",
+            "ref": "l2CurrOfACBus",
+            "name": "currB",
+            "description": "交流母线B相电流",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "A",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "currC",
+            "ref": "l3CurrOfACBus",
+            "name": "currC",
+            "description": "交流母线C相电流",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "A",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "acFrequency",
+            "ref": "aCBusFrequency",
+            "name": "acFrequency",
+            "description": "交流母线频率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "Hz",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "voltA",
+            "ref": "l1L2VoltOfACBus",
+            "name": "voltA",
+            "description": "交流母线AB线电压",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "V",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "voltB",
+            "ref": "l2L3VoltOfACBus",
+            "name": "voltB",
+            "description": "交流母线BC线电压",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "V",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "voltC",
+            "ref": "l3L1VoltOfACBus",
+            "name": "voltC",
+            "description": "交流母线CA线电压",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "V",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "accuDischargEnergy",
+            "ref": "accumulativeDischargedEnergyThroughACPort",
+            "name": "accuDischargEnergy",
+            "description": "累计交流放电电量",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kWh",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "accuChargEnergy",
+            "ref": "accumulativeChargedEnergyThroughACPort",
+            "name": "accuChargEnergy",
+            "description": "累计交流充电电量",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kWh",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "accuDischargEnergyDay",
+            "ref": "dailyDischargedEnergyThroughACPort",
+            "name": "accuDischargEnergyDay",
+            "description": "当天交流放电电量",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kWh",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "accuChargEnergyDay",
+            "ref": "dailyChargedEnergyThroughACPort",
+            "name": "accuChargEnergyDay",
+            "description": "当天交流充电电量",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kWh",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "powerDC",
+            "ref": "dCPower",
+            "name": "powerDC",
+            "description": "直流功率",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "kW",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "currDC",
+            "ref": "dCCurr",
+            "name": "currDC",
+            "description": "直流电流",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "A",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "voltDC",
+            "ref": "dCInputVolt",
+            "name": "voltDC",
+            "description": "直流输入电压",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "V",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "totalStart",
+            "ref": "totalStart",
+            "name": "totalStart",
+            "description": "总开机1- 启动， 其他-无效",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "totalStop",
+            "ref": "totalStop",
+            "name": "totalStop",
+            "description": "总关机1- 停止， 其他-无效",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "clearError",
+            "ref": "clearError",
+            "name": "clearError",
+            "description": "清除故障1- 清除， 其他-无效",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "gridInterconnectionMode",
+            "ref": "gridInterconnectionMode",
+            "name": "gridInterconnectionMode",
+            "description": "并离网模式0- 并网， 1- 离网",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "advancedControlCommands1",
+            "ref": "",
+            "name": "advancedControlCommands1",
+            "description": "高级控制命令1bit0- 系统重启：1-是，0-否",
+            "access": "rw",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "activePowerControlMode",
+            "ref": "activePowerControlMode",
+            "name": "activePowerControlMode",
+            "description": "有功控制模式0- 设置有功， 1- 电压-有功调节， 2- 频率-有功调节， 3- 电压&频率-有功调节， certification-default",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "reactivePowerControlMode",
+            "ref": "reactivePowerControlMode",
+            "name": "reactivePowerControlMode",
+            "description": "无功控制模式0- 禁用， 1- 设置无功， 2- 设置PF， 3- 电压-无功调节， 4- 有功-PF调节， 5- 有功-无功调节， certification-default",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "activePowerSetpo",
+            "ref": "activePowerSetpo",
+            "name": "activePowerSetpo",
+            "description": "有功功率设置-1400.0~1400.0， 单位: 0.1kW， 默认: 0; +: 充电， 功率从电网到电池， -: 放电， 功率从电池到电网. (RAM)",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "reactivePowerSetpo",
+            "ref": "reactivePowerSetpo",
+            "name": "reactivePowerSetpo",
+            "description": "无功功率设置-1400.0~1400.0， 单位: 0.1kVAr， 默认: 0; +: 滞后， -: 超前. (RAM)",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "pFSetpo",
+            "ref": "",
+            "name": "pFSetpo",
+            "description": "功率因数设置-1~+1， 单位: 0.01， 默认: 1; +: 滞后， -: 超前. (RAM)",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "remoteControl",
+            "ref": "controlMode",
+            "name": "remoteControl",
+            "description": "控制模式0- 本地手动， 1- 本地自动， 2- 远程控制， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "powerPNDefinition",
+            "ref": "",
+            "name": "powerPNDefinition",
+            "description": "功率+/-定义0- 正充负放(有功功率) & 正感负容(无功功率)， 1- 正放负充(有功功率) & 正容负感(无功功率)， 2- 预留2， 3- 预留3， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "bmsProtocol",
+            "ref": "",
+            "name": "bmsProtocol",
+            "description": "\"Bms协议类型0- 禁用，",
+            "access": "rw",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "startUpMode",
+            "ref": "",
+            "name": "startUpMode",
+            "description": "启动方式0- 手动启动(上电默认关机，且只有关机指令可消除开机指令)， 1- 自动启动(上电默认开机，且只有关机指令可消除开机指令)， 2- 停机后禁止自启动(上电默认关机，任何原因关机后均消除开机指令)， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "bMSLimitCurrAndPowerMode",
+            "ref": "",
+            "name": "bMSLimitCurrAndPowerMode",
+            "description": "BMS限流限功率模式0- 限流， 1- 限功率， 2- 限流限功率， 3- 禁止限值， default: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "inputDryContactACustomFunction",
+            "ref": "",
+            "name": "inputDryContactACustomFunction",
+            "description": "输入干节点A定制功能0-无效， 1-EPO开路故障， 2-EPO短路故障， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "inputDryContactBCustomFunction",
+            "ref": "",
+            "name": "inputDryContactBCustomFunction",
+            "description": "输入干节点B定制功能0-无效， 1-DRM0功能， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "inputDryContactCCustomFunction",
+            "ref": "",
+            "name": "inputDryContactCCustomFunction",
+            "description": "输入干节点C定制功能0-无效， 1-BMS开路故障， 2-BMS短路故障， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "inputDryContactDCustomFunction",
+            "ref": "",
+            "name": "inputDryContactDCustomFunction",
+            "description": "输入干节点D定制功能0-无效，默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "outputDryContactACustomFunction",
+            "ref": "",
+            "name": "outputDryContactACustomFunction",
+            "description": "输出干节点A定制功能0- 禁用， 1- PCS启/停， 2- PCS离网/并网， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "powerChangeMode",
+            "ref": "",
+            "name": "powerChangeMode",
+            "description": "功率变化模式0- 阶跃， 1- 斜率， certification-default",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "rRNormalRampRate",
+            "ref": "",
+            "name": "rRNormalRampRate",
+            "description": "常规功率变化速率0.0001~3， 单位: 0.0001(*Pnom/s)， certification-default",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "sSSoftStartRampRate",
+            "ref": "",
+            "name": "sSSoftStartRampRate",
+            "description": "软启动功率变化速率0.0001~3， 单位: 0.0001(*Pnom/s)， certification-default",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "gridReconnectionDelay",
+            "ref": "",
+            "name": "gridReconnectionDelay",
+            "description": "电网恢复延时0~1800， 单位: 1s， certification-default",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "antiIslandingEnable",
+            "ref": "",
+            "name": "antiIslandingEnable",
+            "description": "孤岛检测使能0- 禁用， 1- 使能， 默认: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "fVRTPowerMode",
+            "ref": "",
+            "name": "fVRTPowerMode",
+            "description": "电压频率穿越功率模式0- 禁用， 1- 限流， 2- 功率支撑， certification-default",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "offGridVoltStartupMode",
+            "ref": "",
+            "name": "offGridVoltStartupMode",
+            "description": "离网电压启动模式0- Step， 1- Ramp， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "offgridACVoltRegulation",
+            "ref": "",
+            "name": "offgridACVoltRegulation",
+            "description": "离网交流电压调节0.800-1.200， 单位: 0.001(*Vnom)， 默认: 1.000",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "offgridACFreqRegulation",
+            "ref": "",
+            "name": "offgridACFreqRegulation",
+            "description": "离网交流频率调节-5.00~5.00 Hz， 单位: 0.01(+Fnom)， 默认: 0",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "lVRTEntryVolt",
+            "ref": "",
+            "name": "lVRTEntryVolt",
+            "description": "低穿启动值0~1.000， 单位: 0.001(*Vnom)， certification-default",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "lVRTRecoveryVolt",
+            "ref": "",
+            "name": "lVRTRecoveryVolt",
+            "description": "低穿恢复值0~1.000， 单位: 0.001(*Vnom)， certification-default",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "hVRTEntryVolt",
+            "ref": "",
+            "name": "hVRTEntryVolt",
+            "description": "高穿启动值1.000~1.350， 单位: 0.001(*Vnom)， certification-default",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "hVRTRecoveryVolt",
+            "ref": "",
+            "name": "hVRTRecoveryVolt",
+            "description": "高穿恢复值1.000~1.350， 单位: 0.001(*Vnom)， certification-default",
+            "access": "r",
+            "dataType": "double",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "microgridPowerSupplyMode",
+            "ref": "",
+            "name": "microgridPowerSupplyMode",
+            "description": "微网供电模式0-双模(并网初始)， 1-双模(离网初始)， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+      
+        {
+          "identifier": "overVoltRegion1Boundary",
+          "ref": "overVoltRegion1Boundary",
+          "name": "overVoltRegion1Boundary",
+          "description": "过压I段保护范围1.000~1.350， 单位: 0.001(*Vnom)， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 1,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "overVoltRegion1TripTime",
+          "ref": "overVoltRegion1TripTime",
+          "name": "overVoltRegion1TripTime",
+          "description": "过压I段保护时间0.00~180.00， 单位: 0.01s， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 2,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "overVoltRegion2Boundary",
+          "ref": "overVoltRegion2Boundary",
+          "name": "overVoltRegion2Boundary",
+          "description": "过压II段保护范围1.000~1.350， 单位: 0.001(*Vnom)， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 3,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "overVoltRegion2TripTime",
+          "ref": "overVoltRegion2TripTime",
+          "name": "overVoltRegion2TripTime",
+          "description": "过压II段保护时间0.00~180.00， 单位: 0.01s， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 4,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "underVoltRegion1Boundary",
+          "ref": "underVoltRegion1Boundary",
+          "name": "underVoltRegion1Boundary",
+          "description": "欠压I段保护范围0.050~1.000， 单位: 0.001(*Vnom)， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 5,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "underVoltRegion1TripTime",
+          "ref": "underVoltRegion1TripTime",
+          "name": "underVoltRegion1TripTime",
+          "description": "欠压I段保护时间0.00~180.00， 单位: 0.01s， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 6,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "underVoltRegion2Boundary",
+          "ref": "underVoltRegion2Boundary",
+          "name": "underVoltRegion2Boundary",
+          "description": "欠压II段保护范围0.050~1.000， 单位: 0.001(*Vnom)， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 7,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "underVoltRegion2TripTime",
+          "ref": "underVoltRegion2TripTime",
+          "name": "underVoltRegion2TripTime",
+          "description": "欠压II段保护时间0.00~180.00， 单位: 0.01s， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 8,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "overFreqRegion1Boundary",
+          "ref": "overFreqRegion1Boundary",
+          "name": "overFreqRegion1Boundary",
+          "description": "过频I段保护范围0.01~6.00Hz， 单位: 0.01(+Fnom)， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 9,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "overFreqRegion1TripTime",
+          "ref": "overFreqRegion1TripTime",
+          "name": "overFreqRegion1TripTime",
+          "description": "过频I段保护时间0.00~650.00， 单位: 0.01s， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 10,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "overFreqRegion2Boundary",
+          "ref": "overFreqRegion2Boundary",
+          "name": "overFreqRegion2Boundary",
+          "description": "过频II段保护范围0.01~6.00Hz， 单位: 0.01(+Fnom)， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 11,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "overFreqRegion2TripTime",
+          "ref": "overFreqRegion2TripTime",
+          "name": "overFreqRegion2TripTime",
+          "description": "过频II段保护时间0.00~650.00， 单位: 0.1s， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 12,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "underFreqRegion1Boundary",
+          "ref": "underFreqRegion1Boundary",
+          "name": "underFreqRegion1Boundary",
+          "description": "欠频I段保护范围-10 ~ -0.01Hz， 单位: 0.01(+Fnom)， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 13,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "underFreqRegion1TripTime",
+          "ref": "underFreqRegion1TripTime",
+          "name": "underFreqRegion1TripTime",
+          "description": "欠频I段保护时间0.00~650.00， 单位: 0.01s， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 14,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "underFreqRegion2Boundary",
+          "ref": "underFreqRegion2Boundary",
+          "name": "underFreqRegion2Boundary",
+          "description": "欠频II段保护范围-10 ~ -0.01Hz， 单位: 0.01(+Fnom)， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 15,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "underFreqRegion2TripTime",
+          "ref": "underFreqRegion2TripTime",
+          "name": "underFreqRegion2TripTime",
+          "description": "欠频II段保护时间0.00~650.00， 单位: 0.01s， certification-default",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 16,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "dCLowVoltThreshold",
+          "ref": "dCLowVoltThreshold",
+          "name": "dCLowVoltThreshold",
+          "description": "直流下限电压单位: 0.1V， 默认: 范围下限",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 17,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "endOfDischargeVolt",
+          "ref": "endOfDischargeVolt",
+          "name": "endOfDischargeVolt",
+          "description": "放电终止电压单位: 0.1V， 默认: 范围下限",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 18,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "toppingChargeVolt",
+          "ref": "toppingChargeVolt",
+          "name": "toppingChargeVolt",
+          "description": "均充电压单位: 0.1V， 默认: 范围下限",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 19,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "maxChargePower",
+          "ref": "maxChargePower",
+          "name": "maxChargePower",
+          "description": "最大充电功率0.0~3200.0， 单位: 0.1kW， 默认: 0",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 20,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "maxDischargePower",
+          "ref": "maxDischargePower",
+          "name": "maxDischargePower",
+          "description": "最大放电功率0.0~3200.0， 单位: 0.1kW， 默认: 0",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 21,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "maxChargeCurr",
+          "ref": "maxChargeCurr",
+          "name": "maxChargeCurr",
+          "description": "最大充电电流0.0~3200.0， 单位: 0.1A， 默认: 5.0",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 22,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+        {
+          "identifier": "maxDischargeCurr",
+          "ref": "maxDischargeCurr",
+          "name": "maxDischargeCurr",
+          "description": "最大放电电流0.0~3200.0， 单位: 0.1A， 默认: 5.0",
+          "access": "r",
+          "dataType": "double",
+          "defaultValue": "",
+          "level": 2,
+          "paramType": "1",
+          "sort": 23,
+          "specs": {
+            "unit": "",
+            "min": "",
+            "max": ""
+          }
+        },
+      
+        {
+            "identifier": "timeSetpoYear",
+            "ref": "",
+            "name": "timeSetpoYear",
+            "description": "时间设置：年2000~2199， 单位: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "timeSetpoMonth",
+            "ref": "",
+            "name": "timeSetpoMonth",
+            "description": "时间设置：月1~12， 单位: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "timeSetpoDay",
+            "ref": "",
+            "name": "timeSetpoDay",
+            "description": "时间设置：日1~31， 单位: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "timeSetpoHour",
+            "ref": "",
+            "name": "timeSetpoHour",
+            "description": "时间设置：小时0~23， 单位: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "timeSetpoMinute",
+            "ref": "",
+            "name": "timeSetpoMinute",
+            "description": "时间设置：分钟0~59， 单位: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "timeSetpoSecond",
+            "ref": "",
+            "name": "timeSetpoSecond",
+            "description": "时间设置：秒0~59， 单位: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "bMSCommTimeoutSetpo",
+            "ref": "",
+            "name": "bMSCommTimeoutSetpo",
+            "description": "BMS通信超时设置0~600， 单位: 1s",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "remote485CommTimeoutSetpo",
+            "ref": "",
+            "name": "remote485CommTimeoutSetpo",
+            "description": "远程485通信超时设置0~600， 单位: 1s",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "remoteTCPCommTimeoutSetpo",
+            "ref": "",
+            "name": "remoteTCPCommTimeoutSetpo",
+            "description": "远程TCP通信超时设置0~600， 单位: 1s",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "buzzerFunctionEnable",
+            "ref": "",
+            "name": "buzzerFunctionEnable",
+            "description": "蜂鸣器功能使能1- 使能， 0- 禁用， 默认: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "wIFIDisabled",
+            "ref": "",
+            "name": "wIFIDisabled",
+            "description": "WIFI禁用1- 是， 0- 否， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "languageSetpo",
+            "ref": "",
+            "name": "languageSetpo",
+            "description": "语言设置0- 中文， 1- 英文， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "recordingModeOptions",
+            "ref": "",
+            "name": "recordingModeOptions",
+            "description": "记录模式选项0- 默认模式， 1-模式1， 2-模式2， 3-模式3， 4-模式4， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "commSettingToTakeEffect",
+            "ref": "",
+            "name": "commSettingToTakeEffect",
+            "description": "通讯设置生效1- 生效， 其他- 无效",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "modbusDeviceAddress",
+            "ref": "",
+            "name": "modbusDeviceAddress",
+            "description": "Modbus设备地址1~247， 默认: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "rTUBaudRate",
+            "ref": "",
+            "name": "rTUBaudRate",
+            "description": "RTU波特率0- 9600， 1- 19200， 2- 115200， 默认: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "ratedVolt",
+            "ref": "",
+            "name": "ratedVolt",
+            "description": "额定电压等级30K/PWD/125K: 0-380V， 1-400V， 3-480V， 9-208V， 默认: 1",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "ratedFrequency",
+            "ref": "",
+            "name": "ratedFrequency",
+            "description": "额定频率等级0-50Hz， 1-60Hz， 默认: 0",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "certificationArea",
+            "ref": "",
+            "name": "certificationArea",
+            "description": "认证地区certification-default",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        },
+        {
+            "identifier": "standardReference",
+            "ref": "",
+            "name": "standardReference",
+            "description": "标准参考certification-default",
+            "access": "r",
+            "dataType": "int",
+            "defaultValue": "",
+            "level": 2,
+            "specs": {
+                "unit": "",
+                "min": "",
+                "max": ""
+            }
+        }
+    ]
+}

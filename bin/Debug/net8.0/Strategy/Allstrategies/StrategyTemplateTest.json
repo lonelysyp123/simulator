@@ -1,0 +1,173 @@
+{
+  "schema": "v1.0",
+  "profile": {
+    "description": "StrategyTemplate"
+  },
+  "properties": [
+    {
+      "identifier": "RefrigerationStrategy",
+      "input": [
+        {
+            "identifier": "02.maxTemp",
+            "dataType": "System.Double"
+        },
+        {
+            "identifier": "02.avgTemp",
+            "dataType": "System.Double"
+        },
+        {
+            "identifier": "02.minTemp",
+            "dataType": "System.Double"
+        },
+        {
+          "identifier": "03.workMode",
+          "dataType": "System.UInt16"
+        },
+        {
+          "identifier": "02.overSingleVolDiffAlarmLv3",
+          "dataType": "System.Boolean"
+
+        },
+        {
+          "identifier": "05.detectorNTCFault",
+          "dataType": "System.Boolean"
+
+        }
+      ],
+      "name": "RefrigerationStrategy",
+      "description": "温控策略",
+      "access": "x",
+      "level": 1
+    },
+    {
+      "identifier": "ExceptionActuator",
+      "input": [
+        {
+          "identifier": "*.*Alarm",
+          "threshold": [
+            true
+          ]
+        },
+        {
+          "identifier": "*.*Fault",
+          "threshold": [
+            true
+          ]
+        }
+      ],
+      "name": "ExceptionActuator",
+      "description": "故障告警处理策略",
+      "access": "x",
+      "level": 2
+    },
+    {
+      "identifier": "SmoothPowerActuator",
+      "input": [
+        {
+            "identifier": "01.activePower",
+            "threshold": [
+                true
+            ]
+        }
+      ],
+      "name": "SmoothPowerActuator",
+      "description": "功率平滑策略",
+      "access": "x",
+      "level": 3
+    },
+    {
+      "identifier": "AuxiliaryProtectionActuator",
+      "input": [
+        {
+            "identifier": "02.avgSoc",
+            "dataType": "System.Double",
+            "threshold": [
+                0,
+                100
+            ]
+        },
+        {
+            "identifier": "01.powerDC",
+            "dataType": "System.Double",
+            "threshold": [
+                -100,
+                100
+            ]
+        },
+        {
+            "identifier": "01.currDC",
+            "dataType": "System.Double",
+            "threshold": [
+                -100,
+                100
+            ]
+        },
+        {
+            "identifier": "01.voltDC",
+            "dataType": "System.Double",
+            "threshold": [
+                -100,
+                100
+            ]
+        },
+
+        {
+          "identifier": "04.envTemp",
+          "dataType": "System.Double"
+        }
+      ],
+      "name": "AuxiliaryProtectionActuator",
+      "description": "电力系统辅助保护策略策略",
+      "access": "x",
+      "level": 3
+    },
+    {
+      "identifier": "CVActuator",
+      "input": [
+        {
+          "identifier": "01.dcVolt"
+        }
+      ],
+      "name": "CVActuator",
+      "description": "恒压充放电策略",
+      "access": "x",
+      "level": 3
+    },
+    {
+      "identifier": "CircuitBreakerActuator1",
+      "input": [
+
+        {
+          "identifier": "08.stopSwitchFeedBackStatus",
+          "threshold": 1
+        },
+        {
+          "identifier": "07.waterImmersionStatus1",
+          "threshold": 1
+        },
+        {
+          "identifier": "07.waterImmersionStatus2",
+          "threshold": 2
+        },
+        {
+          "identifier": "05.controllerMaxAlarmLevel",
+          "threshold": 3
+        }
+      ],
+      "name": "CircuitBreakerActuator",
+      "description": "脱扣器动作策略",
+      "access": "x",
+      "level": 3
+    }
+  ],
+  "output": [
+    {
+      "identifier": "PCS",
+      "ref": "aa"
+    },
+    {
+      "identifier": "IODevice",
+      "ref": "bb"
+    }
+  ]
+}
