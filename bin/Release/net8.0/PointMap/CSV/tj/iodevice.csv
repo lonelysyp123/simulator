@@ -1,9 +1,0 @@
-﻿ParamName,SampleRate,DefaultValue,Direction,DevClassString,Comment
-WorkingStatus,1,0,1,/sys/class/leds/do1/brightness,工作状态
-WarningStatus,1,0,1,/sys/class/leds/do2/brightness,告警状态
-ErrorStatus,1,0,1,/sys/class/leds/do3/brightness,故障状态
-FanSwitch,1,0,1,/sys/class/leds/do4/brightness,排风扇开关
-GridConnectSwitch,1,0,1,/sys/class/leds/do5/brightness,并网脱口开关
-StopSwitchFeedBackStatus,1,0,0,/sys/class/gpio-input/DIN1/state,急停反馈信号
-SurgeSwitchFeedBackStatus,1,0,0,/sys/class/gpio-input/DIN2/state,浪涌反馈信号
-DoorFeedBackStatus,1,0,0,/sys/class/gpio-input/DIN4/state,门禁反馈信号

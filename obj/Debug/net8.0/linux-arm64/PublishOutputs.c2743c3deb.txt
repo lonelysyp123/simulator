@@ -1,7 +1,0 @@
-/Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/publish/IEC61850-simulatorServer2.pdb
-/Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/publish/bms_bank.csv
-/Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/publish/bms_rack.csv
-/Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/publish/em.csv
-/Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/publish/emu.csv
-/Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/publish/log4net.config
-/Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/publish/IEC61850-simulatorServer2

@@ -1,5 +1,0 @@
-FunctionCode,Address,Size,Index,ParamName,Type,Min,Max,Expression,ReExpression,Unit,Comments,DefaultValue,DataOrder,SampleRate
-3,0,16,0,humidity,System.UInt16,0,95,Param*0.1,,%RH,湿度,,,
-3,1,16,0,temperature,System.Int16,-40,80,Param*0.1,,℃,温度,,,
-3,80,16,0,temperatureCalibrationValue,System.UInt16,,,Param*0.1,,,温度校准值,,,
-3,81,16,0,humidityCalibrationValue,System.UInt16,,,Param*0.1,,,湿度校准值,,,
