@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("IEC61850-simulatorServer2")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7303573ce49afcd425afabe487214f1d2aa8e57a")]
 [assembly: System.Reflection.AssemblyProductAttribute("IEC61850-simulatorServer2")]
 [assembly: System.Reflection.AssemblyTitleAttribute("IEC61850-simulatorServer2")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

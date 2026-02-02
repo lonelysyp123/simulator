@@ -369,3 +369,4 @@ E:/Work/大储/LargeScale-EMS/LocalEMS/IEC61850-simulatorServer2/bin/Debug/net8.
 /Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/bms_rack.csv
 /Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/em.csv
 /Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/emu.csv
+/Users/songyinpei/jobs/IEC61850-simulatorServer2/obj/Debug/net8.0/IEC61850-simulatorServer2.sourcelink.json

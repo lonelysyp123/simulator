@@ -208,3 +208,4 @@
 /Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/libhostpolicy.so
 /Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/libmscordaccore.so
 /Users/songyinpei/jobs/IEC61850-simulatorServer2/bin/Debug/net8.0/linux-arm64/libmscordbi.so
+/Users/songyinpei/jobs/IEC61850-simulatorServer2/obj/Debug/net8.0/linux-arm64/IEC61850-simulatorServer2.sourcelink.json
