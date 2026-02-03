@@ -101,10 +101,19 @@ namespace IEC61850_simulatorServer2
                     }
                     //根据数据点表定义的顺序调整数据格式
                     //当类型为bool时，不需要调整字节顺序
-                    byte[] newData = typeofPoint == "System.Boolean" ? data : Common.ConverByteOrder(data, dataOrder);
-                    object actualData = Common.DataTranslation(newData, 0, point.Size, typeofPoint);
-                    object valueToConvert = (double)actualData / point.Scale;;
-                    ResultArray.Add(item.Key, valueToConvert);
+                    if (typeofPoint == "System.Boolean")
+                    {
+                        byte[] newData =  data;
+                        object actualData = Common.DataTranslation(newData, 0, point.Size, typeofPoint);
+                        ResultArray.Add(item.Key, actualData);
+                    }
+                    else
+                    {
+                        byte[] newData = Common.ConverByteOrder(data, dataOrder);
+                        object actualData = Common.DataTranslation(newData, 0, point.Size, typeofPoint);
+                        object valueToConvert = Convert.ToDouble(actualData) / point.Scale;
+                        ResultArray.Add(item.Key, valueToConvert);
+                    }
                 }
                 return ResultArray;
             }

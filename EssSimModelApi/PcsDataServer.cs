@@ -209,13 +209,13 @@ namespace IEC61850_simulatorServer2.EssSimModelApi
                 var ReactivePower2 = emudata.PcsList[1].PCSReactivePowerSetting;
 
                     //先暂时更新需要控制的参数和变量到Ess模型，主要有功率调节参数，设备启停等数值
-                    if (Math.Abs(ActivePower1 - pcs1.GetCurrentState().ActivePower) > 1 || Math.Abs(ReactivePower1 - pcs1.GetCurrentState().ReactivePower) > 1)
+                    if (Math.Abs(ActivePower1 - pcs1.GetCurrentState().ActivePower) > 0 || Math.Abs(ReactivePower1 - pcs1.GetCurrentState().ReactivePower) > 0)
                     {
                         pcs1.SetPowerCommand(ActivePower1, ReactivePower1);
                     }
 
                     //先暂时更新需要控制的参数和变量到Ess模型，主要有功率调节参数，设备启停等数值
-                    if (Math.Abs(ActivePower2 - pcs2.GetCurrentState().ActivePower) > 1 || Math.Abs(ReactivePower2 - pcs2.GetCurrentState().ReactivePower) > 1)
+                    if (Math.Abs(ActivePower2 - pcs2.GetCurrentState().ActivePower) > 0 || Math.Abs(ReactivePower2 - pcs2.GetCurrentState().ReactivePower) > 0)
                     {
                         pcs2.SetPowerCommand(ActivePower2, ReactivePower2);
                     }

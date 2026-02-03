@@ -270,7 +270,7 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
         }
 
         // 计算功率响应阶段：统一函数，支持线性/二次/平方根曲线；总时长按默认总时长分摊
-        private List<RampStage> ComputePowerRampStages(int current, int target, RampCurve curve)
+        private List<RampStage> ComputePowerRampStages(double current, double target, RampCurve curve)
         {
             var stages = new List<RampStage>();
             if (Math.Abs(target - current) == 0)
@@ -279,7 +279,7 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             }
 
             // _slope * _interval 定义每段最大变化量,直到达到目标，将每个阶段放入stages
-            int intervalPowerChange = curve switch
+            double intervalPowerChange = curve switch
                 {
                     RampCurve.Linear => (int)(_slope * _interval),
                     RampCurve.Quadratic => (int)(_slope * _interval * _interval),
@@ -288,8 +288,8 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
                 };
             while (Math.Abs(target - current) > 0)
             {
-                int stepChange = Math.Min(Math.Abs(target - current), intervalPowerChange);
-                int stepTarget = current + Math.Sign(target - current) * stepChange;
+                double stepChange = Math.Min(Math.Abs(target - current), intervalPowerChange);
+                double stepTarget = current + Math.Sign(target - current) * stepChange;
                 stages.Add(new RampStage
                 {
                     Target = stepTarget,
@@ -306,13 +306,13 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             Thread.Sleep(_delay); // 初始延迟
             while (true)
             {
-                int desiredActive;
+                double desiredActive;
                 lock (_setpointLock)
                 {
-                    desiredActive = (int)_pendingActiveSetpoint;
+                    desiredActive = _pendingActiveSetpoint;
                 }
 
-                int currentActive = (int)_currentState.ActivePower;
+                double currentActive = _currentState.ActivePower;
                 var ActiveStages = ComputePowerRampStages(currentActive, desiredActive, _activeRampCurve);
 
                 // 如果当前已达到目标且没有阶段需要执行，则退出线程节省资源
@@ -352,13 +352,13 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
         {
             while (true)
             {
-                int desiredReactive;
+                double desiredReactive;
                 lock (_setpointLock)
                 {
-                    desiredReactive = (int)_pendingReactiveSetpoint;
+                    desiredReactive = _pendingReactiveSetpoint;
                 }
 
-                int currentReactive = (int)_currentState.ReactivePower;
+                double currentReactive = _currentState.ReactivePower;
                 var ReactiveStages = ComputePowerRampStages(currentReactive, desiredReactive, _reactiveRampCurve);
                 // 如果当前已达到目标且没有阶段需要执行，则退出线程节省资源
                 if (ReactiveStages.Count == 0)
