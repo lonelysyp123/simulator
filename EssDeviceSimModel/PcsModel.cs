@@ -32,7 +32,7 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
     // PCS配置参数
     public class PcsConfiguration
     {
-        public double RatedPower { get; set; }          // 额定功率(kW)
+        public double RatedPower { get; set; }          // 额定功率(kVA)
         public double MaxPower { get; set; }            // 最大过载功率(kW)
         public double Efficiency { get; set; }          // 转换效率(0-1)
         public double DcVoltageRangeMin { get; set; }   // 直流电压范围最小值(V)

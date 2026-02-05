@@ -133,7 +133,7 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             Thread thread = new Thread(() =>
             {
                 int timeIntervalInMs = 200; // 线程实际sleep时间
-                double speedup = 50.0; // 仿真加速倍率
+                double speedup = 10.0; // 仿真加速倍率
                 var step = TimeSpan.FromMilliseconds(timeIntervalInMs * speedup); // 仿真推进步长
                 var inputTransfromerVol = 0;
                 while (true)

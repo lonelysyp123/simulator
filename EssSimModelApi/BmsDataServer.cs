@@ -310,15 +310,27 @@ namespace IEC61850_simulatorServer2.EssSimModelApi
                 BatteryRackState2.IsFault = 0;
             }
 
-            if (_bmsData.BatteryStacks[0].SOC >= 0.95f)
+            if (_bmsData.BatteryStacks[0].SOC >= 0.99f)
             {
-                if (BatteryRackState2.IsFault == 0)
+                if (BatteryRackState.IsFault == 0)
                 {
                     BatteryRackState.IsFault = 1;
                 }
-                else if (BatteryRackState2.IsFault == 2)
+                else if (BatteryRackState.IsFault == 2)
                 {
                     BatteryRackState.IsFault = 3;
+                }
+            }
+
+            if (_bmsData2.BatteryStacks[0].SOC >= 0.99f)
+            {
+                if (BatteryRackState2.IsFault == 0)
+                {
+                    BatteryRackState2.IsFault = 1;
+                }
+                else if (BatteryRackState2.IsFault == 2)
+                {
+                    BatteryRackState2.IsFault = 3;
                 }
             }
 
