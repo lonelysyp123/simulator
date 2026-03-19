@@ -1,91 +1,87 @@
-﻿using IEC61850_simulatorServer2.EssDeviceSimModel;
-using IEC61850_simulatorServer2.EssSimModelApi;
-using IEC61850_simulatorServer2.Display;
+using EssSimulator.Configuration;
+using EssSimulator.Core;
+using EssSimulator.Display;
+using EssSimulator.EssDeviceSimModel;
+using EssSimulator.EssSimModelApi;
 using log4net;
 using log4net.Config;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
-
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
-     
-    class MainClass
+    class Program
     {
-        public static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            // 尝试加载 log4net.config（优先应用目录，回退当前目录）并写入启动日志
+            // 配置 log4net
             try
             {
-                var baseConfig = Path.Combine(AppContext.BaseDirectory, "log4net.config");
-                if (File.Exists(baseConfig))
-                {
-                    XmlConfigurator.Configure(new FileInfo(baseConfig));
-                }
+                var logCfgPath = Path.Combine(AppContext.BaseDirectory, "log4net.config");
+                if (File.Exists(logCfgPath))
+                    XmlConfigurator.Configure(new FileInfo(logCfgPath));
                 else if (File.Exists("log4net.config"))
-                {
                     XmlConfigurator.Configure(new FileInfo("log4net.config"));
-                }
             }
             catch (Exception ex)
             {
-                // 配置加载失败：回退到基础配置，并打印提示
                 BasicConfigurator.Configure();
                 Console.WriteLine($"[log4net] 配置加载失败：{ex.Message}，已启用基础配置");
             }
-            LogManager.GetLogger(typeof(MainClass)).Info("[Program] 应用启动，log4net 配置已尝试加载");
+            LogManager.GetLogger(typeof(Program)).Info("[Program] 应用启动");
 
-            // program now only supports Modbus. parse minimal args --bmsmap and --modbusport
-            int clusterCount = 12;
-            int packCount = 4;
-            int modbusPort = 1502;
-            bool isNoGUI = false;
+            var host = Host.CreateDefaultBuilder(args)
+                .ConfigureServices((ctx, services) =>
+                {
+                    // 绑定配置节到强类型选项
+                    services.Configure<SimulatorConfig>(ctx.Configuration.GetSection(SimulatorConfig.Section));
+                    services.Configure<PcsPhysicalConfig>(ctx.Configuration.GetSection(PcsPhysicalConfig.Section));
+                    services.Configure<TransformerConfig>(ctx.Configuration.GetSection(TransformerConfig.Section));
+                    services.Configure<PcsDefaultConfig>(ctx.Configuration.GetSection(PcsDefaultConfig.Section));
+                    services.Configure<LoadConfig>(ctx.Configuration.GetSection(LoadConfig.Section));
 
-            // 储能单元仿真模型（保持原有 ModelSim 功能，不做修改）
-            EnergyStorageSystem eSS = new EnergyStorageSystem(null, clusterCount, packCount);
+                    // 核心仿真模型（单例 + 托管服务，由 Host 管理生命周期和仿真主循环）
+                    services.AddSingleton<EnergyStorageSystem>(sp =>
+                    {
+                        var simCfg   = sp.GetRequiredService<IOptions<SimulatorConfig>>().Value;
+                        var pcsCfg   = sp.GetRequiredService<IOptions<PcsPhysicalConfig>>().Value;
+                        var transCfg = sp.GetRequiredService<IOptions<TransformerConfig>>().Value;
+                        var loadCfg  = sp.GetRequiredService<IOptions<LoadConfig>>().Value;
+                        var ess = new EnergyStorageSystem(simCfg, pcsCfg, transCfg, loadCfg);
+                        SimulatorHost.Instance.Register("ess", ess);
+                        return ess;
+                    });
+                    services.AddHostedService(sp => sp.GetRequiredService<EnergyStorageSystem>());
 
-            //把ess模拟器添加到对象管理器（保持 ModelSim 行为）
-            var objectsCollect = ObjectsCollect.Instance;
-            objectsCollect.AddObjects("ess", eSS);
+                    // 数据服务（BackgroundService）
+                    services.AddSingleton<BmsDataService>(sp =>
+                    {
+                        var cfg = sp.GetRequiredService<IOptions<SimulatorConfig>>().Value;
+                        return new BmsDataService(cfg.UnitCount, cfg.ClusterCount, cfg.PackCount);
+                    });
+                    services.AddHostedService(sp => sp.GetRequiredService<BmsDataService>());
 
-            int unitCount = 2;
-            //根据单元数量启动对应数量的 Modbus 模拟服务器
-            for (int i = 0; i < unitCount; i++)
-            {
-                int unitModbusPort = modbusPort + i * 10; // 每个单元间隔10端口
-                
-                // BMS协议模拟器
-                string bmsName = $"simBms{i + 1}";
-                ModbusSimServer modbusSimServer = new ModbusSimServer("bms_bank.csv", unitModbusPort, bmsName, clusterCount);
-                objectsCollect.AddObjects(bmsName, modbusSimServer);
-                modbusSimServer.Start();
-                SimServer.serverListenInfo[$"{bmsName}"] = $"Modbus TCP 端口 {unitModbusPort}";
-            }
+                    services.AddSingleton<PcsDataServer>();
+                    services.AddHostedService(sp => sp.GetRequiredService<PcsDataServer>());
 
-            // PCS协议模拟器
-            string pcsName = $"simEmu";
-            ModbusSimServer modbus_emu = new ModbusSimServer("emu.csv", modbusPort - 1, pcsName);
-            objectsCollect.AddObjects(pcsName, modbus_emu);
-            modbus_emu.Start();
-            SimServer.serverListenInfo[$"{pcsName}"] = $"Modbus TCP 端口 {modbusPort - 1}";
+                    services.AddSingleton<EmDataService>();
+                    services.AddHostedService(sp => sp.GetRequiredService<EmDataService>());
 
-            // 电表协议模拟器
-            string emName = $"simEm";
-            ModbusSimServer modbus_em = new ModbusSimServer("em.csv", modbusPort - 2, emName);
-            objectsCollect.AddObjects(emName, modbus_em);
-            modbus_em.Start();
-            SimServer.serverListenInfo[$"{emName}"] = $"Modbus TCP 端口 {modbusPort - 2}";
+                    // Modbus 协议服务（托管服务）
+                    services.AddHostedService<ModbusHostedService>();
 
-            Thread.Sleep(1000);
+                    // GUI（可选，不影响服务启动）
+                    services.AddSingleton<GuiMain>();
+                })
+                .Build();
 
-            // 启动 BMS、PCS 接口数据服务器（保持原有）
-            BmsDataService bmsDataService = new BmsDataService(clusterCount, packCount);
-            PcsDataServer pcsDataServer = new PcsDataServer();
-            EmDataService emDataService = new EmDataService();
+            // 启动控制台 GUI（若未禁用）
+            var simCfg = host.Services.GetRequiredService<IOptions<SimulatorConfig>>().Value;
+            if (!simCfg.NoGui)
+                host.Services.GetRequiredService<GuiMain>();
 
-            if (!isNoGUI)
-            {
-                GuiMain gui = new GuiMain();
-            }
-
+            await host.RunAsync();
         }
     }
 }

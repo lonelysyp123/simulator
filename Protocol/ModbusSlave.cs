@@ -10,7 +10,7 @@ using log4net;
 using NModbus.Data;
 using System.Threading;
 
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     /// <summary>
     /// Modbus Slave
@@ -320,12 +320,10 @@ namespace IEC61850_simulatorServer2
                 if (functionCode == 3 || functionCode == CTRLFUNCTIONCODE)
                 {
                     data = modbusSlave.DataStore.HoldingRegisters.ReadPoints(currentAddress, groupCount);
-                    ushorts.AddRange(data);
                 }
                 else if (functionCode == 4)
                 {
                     data = modbusSlave.DataStore.InputRegisters.ReadPoints(currentAddress, groupCount);
-                    ushorts.AddRange(data);
                 }
                 else
                 {

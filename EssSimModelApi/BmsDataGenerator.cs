@@ -1,4 +1,4 @@
-﻿using IEC61850_simulatorServer2.EssSimModelApi.BatteryManagementSystem;
+﻿using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +7,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IEC61850_simulatorServer2.EssSimModelApi
+namespace EssSimulator.EssSimModelApi
 {
     public static class BmsDataGenerator
     {

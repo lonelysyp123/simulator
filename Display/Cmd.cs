@@ -1,7 +1,8 @@
-﻿using IEC61850_simulatorServer2.EssDeviceSimModel;
-using IEC61850_simulatorServer2.EssSimModelApi;
-using IEC61850_simulatorServer2.EssSimModelApi.BatteryManagementSystem;
-using IEC61850_simulatorServer2.EssSimModelApi.EnergyManagementSystem.EnergyManagementSystem;
+﻿using EssSimulator.EssDeviceSimModel;
+using EssSimulator.Core;
+using EssSimulator.EssSimModelApi;
+using EssSimulator.EssSimModelApi.BatteryManagementSystem;
+using EssSimulator.EssSimModelApi.EnergyManagementSystem.EnergyManagementSystem;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
-namespace IEC61850_simulatorServer2.Display
+namespace EssSimulator.Display
 {
     public interface ICommand
     {
@@ -117,8 +118,8 @@ namespace IEC61850_simulatorServer2.Display
             var dpcDeviceName = dpcnameParts[0];
             var dpcDeviceDataPoint = dpcnameParts[1];
 
-            var objectsCollect = ObjectsCollect.Instance;
-            var obj = objectsCollect.GetObjByName(dpcDeviceName);
+            var objectsCollect = SimulatorHost.Instance;
+            var obj = objectsCollect.Get<object>(dpcDeviceName);
             ModbusSimServer? simServer = obj as ModbusSimServer;
             if (simServer == null)
             {
@@ -126,7 +127,7 @@ namespace IEC61850_simulatorServer2.Display
                 return;
             }
 
-            if (!simServer.dataMaps.Any(m => m.ParamName == dpcDeviceDataPoint))
+            if (!simServer.DataMaps.Any(m => m.ParamName == dpcDeviceDataPoint))
             {
                 Console.WriteLine("指定设备找不到对应数据点");
                 return;
@@ -194,8 +195,8 @@ namespace IEC61850_simulatorServer2.Display
                 return;
             }
 
-            var objectsCollect = ObjectsCollect.Instance;
-            EnergyStorageSystem ess = (EnergyStorageSystem)objectsCollect.GetObjByName("ess"); ;
+            var objectsCollect = SimulatorHost.Instance;
+            EnergyStorageSystem ess = objectsCollect.Get<EnergyStorageSystem>("ess"); ;
             if (ess == null)
             {
                 Console.WriteLine("找不到对应的模型，请确认ess模型已创建");
@@ -268,8 +269,8 @@ namespace IEC61850_simulatorServer2.Display
                 return;
             }
 
-            var objectsCollect = ObjectsCollect.Instance;
-            EnergyStorageSystem ess = (EnergyStorageSystem)objectsCollect.GetObjByName("ess"); ;
+            var objectsCollect = SimulatorHost.Instance;
+            EnergyStorageSystem ess = objectsCollect.Get<EnergyStorageSystem>("ess"); ;
             if (ess == null)
             {
                 Console.WriteLine("找不到对应的模型");

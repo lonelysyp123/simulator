@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IEC61850_simulatorServer2.EssDeviceSimModel
+namespace EssSimulator.EssDeviceSimModel
 {
     // 功率爬坡曲线模式
     public enum RampCurve
@@ -115,6 +115,11 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
         private RampCurve _activeRampCurve = RampCurve.Linear;
         private RampCurve _reactiveRampCurve = RampCurve.Linear;
         private double _gridLossCoefficient = 0.01; // 电网损耗系数，用于简化计算
+        /// <summary>
+        /// 仿真时间加速倍率。爬坡线程的真实 Sleep 时长 = 配置值 / Speedup，
+        /// 使 PCS 爬坡速率在仿真时间轴上与主循环的 SimStep 保持一致。
+        /// </summary>
+        private readonly double _speedup;
 
         private struct RampStage
         {
@@ -122,9 +127,10 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             public int DelayMs;
         }
 
-        public PCSSimulator(PcsConfiguration config, double ambientTemp = 25.0)
+        public PCSSimulator(PcsConfiguration config, double speedup = 1.0, double ambientTemp = 25.0)
         {
             _config = config;
+            _speedup = speedup > 0 ? speedup : 1.0;
             _ambientTemperature = ambientTemp;
             _currentState = new PcsState
             {
@@ -146,8 +152,20 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             _reactiveRampThreadRunning = false;
         }
 
-        // 获取当前状态
+        // 获取当前状态（返回内部引用，调用方只应读取，不应直接赋值属性）
         public PcsState GetCurrentState() => _currentState;
+
+        /// <summary>
+        /// 线程安全地设置调度模式（在 _setpointLock 下写入，与功率斜坡线程不竞争）。
+        /// </summary>
+        public void SetDispatchMode(int activeMode, int reactiveMode)
+        {
+            lock (_setpointLock)
+            {
+                _currentState.ActiveDispathMode   = activeMode;
+                _currentState.ReactiveDispathMode = reactiveMode;
+            }
+        }
 
         // 更新电网状态
         public void UpdateGridState(double voltage, double frequency, bool isAvailable)
@@ -220,8 +238,9 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             if (_currentState.Mode != OperationMode.Off)
             {
                 if (_currentState.FaultType == 3) return;
-                if (_currentState.FaultType == 1 && _pendingActiveSetpoint > 0) return;
-                if (_currentState.FaultType == 2 && _pendingActiveSetpoint < 0) return;
+                // 正放负充：充电故障(1)拦截负功率设定（充电），放电故障(2)拦截正功率设定（放电）
+                if (_currentState.FaultType == 1 && _pendingActiveSetpoint < 0) return;
+                if (_currentState.FaultType == 2 && _pendingActiveSetpoint > 0) return;
                 StartPowerRampThreadIfNeeded();
             }
         }
@@ -303,7 +322,7 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
         // 后台线程：监控设定值变化并按阶段延迟调整实际功率
         private void ActiveRampWorker()
         {
-            Thread.Sleep(_delay); // 初始延迟
+            Thread.Sleep((int)(_delay / _speedup)); // 初始延迟（按仿真加速倍率压缩）
             while (true)
             {
                 double desiredActive;
@@ -340,9 +359,10 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
                         break;
                     }
 
-                    Thread.Sleep(stage.DelayMs);
+                    // 爬坡延迟按仿真加速倍率压缩，使仿真时间轴上的爬坡速率与配置一致
+                    Thread.Sleep(Math.Max(1, (int)(stage.DelayMs / _speedup)));
 
-                    // 根据阶段目标更新当前功率
+                    // 根据阶段目标更新无功功率
                     _currentState.ActivePower = stage.Target;
                 }
             }
@@ -385,7 +405,8 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
                         break;
                     }
 
-                    Thread.Sleep(stage.DelayMs);
+                    // 爬坡延迟按仿真加速倍率压缩，使仿真时间轴上的爬坡速率与配置一致
+                    Thread.Sleep(Math.Max(1, (int)(stage.DelayMs / _speedup)));
 
                     // 根据阶段目标更新当前功率
                     _currentState.ReactivePower = stage.Target;
@@ -442,9 +463,10 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             if (_currentState.FaultType != 0)
             {
                 // 如果isBmsFault为3，则直接进入故障状态，如果为1，则需要判断当前充放电状态，如果正在充电则进入故障状态，否则继续运行，如果为2，则需要判断当前充放电状态，如果正在放电则进入故障状态，否则继续运行
+                // 正放负充约定：充电故障(1)阻止 ActivePower<0，放电故障(2)阻止 ActivePower>0
                 if (_currentState.FaultType == 3 ||
-                    (_currentState.FaultType == 1 && _currentState.ActivePower > 0) ||
-                    (_currentState.FaultType == 2 && _currentState.ActivePower < 0))
+                    (_currentState.FaultType == 1 && _currentState.ActivePower < 0) ||
+                    (_currentState.FaultType == 2 && _currentState.ActivePower > 0))
                 {
                     _currentState.Mode = OperationMode.Off;
                 }
@@ -490,17 +512,19 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             // 3. 更新温度模型
             UpdateTemperatureModel(timeStep);
 
-            // 4. 更新充放电能量统计
+            // 4. 更新充放电能量统计（正放负充：ActivePower>0为放电，<0为充电）
             double energyChange = _currentState.ActivePower * timeStep.TotalHours; // kWh
             if (energyChange > 0)
             {
-                _currentState.DailyChargeEnergy += energyChange;
-                _currentState.TotalChargeEnergy += energyChange;
+                // 放电
+                _currentState.DailyDischargeEnergy += energyChange;
+                _currentState.TotalDischargeEnergy += energyChange;
             }
             else
             {
-                _currentState.DailyDischargeEnergy += -energyChange;
-                _currentState.TotalDischargeEnergy += -energyChange;
+                // 充电
+                _currentState.DailyChargeEnergy += -energyChange;
+                _currentState.TotalChargeEnergy += -energyChange;
             }
         }
 
@@ -516,42 +540,44 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
 
         private void UpdateGridConnectedState()
         {
-            // 计算直流侧电流 (考虑效率)
-            double dcPower = _currentState.ActivePower / _config.Efficiency;
+            // 电流方向约定：正放负充
+            // 放电(ActivePower > 0)：直流电流从电池流出为正，交流电流向电网输出为正
+            // 充电(ActivePower < 0)：直流电流流入电池为负，交流电流从电网流入为负
+            double dcPower = _currentState.ActivePower > 0
+                ? _currentState.ActivePower / _config.Efficiency   // 放电：直流侧需提供更多功率
+                : _currentState.ActivePower * _config.Efficiency;  // 充电：直流侧吸收更少功率
             _currentState.DcCurrent = dcPower * 1000 / _currentState.DcVoltage;
 
             // 交流侧参数 (与电网同步)
             _currentState.AcVoltage = _gridState.Voltage * (1 - _gridLossCoefficient);
             _currentState.Frequency = _gridState.Frequency;
 
-            // 计算交流电流
+            // 计算交流电流（带符号，正=放电向网侧送电，负=充电从网侧取电）
             double apparentPower = Math.Sqrt(
                 Math.Pow(_currentState.ActivePower, 2) +
                 Math.Pow(_currentState.ReactivePower, 2));
-            _currentState.AcCurrent = apparentPower * 1000 / (_currentState.AcVoltage * Math.Sqrt(3));
-            // 判断功率的正负，决定交流电流方向
-            if (_currentState.ActivePower < 0)
-            {
-                _currentState.AcCurrent = -_currentState.AcCurrent;
-            }
+            double acCurrentMag = apparentPower * 1000 / (_currentState.AcVoltage * Math.Sqrt(3));
+            _currentState.AcCurrent = _currentState.ActivePower >= 0 ? acCurrentMag : -acCurrentMag;
         }
 
         private void UpdateIslandedState()
         {
-            // 计算直流侧电流 (考虑效率)
-            double dcPower = _currentState.ActivePower / _config.Efficiency;
+            // 电流方向约定：正放负充（离网模式作为电压源向负载供电）
+            double dcPower = _currentState.ActivePower > 0
+                ? _currentState.ActivePower / _config.Efficiency
+                : _currentState.ActivePower * _config.Efficiency;
             _currentState.DcCurrent = dcPower * 1000 / _currentState.DcVoltage;
 
             // 交流侧参数 (作为电压源)
             _currentState.AcVoltage = _config.AcVoltageNominal;
             _currentState.Frequency = _config.FrequencyNominal;
 
-            // 计算交流电流
+            // 计算交流电流（带符号，正=放电，负=充电）
             double apparentPower = Math.Sqrt(
                 Math.Pow(_currentState.ActivePower, 2) +
                 Math.Pow(_currentState.ReactivePower, 2));
-
-            _currentState.AcCurrent = apparentPower * 1000 /  (_currentState.AcVoltage * Math.Sqrt(3));
+            double acCurrentMag = apparentPower * 1000 / (_currentState.AcVoltage * Math.Sqrt(3));
+            _currentState.AcCurrent = _currentState.ActivePower >= 0 ? acCurrentMag : -acCurrentMag;
         }
 
         private void UpdateTemperatureModel(TimeSpan timeStep)

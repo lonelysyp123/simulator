@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IEC61850_simulatorServer2.EssDeviceSimModel
+namespace EssSimulator.EssDeviceSimModel
 {
     // 电池堆状态
     public class RackState
@@ -110,20 +110,16 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
         // 计算电流分配 (考虑并联簇的内阻差异)
         private double[] CalculateCurrentDistribution(double totalCurrent)
         {
-            // 获取各簇最新电压 (假设并联连接电压相同)
-            double commonVoltage = _clusters.Average(c => c.GetClusterState().TotalVoltage);
-
-            // 计算各簇电流分配 (基于欧姆定律)
-            double totalConductance = _clusters.Sum(c => 1.0 / (c.GetClusterState().TotalVoltage / commonVoltage *
-                                                              c._config.ClusterInternalResistance));
+            // 并联簇按电导比分配电流：I_i = I_total × G_i / ΣG_j。电压差异已内包含在内阻中，不需额外修正。
+            double totalConductance = _clusters.Sum(c => 1.0 / c._config.ClusterInternalResistance);
 
             double[] currents = new double[_clusters.Count];
+            if (totalConductance <= 0) return currents; // 防御性保护
             for (int i = 0; i < _clusters.Count; i++)
             {
-                double resistance = _clusters[i]._config.ClusterInternalResistance;
-                currents[i] = (totalCurrent / totalConductance) * (1.0 / resistance);
+                double g = 1.0 / _clusters[i]._config.ClusterInternalResistance;
+                currents[i] = totalCurrent * g / totalConductance;
             }
-
             return currents;
         }
 
@@ -138,7 +134,9 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
 
             // 计算电流相关参数
             var clusterCurrents = clusterStates.Select(c => c.TotalCurrent).ToList();
-            double currentImbalanceRatio = (clusterCurrents.Max() - clusterCurrents.Min()) / rackCurrent;
+            double currentImbalanceRatio = Math.Abs(rackCurrent) > 0
+                ? (clusterCurrents.Max() - clusterCurrents.Min()) / Math.Abs(rackCurrent)
+                : 0.0;
 
             // 计算SOC相关参数
             var clusterSOCs = clusterStates.Select(c => c.MinPackSOC).ToList();
@@ -147,8 +145,13 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             var clusterTemps = clusterStates.Select(c => c.AvgPackTemp).ToList();
 
             // 计算能量相关参数 (kWh)
-            double remainingEnergy = clusterStates.Sum(c => c.RemainingCapacity) / 1000.0;
-            double totalEnergy = clusterStates.Sum(c => c.TotalCapacity) / 1000.0;
+            // remainingEnergy = 各簇（MinSOC × 簇电压 × 簇配置容量）之和
+            double nominalClusterCapacityAh = _config.ClusterConfig!.PackConfig.NominalCapacity
+                                            * _config.ClusterConfig.PackConfig.ParallelCount; // Ah
+            double remainingEnergy = clusterStates.Sum(c =>
+                c.MinPackSOC * c.TotalVoltage * nominalClusterCapacityAh / 1000.0); // kWh
+            double totalEnergy = clusterStates.Sum(c =>
+                c.TotalVoltage * nominalClusterCapacityAh * c.StateOfHealth / 1000.0); // kWh
 
             // 使用积分和时间计算累计充放电能量
             if (rackCurrent > 0)

@@ -1,6 +1,6 @@
 using System;
 
-namespace IEC61850_simulatorServer2.EssSimModelApi.ElectricMeter
+namespace EssSimulator.EssSimModelApi.ElectricMeter
 {
     /// <summary>
     /// 电表数据模型（接口层 DTO），对应网关侧需要的电表读数。

@@ -1,4 +1,4 @@
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     /// <summary>
     /// 统一 Modbus 从站对外接口（普通与BMS）

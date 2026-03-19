@@ -1,11 +1,11 @@
-﻿using IEC61850_simulatorServer2.Helper;
+﻿using EssSimulator.Helper;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IEC61850_simulatorServer2.EssDeviceSimModel
+namespace EssSimulator.EssDeviceSimModel
 {
     // 电芯基本特性参数
     public class CellSpecifications
@@ -116,14 +116,18 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             voltage = Math.Max(_specs.MinVoltage, Math.Min(_specs.MaxVoltage, voltage));
 
 
-            // 温度模型 (优化版)
-            double powerLoss = Math.Pow(current, 2) * _specs.InternalResistance;
-            double tempChange = powerLoss * deltaTimeHours * 3600 / (_specs.Mass * 900); // 假设比热容900J/kg°C
-            double tempAfterLoss = _currentState.Temperature + tempChange;
-
-            // 冷却源影响，温度向ambientTemp（如26°C）回落
-            double coolingCoeff = 0.08; // 冷却系数，可调节
-            double newTemp = tempAfterLoss - coolingCoeff * (tempAfterLoss - ambientTemp);
+            // 温度模型（一阶滤波，与步长解耦）
+            // 稳态温升 = P_loss / h_coeff（线性冷却系数，W/°C）
+            // 热时间常数 tau = mass * Cp / h_coeff
+            // 一阶滤波：T(t) = T_ss + (T(t-1) - T_ss) * exp(-dt/tau)
+            double powerLoss    = current * current * _specs.InternalResistance; // W
+            const double hCoeff = 0.5;   // 等效散热系数 W/°C（可调）
+            const double Cp     = 900.0; // 比热容 J/(kg·°C)
+            double tau      = _specs.Mass * Cp / hCoeff;                // 热时间常数(s)
+            double deltaTimeSec = deltaTimeHours * 3600.0;              // 步长(s)
+            double T_ss     = ambientTemp + powerLoss / hCoeff;         // 稳态温度
+            double alpha    = Math.Exp(-deltaTimeSec / tau);            // 滤波系数
+            double newTemp  = T_ss + (_currentState.Temperature - T_ss) * alpha;
 
             // 老化模型 (简化)
             double newAge = CalculateAging(_totalAhThroughput, _currentState.CycleCount);

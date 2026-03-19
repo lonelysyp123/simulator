@@ -1,6 +1,6 @@
 
 
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     public class CommunicatorBase
     {

@@ -7,7 +7,7 @@ using log4net.Config;
 using Microsoft.VisualBasic;
 
 
-namespace IEC61850_simulatorServer2.Display
+namespace EssSimulator.Display
 {
     public class LogDisplay
     {

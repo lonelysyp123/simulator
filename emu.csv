@@ -39,11 +39,11 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,25322,u16,16,param18,10,单元1最大允许放电功率,0
 4,25323,u16,16,param19,10,单元1最大感性无功,0
 4,25324,u16,16,param20,10,单元1最大容性无功,0
-4,25325,u32,32,param21,10,单元1总充电量,model=4|arg1=emu.PcsList[1].TotalChargeEnergy|arg2=|arg3=|arg4=1000
-4,25327,u32,32,param22,10,单元1总放电量,model=4|arg1=emu.PcsList[1].TotalDischargeEnergy|arg2=|arg3=|arg4=1000
-4,25329,u32,32,param23,10,单元1当日充电量,model=4|arg1=emu.PcsList[1].DailyChargeEnergy|arg2=|arg3=|arg4=1000
-4,25331,u32,32,param24,10,单元1当日放电量,model=4|arg1=emu.PcsList[1].DailyDischargeEnergy|arg2=|arg3=|arg4=1000
-4,25333,u16,16,param25,1,单元1运行状态,model=4|arg1=emu.PcsList[1].OperatingStatus|arg2=|arg3=|arg4=1000
+4,25325,u32,32,param21,10,单元1总充电量,model=4|arg1=emu.PcsList[0].TotalChargeEnergy|arg2=|arg3=|arg4=1000
+4,25327,u32,32,param22,10,单元1总放电量,model=4|arg1=emu.PcsList[0].TotalDischargeEnergy|arg2=|arg3=|arg4=1000
+4,25329,u32,32,param23,10,单元1当日充电量,model=4|arg1=emu.PcsList[0].DailyChargeEnergy|arg2=|arg3=|arg4=1000
+4,25331,u32,32,param24,10,单元1当日放电量,model=4|arg1=emu.PcsList[0].DailyDischargeEnergy|arg2=|arg3=|arg4=1000
+4,25333,u16,16,param25,1,单元1运行状态,model=4|arg1=emu.PcsList[0].OperationStatus|arg2=|arg3=|arg4=1000
 4,25334,u16,16,param26,1,单元1当前告警,0
 4,25335,u16,16,param27,1,单元1当前故障,0
 4,25600,u16,16,param28,10,单元2交流侧AB电压,model=4|arg1=emu.PcsList[1].LineVoltageAB|arg2=|arg3=|arg4=1000
@@ -70,7 +70,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,25627,u32,32,param49,10,单元2总放电量,model=4|arg1=emu.PcsList[1].TotalDischargeEnergy|arg2=|arg3=|arg4=1000
 4,25629,u32,32,param50,10,单元2当日充电量,model=4|arg1=emu.PcsList[1].DailyChargeEnergy|arg2=|arg3=|arg4=1000
 4,25631,u32,32,param51,10,单元2当日放电量,model=4|arg1=emu.PcsList[1].DailyDischargeEnergy|arg2=|arg3=|arg4=1000
-4,25633,u16,16,param52,1,单元2运行状态,model=4|arg1=emu.PcsList[1].OperatingStatus|arg2=|arg3=|arg4=1000
+4,25633,u16,16,param52,1,单元2运行状态,model=4|arg1=emu.PcsList[1].OperationStatus|arg2=|arg3=|arg4=1000
 4,25634,u16,16,param53,1,单元2当前告警,0
 4,25635,u16,16,param54,1,单元2当前故障,0
 6,100,u16,16,poweronoff,1,高压断路器开合,0

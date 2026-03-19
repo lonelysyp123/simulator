@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Type = System.Type;
 
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     public static class Common
     {

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IEC61850_simulatorServer2.EssDeviceSimModel
+namespace EssSimulator.EssDeviceSimModel
 {
     public class LiFePO4BatteryOCVModel
     {

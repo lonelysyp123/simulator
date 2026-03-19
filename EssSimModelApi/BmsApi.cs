@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using IEC61850_simulatorServer2.EssDeviceSimModel;
+using EssSimulator.EssDeviceSimModel;
 
-namespace IEC61850_simulatorServer2.EssSimModelApi
+namespace EssSimulator.EssSimModelApi
 {
     using System;
     using System.Collections.Generic;

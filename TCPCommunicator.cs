@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using log4net;
 
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     /// <summary>
     /// TCP连接器

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     /// <summary>
     /// 设备信息

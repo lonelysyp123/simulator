@@ -5,7 +5,7 @@ using NModbus.Data;
 using NModbus.Device;
 using NModbus.IO;
 
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     /// <summary>
     /// Modbus Slave TCP

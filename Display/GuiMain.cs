@@ -1,5 +1,5 @@
-﻿using IEC61850_simulatorServer2.EssSimModelApi;
-using IEC61850_simulatorServer2.EssSimModelApi.BatteryManagementSystem;
+﻿using EssSimulator.EssSimModelApi;
+using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 using log4net;
 using log4net.Config;
 using log4net.Layout;
@@ -15,7 +15,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Spectre.Console;
 
-namespace IEC61850_simulatorServer2.Display
+namespace EssSimulator.Display
 {  
     public class GuiMain
     {

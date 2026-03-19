@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IEC61850_simulatorServer2.EssDeviceSimModel
+namespace EssSimulator.EssDeviceSimModel
 {
     // 模组配置
     public class PackConfiguration
@@ -98,22 +98,9 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
                 }
             }
 
-            // 2. 计算温度分布（头部更接近ambientTemp，末端更接近自身原值）
-            var cellStates = _cells.SelectMany(s => s.Select(p => p.GetCurrentState())).ToList();
-            int totalSeries = _config.SeriesCount;
-            for (int s = 0; s < totalSeries; s++)
-            {
-                for (int p = 0; p < _config.ParallelCount; p++)
-                {
-                    var cellState = _cells[s][p].GetCurrentState();
-                    double ratio = 1.0 - (double)s / (totalSeries - 1); // 头部为1，末端为0
-                    double tempDist = cellState.Temperature * (1 - ratio * 0.8) + ambientTemp * ratio * 0.8;
-                    _cells[s][p].SetCellTemperature(tempDist);
-                }
-            }
-
-            // 3. 热扩散优化：让每个cell温度向邻居靠拢，防止极端温差
+            // 2. 热扩散：让每个cell温度向相邻电芯靠拢，模拟Pack内传热平滑温差
             // 只对串联方向做一维扩散
+            int totalSeries = _config.SeriesCount;
             for (int p = 0; p < _config.ParallelCount; p++)
             {
                 var temps = new double[totalSeries];
@@ -167,7 +154,14 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             var cellSOCs = cellStates.Select(c => c.SOC).ToList();
 
             // 计算容量相关参数
-            double remainingCapacity = cellStates.Min(c => c.RemainingCapacity) * _config.ParallelCount;
+            // Pack 剩余容量 = 最弱串联段的并联之和（短板效应）
+            double remainingCapacity = 0;
+            for (int s = 0; s < _config.SeriesCount; s++)
+            {
+                double seriesSegmentCapacity = _cells[s].Sum(c => c.GetCurrentState().RemainingCapacity);
+                if (s == 0 || seriesSegmentCapacity < remainingCapacity)
+                    remainingCapacity = seriesSegmentCapacity;
+            }
             double totalCapacity = _config.NominalCapacity * _config.ParallelCount * cellStates.Average(c => 1 - c.Age);
 
             // 更新模组状态

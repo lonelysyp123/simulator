@@ -1,7 +1,7 @@
 ﻿using System.Data;
 using log4net;
 
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     /// <summary>
     /// ModBus协议解析器

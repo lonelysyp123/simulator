@@ -1,14 +1,15 @@
 ﻿using System;
+using EssSimulator.Core;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using IEC61850_simulatorServer2.EssSimModelApi;
+using EssSimulator.EssSimModelApi;
 using System.Diagnostics;
 using log4net;
 
 
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     public class SimServer
     {
@@ -24,8 +25,8 @@ namespace IEC61850_simulatorServer2
         public static object GetExtIfVariableVal(string arg1)
         {
             string[] parts = arg1.Split('.',2);
-            var objectsCollect = ObjectsCollect.Instance;
-            Object targetObj = objectsCollect.GetObjByName(parts[0]);
+            var objectsCollect = SimulatorHost.Instance;
+            Object targetObj = objectsCollect.Get<object>(parts[0]);
             if (targetObj == null)
             {
                 return null;
@@ -38,8 +39,8 @@ namespace IEC61850_simulatorServer2
         {
             string[] parts = arg1.Split('.', 2);
 
-            var objectsCollect = ObjectsCollect.Instance;
-            Object targetObj = objectsCollect.GetObjByName(parts[0]);
+            var objectsCollect = SimulatorHost.Instance;
+            Object targetObj = objectsCollect.Get<object>(parts[0]);
             if (targetObj == null)
             {
                 return false;

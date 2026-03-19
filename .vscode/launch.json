@@ -8,7 +8,7 @@
             "name": ".NET Core Launch (console)",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/Debug/net8.0/IEC61850-simulatorServer2.dll",
+            "program": "${workspaceFolder}/bin/Debug/net8.0/EssSimulator.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

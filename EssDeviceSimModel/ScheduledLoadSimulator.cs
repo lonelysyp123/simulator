@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace IEC61850_simulatorServer2.EssDeviceSimModel
+namespace EssSimulator.EssDeviceSimModel
 {
     // 仅用日内刻度（时:分:秒），去掉结束时间，按阶跃保持到下一刻度
     public class LoadWindow

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IEC61850_simulatorServer2.EssDeviceSimModel
+namespace EssSimulator.EssDeviceSimModel
 {
     // 电池簇配置
     public class ClusterConfiguration
@@ -109,11 +109,12 @@ namespace IEC61850_simulatorServer2.EssDeviceSimModel
             // 计算SOC相关参数
             var packSOCs = packStates.Select(p => p.MinSOC).ToList(); // 使用模组最小SOC
 
-            // 计算容量相关参数 (kWh)
-            double remainingCapacity = packStates.Min(p => p.RemainingCapacity * p.TotalVoltage) / 1000.0;
+            // 计算容量相关参数
+            // 將屶5的 RemainingCapacity 单位统一为 Ah：串联各 Pack 容量相同，簇总容量 = 任意一个 Pack 的容量（短板效应）
+            double remainingCapacity = packStates.Min(p => p.RemainingCapacity); // Ah
             double totalCapacity = _config.PackConfig.NominalCapacity * _config.PackConfig.ParallelCount *
                                 _config.PackConfig.SeriesCount * _config.PackConfig.NominalVoltage *
-                                packStates.Average(p => p.StateOfHealth) / 1000.0;
+                                packStates.Average(p => p.StateOfHealth) / 1000.0; // kWh
 
             // 更新簇状态
             _currentState = new ClusterState

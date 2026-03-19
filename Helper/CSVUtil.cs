@@ -1,7 +1,7 @@
 using CsvHelper;
 using System.Globalization;
 
-namespace IEC61850_simulatorServer2
+namespace EssSimulator
 {
     /// <summary>
     /// CSV 轉換成 Class

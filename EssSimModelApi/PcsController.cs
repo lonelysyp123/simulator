@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IEC61850_simulatorServer2.EssSimModelApi
+namespace EssSimulator.EssSimModelApi
 {
     /// <summary>
     /// PCS 控制器，包含各种PCS的控制模式和控制算法，包括恒压，限流等控制算法

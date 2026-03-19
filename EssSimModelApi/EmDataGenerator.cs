@@ -1,7 +1,7 @@
 using System;
-using IEC61850_simulatorServer2.EssSimModelApi.ElectricMeter;
+using EssSimulator.EssSimModelApi.ElectricMeter;
 
-namespace IEC61850_simulatorServer2.EssSimModelApi
+namespace EssSimulator.EssSimModelApi
 {
     /// <summary>
     /// 生成电表接口层示例数据，便于初始化与离线演示。
