@@ -6,7 +6,7 @@
 
 本项目是一个基于 `.NET 8` 的储能系统仿真程序，核心能力包括：
 
-- 仿真两套电池舱、两台 PCS、变压器、断路器和负载。
+- 仿真多套电池舱、多台 PCS、变压器、断路器和负载（数量由 `UnitCount` 配置）。
 - 通过 Modbus TCP 对外提供 BMS、PCS/EMU、电表数据。
 - 提供控制台 GUI 和命令行交互命令，便于调试和联调。
 - 使用 CSV 点表将外部点位映射到内部对象路径。
@@ -139,7 +139,7 @@ dotnet EssSimulator.dll
 
 | 配置项 | 默认值 | 说明 |
 |---|---:|---|
-| `UnitCount` | `2` | 储能单元数量，对应 BMS 服务数量 |
+| `UnitCount` | `2` | 储能单元数量；同时创建 UnitCount 个 PCS、电池舱、BMS 数据及 BMS Modbus 从站；emu.PcsList 包含 UnitCount 个 PcsData，由单个 EMU Modbus 从站服务 |
 | `ClusterCount` | `12` | 每个单元的簇数量 |
 | `PackCount` | `4` | 每簇 Pack 数 |
 | `BaseModbusPort` | `1502` | BMS 基础端口，后续单元按 `+10` 递增 |
@@ -148,6 +148,8 @@ dotnet EssSimulator.dll
 | `SimStepMs` | `200` | 仿真主循环睡眠间隔（毫秒） |
 | `Speedup` | `10.0` | 仿真时间倍率 |
 | `NoGui` | `false` | 是否关闭控制台 GUI |
+| `CellInitialSoc` | `0.5` | 电芯初始 SOC 基准值（0-1） |
+| `CellInitialSocRandomRange` | `0.05` | 电芯初始 SOC 随机扰动范围（±），例如 0.05 表示 ±5% |
 
 ### 5.2 其他配置节
 
@@ -171,7 +173,9 @@ dotnet EssSimulator.dll
 | BMS 单元 1 | `simBms1` | `1502` | `bms_bank.csv` |
 | BMS 单元 2 | `simBms2` | `1512` | `bms_bank.csv` |
 
-说明：BMS 端口按以下规则生成：`BaseModbusPort + i × 10`，其中 `i` 从 `0` 开始。
+说明：BMS 端口按以下规则生成：`BaseModbusPort + i × 10`，其中 `i` 从 `0` 开始。当 `UnitCount > 2` 时，会创建 simBms3（1522）、simBms4（1532）等。
+
+**注意**：当 `UnitCount > 2` 时，需在 `emu.csv` 中为 `emu.PcsList[2]`、`emu.PcsList[3]` 等补充相应点位映射，否则多出的 PCS 数据不会通过 Modbus 暴露。
 
 ### 6.2 监听信息查看
 

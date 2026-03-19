@@ -1,4 +1,4 @@
-﻿using EssSimulator.EssDeviceSimModel;
+using EssSimulator.EssDeviceSimModel;
 using EssSimulator.Core;
 using EssSimulator.EssSimModelApi;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
@@ -203,10 +203,17 @@ namespace EssSimulator.Display
                 return;
             }
 
-            // 如果 args[0] 不等于 setPcs1 或 setPcs2，则提示用户指令不支持
-            if (args[0] != "setPcs1" && args[0] != "setPcs2" && args[0] != "setLoad")
+            // 支持 setPcs1, setPcs2, ... setPcsN 或 setLoad
+            bool isSetLoad = args[0] == "setLoad";
+            int pcsIndex = -1;
+            if (!isSetLoad && args[0].StartsWith("setPcs", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine("当前设备不支持指令，请使用 esscmd help 查看用法");
+                if (int.TryParse(args[0].AsSpan(6), out int idx) && idx >= 1 && idx <= ess._pcsList.Count)
+                    pcsIndex = idx - 1;
+            }
+            if (!isSetLoad && pcsIndex < 0)
+            {
+                Console.WriteLine("当前设备不支持指令，请使用 esscmd help 查看用法（支持 setPcs1~setPcsN, setLoad）");
                 return;
             }
 
@@ -224,13 +231,9 @@ namespace EssSimulator.Display
                 return;
             }
 
-            if (args[0] == "setPcs1")
+            if (pcsIndex >= 0)
             {
-                ess._pcs1.SetPcsCharacteristic(args[1], num);
-            }
-            else if(args[0] == "setPcs2")
-            {
-                ess._pcs2.SetPcsCharacteristic(args[1], num);
+                ess._pcsList[pcsIndex].SetPcsCharacteristic(args[1], num);
             }
             else if(args[0] == "setLoad")
             {

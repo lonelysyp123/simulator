@@ -1,8 +1,10 @@
 using EssSimulator.EssDeviceSimModel;
+using EssSimulator.Configuration;
 using EssSimulator.Core;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 using EssSimulator.EssSimModelApi.Mappers;
 using Microsoft.Extensions.Hosting;
+using System.Linq;
 
 namespace EssSimulator.EssSimModelApi
 {
@@ -15,16 +17,19 @@ namespace EssSimulator.EssSimModelApi
     {
         private readonly int _unitCount;
         private readonly BatteryManagementSystemData[] _bmsDataList;
+        private readonly IReadOnlyList<int> _clusterCounts;
 
-        public BmsDataService(int unitCount, int clusterCount, int packCount)
+        public BmsDataService(SimulatorConfig cfg)
         {
-            _unitCount   = unitCount;
-            _bmsDataList = new BatteryManagementSystemData[unitCount];
+            var bmsCfgList = cfg.GetBmsDeviceConfigs();
+            _unitCount = bmsCfgList.Count;
+            _bmsDataList = new BatteryManagementSystemData[_unitCount];
+            _clusterCounts = bmsCfgList.Select(x => x.ClusterCount).ToList();
 
             var store = SimulatorHost.Instance;
-            for (int i = 0; i < unitCount; i++)
+            for (int i = 0; i < _unitCount; i++)
             {
-                _bmsDataList[i] = BmsDataGenerator.GenerateSampleData(1, clusterCount);
+                _bmsDataList[i] = BmsDataGenerator.GenerateSampleData(1, _clusterCounts[i]);
                 store.Register($"bms{i + 1}", _bmsDataList[i]);
             }
         }
@@ -34,26 +39,18 @@ namespace EssSimulator.EssSimModelApi
             var store = SimulatorHost.Instance;
             EnergyStorageSystem? ess = null;
 
-            // ESS 的 BatteryRack 列表：rack1 → index 0, rack2 → index 1, ...
-            // 目前 EnergyStorageSystem 暴露 _batteryRack / _batteryRack2，
-            // 此处通过数组访问，后续可扩展为 IReadOnlyList<BatteryRackSimulator>。
-            BatteryRackSimulator?[] racks = new BatteryRackSimulator[_unitCount];
-
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
                 ess ??= store.Get<EnergyStorageSystem>("ess");
                 if (ess == null) continue;
 
-                // 按索引填充 rack 引用（目前最多支持 2 路，与物理模型字段对应）
-                if (_unitCount > 0) racks[0] = ess._batteryRack;
-                if (_unitCount > 1) racks[1] = ess._batteryRack2;
+                var racks = ess._batteryRacks;
 
-                for (int i = 0; i < _unitCount; i++)
+                for (int i = 0; i < _unitCount && i < racks.Count; i++)
                 {
                     var rack    = racks[i];
                     var bmsData = _bmsDataList[i];
-                    if (rack == null) continue;
 
                     var rackState = rack.GetRackState();
                     BmsMapper.MapRackToStack(rackState, bmsData);

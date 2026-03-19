@@ -39,53 +39,45 @@ namespace EssSimulator.EssSimModelApi.Mappers
         }
 
         /// <summary>更新 EMU 汇总数据（运行状态、SOC 等）。</summary>
-        public static void MapEmuState(EnergyManagementData emu, BatteryRackSimulator bms1)
+        public static void MapEmuState(EnergyManagementData emu, IReadOnlyList<BatteryRackSimulator> batteryRacks)
         {
-            var pcs0 = emu.PcsList[0];
-            var pcs1 = emu.PcsList[1];
-
             emu.Emu.MaxChargePower    = 1250.0f;
             emu.Emu.MaxDischargePower = 1250.0f;
-            emu.Emu.AverageBatterySoc = (float)bms1.GetRackState().MinClusterSOC * 100;
+
+            if (batteryRacks.Count > 0 && batteryRacks[0].GetRackState() != null)
+                emu.Emu.AverageBatterySoc = (float)batteryRacks[0].GetRackState().MinClusterSOC * 100;
 
             // 运行状态判断（正放负充：ActivePower>0为放电，<0为充电）
-            if (pcs0.ActivePower > 10 || pcs1.ActivePower > 10)
-                emu.Emu.OperationStatus = 4;  // 放电
-            else if (pcs0.ActivePower < -10 || pcs1.ActivePower < -10)
-                emu.Emu.OperationStatus = 3;  // 充电
-            else
-                emu.Emu.OperationStatus = 2;
+            bool anyDischarge = false, anyCharge = false;
+            foreach (var pcs in emu.PcsList)
+            {
+                if (pcs.ActivePower > 10)  anyDischarge = true;
+                if (pcs.ActivePower < -10) anyCharge   = true;
+            }
+            emu.Emu.OperationStatus = anyDischarge ? 4 : (anyCharge ? 3 : 2);
         }
 
         /// <summary>将 EMU 控制命令回写到 ESS 物理模型。</summary>
-        public static void ApplyEmuCommands(EnergyManagementData emu, EnergyStorageSystem ess)
+        public static void ApplyEmuCommands(EnergyManagementData emu, EnergyStorageSystem ess, int pcsBaseIndex = 0)
         {
             if (emu.PcsList == null || emu.PcsList.Count == 0) return;
 
-            var pcs1 = ess._pcs1;
-            var pcs2 = ess._pcs2;
+            for (int i = 0; i < emu.PcsList.Count; i++)
+            {
+                var pcsData = emu.PcsList[i];
+                int simIdx = pcsBaseIndex + i;
+                if (simIdx < 0 || simIdx >= ess._pcsList.Count) break;
+                var pcsSim  = ess._pcsList[simIdx];
 
-            // 功率设定命令
-            if (Math.Abs(emu.PcsList[0].PCSActivePowerSetting   - pcs1.GetCurrentState().ActivePower)   > 0 ||
-                Math.Abs(emu.PcsList[0].PCSReactivePowerSetting  - pcs1.GetCurrentState().ReactivePower) > 0)
-                pcs1.SetPowerCommand(emu.PcsList[0].PCSActivePowerSetting, emu.PcsList[0].PCSReactivePowerSetting);
+                if (Math.Abs(pcsData.PCSActivePowerSetting  - pcsSim.GetCurrentState().ActivePower)  > 0 ||
+                    Math.Abs(pcsData.PCSReactivePowerSetting - pcsSim.GetCurrentState().ReactivePower) > 0)
+                    pcsSim.SetPowerCommand(pcsData.PCSActivePowerSetting, pcsData.PCSReactivePowerSetting);
 
-            if (Math.Abs(emu.PcsList[1].PCSActivePowerSetting   - pcs2.GetCurrentState().ActivePower)   > 0 ||
-                Math.Abs(emu.PcsList[1].PCSReactivePowerSetting  - pcs2.GetCurrentState().ReactivePower) > 0)
-                pcs2.SetPowerCommand(emu.PcsList[1].PCSActivePowerSetting, emu.PcsList[1].PCSReactivePowerSetting);
-
-            // 调度模式同步（通过线程安全方法写入，避免直接操作 GetCurrentState() 引用）
-            var state1 = pcs1.GetCurrentState();
-            if (emu.PcsList[0].ActivePowerDispatchMode   != state1.ActiveDispathMode ||
-                emu.PcsList[0].ReactivePowerDispatchMode != state1.ReactiveDispathMode)
-                pcs1.SetDispatchMode(emu.PcsList[0].ActivePowerDispatchMode,
-                                     emu.PcsList[0].ReactivePowerDispatchMode);
-
-            var state2 = pcs2.GetCurrentState();
-            if (emu.PcsList[1].ActivePowerDispatchMode   != state2.ActiveDispathMode ||
-                emu.PcsList[1].ReactivePowerDispatchMode != state2.ReactiveDispathMode)
-                pcs2.SetDispatchMode(emu.PcsList[1].ActivePowerDispatchMode,
-                                     emu.PcsList[1].ReactivePowerDispatchMode);
+                var state = pcsSim.GetCurrentState();
+                if (pcsData.ActivePowerDispatchMode   != state.ActiveDispathMode ||
+                    pcsData.ReactivePowerDispatchMode != state.ReactiveDispathMode)
+                    pcsSim.SetDispatchMode(pcsData.ActivePowerDispatchMode, pcsData.ReactivePowerDispatchMode);
+            }
         }
     }
 }

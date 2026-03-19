@@ -54,8 +54,7 @@ namespace EssSimulator
             // 3. 创建数据同步器
             _dataSync = new EssSimulator.Protocol.Modbus.ModbusDataSync(
                 _slave, _parser, _pointMap, _deviceInfo, clusterCount);
-
-            Console.WriteLine($"{serverName} 创建完成 — ip={_deviceInfo.ip}  port={_deviceInfo.port}");
+            // 控制台输出由启动阶段统一负责，避免与 GUI 输出互相打断
         }
 
         /// <summary>

@@ -15,23 +15,29 @@ namespace EssSimulator.EssSimModelApi
     /// </summary>
     public class PcsDataServer : BackgroundService
     {
-        private readonly EnergyManagementData _emuSys;
+        private readonly List<EnergyManagementData> _emuUnits = new();
+        private readonly int _unitCount;
 
-        public PcsDataServer(IOptions<PcsDefaultConfig> opts)
+        public PcsDataServer(IOptions<SimulatorConfig> simOpts, IOptions<PcsDefaultConfig> pcsOpts)
         {
-            var cfg = opts.Value;
-            _emuSys = new EnergyManagementData();
+            var cfg = pcsOpts.Value;
+            _unitCount = Math.Max(1, simOpts.Value.Devices?.Count ?? 1);
 
-            for (int i = 1; i <= 2; i++)
+            for (int u = 0; u < _unitCount; u++)
             {
-                var pcs = new PcsData { PcsId = i };
-                ApplyDefaultConfig(pcs, cfg);
-                _emuSys.PcsList.Add(pcs);
-            }
+                var emu = new EnergyManagementData();
+                for (int i = 1; i <= 2; i++)
+                {
+                    var pcs = new PcsData { PcsId = i };
+                    ApplyDefaultConfig(pcs, cfg);
+                    emu.PcsList.Add(pcs);
+                }
 
-            _emuSys.Emu.MaxChargePower    = cfg.EmuMaxChargePower;
-            _emuSys.Emu.MaxDischargePower = cfg.EmuMaxDischargePower;
-            SimulatorHost.Instance.Register("emu", _emuSys);
+                emu.Emu.MaxChargePower    = cfg.EmuMaxChargePower;
+                emu.Emu.MaxDischargePower = cfg.EmuMaxDischargePower;
+                _emuUnits.Add(emu);
+                SimulatorHost.Instance.Register($"emu{u + 1}", emu);
+            }
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -45,10 +51,17 @@ namespace EssSimulator.EssSimModelApi
                 ess ??= store.Get<EnergyStorageSystem>("ess");
                 if (ess == null) continue;
 
-                PcsMapper.MapPcsState(ess._pcs1.GetCurrentState(), _emuSys.PcsList[0], ess._batteryRack);
-                PcsMapper.MapPcsState(ess._pcs2.GetCurrentState(), _emuSys.PcsList[1], ess._batteryRack2);
-                PcsMapper.MapEmuState(_emuSys, ess._batteryRack);
-                PcsMapper.ApplyEmuCommands(_emuSys, ess);
+                for (int u = 0; u < _unitCount; u++)
+                {
+                    int baseIdx = u * 2;
+                    if (baseIdx + 1 >= ess._pcsList.Count || baseIdx + 1 >= ess._batteryRacks.Count) break;
+
+                    var emu = _emuUnits[u];
+                    PcsMapper.MapPcsState(ess._pcsList[baseIdx].GetCurrentState(), emu.PcsList[0], ess._batteryRacks[baseIdx]);
+                    PcsMapper.MapPcsState(ess._pcsList[baseIdx + 1].GetCurrentState(), emu.PcsList[1], ess._batteryRacks[baseIdx + 1]);
+                    PcsMapper.MapEmuState(emu, new[] { ess._batteryRacks[baseIdx], ess._batteryRacks[baseIdx + 1] });
+                    PcsMapper.ApplyEmuCommands(emu, ess, baseIdx);
+                }
             }
         }
 

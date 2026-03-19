@@ -1,4 +1,4 @@
-﻿using EssSimulator.EssSimModelApi;
+using EssSimulator.EssSimModelApi;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 using log4net;
 using log4net.Config;
@@ -40,6 +40,52 @@ namespace EssSimulator.Display
             Thread guiThread = new Thread(GuiThread);
             guiThread.Start();
         }
+        private static int GetEssUnitCount()
+        {
+            try
+            {
+                var list = SimServer.GetExtIfVariableVal("ess._pcsList");
+                return list is System.Collections.ICollection c ? c.Count : 0;
+            }
+            catch { return 2; }
+        }
+
+        /// <summary>从 bms1 数据模型读取簇数量（与 Simulator.ClusterCount 一致），失败时回退 12。</summary>
+        private static int GetClusterCount()
+        {
+            try
+            {
+                var v = SimServer.GetExtIfVariableVal("bms1.BatteryStacks[0].Cluseter.Count");
+                if (v is int i) return Math.Max(1, i);
+                if (v is long l) return (int)Math.Max(1, Math.Min(int.MaxValue, l));
+                if (v != null && int.TryParse(v.ToString(), out int p)) return Math.Max(1, p);
+            }
+            catch { /* ignore */ }
+            return 12;
+        }
+
+        private static double SafeGetDouble(string path, double fallback = 0)
+        {
+            try
+            {
+                var o = SimServer.GetExtIfVariableVal(path);
+                if (o == null) return fallback;
+                return Convert.ToDouble(o);
+            }
+            catch { return fallback; }
+        }
+
+        private static bool SafeGetBool(string path, bool fallback = false)
+        {
+            try
+            {
+                var o = SimServer.GetExtIfVariableVal(path);
+                if (o == null) return fallback;
+                return Convert.ToBoolean(o);
+            }
+            catch { return fallback; }
+        }
+
         private void DrawInterface()
         {
             // 绘制主界面（菜单）
@@ -171,93 +217,78 @@ namespace EssSimulator.Display
             }
         }
 
+        /// <summary>ASCII 主接线图：按“储能单元（每单元2路PCS+2路BMS）”动态分组展示。</summary>
         private void DrawMainLine()
         {
-                        // 绘制主接线信息：从 SimServer（仿真后端）读取多个状态值并格式化输出为 ASCII 图形信息。
-                        // 读取操作都通过 SimServer.GetExtIfVariableVal("path") 获取相应的变量值（类型转换由调用方承担）。
-                        // 注意：大量直接转换为基本类型（(double)/(bool)）可能在仿真未初始化时抛出异常或导致默认值，
-                        // 在必要时可在 SimServer 层做更稳健的空值处理。
+            int channelCount = Math.Max(1, GetEssUnitCount());
+            int unitCount = Math.Max(1, (int)Math.Ceiling(channelCount / 2.0));
+            var time = DateTime.Now.ToLongTimeString();
 
-                        // 获取断路器、变压器、PCS、直流母线和 SOC 等多个参数并拼接输出
-                        bool breakerClosed = (bool)SimServer.GetExtIfVariableVal("ess._breaker.IsClosed");
-                        var primaryVoltage = (double)SimServer.GetExtIfVariableVal("ess._transformer._currentState.PrimaryVoltage");
-                        var secondaryVoltage = (double)SimServer.GetExtIfVariableVal("ess._transformer._currentState.SecondaryVoltage");
-                        var primaryCurrent = (double)SimServer.GetExtIfVariableVal("ess._transformer._currentState.PrimaryCurrent");
-                        var secondaryCurrent = (double)SimServer.GetExtIfVariableVal("ess._transformer._currentState.SecondaryCurrent");
-                        var pcs1Reactive = (double)SimServer.GetExtIfVariableVal("ess._pcs1._currentState.ReactivePower");
-                        var pcs2Reactive = (double)SimServer.GetExtIfVariableVal("ess._pcs2._currentState.ReactivePower");
-                        var pcs1Active = (double)SimServer.GetExtIfVariableVal("ess._pcs1._currentState.ActivePower");
-                        var pcs2Active = (double)SimServer.GetExtIfVariableVal("ess._pcs2._currentState.ActivePower");
-                        var dcCurrentRack1 = (double)SimServer.GetExtIfVariableVal("ess._batteryRack._currentState.TotalCurrent");
-                        var dcVoltageRack1 = (double)SimServer.GetExtIfVariableVal("ess._batteryRack._currentState.TotalVoltage");
-                        var socRack1 = 100 * (double)SimServer.GetExtIfVariableVal("ess._batteryRack._currentState.MinClusterSOC");
-                        var socRack2 = 100 * (double)SimServer.GetExtIfVariableVal("ess._batteryRack2._currentState.MinClusterSOC");
-                        var dcCurrentRack2 = (double)SimServer.GetExtIfVariableVal("ess._batteryRack2._currentState.TotalCurrent");
-                        var dcVoltageRack2 = (double)SimServer.GetExtIfVariableVal("ess._batteryRack2._currentState.TotalVoltage");
-                        var loadActivePower = (double)SimServer.GetExtIfVariableVal("ess._loadSimulator.ActivePower");
-                        var loadReactivePower = (double)SimServer.GetExtIfVariableVal("ess._loadSimulator.ReactivePower");
-                        var meterIA = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.PhaseACurrent"));
-                        var meterIB = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.PhaseBCurrent"));
-                        var meterIC = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.PhaseCCurrent"));
-                        var meterUab = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.LineVoltageAB"));
-                        var meterUbc = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.LineVoltageBC"));
-                        var meterUca = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.LineVoltageCA"));
-                        var switchState = (bool)SimServer.GetExtIfVariableVal("ess._breaker.swState");
-                        var time = DateTime.Now.ToLongTimeString();
-                        SafeSetCursorPosition(0, 0);
-                        Console.WriteLine(@"
-电气主接线[{0}]
-========= 电压: 10.5 Kv  
-                |
-                |
-                |                                                                三相电流: {19}/{20}/{21} A           有功功率: {17}  kw
-                |   状态: {1}   状态: {2}          电压: {3}kV/{5}V           线电压: {22}/{23}/{24} V             无功功率: {18}  kvar
-                |----[断路器]---[隔离开关]------------[变压器]-----------------[电表]------------------------------[负载]
-                                                  电流: {4}A/{6}A                           |                     
-                                                                                            |
-                                                                                            | 
-                                                                            ---------------------------------
-                                                                            |                               |
-                                                                            |                               |
-                                                                            |                               |
-                                                                          [PCS2]                          [PCS1]
-                                                                            |  无功功率: {7}   kvar          |   无功功率: {12}   kvar
-                                                                            |  有功功率: {8}   kw            |   有功功率: {13}   kw  
-                                                                            |                               |
-                                                                         [电池舱2]                       [电池舱1]
-                                                                        SOC: {9}  %                    SOC: {14}  %
-                                                                        直流电压: {10}  V               直流电压: {15}  V
-                                                                        直流电流: {11}  A               直流电流: {16}  A
+            bool breakerClosed = SafeGetBool("ess._breaker.IsClosed");
+            bool switchState  = SafeGetBool("ess._breaker.swState");
+            double primaryVoltage   = SafeGetDouble("ess._transformer._currentState.PrimaryVoltage");
+            double secondaryVoltage = SafeGetDouble("ess._transformer._currentState.SecondaryVoltage");
+            double primaryCurrent   = SafeGetDouble("ess._transformer._currentState.PrimaryCurrent");
+            double secondaryCurrent = SafeGetDouble("ess._transformer._currentState.SecondaryCurrent");
+            double loadActivePower   = SafeGetDouble("ess._loadSimulator.ActivePower");
+            double loadReactivePower = SafeGetDouble("ess._loadSimulator.ReactivePower");
+            double meterIA = SafeGetDouble("em.PhaseACurrent");
+            double meterIB = SafeGetDouble("em.PhaseBCurrent");
+            double meterIC = SafeGetDouble("em.PhaseCCurrent");
+            double meterUab = SafeGetDouble("em.LineVoltageAB");
+            double meterUbc = SafeGetDouble("em.LineVoltageBC");
+            double meterUca = SafeGetDouble("em.LineVoltageCA");
 
+            var sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine($"电气主接线 [{time}]  （储能单元数: {unitCount}，PCS/BMS通道数: {channelCount}）");
+            sb.AppendLine("========= 电压: 10.5 kV");
+            sb.AppendLine("        |");
+            sb.AppendLine($"        |   断路器: {(breakerClosed ? "合" : "分")}   隔离开关: {(switchState ? "合" : "分")}");
+            sb.AppendLine($"        |   一次侧 {primaryVoltage / 1000:0.0} kV / {primaryCurrent:0.0} A    二次侧 {secondaryVoltage:0.0} V / {secondaryCurrent:0.0} A");
+            sb.AppendLine($"        |   电表 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab:0.0} / {meterUbc:0.0} / {meterUca:0.0} V");
+            sb.AppendLine($"        |   负载 有功 {loadActivePower:0.0} kW   无功 {loadReactivePower:0.0} kvar");
+            sb.AppendLine("        |----[断路器]---[隔离开关]----[变压器]----[电表]----[负载]");
+            sb.AppendLine("        |                      |");
+            sb.AppendLine("        |                      +--- 并网点 ---+");
+            sb.AppendLine("        |                                      |");
 
+            for (int u = unitCount - 1; u >= 0; u--)
+            {
+                int a = u * 2;
+                int b = u * 2 + 1;
 
-                                                                            
-", time,
-        breakerClosed.ToString(),          // {1}
-        switchState.ToString(),            // {2}
-        (primaryVoltage / 1000).ToString("0.0"), // {3}
-        primaryCurrent.ToString("00.0"),   // {4}
-        secondaryVoltage.ToString("0000.0"), // {5}
-        secondaryCurrent.ToString("0000.0"), // {6}
-        pcs2Reactive.ToString("0000.0"),     // {7}
-        pcs2Active.ToString("0000.0"),       // {8}
-        socRack2.ToString("000.0"),         // {9}
-        dcVoltageRack2.ToString("0000.0"),   // {10}
-        dcCurrentRack2.ToString("0000.0"),   // {11}
-        pcs1Reactive.ToString("0000.0"),     // {12}
-        pcs1Active.ToString("0000.0"),       // {13}
-        socRack1.ToString("000.0"),         // {14}
-        dcVoltageRack1.ToString("0000.0"),   // {15}
-        dcCurrentRack1.ToString("0000.0"),   // {16}
-        loadActivePower.ToString("0000.0"),   // {17}
-        loadReactivePower.ToString("0000.0"), // {18}
-        meterIA.ToString("0000.0"),           // {19}
-        meterIB.ToString("0000.0"),           // {20}
-        meterIC.ToString("0000.0"),           // {21}
-        meterUab.ToString("0000.0"),         // {22}
-        meterUbc.ToString("0000.0"),         // {23}
-        meterUca.ToString("0000.0")          // {24}
-        );}
+                sb.AppendLine($"        |  ====== [UNIT {u + 1}]  (PCS{a + 1}/PCS{b + 1}  对应  舱{a + 1}/舱{b + 1}) ======");
+
+                if (a < channelCount)
+                {
+                    double pa = SafeGetDouble($"ess._pcsList[{a}]._currentState.ActivePower");
+                    double pr = SafeGetDouble($"ess._pcsList[{a}]._currentState.ReactivePower");
+                    double soc = 100 * SafeGetDouble($"ess._batteryRacks[{a}]._currentState.MinClusterSOC");
+                    double vdc = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalVoltage");
+                    double idc = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalCurrent");
+                    sb.AppendLine($"        |   PCS{a + 1}: P {pa:0.0} kW  Q {pr:0.0} kvar");
+                    sb.AppendLine($"        |   舱{a + 1}:  SOC {soc:0.1f}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
+                }
+                if (b < channelCount)
+                {
+                    double pa = SafeGetDouble($"ess._pcsList[{b}]._currentState.ActivePower");
+                    double pr = SafeGetDouble($"ess._pcsList[{b}]._currentState.ReactivePower");
+                    double soc = 100 * SafeGetDouble($"ess._batteryRacks[{b}]._currentState.MinClusterSOC");
+                    double vdc = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalVoltage");
+                    double idc = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalCurrent");
+                    sb.AppendLine($"        |   PCS{b + 1}: P {pa:0.0} kW  Q {pr:0.0} kvar");
+                    sb.AppendLine($"        |   舱{b + 1}:  SOC {soc:0.1f}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
+                }
+
+                if (u > 0)
+                    sb.AppendLine("        |                                      |");
+            }
+            sb.AppendLine();
+
+            SafeSetCursorPosition(0, 0);
+            Console.Write(sb.ToString());
+        }
 
         private void DrawLog()
         {
@@ -310,31 +341,23 @@ namespace EssSimulator.Display
                     {
                         while (!Console.KeyAvailable)
                         {
-                            // 采集数据
-                            bool breakerClosed = (bool)SimServer.GetExtIfVariableVal("ess._breaker.IsClosed");
-                            var primaryVoltage = (double)SimServer.GetExtIfVariableVal("ess._transformer._currentState.PrimaryVoltage");
-                            var secondaryVoltage = (double)SimServer.GetExtIfVariableVal("ess._transformer._currentState.SecondaryVoltage");
-                            var primaryCurrent = (double)SimServer.GetExtIfVariableVal("ess._transformer._currentState.PrimaryCurrent");
-                            var secondaryCurrent = (double)SimServer.GetExtIfVariableVal("ess._transformer._currentState.SecondaryCurrent");
-                            var pcs1Reactive = (double)SimServer.GetExtIfVariableVal("ess._pcs1._currentState.ReactivePower");
-                            var pcs2Reactive = (double)SimServer.GetExtIfVariableVal("ess._pcs2._currentState.ReactivePower");
-                            var pcs1Active = (double)SimServer.GetExtIfVariableVal("ess._pcs1._currentState.ActivePower");
-                            var pcs2Active = (double)SimServer.GetExtIfVariableVal("ess._pcs2._currentState.ActivePower");
-                            var dcCurrentRack1 = (double)SimServer.GetExtIfVariableVal("ess._batteryRack._currentState.TotalCurrent");
-                            var dcVoltageRack1 = (double)SimServer.GetExtIfVariableVal("ess._batteryRack._currentState.TotalVoltage");
-                            var socRack1 = 100 * (double)SimServer.GetExtIfVariableVal("ess._batteryRack._currentState.MinClusterSOC");
-                            var socRack2 = 100 * (double)SimServer.GetExtIfVariableVal("ess._batteryRack2._currentState.MinClusterSOC");
-                            var dcCurrentRack2 = (double)SimServer.GetExtIfVariableVal("ess._batteryRack2._currentState.TotalCurrent");
-                            var dcVoltageRack2 = (double)SimServer.GetExtIfVariableVal("ess._batteryRack2._currentState.TotalVoltage");
-                            var loadActivePower = (double)SimServer.GetExtIfVariableVal("ess._loadSimulator.ActivePower");
-                            var loadReactivePower = (double)SimServer.GetExtIfVariableVal("ess._loadSimulator.ReactivePower");
-                            var switchState = (bool)SimServer.GetExtIfVariableVal("ess._breaker.swState");
+                            // 采集数据（支持 N 路）
+                            bool breakerClosed = SafeGetBool("ess._breaker.IsClosed");
+                            var primaryVoltage = SafeGetDouble("ess._transformer._currentState.PrimaryVoltage");
+                            var secondaryVoltage = SafeGetDouble("ess._transformer._currentState.SecondaryVoltage");
+                            var primaryCurrent = SafeGetDouble("ess._transformer._currentState.PrimaryCurrent");
+                            var secondaryCurrent = SafeGetDouble("ess._transformer._currentState.SecondaryCurrent");
+                            var loadActivePower = SafeGetDouble("ess._loadSimulator.ActivePower");
+                            var loadReactivePower = SafeGetDouble("ess._loadSimulator.ReactivePower");
+                            var switchState = SafeGetBool("ess._breaker.swState");
                             var time = DateTime.Now.ToLongTimeString();
+                            int channelCount = Math.Max(1, GetEssUnitCount());
+                            int unitCount = Math.Max(1, (int)Math.Ceiling(channelCount / 2.0));
 
                             // 顶部信息面板（避免 Markup 标签与中文状态混淆，改用 Text）
                             var breakerStatus = breakerClosed ? "合" : "分";
                             var isoStatus = switchState ? "合" : "分";
-                            var headerText = new Text($"电气主接线 {time}\n状态: 断路器[{breakerStatus}] 隔离[{isoStatus}]\n");
+                            var headerText = new Text($"电气主接线 {time}  （单元数 {unitCount}，通道数 {channelCount}）\n状态: 断路器[{breakerStatus}] 隔离[{isoStatus}]\n");
                             var header = new Panel(headerText).Border(BoxBorder.Rounded);
 
                             // 交流侧表格（一次/二次、负载）
@@ -348,32 +371,55 @@ namespace EssSimulator.Display
                             acTable.AddRow("二次侧", $"{secondaryVoltage:0.0} V", $"{secondaryCurrent:0.0} A", "-", "-");
                             acTable.AddRow("负载", "-", "-", $"{loadActivePower:0.0}", $"{loadReactivePower:0.0}");
 
-                            // PCS 表格
-                            var pcsTable = new Table().Border(TableBorder.Rounded).Title("PCS");
-                            pcsTable.AddColumn("设备");
-                            pcsTable.AddColumn("有功(kW)");
-                            pcsTable.AddColumn("无功(kvar)");
-                            pcsTable.AddRow("PCS1", $"{pcs1Active:0.0}", $"{pcs1Reactive:0.0}");
-                            pcsTable.AddRow("PCS2", $"{pcs2Active:0.0}", $"{pcs2Reactive:0.0}");
+                            // 单元总览表（每行一个 UNIT，包含2路 PCS+2路 BMS）
+                            var unitTable = new Table().Border(TableBorder.Rounded).Title("储能单元");
+                            unitTable.AddColumn("UNIT");
+                            unitTable.AddColumn("PCS-A P/Q");
+                            unitTable.AddColumn("PCS-B P/Q");
+                            unitTable.AddColumn("舱-A SOC/V/I");
+                            unitTable.AddColumn("舱-B SOC/V/I");
 
-                            // 电池舱表格
-                            var bmsTable = new Table().Border(TableBorder.Rounded).Title("电池舱");
-                            bmsTable.AddColumn("舱");
-                            bmsTable.AddColumn("SOC(%)");
-                            bmsTable.AddColumn("直流电压(V)");
-                            bmsTable.AddColumn("直流电流(A)");
-                            bmsTable.AddRow("舱1", $"{socRack1:0.0}", $"{dcVoltageRack1:0.0}", $"{dcCurrentRack1:0.0}");
-                            bmsTable.AddRow("舱2", $"{socRack2:0.0}", $"{dcVoltageRack2:0.0}", $"{dcCurrentRack2:0.0}");
+                            for (int u = 0; u < unitCount; u++)
+                            {
+                                int a = u * 2;
+                                int b = u * 2 + 1;
+
+                                string pcsA = "-", pcsB = "-", bmsA = "-", bmsB = "-";
+                                if (a < channelCount)
+                                {
+                                    double pa = SafeGetDouble($"ess._pcsList[{a}]._currentState.ActivePower");
+                                    double pr = SafeGetDouble($"ess._pcsList[{a}]._currentState.ReactivePower");
+                                    pcsA = $"PCS{a + 1} {pa:0.0}/{pr:0.0}";
+
+                                    double s = 100 * SafeGetDouble($"ess._batteryRacks[{a}]._currentState.MinClusterSOC");
+                                    double v = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalVoltage");
+                                    double c = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalCurrent");
+                                    bmsA = $"舱{a + 1} {s:0.0}%/{v:0.0}/{c:0.0}";
+                                }
+                                if (b < channelCount)
+                                {
+                                    double pa = SafeGetDouble($"ess._pcsList[{b}]._currentState.ActivePower");
+                                    double pr = SafeGetDouble($"ess._pcsList[{b}]._currentState.ReactivePower");
+                                    pcsB = $"PCS{b + 1} {pa:0.0}/{pr:0.0}";
+
+                                    double s = 100 * SafeGetDouble($"ess._batteryRacks[{b}]._currentState.MinClusterSOC");
+                                    double v = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalVoltage");
+                                    double c = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalCurrent");
+                                    bmsB = $"舱{b + 1} {s:0.0}%/{v:0.0}/{c:0.0}";
+                                }
+
+                                unitTable.AddRow($"UNIT {u + 1}", pcsA, pcsB, bmsA, bmsB);
+                            }
 
                             // 电表数据表格（A/B/C 相电流，AB/BC/CA 线电压，总电压/总电流）
                             double meterIA = 0, meterIB = 0, meterIC = 0;
                             double meterUab = 0, meterUbc = 0, meterUca = 0;
-                            meterIA = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.PhaseACurrent"));
-                            meterIB = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.PhaseBCurrent"));
-                            meterIC = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.PhaseCCurrent"));
-                            meterUab = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.LineVoltageAB"));
-                            meterUbc = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.LineVoltageBC"));
-                            meterUca = Convert.ToDouble(SimServer.GetExtIfVariableVal("em.LineVoltageCA"));
+                            meterIA = SafeGetDouble("em.PhaseACurrent");
+                            meterIB = SafeGetDouble("em.PhaseBCurrent");
+                            meterIC = SafeGetDouble("em.PhaseCCurrent");
+                            meterUab = SafeGetDouble("em.LineVoltageAB");
+                            meterUbc = SafeGetDouble("em.LineVoltageBC");
+                            meterUca = SafeGetDouble("em.LineVoltageCA");
 
                             var meterTable = new Table().Border(TableBorder.Rounded).Title("电表");
                             meterTable.AddColumn("项目");
@@ -387,8 +433,7 @@ namespace EssSimulator.Display
                             grid.AddRow(header);
                             grid.AddRow(acTable);
                             grid.AddRow(meterTable);
-                            grid.AddRow(pcsTable);
-                            grid.AddRow(bmsTable);
+                            grid.AddRow(unitTable);
 
                             ctx.UpdateTarget(new Panel(grid).RoundedBorder());
                             Thread.Sleep(100);
@@ -440,16 +485,18 @@ namespace EssSimulator.Display
 
         private void DrawBatteryInfo()
         {
+            int unitCount = Math.Max(1, GetEssUnitCount());
             int bmsId = 0;
             while (true)
             {
                 Console.Clear();
+                bmsId = Math.Clamp(bmsId, 0, unitCount - 1);
 
                 AnsiConsole.Live(new Panel("电池舱信息").RoundedBorder().Border(BoxBorder.Rounded)).Start(ctx =>
                 {
                     while (!Console.KeyAvailable)
                     {
-                        string basePath = bmsId == 0 ? "bms1.BatteryStacks[0]" : "bms2.BatteryStacks[0]";
+                        string basePath = $"bms{bmsId + 1}.BatteryStacks[0]";
 
                         double totVolt = 0, totCurr = 0, soc = 0, soh = 0, maxCellV = 0, minCellV = 0;
                         int maxClusterId = 0, maxPackId = 0, maxCellId = 0, minClusterId = 0, minPackId = 0, minCellId = 0;
@@ -466,7 +513,7 @@ namespace EssSimulator.Display
                         minPackId = Convert.ToInt32(SimServer.GetExtIfVariableVal($"{basePath}.MinCellVoltagePackId"));
                         minCellId = Convert.ToInt32(SimServer.GetExtIfVariableVal($"{basePath}.MinCellVoltageCellId"));
 
-                        var overview = new Table().Border(TableBorder.Rounded).Title($"电池舱总览 - 舱{bmsId}");
+                        var overview = new Table().Border(TableBorder.Rounded).Title($"电池舱总览 - 舱{bmsId + 1}");
                         overview.AddColumn("属性");
                         overview.AddColumn("数值");
                         overview.AddRow("总电压 (V)", $"{totVolt:0.0}");
@@ -487,7 +534,7 @@ namespace EssSimulator.Display
                         clusterTable.AddColumn("单体最高(V)");
                         clusterTable.AddColumn("单体最低(V)");
 
-                        int cluserCount = 12;
+                        int cluserCount = GetClusterCount();
                         for (int i = 0; i < cluserCount; i++)
                         {
                             double cCurr = 0, cVolt = 0, cSoc = 0, cSoh = 0, cAvg = 0, cMax = 0, cMin = 0;
@@ -504,7 +551,7 @@ namespace EssSimulator.Display
 
                         var grid = new Grid();
                         grid.AddColumn(new GridColumn().Width(Math.Min(Console.WindowWidth - 2, 120)));
-                        grid.AddRow(new Text($"上下箭头切换舱 (当前 {bmsId})，Esc 返回"));
+                        grid.AddRow(new Text($"上下箭头切换舱 (当前 舱{bmsId + 1}/{unitCount})，Esc 返回"));
                         grid.AddRow(overview);
                         grid.AddRow(clusterTable);
 
@@ -521,7 +568,7 @@ namespace EssSimulator.Display
                 var key = Console.ReadKey(true);
                 if (key.Key == ConsoleKey.UpArrow)
                 {
-                    bmsId = Math.Min(1, bmsId + 1);
+                    bmsId = Math.Min(unitCount - 1, bmsId + 1);
                 }
                 else if (key.Key == ConsoleKey.DownArrow)
                 {
@@ -536,18 +583,22 @@ namespace EssSimulator.Display
 
         private void DrawCellInfo()
         {
+            int unitCount = Math.Max(1, GetEssUnitCount());
             int batlibId = 0;
             int cluserId = 0;
 
             while (true)
             {
                 Console.Clear();
+                batlibId = Math.Clamp(batlibId, 0, unitCount - 1);
+                int clusterCount = Math.Max(1, GetClusterCount());
+                cluserId = Math.Clamp(cluserId, 0, clusterCount - 1);
 
                 AnsiConsole.Live(new Panel("电池单体电压").RoundedBorder().Border(BoxBorder.Rounded)).Start(ctx =>
                 {
                     while (!Console.KeyAvailable)
                     {
-                        string basePath = batlibId == 0 ? "bms1.BatteryStacks[0]" : "bms2.BatteryStacks[0]";
+                        string basePath = $"bms{batlibId + 1}.BatteryStacks[0]";
 
                         // 每个簇有 4 个电池包，每包 104 节单体，分成两列显示以避免过长
                         var packTables = new List<Table>();
@@ -595,7 +646,7 @@ namespace EssSimulator.Display
                         packGrid.AddRow(packTables[0], packTables[1], packTables[2], packTables[3]);
 
                         // 顶部提示与时间戳
-                        var header = new Text($"上下箭头切换舱 (当前 {batlibId})，左右箭头切换簇 (当前 {cluserId})，Esc 返回\n时间: {DateTime.Now:HH:mm:ss}");
+                        var header = new Text($"上下箭头切换舱 (当前 舱{batlibId + 1}/{unitCount})，左右箭头切换簇 (当前 簇{cluserId + 1}/{clusterCount})，Esc 返回\n时间: {DateTime.Now:HH:mm:ss}");
 
                         var grid = new Grid();
                         grid.AddColumn(new GridColumn().Width(Math.Min(Console.WindowWidth - 2, 140)));
@@ -615,7 +666,8 @@ namespace EssSimulator.Display
                 var key = Console.ReadKey(true);
                 if (key.Key == ConsoleKey.RightArrow)
                 {
-                    cluserId = Math.Min(20, cluserId + 1);
+                    int cc = Math.Max(1, GetClusterCount());
+                    cluserId = Math.Min(cc - 1, cluserId + 1);
                 }
                 else if (key.Key == ConsoleKey.LeftArrow)
                 {
@@ -623,7 +675,7 @@ namespace EssSimulator.Display
                 }
                 else if (key.Key == ConsoleKey.UpArrow)
                 {
-                    batlibId = Math.Min(10, batlibId + 1);
+                    batlibId = Math.Min(unitCount - 1, batlibId + 1);
                 }
                 else if (key.Key == ConsoleKey.DownArrow)
                 {

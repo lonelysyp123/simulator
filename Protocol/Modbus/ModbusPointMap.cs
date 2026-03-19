@@ -99,12 +99,17 @@ namespace EssSimulator.Protocol.Modbus
             if (!int.TryParse(new string(name.Where(char.IsDigit).ToArray()), out int deviceId))
                 return;
 
-            if (isEmu) return; // EMU 不替换 deviceId
-
             foreach (var e in entries)
             {
                 if (e.ModelSim != null)
+                {
+                    // BMS 点表：用 deviceId 替换为 bms1/bms2/... 的数字部分
                     e.ModelSim = e.ModelSim.Replace("deviceId", deviceId.ToString());
+
+                    // EMU 点表：用 emuDeviceId 替换为 emu1/emu2/... 的对象根
+                    if (isEmu)
+                        e.ModelSim = e.ModelSim.Replace("emuDeviceId", $"emu{deviceId}");
+                }
             }
         }
     }

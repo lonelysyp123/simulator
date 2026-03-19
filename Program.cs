@@ -13,6 +13,25 @@ namespace EssSimulator
 {
     class Program
     {
+        private static void PrintProtocolCreateInfo(SimulatorConfig cfg)
+        {
+            Console.WriteLine("==== 协议模拟器创建 ====");
+            Console.WriteLine($"电表   simEm  : Modbus TCP 端口 {cfg.Protocol.EmModbusPort}");
+            int unitCount = Math.Max(1, cfg.Devices?.Count ?? 1);
+            for (int i = 0; i < unitCount; i++)
+            {
+                int emuPort = cfg.Protocol.BaseEmuModbusPort + i * cfg.Protocol.EmuPortStep;
+                Console.WriteLine($"EMU 单元{i + 1} simEmu{i + 1}: Modbus TCP 端口 {emuPort}（承载 emu{i + 1}.PcsList[0..1]）");
+            }
+            for (int i = 0; i < Math.Max(1, cfg.UnitCount); i++)
+            {
+                int port = cfg.Protocol.BaseBmsModbusPort + i * cfg.Protocol.BmsPortStep;
+                Console.WriteLine($"BMS 路{i + 1} simBms{i + 1}: Modbus TCP 端口 {port}");
+            }
+            Console.WriteLine("=======================");
+            Console.WriteLine();
+        }
+
         static async Task Main(string[] args)
         {
             // 配置 log4net
@@ -58,7 +77,7 @@ namespace EssSimulator
                     services.AddSingleton<BmsDataService>(sp =>
                     {
                         var cfg = sp.GetRequiredService<IOptions<SimulatorConfig>>().Value;
-                        return new BmsDataService(cfg.UnitCount, cfg.ClusterCount, cfg.PackCount);
+                        return new BmsDataService(cfg);
                     });
                     services.AddHostedService(sp => sp.GetRequiredService<BmsDataService>());
 
@@ -76,12 +95,18 @@ namespace EssSimulator
                 })
                 .Build();
 
-            // 启动控制台 GUI（若未禁用）
             var simCfg = host.Services.GetRequiredService<IOptions<SimulatorConfig>>().Value;
-            if (!simCfg.NoGui)
+            // 先打印协议创建信息，再启动 GUI 覆盖输出，避免混杂
+            PrintProtocolCreateInfo(simCfg);
+
+            // 先启动 Host（后台服务会创建并启动 Modbus 从站等）
+            await host.StartAsync();
+
+            // 启动控制台 GUI（若未禁用）。GUI 内部会 Clear 覆盖上面的打印。
+            if (!simCfg.Runtime.NoGui)
                 host.Services.GetRequiredService<GuiMain>();
 
-            await host.RunAsync();
+            await host.WaitForShutdownAsync();
         }
     }
 }

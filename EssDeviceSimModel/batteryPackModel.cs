@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,6 +13,8 @@ namespace EssSimulator.EssDeviceSimModel
         public int ParallelCount { get; set; }  // 并联电芯数量
         public double NominalVoltage { get; set; } // 单芯额定电压(V)
         public double NominalCapacity { get; set; } // 单芯额定容量(Ah)
+        public double InitialSoc { get; set; } = 0.5; // 电芯初始SOC基准(0-1)
+        public double InitialSocRandomRange { get; set; } = 0.05; // 初始SOC随机扰动范围(±)
         public double PackInternalResistance { get; set; } // 模组总内阻(Ohm)
         public double CoolingEfficiency { get; set; } = 0.7; // 冷却系统效率(0-1)
     }
@@ -64,7 +66,9 @@ namespace EssSimulator.EssDeviceSimModel
                         NominalVoltage = config.NominalVoltage,
                         MinVoltage = 2.5,
                         MaxVoltage = 3.65,
-                        InitialSOC = 0.5 * (1 + (_random.NextDouble() - 0.5) * 0.05), // ±5% SOC差异
+                        InitialSOC = Math.Clamp(
+                            config.InitialSoc + (_random.NextDouble() - 0.5) * 2.0 * config.InitialSocRandomRange,
+                            0.0, 1.0),
                         InternalResistance = 0.0002 * (1 + (_random.NextDouble() - 0.5) * 0.1), // ±10%内阻差异
                         Mass = 0.05,
                         Volume = 0.0001

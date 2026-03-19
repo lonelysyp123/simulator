@@ -19,9 +19,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
         public static void MapEssToEmData(EnergyStorageSystem ess, EmData emData, TimeSpan dt,
             ref double forwardKWh, ref double reverseKWh)
         {
-            var pcs1  = ess._pcs1.GetCurrentState();
-            var pcs2  = ess._pcs2.GetCurrentState();
-            var xfSt  = ess._transformer.GetCurrentState();
+            var xfSt = ess._transformer.GetCurrentState();
 
             double lineVoltage = xfSt?.SecondaryVoltage > 0
                 ? xfSt.SecondaryVoltage
@@ -30,8 +28,13 @@ namespace EssSimulator.EssSimModelApi.Mappers
             double loadP = ess._loadSimulator.ActivePower;
             double loadQ = ess._loadSimulator.ReactivePower;
 
-            double totalP = pcs1.ActivePower  + pcs2.ActivePower  + loadP;
-            double totalQ = pcs1.ReactivePower + pcs2.ReactivePower + loadQ;
+            double totalP = loadP, totalQ = loadQ;
+            foreach (var pcs in ess._pcsList)
+            {
+                var st = pcs.GetCurrentState();
+                totalP += st.ActivePower;
+                totalQ += st.ReactivePower;
+            }
             double totalS = Math.Sqrt(totalP * totalP + totalQ * totalQ);
             double pf     = totalS > 0 ? Math.Clamp(totalP / totalS, -1.0, 1.0) : 1.0;
             double I      = lineVoltage > 0 ? totalS * 1000.0 / lineVoltage / Math.Sqrt(3.0) : 0.0;

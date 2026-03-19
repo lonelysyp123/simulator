@@ -1,65 +1,127 @@
+using System.Collections.Generic;
+using System.Linq;
+
 namespace EssSimulator.Configuration
 {
+    public class RuntimeConfig
+    {
+        /// <summary>是否禁用控制台 GUI（无头模式）</summary>
+        public bool NoGui { get; set; } = false;
+
+        /// <summary>主循环真实休眠间隔（ms）</summary>
+        public int SimStepMs { get; set; } = 200;
+
+        /// <summary>仿真加速倍率</summary>
+        public double Speedup { get; set; } = 100.0;
+    }
+
+    public class ProtocolConfig
+    {
+        /// <summary>BMS Modbus TCP 基础端口（后续按步长递增）</summary>
+        public int BaseBmsModbusPort { get; set; } = 1502;
+
+        /// <summary>BMS 端口步长</summary>
+        public int BmsPortStep { get; set; } = 10;
+
+        /// <summary>EMU Modbus TCP 基础端口（每个储能单元一个 EMU 从站）</summary>
+        public int BaseEmuModbusPort { get; set; } = 1501;
+
+        /// <summary>EMU 端口步长（单位：端口号）</summary>
+        public int EmuPortStep { get; set; } = 1;
+
+        /// <summary>电表 Modbus TCP 端口</summary>
+        public int EmModbusPort { get; set; } = 1500;
+    }
+
+    public class PcsDeviceConfig
+    {
+        public string Name { get; set; } = "PCS";
+    }
+
+    public class BmsDeviceConfig
+    {
+        public string Name { get; set; } = "BMS";
+        public int ClusterCount { get; set; } = 12;
+        public int PackCount { get; set; } = 4;
+        public int CellSeriesCount { get; set; } = 104;
+        public int CellParallelCount { get; set; } = 1;
+        public double CellNominalVoltage { get; set; } = 3.2;
+        public double CellNominalCapacity { get; set; } = 314;
+        public double CellInitialSoc { get; set; } = 0.5;
+        public double CellInitialSocRandomRange { get; set; } = 0.05;
+        public double PackInternalResistance { get; set; } = 0.05;
+        public double ClusterInternalResistance { get; set; } = 0.1;
+        public double RackInternalResistance { get; set; } = 0.02;
+    }
+
+    public class EssUnitConfig
+    {
+        public string Name { get; set; } = "Unit";
+        /// <summary>固定 2 路 PCS 配置</summary>
+        public List<PcsDeviceConfig> Pcs { get; set; } = new();
+        /// <summary>固定 2 路 BMS 配置</summary>
+        public List<BmsDeviceConfig> Bms { get; set; } = new();
+    }
+
     /// <summary>顶层仿真器配置（对应 appsettings.json: Simulator 节）</summary>
     public class SimulatorConfig
     {
         public const string Section = "Simulator";
 
-        /// <summary>储能单元（ESS Unit）数量，每个单元拥有独立的 BMS Modbus 服务</summary>
-        public int UnitCount { get; set; } = 2;
+        public RuntimeConfig Runtime { get; set; } = new();
+        public ProtocolConfig Protocol { get; set; } = new();
+        public List<EssUnitConfig> Devices { get; set; } = new();
 
-        /// <summary>每个单元的电池簇数量</summary>
-        public int ClusterCount { get; set; } = 12;
+        // 兼容旧代码的便捷属性（由新结构推导）
+        public int UnitCount => Math.Max(1, Devices?.Count ?? 1) * 2; // 每单元固定 2 路 PCS/BMS
+        public int BaseModbusPort => Protocol.BaseBmsModbusPort;
+        public int PcsModbusPort => Protocol.BaseEmuModbusPort;
+        public int EmModbusPort => Protocol.EmModbusPort;
+        public int SimStepMs => Runtime.SimStepMs;
+        public double Speedup => Runtime.Speedup;
+        public bool NoGui => Runtime.NoGui;
 
-        /// <summary>每簇电池模组数量</summary>
-        public int PackCount { get; set; } = 4;
+        public IReadOnlyList<BmsDeviceConfig> GetBmsDeviceConfigs()
+        {
+            var list = new List<BmsDeviceConfig>();
+            var units = (Devices == null || Devices.Count == 0) ? new List<EssUnitConfig> { new() } : Devices;
 
-        /// <summary>BMS Modbus TCP 基础端口（单元 i 使用 BaseModbusPort + i*10）</summary>
-        public int BaseModbusPort { get; set; } = 1502;
+            foreach (var unit in units)
+            {
+                var bms = unit.Bms ?? new List<BmsDeviceConfig>();
+                while (bms.Count < 2) bms.Add(new BmsDeviceConfig());
+                list.Add(bms[0]);
+                list.Add(bms[1]);
+            }
+            return list;
+        }
 
-        /// <summary>PCS (EMU) Modbus TCP 端口</summary>
-        public int PcsModbusPort { get; set; } = 1501;
+        public IReadOnlyList<PcsDeviceConfig> GetPcsDeviceConfigs()
+        {
+            var list = new List<PcsDeviceConfig>();
+            var units = (Devices == null || Devices.Count == 0) ? new List<EssUnitConfig> { new() } : Devices;
 
-        /// <summary>电表 Modbus TCP 端口</summary>
-        public int EmModbusPort { get; set; } = 1500;
+            foreach (var unit in units)
+            {
+                var pcs = unit.Pcs ?? new List<PcsDeviceConfig>();
+                while (pcs.Count < 2) pcs.Add(new PcsDeviceConfig());
+                list.Add(pcs[0]);
+                list.Add(pcs[1]);
+            }
+            return list;
+        }
 
-        /// <summary>
-        /// 主循环的真实休眠间隔（毫秒）。决定 CPU 占用率，与仿真速度无关。
-        /// 例如设为 200，则主循环每 200ms 真实时间 tick 一次。
-        /// </summary>
-        public int SimStepMs { get; set; } = 200;
-
-        /// <summary>
-        /// 仿真时间加速倍率。每次 tick 传给物理模型的时间步长 = SimStepMs × Speedup（ms）。
-        /// Speedup=1 表示实时仿真；Speedup=100 表示仿真时间以 100 倍速推进。
-        /// 注意：此值与主循环休眠时间无关，仅影响物理量（SOC、能量、温度等）的积分速率
-        /// 以及 PCS 功率爬坡线程的 Sleep 压缩倍率。
-        /// </summary>
-        public double Speedup { get; set; } = 1000.0;
-
-        /// <summary>是否禁用控制台 GUI（无头模式）</summary>
-        public bool NoGui { get; set; } = false;
-
-        /// <summary>电池单体串联数</summary>
-        public int CellSeriesCount { get; set; } = 104;
-
-        /// <summary>电池单体并联数</summary>
-        public int CellParallelCount { get; set; } = 1;
-
-        /// <summary>单体额定电压（V）</summary>
-        public double CellNominalVoltage { get; set; } = 3.2;
-
-        /// <summary>单体额定容量（Ah）</summary>
-        public double CellNominalCapacity { get; set; } = 314;
-
-        /// <summary>模组内阻（Ω）</summary>
-        public double PackInternalResistance { get; set; } = 0.05;
-
-        /// <summary>簇内阻（Ω）</summary>
-        public double ClusterInternalResistance { get; set; } = 0.1;
-
-        /// <summary>堆内阻（Ω）</summary>
-        public double RackInternalResistance { get; set; } = 0.02;
+        public int ClusterCount => GetBmsDeviceConfigs().First().ClusterCount;
+        public int PackCount => GetBmsDeviceConfigs().First().PackCount;
+        public int CellSeriesCount => GetBmsDeviceConfigs().First().CellSeriesCount;
+        public int CellParallelCount => GetBmsDeviceConfigs().First().CellParallelCount;
+        public double CellNominalVoltage => GetBmsDeviceConfigs().First().CellNominalVoltage;
+        public double CellNominalCapacity => GetBmsDeviceConfigs().First().CellNominalCapacity;
+        public double CellInitialSoc => GetBmsDeviceConfigs().First().CellInitialSoc;
+        public double CellInitialSocRandomRange => GetBmsDeviceConfigs().First().CellInitialSocRandomRange;
+        public double PackInternalResistance => GetBmsDeviceConfigs().First().PackInternalResistance;
+        public double ClusterInternalResistance => GetBmsDeviceConfigs().First().ClusterInternalResistance;
+        public double RackInternalResistance => GetBmsDeviceConfigs().First().RackInternalResistance;
     }
 
     /// <summary>PCS 物理参数配置（对应 appsettings.json: Pcs 节）</summary>

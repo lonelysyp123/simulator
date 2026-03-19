@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,13 +36,27 @@ namespace EssSimulator.EssDeviceSimModel
         // 当前充电/放电状态
 
 
-        public  BatteryRackSimulator _batteryRack { get; set; }
+        /// <summary>电池堆列表，索引 i 对应第 i+1 个储能单元。通过 ess._batteryRacks[i] 或路径 ess._batteryRacks[0] 访问。</summary>
+        public IReadOnlyList<BatteryRackSimulator> _batteryRacks { get; }
 
-        public BatteryRackSimulator _batteryRack2 { get; set; }
-        public PCSSimulator _pcs1 { get; set; }
+        /// <summary>PCS 列表，索引 i 对应第 i+1 个 PCS。通过 ess._pcsList[i] 或路径 ess._pcsList[0] 访问。</summary>
+        public IReadOnlyList<PCSSimulator> _pcsList { get; }
 
-        //public readonly BatteryRackSimulator _batteryRack2;
-        public PCSSimulator _pcs2 { get; set; }
+        /// <summary>兼容旧路径：ess._batteryRack 等价于 ess._batteryRacks[0]</summary>
+        [Obsolete("请使用 _batteryRacks[0]")]
+        public BatteryRackSimulator _batteryRack => _batteryRacks.Count > 0 ? _batteryRacks[0] : null!;
+
+        /// <summary>兼容旧路径：ess._batteryRack2 等价于 ess._batteryRacks[1]</summary>
+        [Obsolete("请使用 _batteryRacks[1]")]
+        public BatteryRackSimulator _batteryRack2 => _batteryRacks.Count > 1 ? _batteryRacks[1] : null!;
+
+        /// <summary>兼容旧路径：ess._pcs1 等价于 ess._pcsList[0]</summary>
+        [Obsolete("请使用 _pcsList[0]")]
+        public PCSSimulator _pcs1 => _pcsList.Count > 0 ? _pcsList[0] : null!;
+
+        /// <summary>兼容旧路径：ess._pcs2 等价于 ess._pcsList[1]</summary>
+        [Obsolete("请使用 _pcsList[1]")]
+        public PCSSimulator _pcs2 => _pcsList.Count > 1 ? _pcsList[1] : null!;
 
         //public GridState _gridState;
         public Breaker _breaker { get; set; } //断路器
@@ -52,29 +66,37 @@ namespace EssSimulator.EssDeviceSimModel
 
         public EnergyStorageSystem(SimulatorConfig simCfg, PcsPhysicalConfig pcsCfg, TransformerConfig transCfg, LoadConfig loadCfg)
         {
-            // 电池堆配置（从 SimulatorConfig 读取）
-            var rackConfig = new RackConfiguration
-            {
-                ClusterCount = simCfg.ClusterCount,
-                ClusterConfig = new ClusterConfiguration
-                {
-                    PackCount = simCfg.PackCount,
-                    PackConfig = new PackConfiguration
-                    {
-                        SeriesCount             = simCfg.CellSeriesCount,
-                        ParallelCount           = simCfg.CellParallelCount,
-                        NominalVoltage          = simCfg.CellNominalVoltage,
-                        NominalCapacity         = simCfg.CellNominalCapacity,
-                        PackInternalResistance   = simCfg.PackInternalResistance
-                    },
-                    ClusterInternalResistance = simCfg.ClusterInternalResistance
-                },
-                RackInternalResistance = simCfg.RackInternalResistance
-            };
-            _batteryRack  = new BatteryRackSimulator(rackConfig);
-            _batteryRack2 = new BatteryRackSimulator(rackConfig);
+            var racks = new List<BatteryRackSimulator>();
+            var pcsList = new List<PCSSimulator>();
+            var bmsDeviceConfigs = simCfg.GetBmsDeviceConfigs();
+            int unitCount = Math.Max(1, bmsDeviceConfigs.Count);
 
-            // PCS 配置（从 PcsPhysicalConfig 读取）
+            for (int i = 0; i < unitCount; i++)
+            {
+                var bmsCfg = bmsDeviceConfigs[i];
+                var rackConfig = new RackConfiguration
+                {
+                    ClusterCount = bmsCfg.ClusterCount,
+                    ClusterConfig = new ClusterConfiguration
+                    {
+                        PackCount = bmsCfg.PackCount,
+                        PackConfig = new PackConfiguration
+                        {
+                            SeriesCount = bmsCfg.CellSeriesCount,
+                            ParallelCount = bmsCfg.CellParallelCount,
+                            NominalVoltage = bmsCfg.CellNominalVoltage,
+                            NominalCapacity = bmsCfg.CellNominalCapacity,
+                            InitialSoc = bmsCfg.CellInitialSoc,
+                            InitialSocRandomRange = bmsCfg.CellInitialSocRandomRange,
+                            PackInternalResistance = bmsCfg.PackInternalResistance
+                        },
+                        ClusterInternalResistance = bmsCfg.ClusterInternalResistance
+                    },
+                    RackInternalResistance = bmsCfg.RackInternalResistance
+                };
+                racks.Add(new BatteryRackSimulator(rackConfig));
+            }
+
             var pcsConfig = new PcsConfiguration
             {
                 RatedPower        = pcsCfg.RatedPower,
@@ -86,8 +108,13 @@ namespace EssSimulator.EssDeviceSimModel
                 FrequencyNominal  = pcsCfg.FrequencyNominal,
                 MaxCurrent        = pcsCfg.MaxCurrent
             };
-            _pcs1 = new PCSSimulator(pcsConfig, speedup: simCfg.Speedup);
-            _pcs2 = new PCSSimulator(pcsConfig, speedup: simCfg.Speedup);
+            for (int i = 0; i < unitCount; i++)
+            {
+                pcsList.Add(new PCSSimulator(pcsConfig, speedup: simCfg.Speedup));
+            }
+
+            _batteryRacks = racks;
+            _pcsList      = pcsList;
 
             _breaker = new Breaker();
 
@@ -157,17 +184,24 @@ namespace EssSimulator.EssDeviceSimModel
                 {
                     DateTime simTime = DateTime.Now;
 
-                    var pcs1State = _pcs1.GetCurrentState();
-                    var pcs2State = _pcs2.GetCurrentState();
+                    double totalSecCurrent = 0;
+                    double totalActiveKw   = _loadSimulator.ActivePower;
+                    double totalReactiveKvar = _loadSimulator.ReactivePower;
+
+                    foreach (var pcs in _pcsList)
+                    {
+                        var st = pcs.GetCurrentState();
+                        totalSecCurrent += st.AcCurrent;
+                        totalActiveKw   += st.ActivePower;
+                        totalReactiveKvar += st.ReactivePower;
+                    }
 
                     var secVoltage   = _transformer.GetCurrentState().SecondaryVoltage;
                     var loadCurrentA = _loadSimulator.ComputeLoadCurrentA(ref secVoltage);
-                    double totalSecCurrent = pcs1State.AcCurrent + pcs2State.AcCurrent + loadCurrentA;
+                    totalSecCurrent += loadCurrentA;
 
-                    var totalActiveKw     = pcs1State.ActivePower   + pcs2State.ActivePower   + _loadSimulator.ActivePower;
-                    var totalReactiveKvar = pcs1State.ReactivePower + pcs2State.ReactivePower + _loadSimulator.ReactivePower;
-                    var totalApparentKva  = Math.Sqrt(totalActiveKw * totalActiveKw + totalReactiveKvar * totalReactiveKvar);
-                    var powerFactor       = totalApparentKva > 0 ? totalActiveKw / totalApparentKva : 1.0;
+                    var totalApparentKva = Math.Sqrt(totalActiveKw * totalActiveKw + totalReactiveKvar * totalReactiveKvar);
+                    var powerFactor     = totalApparentKva > 0 ? totalActiveKw / totalApparentKva : 1.0;
 
                     var priCurrent = Math.Abs(_transformer.GetCurrentState().PrimaryCurrent);
                     _breaker.Update(priCurrent);
@@ -177,18 +211,21 @@ namespace EssSimulator.EssDeviceSimModel
                         inputVoltage = (int)_transCfg.PrimaryVoltage;
                         _transformer.Update(inputVoltage, totalSecCurrent, powerFactor, totalApparentKva, simTime);
                         var secV = _transformer.GetCurrentState().SecondaryVoltage;
-                        _pcs1.UpdateGridState(secV, _pcsCfg.FrequencyNominal, true);
-                        _pcs2.UpdateGridState(secV, _pcsCfg.FrequencyNominal, true);
+                        foreach (var pcs in _pcsList)
+                        {
+                            pcs.UpdateGridState(secV, _pcsCfg.FrequencyNominal, true);
+                        }
                     }
                     else
                     {
                         inputVoltage    = 0;
                         totalSecCurrent = 0;
                         _transformer.Update(0, 0, powerFactor, totalApparentKva, simTime);
-                        _pcs1.UpdateGridState(0, 0, false);
-                        _pcs1.TransitionToMode(OperationMode.Standby);
-                        _pcs2.UpdateGridState(0, 0, false);
-                        _pcs2.TransitionToMode(OperationMode.Standby);
+                        foreach (var pcs in _pcsList)
+                        {
+                            pcs.UpdateGridState(0, 0, false);
+                            pcs.TransitionToMode(OperationMode.Standby);
+                        }
                     }
 
                     Update(simTime, _simStep);
@@ -209,21 +246,16 @@ namespace EssSimulator.EssDeviceSimModel
         // 更新系统状态
         private void Update(DateTime simTime, TimeSpan step)
         {
-            var rackState1 = _batteryRack.GetRackState();
-            var rackState2 = _batteryRack2.GetRackState();
-            if (rackState1 == null || rackState2 == null)
+            int n = Math.Min(_batteryRacks.Count, _pcsList.Count);
+            for (int i = 0; i < n; i++)
             {
-                return;
-            }
-            // 设备可根据需要选择用simTime或step
-            _pcs1.Update(rackState1.TotalVoltage, rackState1.IsFault, simTime, step);
-            _pcs2.Update(rackState2.TotalVoltage, rackState2.IsFault, simTime, step);
-            // 电池内部电流方向：正充负放。PCS约定正放负充，因此对电池取负
-            _batteryRack.Update(-_pcs1.GetCurrentState().DcCurrent, 25.0, simTime, step);
-            _batteryRack2.Update(-_pcs2.GetCurrentState().DcCurrent, 25.0, simTime, step);
+                var rackState = _batteryRacks[i].GetRackState();
+                if (rackState == null) continue;
 
-            //统计量计算
-            //UpdateEnergyStorage(_pcsCurrentState);
+                _pcsList[i].Update(rackState.TotalVoltage, rackState.IsFault, simTime, step);
+                // 电池内部电流方向：正充负放。PCS约定正放负充，因此对电池取负
+                _batteryRacks[i].Update(-_pcsList[i].GetCurrentState().DcCurrent, 25.0, simTime, step);
+            }
         }
 
         // // 示例使用
