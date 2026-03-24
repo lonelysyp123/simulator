@@ -86,6 +86,42 @@ namespace EssSimulator.Display
             catch { return fallback; }
         }
 
+        private CommandProcessor BuildCommandProcessor()
+        {
+            var commands = new List<ICommand>
+            {
+                new EssCommand(),
+                new BreakerCommand(),
+                new DataPointChangeCommand(),
+            };
+            return new CommandProcessor(commands);
+        }
+
+        /// <summary>
+        /// 在当前视图内输入并执行一条指令，执行后返回原视图。
+        /// </summary>
+        private void PromptAndExecuteInlineCommand(CommandProcessor processor)
+        {
+            try
+            {
+                Console.Clear();
+                Console.WriteLine("主电气接线 - 指令输入（执行后自动返回）");
+                Console.WriteLine("可用命令: esscmd / breaker / dpc");
+                Console.Write("cmd> ");
+                var input = Console.ReadLine();
+                if (!string.IsNullOrWhiteSpace(input))
+                {
+                    processor.ProcessCommand(input);
+                }
+                Console.WriteLine("按任意键返回主电气接线...");
+                Console.ReadKey(true);
+            }
+            catch
+            {
+                // 忽略输入阶段异常，确保界面线程持续运行
+            }
+        }
+
         private void DrawInterface()
         {
             // 绘制主界面（菜单）
@@ -238,6 +274,8 @@ namespace EssSimulator.Display
             double meterUab = SafeGetDouble("em.LineVoltageAB");
             double meterUbc = SafeGetDouble("em.LineVoltageBC");
             double meterUca = SafeGetDouble("em.LineVoltageCA");
+            double meterActive = SafeGetDouble("em.TotalActivePower");
+            double meterReactive = SafeGetDouble("em.TotalReactivePower");
 
             var sb = new StringBuilder();
             sb.AppendLine();
@@ -245,10 +283,15 @@ namespace EssSimulator.Display
             sb.AppendLine("========= 电压: 10.5 kV");
             sb.AppendLine("        |");
             sb.AppendLine($"        |   断路器: {(breakerClosed ? "合" : "分")}   隔离开关: {(switchState ? "合" : "分")}");
-            sb.AppendLine($"        |   一次侧 {primaryVoltage / 1000:0.0} kV / {primaryCurrent:0.0} A    二次侧 {secondaryVoltage:0.0} V / {secondaryCurrent:0.0} A");
-            sb.AppendLine($"        |   电表 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab:0.0} / {meterUbc:0.0} / {meterUca:0.0} V");
-            sb.AppendLine($"        |   负载 有功 {loadActivePower:0.0} kW   无功 {loadReactivePower:0.0} kvar");
-            sb.AppendLine("        |----[断路器]---[隔离开关]----[变压器]----[电表]----[负载]");
+            sb.AppendLine("        |");
+            sb.AppendLine($"        |                           变压器: 一次侧 {primaryVoltage / 1000:0.0} kV / {primaryCurrent:0.0} A    二次侧 {secondaryVoltage:0.0} V / {secondaryCurrent:0.0} A");
+            sb.AppendLine("        |");
+            sb.AppendLine($"        |                                       电表 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab:0.0} / {meterUbc:0.0} / {meterUca:0.0} V");
+            sb.AppendLine($"        |                                       有功功率: {meterActive:0.0} kW    无功功率: {meterReactive:0.0} kvar");
+            sb.AppendLine("        |");
+            sb.AppendLine($"        |                                                   负载 有功 {loadActivePower:0.0} kW   无功 {loadReactivePower:0.0} kvar");
+            sb.AppendLine("        |");
+            sb.AppendLine("        |----[断路器]---[隔离开关]----[变压器]----[电表]---------[负载]");
             sb.AppendLine("        |                                                |");
             sb.AppendLine("        |                                                +--- 并网点 ---+");
             sb.AppendLine("        |                                                                |");
@@ -289,6 +332,7 @@ namespace EssSimulator.Display
                 }
             }
             sb.AppendLine();
+            sb.AppendLine("操作: Tab 切换视图 | :/C 输入命令 | Esc 返回");
 
             SafeSetCursorPosition(0, 0);
             Console.Write(sb.ToString());
@@ -335,12 +379,14 @@ namespace EssSimulator.Display
         {
             // Tab 切换 Spectre.Console 实时视图 与 原 ASCII 图
             bool useLive = false;
+            var processor = BuildCommandProcessor();
             Console.Clear();
             while (true)
             {
                 if (useLive)
                 {
                     bool switchRequested = false;
+                    bool commandRequested = false;
                     AnsiConsole.Live(new Panel("主电气接线").RoundedBorder().Border(BoxBorder.Rounded)).Start(ctx =>
                     {
                         while (!Console.KeyAvailable)
@@ -361,7 +407,7 @@ namespace EssSimulator.Display
                             // 顶部信息面板（避免 Markup 标签与中文状态混淆，改用 Text）
                             var breakerStatus = breakerClosed ? "合" : "分";
                             var isoStatus = switchState ? "合" : "分";
-                            var headerText = new Text($"电气主接线 {time}  （单元数 {unitCount}，通道数 {channelCount}）\n状态: 断路器[{breakerStatus}] 隔离[{isoStatus}]\n");
+                            var headerText = new Text($"电气主接线 {time}  （单元数 {unitCount}，通道数 {channelCount}）\n状态: 断路器[{breakerStatus}] 隔离[{isoStatus}]\n操作: Tab 切换视图 | :/C 输入命令 | Esc 返回\n");
                             var header = new Panel(headerText).Border(BoxBorder.Rounded);
 
                             // 交流侧表格（一次/二次、负载）
@@ -450,6 +496,12 @@ namespace EssSimulator.Display
                             {
                                 switchRequested = true;
                             }
+                            else if ((key.Key == ConsoleKey.Oem2 && key.Modifiers == ConsoleModifiers.Shift) ||
+                                     key.Key == ConsoleKey.C)
+                            {
+                                // ':' 键（通常是 Shift + Oem2），兼容 C 快捷键
+                                commandRequested = true;
+                            }
                             else if (key.Key == ConsoleKey.Escape)
                             {
                                 // 退出视图
@@ -459,8 +511,17 @@ namespace EssSimulator.Display
                     });
                     if (!switchRequested)
                     {
-                        // ESC 退出
-                        break;
+                        if (commandRequested)
+                        {
+                            PromptAndExecuteInlineCommand(processor);
+                            Console.Clear();
+                            continue;
+                        }
+                        else
+                        {
+                            // ESC 退出
+                            break;
+                        }
                     }
                     useLive = false;
                     Console.Clear();
@@ -476,6 +537,13 @@ namespace EssSimulator.Display
                         if (key.Key == ConsoleKey.Tab)
                         {
                             useLive = true;
+                            Console.Clear();
+                        }
+                        else if ((key.Key == ConsoleKey.Oem2 && key.Modifiers == ConsoleModifiers.Shift) ||
+                                 key.Key == ConsoleKey.C)
+                        {
+                            // ':' 键（通常是 Shift + Oem2），兼容 C 快捷键
+                            PromptAndExecuteInlineCommand(processor);
                             Console.Clear();
                         }
                         else if (key.Key == ConsoleKey.Escape)
