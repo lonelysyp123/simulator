@@ -103,6 +103,7 @@ namespace EssSimulator
             var buf = new Dictionary<string, object> { { name, value } };
             try { _slave.Write(buf); }
             catch (Exception ex) { _log.Error("即时写入 Modbus 失败", ex); }
+            _dataSync.InvalidateDataShadow(name);
         }
 
         public object? GetDataObjectByMesurePointName(string name)

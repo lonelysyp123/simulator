@@ -24,11 +24,23 @@ namespace EssSimulator
             object result = 0;
             if (size > ADDRESS_LENGTH && type != "System.String")
             {
-                //字节数组前面为高位，后面为低位                     
-                byte[] newData = new byte[4];
-                Array.Copy(data, 2, newData, 0, 2); // 复制后两个元素到新数组的前两个位置
-                Array.Copy(data, 0, newData, 2, 2); // 复制前两个元素到新数组的后两个位置
-                result = BitConverter.ToUInt32(newData, 0);//该转化默认小端序
+                if (data == null || data.Length < 4)
+                {
+                    throw new ArgumentException("Data length must be at least 4 bytes for 32-bit translation.");
+                }
+                if (type == "System.Int32")
+                {
+                    result = BitConverter.ToInt32(data, 0); // 32位有符号
+                }
+                else if (type == "System.UInt32")
+                {
+                    result = BitConverter.ToUInt32(data, 0); // 32位无符号
+                }
+                else
+                {
+                    // 兼容旧逻辑：未知 32 位类型默认按无符号处理
+                    result = BitConverter.ToUInt32(data, 0);
+                }
             }
             //处理SN码
             else if (size > ADDRESS_LENGTH && type == "System.String")

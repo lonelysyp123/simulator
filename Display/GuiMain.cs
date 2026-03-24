@@ -249,9 +249,9 @@ namespace EssSimulator.Display
             sb.AppendLine($"        |   电表 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab:0.0} / {meterUbc:0.0} / {meterUca:0.0} V");
             sb.AppendLine($"        |   负载 有功 {loadActivePower:0.0} kW   无功 {loadReactivePower:0.0} kvar");
             sb.AppendLine("        |----[断路器]---[隔离开关]----[变压器]----[电表]----[负载]");
-            sb.AppendLine("        |                      |");
-            sb.AppendLine("        |                      +--- 并网点 ---+");
-            sb.AppendLine("        |                                      |");
+            sb.AppendLine("        |                                                |");
+            sb.AppendLine("        |                                                +--- 并网点 ---+");
+            sb.AppendLine("        |                                                                |");
 
             for (int u = unitCount - 1; u >= 0; u--)
             {
@@ -270,6 +270,7 @@ namespace EssSimulator.Display
                     sb.AppendLine($"        |   PCS{a + 1}: P {pa:0.0} kW  Q {pr:0.0} kvar");
                     sb.AppendLine($"        |   舱{a + 1}:  SOC {soc:0.1f}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
                 }
+                sb.AppendLine("        |");
                 if (b < channelCount)
                 {
                     double pa = SafeGetDouble($"ess._pcsList[{b}]._currentState.ActivePower");
@@ -282,7 +283,10 @@ namespace EssSimulator.Display
                 }
 
                 if (u > 0)
-                    sb.AppendLine("        |                                      |");
+                {
+                    sb.AppendLine("        |");
+                    sb.AppendLine("        |");
+                }
             }
             sb.AppendLine();
 

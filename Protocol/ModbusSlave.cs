@@ -161,8 +161,11 @@ namespace EssSimulator
             var entry = pointMapToUse.Where(p => p.ParamName == paramName).FirstOrDefault();
             if (entry == null) return null;
             // 预筛功能码，避免内层重复 LINQ 分配
-            List<byte[]> data = ReadFunc((ushort)entry.Address, 1, entry.FunctionCode, 1);
-            return data[0];
+            ushort num = (ushort)(entry.Size / ADDRESS_LENGTH);
+            if (num == 0) num = 1;
+            List<byte[]> data = ReadFunc((ushort)entry.Address, num, entry.FunctionCode, 1);
+            if (data == null || data.Count == 0) return Array.Empty<byte>();
+            return data.SelectMany(x => x).ToArray();
         }
 
         public bool Write(Dictionary<string, object> data, byte slaveId = 1)

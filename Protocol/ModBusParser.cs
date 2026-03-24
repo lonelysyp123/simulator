@@ -84,7 +84,7 @@ namespace EssSimulator
                     if (point.Size == 32)
                     {
                         typeofPoint = "System.Int32";
-                        dataOrder = "DCBA";
+                        dataOrder = "CDAB";
                     }
                     else if (point.Size == 16)
                     {

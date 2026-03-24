@@ -276,5 +276,15 @@ namespace EssSimulator.Protocol.Modbus
             var parsed = parser.DataParse(new Dictionary<string, object> { { name, raw } });
             return parsed.TryGetValue(name, out var val) ? val : null;
         }
+
+        /// <summary>
+        /// 标记数据点为“脏”，使下一轮数据 worker 强制回写实时值。
+        /// 用于 dpc set 这类临时覆盖场景，避免因 shadow 去重而长期停留在手工值。
+        /// </summary>
+        public void InvalidateDataShadow(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+            _shadowData.TryRemove(name, out _);
+        }
     }
 }
