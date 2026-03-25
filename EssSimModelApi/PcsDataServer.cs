@@ -80,8 +80,6 @@ namespace EssSimulator.EssSimModelApi
             pcs.ChargePowerLimit                  = cfg.ChargePowerLimit;
             pcs.DischargePowerLimit               = cfg.DischargePowerLimit;
             pcs.PCSRatePower                      = cfg.PCSRatePower;
-            pcs.ActivePowerDispatchMode           = cfg.ActivePowerDispatchMode;
-            pcs.ReactivePowerDispatchMode         = cfg.ReactivePowerDispatchMode;
             pcs.ActiveReactivePriority            = cfg.ActiveReactivePriority;
             pcs.FrequencyActiveSetting            = cfg.FrequencyActiveSetting;
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -52,7 +52,7 @@ namespace EssSimulator.EssDeviceSimModel
         public double AcVoltage { get; set; }           // 交流侧电压(V)
         public double AcCurrent { get; set; }           // 交流侧电流(A)
         public double ActivePower { get; set; }         // 有功功率(kW)
-        public double ReactivePower { get; set; }        // 无功功率(kvar)
+        public double ReactivePower { get; set; }        // 无功功率(kvar, legacy符号: 正=感性吸收)
         public double Frequency { get; set; }           // 输出频率(Hz)
         public double Temperature { get; set; }         // 设备温度(°C)
         public double ActivePowerSettingVal { get; set; }  //有功设置值
@@ -61,8 +61,6 @@ namespace EssSimulator.EssDeviceSimModel
         public double DcCCSettingVal { get; set; } //直流恒流设置值
         public double DcCVSettingVal { get; set; } //直流恒压设置值
         public double DcCPSettingVal { get; set; } //直流恒功率设置值
-        public int ActiveDispathMode { get; set; }   //有功调度模式 0-直流恒流 1-直流恒压 2-直流恒功率 3-交流恒功率
-        public int ReactiveDispathMode { get; set; }  //无功调度模式 0-受控功率因素调节 1-受控直接无功量调节
 
         //保护参数，超过值，保护动作
         public double DcProtectChgCurrent { get; set; }    //Dc保护电流
@@ -154,18 +152,6 @@ namespace EssSimulator.EssDeviceSimModel
 
         // 获取当前状态（返回内部引用，调用方只应读取，不应直接赋值属性）
         public PcsState GetCurrentState() => _currentState;
-
-        /// <summary>
-        /// 线程安全地设置调度模式（在 _setpointLock 下写入，与功率斜坡线程不竞争）。
-        /// </summary>
-        public void SetDispatchMode(int activeMode, int reactiveMode)
-        {
-            lock (_setpointLock)
-            {
-                _currentState.ActiveDispathMode   = activeMode;
-                _currentState.ReactiveDispathMode = reactiveMode;
-            }
-        }
 
         // 更新电网状态
         public void UpdateGridState(double voltage, double frequency, bool isAvailable)
@@ -480,6 +466,9 @@ namespace EssSimulator.EssDeviceSimModel
                 _currentState.Mode = OperationMode.Normal;
             }
 
+            // 设计约束：无功目标由 EMS 主控下发，PCS 不在本地自动改写无功设定值。
+            // 因此这里不调用本地 Volt-Var 控制逻辑，避免覆盖 EMS 设定。
+
             // 2. 根据模式更新状态
             switch (_currentState.Mode)
             {
@@ -541,8 +530,9 @@ namespace EssSimulator.EssDeviceSimModel
         private void UpdateGridConnectedState()
         {
             // 电流方向约定：正放负充
-            // 放电(ActivePower > 0)：直流电流从电池流出为正，交流电流向电网输出为正
-            // 充电(ActivePower < 0)：直流电流流入电池为负，交流电流从电网流入为负
+            // 放电(ActivePower > 0)：直流电流从电池流出为正；
+            // 在系统并网点汇总中，约定“从电网流向设备”为正，因此放电对应交流电流为负。
+            // 充电(ActivePower < 0)：从电网吸收功率，对应交流电流为正。
             double dcPower = _currentState.ActivePower > 0
                 ? _currentState.ActivePower / _config.Efficiency   // 放电：直流侧需提供更多功率
                 : _currentState.ActivePower * _config.Efficiency;  // 充电：直流侧吸收更少功率
@@ -552,12 +542,12 @@ namespace EssSimulator.EssDeviceSimModel
             _currentState.AcVoltage = _gridState.Voltage * (1 - _gridLossCoefficient);
             _currentState.Frequency = _gridState.Frequency;
 
-            // 计算交流电流（带符号，正=放电向网侧送电，负=充电从网侧取电）
+            // 计算交流电流（带符号，正=从网侧取电，负=向网侧送电）
             double apparentPower = Math.Sqrt(
                 Math.Pow(_currentState.ActivePower, 2) +
                 Math.Pow(_currentState.ReactivePower, 2));
             double acCurrentMag = apparentPower * 1000 / (_currentState.AcVoltage * Math.Sqrt(3));
-            _currentState.AcCurrent = _currentState.ActivePower >= 0 ? acCurrentMag : -acCurrentMag;
+            _currentState.AcCurrent = _currentState.ActivePower >= 0 ? -acCurrentMag : acCurrentMag;
         }
 
         private void UpdateIslandedState()

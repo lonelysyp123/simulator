@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -154,9 +154,6 @@ namespace EssSimulator.EssSimModelApi
 
                 public float DCCCLimit { get; set; }                // 直流恒流电流
                 public float DCCVLimit { get; set; }                // 直流恒压电压
-                // 控制模式
-                public int ActivePowerDispatchMode { get; set; }   // 有功调度方式
-                public int ReactivePowerDispatchMode { get; set; } // 无功调度方式
                 public int ActiveReactivePriority { get; set; }    // 有功无功优先
                 public int FrequencyActiveSetting { get; set; }    // 频率有功设置
 

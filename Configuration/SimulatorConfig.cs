@@ -173,8 +173,6 @@ namespace EssSimulator.Configuration
         public float DischargePowerLimit { get; set; } = 500;
         public float PCSRatePower { get; set; } = 1250;
 
-        public int ActivePowerDispatchMode { get; set; } = 1;
-        public int ReactivePowerDispatchMode { get; set; } = 1;
         public int ActiveReactivePriority { get; set; } = 1;
         public int FrequencyActiveSetting { get; set; } = 1;
 

@@ -185,22 +185,26 @@ namespace EssSimulator.EssDeviceSimModel
                     DateTime simTime = DateTime.Now;
 
                     double totalSecCurrent = 0;
-                    double totalActiveKw   = _loadSimulator.ActivePower;
-                    double totalReactiveKvar = _loadSimulator.ReactivePower;
+                    // 并网点功率约定：向电网送出为正，负载消耗视为负注入。
+                    double totalActiveKw   = -_loadSimulator.ActivePower;
+                    // 无功统一约定：
+                    // - legacy符号（当前模型量）: 正=感性吸收
+                    // - support符号（控制语义）: 正=支撑电压
+                    double totalReactiveLegacyKvar = -_loadSimulator.ReactivePower;
 
                     foreach (var pcs in _pcsList)
                     {
                         var st = pcs.GetCurrentState();
                         totalSecCurrent += st.AcCurrent;
                         totalActiveKw   += st.ActivePower;
-                        totalReactiveKvar += st.ReactivePower;
+                        totalReactiveLegacyKvar += st.ReactivePower;
                     }
-
-                    var secVoltage   = _transformer.GetCurrentState().SecondaryVoltage;
-                    var loadCurrentA = _loadSimulator.ComputeLoadCurrentA(ref secVoltage);
+                    // 统一测点：并网点线电压（PCC）取变压器二次侧电压。
+                    var pccLineVoltageV = _transformer.GetCurrentState().SecondaryVoltage;
+                    var loadCurrentA = _loadSimulator.ComputeLoadCurrentA(ref pccLineVoltageV);
                     totalSecCurrent += loadCurrentA;
 
-                    var totalApparentKva = Math.Sqrt(totalActiveKw * totalActiveKw + totalReactiveKvar * totalReactiveKvar);
+                    var totalApparentKva = Math.Sqrt(totalActiveKw * totalActiveKw + totalReactiveLegacyKvar * totalReactiveLegacyKvar);
                     var powerFactor     = totalApparentKva > 0 ? totalActiveKw / totalApparentKva : 1.0;
 
                     var priCurrent = Math.Abs(_transformer.GetCurrentState().PrimaryCurrent);

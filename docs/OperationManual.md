@@ -6,7 +6,7 @@
 
 本项目是一个基于 `.NET 8` 的储能系统仿真程序，核心能力包括：
 
-- 仿真多套电池舱、多台 PCS、变压器、断路器和负载（数量由 `UnitCount` 配置）。
+- 仿真多套电池舱、多台 PCS、变压器、断路器和负载（数量由 `Simulator.Devices` 推导）。
 - 通过 Modbus TCP 对外提供 BMS、PCS/EMU、电表数据。
 - 提供控制台 GUI 和命令行交互命令，便于调试和联调。
 - 使用 CSV 点表将外部点位映射到内部对象路径。
@@ -123,7 +123,9 @@ dotnet EssSimulator.dll
 
 ```json
 "Simulator": {
-  "NoGui": true
+  "Runtime": {
+    "NoGui": true
+  }
 }
 ```
 
@@ -135,21 +137,26 @@ dotnet EssSimulator.dll
 
 主配置文件为 `appsettings.json`。
 
-### 5.1 `Simulator` 配置项
+### 5.1 `Simulator` 配置项（按当前结构）
 
 | 配置项 | 默认值 | 说明 |
 |---|---:|---|
-| `UnitCount` | `2` | 储能单元数量；同时创建 UnitCount 个 PCS、电池舱、BMS 数据及 BMS Modbus 从站；emu.PcsList 包含 UnitCount 个 PcsData，由单个 EMU Modbus 从站服务 |
-| `ClusterCount` | `12` | 每个单元的簇数量 |
-| `PackCount` | `4` | 每簇 Pack 数 |
-| `BaseModbusPort` | `1502` | BMS 基础端口，后续单元按 `+10` 递增 |
-| `PcsModbusPort` | `1501` | PCS/EMU Modbus 端口 |
-| `EmModbusPort` | `1500` | 电表 Modbus 端口 |
-| `SimStepMs` | `200` | 仿真主循环睡眠间隔（毫秒） |
-| `Speedup` | `10.0` | 仿真时间倍率 |
-| `NoGui` | `false` | 是否关闭控制台 GUI |
-| `CellInitialSoc` | `0.5` | 电芯初始 SOC 基准值（0-1） |
-| `CellInitialSocRandomRange` | `0.05` | 电芯初始 SOC 随机扰动范围（±），例如 0.05 表示 ±5% |
+| `Simulator.Runtime.SimStepMs` | `200` | 仿真主循环步长（ms） |
+| `Simulator.Runtime.Speedup` | `100.0` | 仿真加速倍率 |
+| `Simulator.Runtime.NoGui` | `false` | 是否禁用 GUI（无头模式） |
+| `Simulator.Protocol.BaseBmsModbusPort` | `1502` | BMS Modbus 基础端口 |
+| `Simulator.Protocol.BmsPortStep` | `10` | BMS 端口步长 |
+| `Simulator.Protocol.BaseEmuModbusPort` | `1501` | EMU Modbus 基础端口（每储能单元一个） |
+| `Simulator.Protocol.EmuPortStep` | `1` | EMU 端口步长 |
+| `Simulator.Protocol.EmModbusPort` | `1500` | 电表 Modbus 端口 |
+| `Simulator.Devices[*].Pcs[*].Name` | `PCS` | PCS 名称 |
+| `Simulator.Devices[*].Bms[*].ClusterCount` | `12` | 簇数量 |
+| `Simulator.Devices[*].Bms[*].PackCount` | `4` | 每簇 Pack 数 |
+| `Simulator.Devices[*].Bms[*].CellSeriesCount` | `104` | 单包串联单体数 |
+| `Simulator.Devices[*].Bms[*].CellNominalVoltage` | `3.2` | 电芯额定电压 |
+| `Simulator.Devices[*].Bms[*].CellNominalCapacity` | `314` | 电芯额定容量 |
+| `Simulator.Devices[*].Bms[*].CellInitialSoc` | `0.5` | 电芯初始 SOC 基准值（0-1） |
+| `Simulator.Devices[*].Bms[*].CellInitialSocRandomRange` | `0.05` | 初始 SOC 随机扰动范围（±） |
 
 ### 5.2 其他配置节
 
@@ -164,18 +171,17 @@ dotnet EssSimulator.dll
 
 程序启动后会自动启动多个 Modbus TCP 服务。
 
-### 6.1 默认端口
+### 6.1 端口生成规则（以配置为准）
 
 | 服务名 | 设备名 | 默认端口 | 数据来源 |
 |---|---|---:|---|
 | 电表 | `simEm` | `1500` | `em.csv` |
-| PCS/EMU | `simEmu` | `1501` | `emu.csv` |
-| BMS 单元 1 | `simBms1` | `1502` | `bms_bank.csv` |
-| BMS 单元 2 | `simBms2` | `1512` | `bms_bank.csv` |
+| PCS/EMU（单元 u） | `simEmu{u}` | `BaseEmuModbusPort + (u-1) * EmuPortStep` | `emu.csv` |
+| BMS 单元 i | `simBms{i}` | `BaseBmsModbusPort + (i-1) * BmsPortStep` | `bms_bank.csv` |
 
-说明：BMS 端口按以下规则生成：`BaseModbusPort + i × 10`，其中 `i` 从 `0` 开始。当 `UnitCount > 2` 时，会创建 simBms3（1522）、simBms4（1532）等。
+说明：实际端口由 `Simulator.Protocol.*` 决定；文档中的数值仅为默认配置类初始值示例。
 
-**注意**：当 `UnitCount > 2` 时，需在 `emu.csv` 中为 `emu.PcsList[2]`、`emu.PcsList[3]` 等补充相应点位映射，否则多出的 PCS 数据不会通过 Modbus 暴露。
+**注意**：当实际 PCS/EMU 通道数超过 `emu.csv` 当前映射范围时，需为 `emu.PcsList[n]` 补充对应点位，否则多出的 PCS 数据不会通过 Modbus 暴露。
 
 ### 6.2 监听信息查看
 
@@ -231,7 +237,7 @@ CSV 中 `ModelSim` 的 `arg1` 会映射到程序内部对象路径，例如：
 | 主电气接线 | 显示断路器、变压器、PCS、电池舱、负载、电表数据 |
 | 电池堆簇信息 | 查看电池堆及簇级状态 |
 | 电池单体信息 | 查看单体电压等详细信息 |
-| 命令输入 | 输入命令调试设备 |
+| 命令输入 | 输入命令调试设备（`esscmd`/`breaker`/`dpc`） |
 | 连接信息 | 查看服务监听与客户端连接状态 |
 | 日志信息 | 查看日志输出 |
 
@@ -241,29 +247,19 @@ GUI 快捷键：
 - `Enter`：进入页面
 - `Esc`：退出程序
 
+主电气接线页面内快捷键（新增）：
+
+- `Tab`：在实时表格视图与 ASCII 视图之间切换
+- `:` 或 `C`：直接打开“内联命令输入”，执行后自动返回主接线页面
+- `Esc`：返回上一级菜单
+
 ---
 
-## 9. 控制台命令说明
+## 9. 控制台命令说明（当前 GUI 接入）
 
 命令定义在 `Display/Cmd.cs`。
 
-### 9.1 `help`
-
-显示所有可用命令。
-
-```text
-help
-```
-
-### 9.2 `exit`
-
-退出程序。
-
-```text
-exit
-```
-
-### 9.3 `dpc`
+### 9.1 `dpc`
 
 用于按点位名称直接读取或写入数据。
 
@@ -293,7 +289,7 @@ dpc simEm.yc12 get
 - 设备名错误：会提示“找不到对应的设备模型”。
 - 点位名错误：会提示“指定设备找不到对应数据点”。
 
-### 9.4 `esscmd`
+### 9.2 `esscmd`
 
 用于调节 PCS 特性或负载参数。
 
@@ -337,7 +333,7 @@ esscmd setLoad reactivePower 80
 - `setLoad` 一旦执行，会停止按时段自动切换负载，改为使用手动设定值。
 - `setPcs1` 和 `setPcs2` 只作用于对应 PCS。
 
-### 9.5 `breaker`
+### 9.3 `breaker`
 
 直接设置主断路器状态。
 
@@ -353,16 +349,15 @@ breaker set false
 - `true`：合闸
 - `false`：分闸
 
-### 9.6 `math`
+### 9.4 退出命令输入
 
-测试用数学命令，与仿真无直接关系。
+在“命令输入”页面中输入：
 
 ```text
-math add 1 2
-math sub 3 1
-math mul 2 4
-math div 8 2
+exit
 ```
+
+可返回 GUI 菜单（不会退出整个进程）。
 
 ---
 
@@ -379,6 +374,9 @@ math div 8 2
 	- 电池舱 SOC、直流电压、直流电流
 	- 负载有功、无功
 	- 电表三相电流、线电压
+
+说明：当前系统中负载与 PCS 交流电流均按三相线电压口径计算  
+`I = S / (sqrt(3) * Uline)`，用于保证功率对消场景下电流口径一致。
 
 ### 10.2 读取 BMS 的 SOC
 
@@ -413,6 +411,56 @@ esscmd setPcs1 delay 50
 breaker set true
 breaker set false
 ```
+
+### 10.6 EMS 主控无功模式（推荐）
+
+本项目当前按“EMS 主控”建模：
+
+- EMS/调度通过控制点下发有功、无功设定（例如 `5300/5301`）。
+- PCS 负责执行设定值及爬坡，不在本地自动改写无功目标。
+- 电池仅体现能量吸收/释放与电压电流响应。
+
+说明：自动无功（Volt-Var）相关配置已移除，PCS 仅执行 EMS 下发的无功设定值。
+
+### 10.7 无功-电压反馈逻辑详解（EMS 主控前提）
+
+本节对应代码：
+
+- `EssDeviceSimModel/GridFeedbackConventions.cs`
+- `EssDeviceSimModel/ScheduledLoadSimulator.cs`
+- `EssDeviceSimModel/EnergyStorageSys.cs`
+- `EssDeviceSimModel/PcsModel.cs`
+
+#### 10.7.1 控制边界
+
+- **谁给 Q 目标**：EMS（外部控制）  
+- **谁执行 Q 目标**：PCS（爬坡、限幅、状态机）  
+- **谁体现 Q 对 V 的影响**：网络/负载/变压器耦合模型
+
+即：控制权属于 EMS，物理反馈属于电网模型。
+
+#### 10.7.2 符号与测点
+
+- legacy 无功符号：`Qlegacy > 0` 表示感性吸收（通常拉低电压）
+- 并网测点：PCC 线电压（变压器二次侧）
+
+#### 10.7.3 反馈链路
+
+当前系统的无功-电压闭环为：
+
+1. EMS 下发 PCS 无功设定值  
+2. PCS 输出有功/无功到交流侧  
+3. 系统汇总总有功/总无功与总电流  
+4. 变压器按负载率和功率因数计算二次侧电压  
+5. 负载模型按电压更新电流，反馈到下一周期
+
+因此，虽然 PCS 不做本地自动无功控制，但系统仍具备“无功影响电压”的动态反馈。
+
+#### 10.7.4 为什么这样设计
+
+- 保持控制职责清晰：EMS 做调度，PCS 做执行。  
+- 便于联调：Modbus 写入的无功设定不会被本地控制器覆盖。  
+- 更贴合你的仿真目标：验证 EMS 策略下的电网响应，而不是引入 PCS 自主控制策略。
 
 ---
 
@@ -460,7 +508,7 @@ dotnet build ./EssSimulator.csproj
 
 可能原因：
 
-- `appsettings.json` 中 `Simulator.NoGui=true`
+- `appsettings.json` 中 `Simulator.Runtime.NoGui=true`
 - 当前运行环境不适合控制台交互
 
 ### 12.3 `dpc` 设置后值又变回去了
@@ -468,7 +516,7 @@ dotnet build ./EssSimulator.csproj
 原因：
 
 - 该点位是由模型周期性刷新生成的
-- `dpc set` 只是临时写入，后续会被后台线程覆盖
+- `dpc set` 为临时写入；当前实现会在后续轮询中强制回归模型实时值
 
 ### 12.4 无法连接 Modbus 端口
 
@@ -546,7 +594,10 @@ lsof -i :1512
 - `Display/Cmd.cs`
 - `Display/GuiMain.cs`
 - `Protocol/ModbusHostedService.cs`
+- `Protocol/Modbus/ModbusDataSync.cs`
+- `Protocol/ModbusSimServer.cs`
 - `EssDeviceSimModel/PcsModel.cs`
+- `EssDeviceSimModel/GridFeedbackConventions.cs`
 - `EssDeviceSimModel/ScheduledLoadSimulator.cs`
 - `bms_bank.csv`
 - `emu.csv`

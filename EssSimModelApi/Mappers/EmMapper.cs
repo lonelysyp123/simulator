@@ -21,12 +21,15 @@ namespace EssSimulator.EssSimModelApi.Mappers
         {
             var xfSt = ess._transformer.GetCurrentState();
 
+            // 统一测点：并网点线电压（PCC）取变压器二次侧电压。
             double lineVoltage = xfSt?.SecondaryVoltage > 0
                 ? xfSt.SecondaryVoltage
                 : ess._transformer._specs.SecondaryVoltage;
 
-            double loadP = ess._loadSimulator.ActivePower;
-            double loadQ = ess._loadSimulator.ReactivePower;
+            // 并网点功率约定：向电网送出为正，负载消耗视为负注入。
+            double loadP = -ess._loadSimulator.ActivePower;
+            // 无功沿用 legacy 符号，并在并网点统计时按负载消耗取负注入。
+            double loadQ = -ess._loadSimulator.ReactivePower;
 
             double totalP = loadP, totalQ = loadQ;
             foreach (var pcs in ess._pcsList)

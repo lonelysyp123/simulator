@@ -72,11 +72,6 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 if (Math.Abs(pcsData.PCSActivePowerSetting  - pcsSim.GetCurrentState().ActivePower)  > 0 ||
                     Math.Abs(pcsData.PCSReactivePowerSetting - pcsSim.GetCurrentState().ReactivePower) > 0)
                     pcsSim.SetPowerCommand(pcsData.PCSActivePowerSetting, pcsData.PCSReactivePowerSetting);
-
-                var state = pcsSim.GetCurrentState();
-                if (pcsData.ActivePowerDispatchMode   != state.ActiveDispathMode ||
-                    pcsData.ReactivePowerDispatchMode != state.ReactiveDispathMode)
-                    pcsSim.SetDispatchMode(pcsData.ActivePowerDispatchMode, pcsData.ReactivePowerDispatchMode);
             }
         }
     }
