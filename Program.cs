@@ -13,6 +13,81 @@ namespace EssSimulator
 {
     class Program
     {
+        private static bool IsSimulatorReady(int expectedServerCount)
+        {
+            var store = SimulatorHost.Instance;
+            if (!store.Contains("ess") ||
+                !store.Contains("em") ||
+                !store.Contains("bms1") ||
+                !store.Contains("emu1") ||
+                !store.Contains("simEm") ||
+                !store.Contains("simBms1") ||
+                !store.Contains("simEmu1"))
+            {
+                return false;
+            }
+
+            if (SimServer.serverListenInfo.Count < expectedServerCount)
+            {
+                return false;
+            }
+
+            try
+            {
+                var soc = SimServer.GetExtIfVariableVal("bms1.BatteryStacks[0].SOC");
+                var totalActivePower = SimServer.GetExtIfVariableVal("em.TotalActivePower");
+                var pcsList = SimServer.GetExtIfVariableVal("ess._pcsList") as System.Collections.ICollection;
+                return soc != null && totalActivePower != null && pcsList != null && pcsList.Count > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static async Task WaitForSimulatorReadyAsync(SimulatorConfig cfg, CancellationToken cancellationToken)
+        {
+            int expectedBmsCount = Math.Max(1, cfg.UnitCount);
+            int expectedEmuCount = Math.Max(1, cfg.Devices?.Count ?? 1);
+            int expectedServerCount = expectedBmsCount + expectedEmuCount + 1; // BMS + EMU + EM
+            var timeout = TimeSpan.FromSeconds(60);
+            var start = DateTime.UtcNow;
+            var spinner = new[] { '|', '/', '-', '\\' };
+            int spinnerIndex = 0;
+
+            while ((DateTime.UtcNow - start) < timeout)
+            {
+                if (IsSimulatorReady(expectedServerCount))
+                {
+                    Console.Clear();
+                    return;
+                }
+
+                var elapsedSeconds = (int)(DateTime.UtcNow - start).TotalSeconds;
+                Console.Clear();
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("=== 储能单元模拟器加载中 ===");
+                Console.ResetColor();
+                Console.WriteLine();
+                Console.WriteLine("正在初始化内部模拟器与协议服务，请稍候...");
+                Console.WriteLine($"协议服务进度: {SimServer.serverListenInfo.Count}/{expectedServerCount}");
+                Console.WriteLine($"加载状态: {spinner[spinnerIndex]}  已等待 {elapsedSeconds}s");
+                Console.WriteLine();
+                Console.WriteLine("加载完成后将自动进入可视化界面。");
+
+                spinnerIndex = (spinnerIndex + 1) % spinner.Length;
+                await Task.Delay(200, cancellationToken);
+            }
+
+            // 超时兜底：避免无限等待，给出提示后继续进入 GUI。
+            Console.Clear();
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine("初始化等待超时，仍将进入可视化界面。");
+            Console.WriteLine("若 dpc 初始读取异常，请稍后重试。");
+            Console.ResetColor();
+            await Task.Delay(1200, cancellationToken);
+        }
+
         private static void PrintProtocolCreateInfo(SimulatorConfig cfg)
         {
             Console.WriteLine("==== 协议模拟器创建 ====");
@@ -96,15 +171,20 @@ namespace EssSimulator
                 .Build();
 
             var simCfg = host.Services.GetRequiredService<IOptions<SimulatorConfig>>().Value;
-            // 先打印协议创建信息，再启动 GUI 覆盖输出，避免混杂
-            PrintProtocolCreateInfo(simCfg);
 
             // 先启动 Host（后台服务会创建并启动 Modbus 从站等）
             await host.StartAsync();
 
             // 启动控制台 GUI（若未禁用）。GUI 内部会 Clear 覆盖上面的打印。
             if (!simCfg.Runtime.NoGui)
+            {
+                await WaitForSimulatorReadyAsync(simCfg, CancellationToken.None);
                 host.Services.GetRequiredService<GuiMain>();
+            }
+            else
+            {
+                PrintProtocolCreateInfo(simCfg);
+            }
 
             await host.WaitForShutdownAsync();
         }
