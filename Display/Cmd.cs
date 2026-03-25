@@ -5,8 +5,10 @@ using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem.EnergyManagementSystem;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -104,15 +106,33 @@ namespace EssSimulator.Display
                 return;
             }
 
+            if (!TryExecuteDpcOperation(args, out var message))
+            {
+                Console.WriteLine(message);
+                return;
+            }
+
+            Console.WriteLine(message);
+        }
+
+        public static bool TryExecuteDpcOperation(string[] args, out string message)
+        {
+            message = string.Empty;
+            if (args.Length < 2)
+            {
+                message = "dpc 参数不足，请使用 dpc help 查看用法";
+                return false;
+            }
+
             var dpcname = args[0];
-            var op = args[1].ToLower();
-            var opdata = args.Length > 2 ? args[2] : string.Empty;
+            var op = args[1].ToLowerInvariant();
+            var opdata = args.Length > 2 ? string.Join(' ', args.Skip(2)) : string.Empty;
 
             var dpcnameParts = dpcname.Split('.');
             if (dpcnameParts.Length != 2)
             {
-                Console.WriteLine("dpcname 格式错误，应为 <device>.<datapoint>");
-                return;
+                message = "dpcname 格式错误，应为 <device>.<datapoint>";
+                return false;
             }
 
             var dpcDeviceName = dpcnameParts[0];
@@ -123,37 +143,46 @@ namespace EssSimulator.Display
             ModbusSimServer? simServer = obj as ModbusSimServer;
             if (simServer == null)
             {
-                Console.WriteLine("找不到对应的设备模型");
-                return;
+                message = "找不到对应的设备模型";
+                return false;
             }
 
             if (!simServer.DataMaps.Any(m => m.ParamName == dpcDeviceDataPoint))
             {
-                Console.WriteLine("指定设备找不到对应数据点");
-                return;
+                message = "指定设备找不到对应数据点";
+                return false;
             }
 
             if (op == "set")
             {
+                if (string.IsNullOrWhiteSpace(opdata))
+                {
+                    message = "set 操作缺少参数值";
+                    return false;
+                }
+
                 simServer.SetDataStoreByMesurePointName(dpcDeviceDataPoint, opdata);
-                Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {dpcDeviceName}.{dpcDeviceDataPoint} 设置值为 {opdata} (若 ModelSim 不为 0 将在下一个轮询周期被覆盖)");
+                message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {dpcDeviceName}.{dpcDeviceDataPoint} 设置值为 {opdata} (若 ModelSim 不为 0 将在下一个轮询周期被覆盖)";
+                return true;
             }
-            else if (op == "get")
+
+            if (op == "get")
             {
                 object? result = simServer.GetDataObjectByMesurePointName(dpcDeviceDataPoint);
                 if (result == null)
                 {
-                    Console.WriteLine("获取为空，可能原因: 1) 点名错误 2) 点不支持读取");
+                    message = "获取为空，可能原因: 1) 点名错误 2) 点不支持读取";
                 }
                 else
                 {
-                    Console.WriteLine($"设备:{dpcDeviceName} 数据点:{dpcDeviceDataPoint} val:{result}");
+                    message = $"设备:{dpcDeviceName} 数据点:{dpcDeviceDataPoint} val:{result}";
                 }
+
+                return true;
             }
-            else
-            {
-                Console.WriteLine("不支持的操作，请使用 set 或 get，或 dpc help 查看用法");
-            }
+
+            message = "不支持的操作，请使用 set 或 get，或 dpc help 查看用法";
+            return false;
         }
 
         private void PrintHelp()
@@ -166,6 +195,199 @@ namespace EssSimulator.Display
             Console.WriteLine("示例:");
             Console.WriteLine("  dpc ess.yc1 get");
             Console.WriteLine("  dpc ess.yc1 set 123.45");
+        }
+    }
+
+    public class DpcTestSuite
+    {
+        public List<DpcTestCase> Tests { get; set; } = [];
+    }
+
+    public class DpcTestCase
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public List<string> Steps { get; set; } = [];
+        public string Script { get; set; } = string.Empty;
+    }
+
+    public class DpcAutoTestCommand() : ICommand
+    {
+        public string Name => "dpctest";
+        public string Description => "执行自动化 DPC 测试";
+
+        public void Execute(string[] args)
+        {
+            if (args.Length < 1 || args[0].Equals("help", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintHelp();
+                return;
+            }
+
+            if (!TryLoadSuite(out var suite, out var loadError))
+            {
+                Console.WriteLine(loadError);
+                return;
+            }
+
+            if (args[0].Equals("list", StringComparison.OrdinalIgnoreCase))
+            {
+                PrintTestList(suite);
+                return;
+            }
+
+            var testName = args[0];
+            var testCase = suite.Tests.FirstOrDefault(t => t.Name.Equals(testName, StringComparison.OrdinalIgnoreCase));
+            if (testCase == null)
+            {
+                Console.WriteLine($"未找到自动化测试: {testName}");
+                return;
+            }
+
+            var steps = BuildSteps(testCase);
+            if (steps.Count == 0)
+            {
+                Console.WriteLine($"测试 [{testCase.Name}] 没有可执行步骤");
+                return;
+            }
+
+            Console.WriteLine($"开始执行测试 [{testCase.Name}]，步骤数: {steps.Count}");
+            if (!string.IsNullOrWhiteSpace(testCase.Description))
+                Console.WriteLine($"说明: {testCase.Description}");
+
+            for (int i = 0; i < steps.Count; i++)
+            {
+                var step = steps[i].Trim();
+                if (string.IsNullOrWhiteSpace(step))
+                    continue;
+
+                Console.WriteLine($"[{i + 1}/{steps.Count}] {step}");
+
+                if (TryParseSleepSeconds(step, out var sleepMilliseconds))
+                {
+                    Thread.Sleep(TimeSpan.FromMilliseconds(sleepMilliseconds));
+                    Console.WriteLine($"等待完成: {sleepMilliseconds} 毫秒");
+                    continue;
+                }
+
+                if (step.StartsWith("dpc ", StringComparison.OrdinalIgnoreCase))
+                {
+                    var dpcArgs = step.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
+                    if (!DataPointChangeCommand.TryExecuteDpcOperation(dpcArgs, out var dpcMessage))
+                    {
+                        Console.WriteLine($"测试 [{testCase.Name}] 执行失败: {dpcMessage}");
+                        return;
+                    }
+
+                    Console.WriteLine(dpcMessage);
+                    continue;
+                }
+
+                Console.WriteLine($"测试 [{testCase.Name}] 执行失败: 不支持的步骤 [{step}]，当前仅支持 dpc 和 sleep");
+                return;
+            }
+
+            Console.WriteLine($"测试 [{testCase.Name}] 执行完成");
+        }
+
+        private static List<string> BuildSteps(DpcTestCase testCase)
+        {
+            if (testCase.Steps.Count > 0)
+                return testCase.Steps.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList();
+
+            if (!string.IsNullOrWhiteSpace(testCase.Script))
+            {
+                return testCase.Script
+                    .Split(';', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList();
+            }
+
+            return [];
+        }
+
+        private static bool TryParseSleepSeconds(string step, out int seconds)
+        {
+            seconds = 0;
+            if (step.StartsWith("sleep(", StringComparison.OrdinalIgnoreCase) && step.EndsWith(")"))
+            {
+                var body = step["sleep(".Length..^1].Trim();
+                return int.TryParse(body, out seconds) && seconds >= 0;
+            }
+
+            if (step.StartsWith("sleep ", StringComparison.OrdinalIgnoreCase))
+            {
+                var body = step["sleep ".Length..].Trim();
+                return int.TryParse(body, out seconds) && seconds >= 0;
+            }
+
+            return false;
+        }
+
+        private static void PrintTestList(DpcTestSuite suite)
+        {
+            if (suite.Tests.Count == 0)
+            {
+                Console.WriteLine("autotest.json 中没有定义任何测试");
+                return;
+            }
+
+            Console.WriteLine("可用自动化测试:");
+            foreach (var test in suite.Tests)
+            {
+                var desc = string.IsNullOrWhiteSpace(test.Description) ? "" : $" - {test.Description}";
+                Console.WriteLine($"  {test.Name}{desc}");
+            }
+        }
+
+        private static bool TryLoadSuite(out DpcTestSuite suite, out string error)
+        {
+            suite = new DpcTestSuite();
+            error = string.Empty;
+
+            var candidatePaths = new[]
+            {
+                Path.Combine(Directory.GetCurrentDirectory(), "autotest.json"),
+                Path.Combine(AppContext.BaseDirectory, "autotest.json")
+            };
+
+            var configPath = candidatePaths.FirstOrDefault(File.Exists);
+            if (string.IsNullOrWhiteSpace(configPath))
+            {
+                error = "未找到 autotest.json，请在程序目录或启动目录下创建该文件";
+                return false;
+            }
+
+            try
+            {
+                var json = File.ReadAllText(configPath);
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    ReadCommentHandling = JsonCommentHandling.Skip,
+                    AllowTrailingCommas = true
+                };
+                suite = JsonSerializer.Deserialize<DpcTestSuite>(json, options) ?? new DpcTestSuite();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = $"读取 autotest.json 失败: {ex.Message}";
+                return false;
+            }
+        }
+
+        private static void PrintHelp()
+        {
+            Console.WriteLine("用法: dpctest <testName>");
+            Console.WriteLine("  dpctest list         列出 autotest.json 中的测试名称");
+            Console.WriteLine("  dpctest <testName>   执行指定测试");
+            Console.WriteLine("  dpctest help         查看帮助");
+            Console.WriteLine("步骤语法支持:");
+            Console.WriteLine("  dpc <device.point> set <value>");
+            Console.WriteLine("  dpc <device.point> get");
+            Console.WriteLine("  sleep(10) 或 sleep 10");
         }
     }
 
@@ -324,7 +546,7 @@ namespace EssSimulator.Display
             else
             {
                 Console.WriteLine($"未知命令: {commandName}");
-                Console.WriteLine("当前可用命令:esscmd, exit, dpc");
+                Console.WriteLine("当前可用命令: esscmd, breaker, dpc, dpctest, exit");
             }
         }
     }

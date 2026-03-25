@@ -237,7 +237,7 @@ CSV 中 `ModelSim` 的 `arg1` 会映射到程序内部对象路径，例如：
 | 主电气接线 | 显示断路器、变压器、PCS、电池舱、负载、电表数据 |
 | 电池堆簇信息 | 查看电池堆及簇级状态 |
 | 电池单体信息 | 查看单体电压等详细信息 |
-| 命令输入 | 输入命令调试设备（`esscmd`/`breaker`/`dpc`） |
+| 命令输入 | 输入命令调试设备（`esscmd`/`breaker`/`dpc`/`dpctest`） |
 | 连接信息 | 查看服务监听与客户端连接状态 |
 | 日志信息 | 查看日志输出 |
 
@@ -349,7 +349,45 @@ breaker set false
 - `true`：合闸
 - `false`：分闸
 
-### 9.4 退出命令输入
+### 9.4 `dpctest`
+
+用于执行 `autotest.json` 中定义的自动化脚本（按顺序执行 `dpc` 和 `sleep` 步骤）。
+
+#### 语法
+
+```text
+dpctest list
+dpctest <testName>
+```
+
+#### `autotest.json` 结构
+
+```json
+{
+  "tests": [
+    {
+      "name": "xxtest",
+      "description": "按阶梯下调 simEm.yc19",
+      "steps": [
+        "dpc simEm.yc19 set 49.95",
+        "sleep(10)",
+        "dpc simEm.yc19 set 49.9"
+      ]
+    }
+  ]
+}
+```
+
+也支持使用 `script` 字段按分号分隔步骤，例如：  
+`dpc simEm.yc19 set 49.95;sleep(10);dpc simEm.yc19 set 49.9;`
+
+#### 步骤语法
+
+- `dpc <device>.<datapoint> set <value>`
+- `dpc <device>.<datapoint> get`
+- `sleep(10)` 或 `sleep 10`
+
+### 9.5 退出命令输入
 
 在“命令输入”页面中输入：
 

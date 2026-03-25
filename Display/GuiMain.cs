@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Spectre.Console;
 
+
 namespace EssSimulator.Display
 {  
     public class GuiMain
@@ -93,6 +94,7 @@ namespace EssSimulator.Display
                 new EssCommand(),
                 new BreakerCommand(),
                 new DataPointChangeCommand(),
+                new DpcAutoTestCommand(),
             };
             return new CommandProcessor(commands);
         }
@@ -106,7 +108,7 @@ namespace EssSimulator.Display
             {
                 Console.Clear();
                 Console.WriteLine("主电气接线 - 指令输入（执行后自动返回）");
-                Console.WriteLine("可用命令: esscmd / breaker / dpc");
+                Console.WriteLine("可用命令: esscmd / breaker / dpc / dpctest");
                 Console.Write("cmd> ");
                 var input = Console.ReadLine();
                 if (!string.IsNullOrWhiteSpace(input))
@@ -831,6 +833,7 @@ namespace EssSimulator.Display
                 new EssCommand(),
                 new BreakerCommand(),
                 new DataPointChangeCommand(),
+                new DpcAutoTestCommand(),
             };
 
             var processor = new CommandProcessor(commands);
