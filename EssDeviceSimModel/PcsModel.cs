@@ -112,7 +112,7 @@ namespace EssSimulator.EssDeviceSimModel
         private int _delay = 0; // 默认延迟时间(ms)
         private RampCurve _activeRampCurve = RampCurve.Linear;
         private RampCurve _reactiveRampCurve = RampCurve.Linear;
-        private double _gridLossCoefficient = 0.01; // 电网损耗系数，用于简化计算
+        private readonly double _gridLossCoefficient; // 电网损耗系数，用于简化计算
         /// <summary>
         /// 仿真时间加速倍率。爬坡线程的真实 Sleep 时长 = 配置值 / Speedup，
         /// 使 PCS 爬坡速率在仿真时间轴上与主循环的 SimStep 保持一致。
@@ -125,11 +125,12 @@ namespace EssSimulator.EssDeviceSimModel
             public int DelayMs;
         }
 
-        public PCSSimulator(PcsConfiguration config, double speedup = 1.0, double ambientTemp = 25.0)
+        public PCSSimulator(PcsConfiguration config, double speedup = 1.0, double ambientTemp = 25.0, double gridLossCoefficient = 0.01)
         {
             _config = config;
             _speedup = speedup > 0 ? speedup : 1.0;
             _ambientTemperature = ambientTemp;
+            _gridLossCoefficient = Math.Clamp(gridLossCoefficient, 0, 0.95);
             _currentState = new PcsState
             {
                 Mode = OperationMode.Standby,
@@ -152,6 +153,19 @@ namespace EssSimulator.EssDeviceSimModel
 
         // 获取当前状态（返回内部引用，调用方只应读取，不应直接赋值属性）
         public PcsState GetCurrentState() => _currentState;
+
+        /// <summary>
+        /// 计算网侧有功功率（kW）。
+        /// 约定：正值表示向电网送电，负值表示从电网取电。
+        /// - 放电时（P>=0）按线损效率折减；
+        /// - 充电时（P<0）按线损效率反推网侧取电。
+        /// </summary>
+        public double GetGridSideActivePower()
+        {
+            var p = _currentState.ActivePower;
+            var lineEfficiency = 1.0 - _gridLossCoefficient;
+            return p >= 0 ? p * lineEfficiency : p / lineEfficiency;
+        }
 
         // 更新电网状态
         public void UpdateGridState(double voltage, double frequency, bool isAvailable)
@@ -543,11 +557,12 @@ namespace EssSimulator.EssDeviceSimModel
             _currentState.Frequency = _gridState.Frequency;
 
             // 计算交流电流（带符号，正=从网侧取电，负=向网侧送电）
+            var gridSideActivePower = GetGridSideActivePower();
             double apparentPower = Math.Sqrt(
-                Math.Pow(_currentState.ActivePower, 2) +
+                Math.Pow(gridSideActivePower, 2) +
                 Math.Pow(_currentState.ReactivePower, 2));
             double acCurrentMag = apparentPower * 1000 / (_currentState.AcVoltage * Math.Sqrt(3));
-            _currentState.AcCurrent = _currentState.ActivePower >= 0 ? -acCurrentMag : acCurrentMag;
+            _currentState.AcCurrent = gridSideActivePower >= 0 ? -acCurrentMag : acCurrentMag;
         }
 
         private void UpdateIslandedState()

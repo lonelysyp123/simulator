@@ -35,7 +35,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
             foreach (var pcs in ess._pcsList)
             {
                 var st = pcs.GetCurrentState();
-                totalP += st.ActivePower;
+                totalP += pcs.GetGridSideActivePower();
                 totalQ += st.ReactivePower;
             }
             double totalS = Math.Sqrt(totalP * totalP + totalQ * totalQ);

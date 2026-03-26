@@ -137,6 +137,8 @@ namespace EssSimulator.Configuration
         public double AcVoltageNominal { get; set; } = 690;
         public double FrequencyNominal { get; set; } = 50;
         public double MaxCurrent { get; set; } = 1588;
+        /// <summary>线损相关系数（用于并网电压折算）</summary>
+        public double GridLossCoefficient { get; set; } = 0.01;
     }
 
     /// <summary>变压器参数配置（对应 appsettings.json: Transformer 节）</summary>
@@ -190,5 +192,7 @@ namespace EssSimulator.Configuration
 
         /// <summary>无功计划负载（kvar）</summary>
         public double ReactivePowerPlan { get; set; } = 0;
+        /// <summary>无功-电压反馈系数（legacy 负载反馈）</summary>
+        public double ReactiveVoltageFeedbackCoefficient { get; set; } = 0.001;
     }
 }

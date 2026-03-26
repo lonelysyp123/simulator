@@ -22,11 +22,12 @@ namespace EssSimulator.EssDeviceSimModel
 
         private List<LoadWindow> windows;
         // 灵敏系数k，
-        private double k = 0.001;
+        private readonly double k;
 
-        public ScheduledLoadSimulator(List<LoadWindow> window)
+        public ScheduledLoadSimulator(List<LoadWindow> window, double reactiveVoltageFeedbackCoefficient = 0.001)
         {
             this.windows = window;
+            k = reactiveVoltageFeedbackCoefficient;
             SetSchedule();
         }
 

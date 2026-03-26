@@ -110,7 +110,10 @@ namespace EssSimulator.EssDeviceSimModel
             };
             for (int i = 0; i < unitCount; i++)
             {
-                pcsList.Add(new PCSSimulator(pcsConfig, speedup: simCfg.Speedup));
+                pcsList.Add(new PCSSimulator(
+                    pcsConfig,
+                    speedup: simCfg.Speedup,
+                    gridLossCoefficient: pcsCfg.GridLossCoefficient));
             }
 
             _batteryRacks = racks;
@@ -140,7 +143,7 @@ namespace EssSimulator.EssDeviceSimModel
                     ActivePowerPlan   = loadCfg.ActivePowerPlan,
                     ReactivePowerPlan = loadCfg.ReactivePowerPlan
                 }
-            });
+            }, reactiveVoltageFeedbackCoefficient: loadCfg.ReactiveVoltageFeedbackCoefficient);
 
             // 初始化统计数据
             TotalChargeEnergy   = 0;
@@ -196,7 +199,7 @@ namespace EssSimulator.EssDeviceSimModel
                     {
                         var st = pcs.GetCurrentState();
                         totalSecCurrent += st.AcCurrent;
-                        totalActiveKw   += st.ActivePower;
+                        totalActiveKw   += pcs.GetGridSideActivePower();
                         totalReactiveLegacyKvar += st.ReactivePower;
                     }
                     // 统一测点：并网点线电压（PCC）取变压器二次侧电压。

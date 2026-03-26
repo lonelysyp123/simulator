@@ -16,12 +16,19 @@ namespace EssSimulator.EssDeviceSimModel
         public const string PccVoltageMeasurementPoint = "Transformer.SecondaryVoltage";
 
         /// <summary>
-        /// 在当前 legacy 负载模型下应用电压反馈（保持现有行为，不改变仿真结果）。
-        /// 现行为：仅当 Qlegacy > 0 时按 k 下拉电压。
+        /// 在当前 legacy 负载模型下应用电压反馈。
+        /// 现行为：
+        /// - Qlegacy > 0 时按 k 下拉电压；
+        /// - Qlegacy < 0 时按 k 上抬电压；
+        /// - Qlegacy = 0 时电压不变。
         /// </summary>
         public static double ApplyLegacyLoadVoltageFeedback(double inputVoltage, double legacyReactiveKvar, double k)
         {
             if (legacyReactiveKvar > 0)
+            {
+                return inputVoltage - legacyReactiveKvar * k;
+            }
+            if (legacyReactiveKvar < 0)
             {
                 return inputVoltage - legacyReactiveKvar * k;
             }
