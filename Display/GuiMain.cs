@@ -27,6 +27,7 @@ namespace EssSimulator.Display
         // 引起的异常或输出堆叠（重复打印）。
         private static bool _isRunning = true;
         private static int _selectedIndex = 0; // 当前选中项索引
+        private static string? _lastCommand; // 仅保留上一条指令
         //private static string[] _menuItems = { "主电气接线", "电池堆簇信息", "电池单体信息","日志信息","命令输入","连接信息"};
         private static string[] _menuItems = { "主电气接线", "电池堆簇信息", "电池单体信息", "命令输入", "连接信息", "日志信息"};
 
@@ -109,8 +110,7 @@ namespace EssSimulator.Display
                 Console.Clear();
                 Console.WriteLine("主电气接线 - 指令输入（执行后自动返回）");
                 Console.WriteLine("可用命令: esscmd / breaker / dpc / dpctest");
-                Console.Write("cmd> ");
-                var input = Console.ReadLine();
+                var input = ReadCommandLineWithLastHistory("cmd> ");
                 if (!string.IsNullOrWhiteSpace(input))
                 {
                     processor.ProcessCommand(input);
@@ -121,6 +121,79 @@ namespace EssSimulator.Display
             catch
             {
                 // 忽略输入阶段异常，确保界面线程持续运行
+            }
+        }
+
+        /// <summary>
+        /// 读取单行指令，支持“上键回显上一条指令”（仅一条历史，多次上键不重复动作）。
+        /// </summary>
+        private string ReadCommandLineWithLastHistory(string prompt)
+        {
+            Console.Write(prompt);
+            var buffer = new StringBuilder();
+            int renderedLength = 0;
+            bool recalledOnce = false;
+
+            void Render()
+            {
+                string text = buffer.ToString();
+                Console.Write('\r');
+                Console.Write(prompt);
+                Console.Write(text);
+                int eraseCount = renderedLength - text.Length;
+                if (eraseCount > 0)
+                {
+                    Console.Write(new string(' ', eraseCount));
+                }
+                Console.Write('\r');
+                Console.Write(prompt);
+                Console.Write(text);
+                renderedLength = text.Length;
+            }
+
+            while (true)
+            {
+                var key = Console.ReadKey(true);
+                if (key.Key == ConsoleKey.Enter)
+                {
+                    Console.WriteLine();
+                    var input = buffer.ToString();
+                    if (!string.IsNullOrWhiteSpace(input))
+                    {
+                        _lastCommand = input;
+                    }
+                    return input;
+                }
+
+                if (key.Key == ConsoleKey.UpArrow)
+                {
+                    if (!recalledOnce && !string.IsNullOrWhiteSpace(_lastCommand))
+                    {
+                        buffer.Clear();
+                        buffer.Append(_lastCommand);
+                        recalledOnce = true;
+                        Render();
+                    }
+                    continue;
+                }
+
+                if (key.Key == ConsoleKey.Backspace)
+                {
+                    if (buffer.Length > 0)
+                    {
+                        buffer.Remove(buffer.Length - 1, 1);
+                        recalledOnce = false;
+                        Render();
+                    }
+                    continue;
+                }
+
+                if (!char.IsControl(key.KeyChar))
+                {
+                    buffer.Append(key.KeyChar);
+                    recalledOnce = false;
+                    Render();
+                }
             }
         }
 
@@ -840,8 +913,7 @@ namespace EssSimulator.Display
 
             while (true)
             {
-                Console.Write("> ");
-                var input = Console.ReadLine();
+                var input = ReadCommandLineWithLastHistory("> ");
                 if (input == "exit")
                 {
                     return;
