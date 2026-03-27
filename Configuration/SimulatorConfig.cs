@@ -152,6 +152,8 @@ namespace EssSimulator.Configuration
         public double NoLoadLoss { get; set; } = 50;
         public double LoadLoss { get; set; } = 200;
         public double ImpedancePercent { get; set; } = 4;
+        /// <summary>并网点无功-电压影响系数（1.0=按阻抗标称影响）</summary>
+        public double ReactiveVoltageInfluenceCoefficient { get; set; } = 1.0;
         public double NoLoadCurrentPercent { get; set; } = 2;
     }
 
@@ -187,12 +189,10 @@ namespace EssSimulator.Configuration
     {
         public const string Section = "Load";
 
-        /// <summary>有功计划负载（kW）</summary>
-        public double ActivePowerPlan { get; set; } = 500;
+        /// <summary>有功计划负载（kW，+放电/-用电）</summary>
+        public double ActivePowerPlan { get; set; } = -500;
 
         /// <summary>无功计划负载（kvar）</summary>
         public double ReactivePowerPlan { get; set; } = 0;
-        /// <summary>无功-电压反馈系数（legacy 负载反馈）</summary>
-        public double ReactiveVoltageFeedbackCoefficient { get; set; } = 0.001;
     }
 }

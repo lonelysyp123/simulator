@@ -313,7 +313,7 @@ namespace EssSimulator.Display
                     double vdc = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalVoltage");
                     double idc = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalCurrent");
                     sb.AppendLine($"        |   PCS{a + 1}: P {pa:0.0} kW  Q {pr:0.0} kvar");
-                    sb.AppendLine($"        |   舱{a + 1}:  SOC {soc:0.1f}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
+                    sb.AppendLine($"        |   舱{a + 1}:  SOC {soc:0.0}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
                 }
                 sb.AppendLine("        |");
                 if (b < channelCount)
@@ -324,7 +324,7 @@ namespace EssSimulator.Display
                     double vdc = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalVoltage");
                     double idc = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalCurrent");
                     sb.AppendLine($"        |   PCS{b + 1}: P {pa:0.0} kW  Q {pr:0.0} kvar");
-                    sb.AppendLine($"        |   舱{b + 1}:  SOC {soc:0.1f}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
+                    sb.AppendLine($"        |   舱{b + 1}:  SOC {soc:0.0}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
                 }
 
                 if (u > 0)

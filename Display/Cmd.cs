@@ -404,7 +404,7 @@ namespace EssSimulator.Display
                 Console.WriteLine("使用示例2: esscmd setPcsX interval 100(ms)");
                 Console.WriteLine("使用示例3: esscmd setPcsX delay 100(ms)");
                 // 可用于负载有功无功设置
-                Console.WriteLine("使用示例4: esscmd setLoad activePower 500(kW)");
+                Console.WriteLine("使用示例4: esscmd setLoad activePower -500(kW)  // -用电, +放电");
                 Console.WriteLine("使用示例5: esscmd setLoad reactivePower 200(kVar)");
                 return;
             }

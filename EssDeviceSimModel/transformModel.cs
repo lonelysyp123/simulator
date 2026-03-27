@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,6 +20,7 @@ namespace EssSimulator.EssDeviceSimModel
             public double NoLoadLoss { get; set; }         // 空载损耗 (铁损) (W)
             public double LoadLoss { get; set; }          // 负载损耗 (铜损) (W)
             public double ImpedancePercent { get; set; }   // 阻抗百分比 (%)
+            public double ReactiveVoltageInfluenceCoefficient { get; set; } = 1.0; // 并网点无功-电压影响系数
             public double NoLoadCurrentPercent { get; set; } // 空载电流百分比 (%)
             public double CoolingCoefficient { get; set; } = 0.01; // 冷却系数 (W/°C)
             public double ThermalTimeConstant { get; set; } = 180.0; // 热时间常数 (分钟)
@@ -63,7 +64,7 @@ namespace EssSimulator.EssDeviceSimModel
         public TransformerState GetCurrentState() => _currentState;
 
         // 更新变压器状态
-        public void Update(double primaryVoltage, double secondaryCurrent, double powerFactor, double totalApparentPowerKva, DateTime timeStamp)
+        public void Update(double primaryVoltage, double secondaryCurrent, double powerFactor, double totalApparentPowerKva, double totalReactivePowerKvar, DateTime timeStamp)
         {
             // 1. 更新基本参数
             _currentState.PrimaryVoltage = primaryVoltage;
@@ -74,9 +75,25 @@ namespace EssSimulator.EssDeviceSimModel
             // 2. 计算变比
             double turnsRatio = _specs.PrimaryVoltage / _specs.SecondaryVoltage;
 
-            // 3. 计算二次侧电压 (考虑阻抗压降)
-            double voltageDrop = _specs.ImpedancePercent / 100 * _currentState.LoadRatio;
-            _currentState.SecondaryVoltage = primaryVoltage / turnsRatio * (1 - voltageDrop);
+            // 3. 计算负载率与二次侧电压
+            // - 电流项（|I|）体现线路/绕组阻抗造成的幅值压降
+            // - 无功项（Q 符号）体现感性/容性无功对电压方向影响：
+            //   Q>0（感性吸收）下拉电压；Q<0（容性支撑）抬升电压
+            double ratedSecondaryCurrent = _specs.RatedPower * 1000 / _specs.SecondaryVoltage;
+            double loadRatioAbs = ratedSecondaryCurrent > 0
+                ? Math.Abs(secondaryCurrent) / ratedSecondaryCurrent
+                : 0;
+            _currentState.LoadRatio = secondaryCurrent / ratedSecondaryCurrent;
+
+            double zPu = _specs.ImpedancePercent / 100.0;
+            double currentDropPu = zPu * loadRatioAbs;
+            double reactiveShiftPu = GridFeedbackConventions.CalculatePccReactiveVoltageShiftPu(
+                totalReactivePowerKvar,
+                _specs.RatedPower,
+                zPu,
+                _specs.ReactiveVoltageInfluenceCoefficient);
+            double netVoltageFactor = 1 - currentDropPu - reactiveShiftPu;
+            _currentState.SecondaryVoltage = primaryVoltage / turnsRatio * netVoltageFactor;
 
             // 4. 计算一次侧电流
             double noLoadCurrent = _specs.NoLoadCurrentPercent / 100 * (_specs.RatedPower * 1000 / _specs.PrimaryVoltage);
@@ -91,9 +108,6 @@ namespace EssSimulator.EssDeviceSimModel
             {
                 _currentState.PrimaryCurrent = -_currentState.PrimaryCurrent;
             }
-
-            // 5. 计算负载率
-            _currentState.LoadRatio = secondaryCurrent / (_specs.RatedPower * 1000 / _specs.SecondaryVoltage);
 
             // 10. 计算损耗
             _currentState.IronLoss = _specs.NoLoadLoss * Math.Pow(primaryVoltage / _specs.PrimaryVoltage, 2);

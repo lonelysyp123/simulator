@@ -26,10 +26,10 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 ? xfSt.SecondaryVoltage
                 : ess._transformer._specs.SecondaryVoltage;
 
-            // 并网点功率约定：向电网送出为正，负载消耗视为负注入。
-            double loadP = -ess._loadSimulator.ActivePower;
-            // 无功沿用 legacy 符号，并在并网点统计时按负载消耗取负注入。
-            double loadQ = -ess._loadSimulator.ReactivePower;
+            // 并网点功率方向约定：+ 向电网送电（放电），- 从电网取电（用电）。
+            double loadP = ess._loadSimulator.ActivePower;
+            // 无功沿用 legacy 符号，按同方向约定直接汇总。
+            double loadQ = ess._loadSimulator.ReactivePower;
 
             double totalP = loadP, totalQ = loadQ;
             foreach (var pcs in ess._pcsList)

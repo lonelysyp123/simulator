@@ -8,6 +8,7 @@ namespace EssSimulator.EssDeviceSimModel
     public class LoadWindow
     {
         public TimeSpan Start { get; set; }           // 起始刻度（当日时分秒）
+        // 方向约定：+ 表示向电网送电（放电），- 表示从电网取电（用电）
         public double ActivePowerPlan { get; set; } = 0;     // 有功功率(kW)
         public double ReactivePowerPlan { get; set; } = 0; // 无功功率(kvar)
     }
@@ -17,17 +18,15 @@ namespace EssSimulator.EssDeviceSimModel
     /// </summary>
     public class ScheduledLoadSimulator
     {
+        // 方向约定：+ 表示向电网送电（放电），- 表示从电网取电（用电）
         public double ActivePower { get; set; }  // 当前有功(kW)
         public double ReactivePower { get; set; }    // 当前无功(kvar, legacy符号: 正=感性吸收)
 
         private List<LoadWindow> windows;
-        // 灵敏系数k，
-        private readonly double k;
 
-        public ScheduledLoadSimulator(List<LoadWindow> window, double reactiveVoltageFeedbackCoefficient = 0.001)
+        public ScheduledLoadSimulator(List<LoadWindow> window)
         {
             this.windows = window;
-            k = reactiveVoltageFeedbackCoefficient;
             SetSchedule();
         }
 
@@ -65,12 +64,10 @@ namespace EssSimulator.EssDeviceSimModel
         }
 
         // 将有功功率换算为交流电流(A)。
-        // 统一测点：入参 voltage 为并网点电压（变压器二次侧线电压）。
-        public double ComputeLoadCurrentA(ref double voltage)
+        // 入参 voltage 为并网点电压（变压器二次侧线电压）。
+        public double ComputeLoadCurrentA(double voltage)
         {
             UpdateCurrentLoad(DateTime.Now);
-            // 按统一约定封装 legacy 反馈：现阶段保持原行为不变，仅标准化入口。
-            voltage = GridFeedbackConventions.ApplyLegacyLoadVoltageFeedback(voltage, ReactivePower, k);
 
             if (voltage <= 0) return 0;
             var p = ActivePower;
@@ -79,7 +76,9 @@ namespace EssSimulator.EssDeviceSimModel
             if (sKva <= 0) return 0;
 
             // 与 PCS 三相口径保持一致：I = S / (sqrt(3) * Uline)
-            return sKva * 1000.0 / (voltage * Math.Sqrt(3.0));
+            // 电流方向约定与 PCS 一致：正=从网侧取电，负=向网侧送电
+            var currentMag = sKva * 1000.0 / (voltage * Math.Sqrt(3.0));
+            return p >= 0 ? -currentMag : currentMag;
         }
 
         private bool isStoppedLoadWindows = false;
