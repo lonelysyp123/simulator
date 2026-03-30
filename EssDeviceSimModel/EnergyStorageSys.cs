@@ -195,7 +195,7 @@ namespace EssSimulator.EssDeviceSimModel
 
                     // 并网点功率方向约定：+ 向电网送电（放电），- 从电网取电（用电）。
                     double totalActiveKw = _loadSimulator.ActivePower;
-                    // 无功统一约定（legacy）：正=感性吸收，负=容性支撑。
+                    // 无功统一约定：正=升压支撑，负=降压作用。
                     double totalReactiveLegacyKvar = _loadSimulator.ReactivePower;
                     foreach (var pcs in _pcsList)
                     {

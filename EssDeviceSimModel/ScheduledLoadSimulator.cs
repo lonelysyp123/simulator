@@ -20,7 +20,7 @@ namespace EssSimulator.EssDeviceSimModel
     {
         // 方向约定：+ 表示向电网送电（放电），- 表示从电网取电（用电）
         public double ActivePower { get; set; }  // 当前有功(kW)
-        public double ReactivePower { get; set; }    // 当前无功(kvar, legacy符号: 正=感性吸收)
+        public double ReactivePower { get; set; }    // 当前无功(kvar, 约定: 正=升压支撑, 负=降压作用)
 
         private List<LoadWindow> windows;
 

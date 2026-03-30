@@ -52,7 +52,7 @@ namespace EssSimulator.EssDeviceSimModel
         public double AcVoltage { get; set; }           // 交流侧电压(V)
         public double AcCurrent { get; set; }           // 交流侧电流(A)
         public double ActivePower { get; set; }         // 有功功率(kW)
-        public double ReactivePower { get; set; }        // 无功功率(kvar, legacy符号: 正=感性吸收)
+        public double ReactivePower { get; set; }        // 无功功率(kvar, 约定: 正=升压支撑, 负=降压作用)
         public double Frequency { get; set; }           // 输出频率(Hz)
         public double Temperature { get; set; }         // 设备温度(°C)
         public double ActivePowerSettingVal { get; set; }  //有功设置值

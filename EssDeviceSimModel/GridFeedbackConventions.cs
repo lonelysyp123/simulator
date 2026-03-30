@@ -5,7 +5,7 @@ namespace EssSimulator.EssDeviceSimModel
     /// <summary>
     /// 无功-电压反馈统一约定（符号与测点定义）。
     /// 说明：
-    /// 1) legacy 无功符号沿用现网逻辑：Qlegacy > 0 表示感性吸收（通常拉低电压）。
+    /// 1) 并网点无功符号约定：Q > 0 表示升压支撑，Q < 0 表示降压作用。
     /// 2) 并网测点统一定义为变压器二次侧线电压（并网点/母线电压）。
     /// </summary>
     public static class GridFeedbackConventions
@@ -18,8 +18,8 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>
         /// 计算并网点无功引起的电压偏移（pu）。
         /// 方向约定：
-        /// - Qlegacy > 0（感性吸收）=> 正偏移量，表示压降加大；
-        /// - Qlegacy < 0（容性支撑）=> 负偏移量，表示电压抬升。
+        /// - Q > 0 => 正偏移量，表示电压抬升；
+        /// - Q < 0 => 负偏移量，表示电压下拉。
         /// </summary>
         /// <param name="legacyReactiveKvar">并网点总无功（kvar）</param>
         /// <param name="ratedPowerKva">额定容量（kVA）</param>
@@ -38,19 +38,19 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>
         /// 在当前 legacy 负载模型下应用电压反馈。
         /// 现行为：
-        /// - Qlegacy > 0 时按 k 下拉电压；
-        /// - Qlegacy < 0 时按 k 上抬电压；
+        /// - Q > 0 时按 k 上抬电压；
+        /// - Q < 0 时按 k 下拉电压；
         /// - Qlegacy = 0 时电压不变。
         /// </summary>
         public static double ApplyLegacyLoadVoltageFeedback(double inputVoltage, double legacyReactiveKvar, double k)
         {
             if (legacyReactiveKvar > 0)
             {
-                return inputVoltage - legacyReactiveKvar * k;
+                return inputVoltage + legacyReactiveKvar * k;
             }
             if (legacyReactiveKvar < 0)
             {
-                return inputVoltage - legacyReactiveKvar * k;
+                return inputVoltage + legacyReactiveKvar * k;
             }
             return inputVoltage;
         }

@@ -76,23 +76,23 @@ namespace EssSimulator.EssDeviceSimModel
             double turnsRatio = _specs.PrimaryVoltage / _specs.SecondaryVoltage;
 
             // 3. 计算负载率与二次侧电压
-            // - 电流项（|I|）体现线路/绕组阻抗造成的幅值压降
-            // - 无功项（Q 符号）体现感性/容性无功对电压方向影响：
-            //   Q>0（感性吸收）下拉电压；Q<0（容性支撑）抬升电压
-            double ratedSecondaryCurrent = _specs.RatedPower * 1000 / _specs.SecondaryVoltage;
-            double loadRatioAbs = ratedSecondaryCurrent > 0
-                ? Math.Abs(secondaryCurrent) / ratedSecondaryCurrent
+            // 额定电流按三相线电压口径：I = S / (sqrt(3) * Uline)
+            double ratedSecondaryCurrent = _specs.RatedPower * 1000 / (_specs.SecondaryVoltage * Math.Sqrt(3));
+            _currentState.LoadRatio = ratedSecondaryCurrent > 0
+                ? secondaryCurrent / ratedSecondaryCurrent
                 : 0;
-            _currentState.LoadRatio = secondaryCurrent / ratedSecondaryCurrent;
 
+            // 并网点电压采用 Q 线性反馈（漏抗主导近似）：
+            // - Q > 0 抬升电压
+            // - Q < 0 下拉电压
+            // 在固定 P 条件下，+/-Q 对称。
             double zPu = _specs.ImpedancePercent / 100.0;
-            double currentDropPu = zPu * loadRatioAbs;
             double reactiveShiftPu = GridFeedbackConventions.CalculatePccReactiveVoltageShiftPu(
                 totalReactivePowerKvar,
                 _specs.RatedPower,
                 zPu,
                 _specs.ReactiveVoltageInfluenceCoefficient);
-            double netVoltageFactor = 1 - currentDropPu - reactiveShiftPu;
+            double netVoltageFactor = 1 + reactiveShiftPu;
             _currentState.SecondaryVoltage = primaryVoltage / turnsRatio * netVoltageFactor;
 
             // 4. 计算一次侧电流
