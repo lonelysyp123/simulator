@@ -13,6 +13,21 @@ namespace EssSimulator.Configuration
 
         /// <summary>仿真加速倍率</summary>
         public double Speedup { get; set; } = 100.0;
+
+        /// <summary>PCS 功率爬坡参数</summary>
+        public PcsRampConfig PcsRamp { get; set; } = new();
+    }
+
+    public class PcsRampConfig
+    {
+        /// <summary>功率变化斜率（默认与历史行为一致）</summary>
+        public double Slope { get; set; } = 1;
+
+        /// <summary>每一级功率变化时间间隔（ms）</summary>
+        public int IntervalMs { get; set; } = 100;
+
+        /// <summary>新设定值生效前初始延时（ms）</summary>
+        public int DelayMs { get; set; } = 0;
     }
 
     public class ProtocolConfig
@@ -36,6 +51,10 @@ namespace EssSimulator.Configuration
     public class PcsDeviceConfig
     {
         public string Name { get; set; } = "PCS";
+        /// <summary>
+        /// PCS 爬坡参数覆盖项；为空时回退到 Runtime.PcsRamp。
+        /// </summary>
+        public PcsRampConfig? PcsRamp { get; set; }
     }
 
     public class BmsDeviceConfig

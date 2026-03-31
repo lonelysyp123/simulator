@@ -400,12 +400,11 @@ namespace EssSimulator.Display
         {
             if (args.Length == 1 && args[0] == "help")
             {
-                Console.WriteLine("使用示例1: esscmd setPcsX slope 0.5(kw/ms)");
-                Console.WriteLine("使用示例2: esscmd setPcsX interval 100(ms)");
-                Console.WriteLine("使用示例3: esscmd setPcsX delay 100(ms)");
+                Console.WriteLine("使用示例1: esscmd setPcsX activePower 500(kW)");
+                Console.WriteLine("使用示例2: esscmd setPcsX reactivePower 100(kVar)");
                 // 可用于负载有功无功设置
-                Console.WriteLine("使用示例4: esscmd setLoad activePower -500(kW)  // -用电, +放电");
-                Console.WriteLine("使用示例5: esscmd setLoad reactivePower 200(kVar)");
+                Console.WriteLine("使用示例3: esscmd setLoad activePower -500(kW)  // -用电, +放电");
+                Console.WriteLine("使用示例4: esscmd setLoad reactivePower 200(kVar)");
                 return;
             }
 
@@ -439,8 +438,8 @@ namespace EssSimulator.Display
                 return;
             }
 
-            // 如果 args[1] 不等于 slope、interval 或 delay，则提示用户指令不支持
-            if (args[1] != "slope" && args[1] != "interval" && args[1] != "delay" && args[1] != "activePower" && args[1] != "reactivePower")
+            // setPcsX 只支持 activePower/reactivePower；setLoad 支持 activePower/reactivePower
+            if (args[1] != "activePower" && args[1] != "reactivePower")
             {
                 Console.WriteLine("当前操作不支持，请使用 esscmd help 查看用法");
                 return;
@@ -455,7 +454,16 @@ namespace EssSimulator.Display
 
             if (pcsIndex >= 0)
             {
-                ess._pcsList[pcsIndex].SetPcsCharacteristic(args[1], num);
+                var pcs = ess._pcsList[pcsIndex];
+                var st = pcs.GetCurrentState();
+                if (args[1] == "activePower")
+                {
+                    pcs.SetPowerCommand(num, st.ReactivePower);
+                }
+                else
+                {
+                    pcs.SetPowerCommand(st.ActivePower, num);
+                }
             }
             else if(args[0] == "setLoad")
             {

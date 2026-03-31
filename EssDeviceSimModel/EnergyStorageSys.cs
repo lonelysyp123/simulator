@@ -69,6 +69,7 @@ namespace EssSimulator.EssDeviceSimModel
             var racks = new List<BatteryRackSimulator>();
             var pcsList = new List<PCSSimulator>();
             var bmsDeviceConfigs = simCfg.GetBmsDeviceConfigs();
+            var pcsDeviceConfigs = simCfg.GetPcsDeviceConfigs();
             int unitCount = Math.Max(1, bmsDeviceConfigs.Count);
 
             for (int i = 0; i < unitCount; i++)
@@ -110,10 +111,15 @@ namespace EssSimulator.EssDeviceSimModel
             };
             for (int i = 0; i < unitCount; i++)
             {
+                var pcsDeviceCfg = i < pcsDeviceConfigs.Count ? pcsDeviceConfigs[i] : new PcsDeviceConfig();
+                var rampCfg = pcsDeviceCfg.PcsRamp ?? simCfg.Runtime.PcsRamp;
                 pcsList.Add(new PCSSimulator(
                     pcsConfig,
                     speedup: simCfg.Speedup,
-                    gridLossCoefficient: pcsCfg.GridLossCoefficient));
+                    gridLossCoefficient: pcsCfg.GridLossCoefficient,
+                    slope: rampCfg.Slope,
+                    intervalMs: rampCfg.IntervalMs,
+                    delayMs: rampCfg.DelayMs));
             }
 
             _batteryRacks = racks;

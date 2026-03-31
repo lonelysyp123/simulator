@@ -291,18 +291,16 @@ dpc simEm.yc12 get
 
 ### 9.2 `esscmd`
 
-用于调节 PCS 特性或负载参数。
+用于调节 PCS 功率指令或负载参数。
 
 #### 语法
 
 ```text
-esscmd setPcs1 slope <value>
-esscmd setPcs1 interval <value>
-esscmd setPcs1 delay <value>
+esscmd setPcs1 activePower <value>
+esscmd setPcs1 reactivePower <value>
 
-esscmd setPcs2 slope <value>
-esscmd setPcs2 interval <value>
-esscmd setPcs2 delay <value>
+esscmd setPcs2 activePower <value>
+esscmd setPcs2 reactivePower <value>
 
 esscmd setLoad activePower <value>
 esscmd setLoad reactivePower <value>
@@ -312,18 +310,16 @@ esscmd setLoad reactivePower <value>
 
 | 参数 | 说明 |
 |---|---|
-| `slope` | PCS 功率变化速率 |
-| `interval` | 每一级功率变化时间间隔，单位毫秒 |
-| `delay` | 新设定值生效前的初始延时，单位毫秒 |
-| `activePower` | 负载有功功率，单位 kW |
-| `reactivePower` | 负载无功功率，单位 kvar |
+| `setPcsX activePower` | PCS 有功功率设定，单位 kW |
+| `setPcsX reactivePower` | PCS 无功功率设定，单位 kvar |
+| `setLoad activePower` | 负载有功功率，单位 kW |
+| `setLoad reactivePower` | 负载无功功率，单位 kvar |
 
 #### 示例
 
 ```text
-esscmd setPcs1 slope 0.5
-esscmd setPcs1 interval 500
-esscmd setPcs1 delay 100
+esscmd setPcs1 activePower 600
+esscmd setPcs1 reactivePower 80
 esscmd setLoad activePower 600
 esscmd setLoad reactivePower 80
 ```
@@ -332,6 +328,9 @@ esscmd setLoad reactivePower 80
 
 - `setLoad` 一旦执行，会停止按时段自动切换负载，改为使用手动设定值。
 - `setPcs1` 和 `setPcs2` 只作用于对应 PCS。
+- PCS 爬坡参数支持“全局默认 + 每个 PCS 覆盖”：
+  - 全局默认：`Simulator.Runtime.PcsRamp`
+  - 每个 PCS 覆盖：`Simulator.Devices[x].Pcs[y].PcsRamp`
 
 ### 9.3 `breaker`
 
@@ -436,12 +435,18 @@ esscmd setLoad reactivePower 50
 ### 10.4 修改 PCS 响应特性
 
 ```text
-esscmd setPcs1 slope 1.0
-esscmd setPcs1 interval 300
-esscmd setPcs1 delay 50
+全局默认:
+appsettings.json -> Simulator.Runtime.PcsRamp.Slope
+appsettings.json -> Simulator.Runtime.PcsRamp.IntervalMs
+appsettings.json -> Simulator.Runtime.PcsRamp.DelayMs
+
+单个 PCS 覆盖:
+appsettings.json -> Simulator.Devices[0].Pcs[0].PcsRamp.Slope
+appsettings.json -> Simulator.Devices[0].Pcs[0].PcsRamp.IntervalMs
+appsettings.json -> Simulator.Devices[0].Pcs[0].PcsRamp.DelayMs
 ```
 
-该操作会使 PCS1 的有功/无功调整过程更快。
+若单个 PCS 未配置 `PcsRamp`，将回退到 `Simulator.Runtime.PcsRamp`。修改后重启程序生效。
 
 ### 10.5 手动控制断路器
 

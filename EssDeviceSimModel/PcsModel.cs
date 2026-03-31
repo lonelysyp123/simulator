@@ -107,9 +107,9 @@ namespace EssSimulator.EssDeviceSimModel
         private bool _activeRampThreadRunning;
         private Thread? _reactiveRampThread;
         private bool _reactiveRampThreadRunning;
-        private double _slope = 1; // 默认斜率
-        private int _interval = 100; // 默认间隔时间(ms)
-        private int _delay = 0; // 默认延迟时间(ms)
+        private readonly double _slope; // 爬坡斜率
+        private readonly int _interval; // 间隔时间(ms)
+        private readonly int _delay; // 初始延迟(ms)
         private RampCurve _activeRampCurve = RampCurve.Linear;
         private RampCurve _reactiveRampCurve = RampCurve.Linear;
         private readonly double _gridLossCoefficient; // 电网损耗系数，用于简化计算
@@ -125,12 +125,22 @@ namespace EssSimulator.EssDeviceSimModel
             public int DelayMs;
         }
 
-        public PCSSimulator(PcsConfiguration config, double speedup = 1.0, double ambientTemp = 25.0, double gridLossCoefficient = 0.01)
+        public PCSSimulator(
+            PcsConfiguration config,
+            double speedup = 1.0,
+            double ambientTemp = 25.0,
+            double gridLossCoefficient = 0.01,
+            double slope = 1,
+            int intervalMs = 100,
+            int delayMs = 0)
         {
             _config = config;
             _speedup = speedup > 0 ? speedup : 1.0;
             _ambientTemperature = ambientTemp;
             _gridLossCoefficient = Math.Clamp(gridLossCoefficient, 0, 0.95);
+            _slope = slope;
+            _interval = Math.Max(1, intervalMs);
+            _delay = Math.Max(0, delayMs);
             _currentState = new PcsState
             {
                 Mode = OperationMode.Standby,
@@ -242,25 +252,6 @@ namespace EssSimulator.EssDeviceSimModel
                 if (_currentState.FaultType == 1 && _pendingActiveSetpoint < 0) return;
                 if (_currentState.FaultType == 2 && _pendingActiveSetpoint > 0) return;
                 StartPowerRampThreadIfNeeded();
-            }
-        }
-
-        // 设置PCS内部特性
-        public void SetPcsCharacteristic(string characteristic, double num)
-        {
-            switch (characteristic)
-            {
-                case "slope":
-                    _slope = num;
-                    break;
-                case "interval":
-                    _interval = (int)num;
-                    break;
-                case "delay":
-                    _delay = (int)num;
-                    break;
-                default:
-                    throw new ArgumentException($"Unknown PCS characteristic: {characteristic}");
             }
         }
 
