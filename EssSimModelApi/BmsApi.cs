@@ -15,6 +15,12 @@ namespace EssSimulator.EssSimModelApi
         // 电池簇基础测量数据
         public class ClusterBasicMeasurements
         {
+            [System.Runtime.Serialization.IgnoreDataMember]
+            public float NominalEnergyKWh { get; set; } = 5016f / 12f;
+
+            [System.Runtime.Serialization.IgnoreDataMember]
+            public float MaxCRate { get; set; } = 0.5f;
+
             public float? TotalVoltage { get; set; } // 簇端总电压
             public float? Current { get; set; } // 簇端电流
             public float? Power { get; set; } // 簇端功率
@@ -49,30 +55,9 @@ namespace EssSimulator.EssSimModelApi
             { 
                 get
                 {
-                    // 每簇的额定容量是5016/12kwh，0.5c充电功率为2508/12kw，同时根据当前soc调整最大充电功率，当大于80%时线性降低到1/2，当大于85%时为1/4，当大于90%时为0
-                    if (SOC.HasValue)
-                    {
-                        if (SOC.Value < 0.8f)
-                        {
-                            return 2508f/12;
-                        }
-                        else if (SOC.Value < 0.85f)
-                        {
-                            return 2508f/12 * (1 - (SOC.Value - 0.8f) / 0.05f * 0.5f);
-                        }
-                        else if (SOC.Value < 0.9f)
-                        {
-                            return 2508f/12 * 0.5f * (1 - (SOC.Value - 0.85f) / 0.05f * 0.5f);
-                        }
-                        else
-                        {
-                            return 0f;
-                        }
-                    }
-                    else
-                    {
-                        return null;
-                    }
+                    if (!SOC.HasValue) return null;
+                    float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
+                    return basePower * GetChargePowerFactor(SOC.Value);
                 }
             } 
 
@@ -80,30 +65,9 @@ namespace EssSimulator.EssSimModelApi
             { 
                 get
                 {
-                    // 每簇的额定容量是5016/12kwh，0.5c放电功率为2508/12kw，同时根据当前soc调整最大放电功率，当小于20%时线性降低到1/2，当小于15%时为1/4，当小于10%时为0
-                    if (SOC.HasValue)
-                    {
-                        if (SOC.Value > 0.2f)
-                        {
-                            return 2508f/12;
-                        }
-                        else if (SOC.Value > 0.15f)
-                        {
-                            return 2508f/12 * (SOC.Value - 0.15f) / 0.05f * 0.5f + 2508f/12 * 0.5f;
-                        }
-                        else if (SOC.Value > 0.1f)
-                        {
-                            return 2508f/12 * 0.5f * (SOC.Value - 0.1f) / 0.05f * 0.5f;
-                        }
-                        else
-                        {
-                            return 0f;
-                        }
-                    }
-                    else
-                    {
-                        return null;
-                    }
+                    if (!SOC.HasValue) return null;
+                    float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
+                    return basePower * GetDischargePowerFactor(SOC.Value);
                 }
             } 
 
@@ -138,6 +102,22 @@ namespace EssSimulator.EssSimModelApi
                     }
                 }
             } 
+
+            private static float GetChargePowerFactor(float soc)
+            {
+                if (soc < 0.8f) return 1.0f;
+                if (soc < 0.85f) return 1.0f - (soc - 0.8f) / 0.05f * 0.5f;
+                if (soc < 0.9f) return 0.5f - (soc - 0.85f) / 0.05f * 0.25f;
+                return 0.0f;
+            }
+
+            private static float GetDischargePowerFactor(float soc)
+            {
+                if (soc > 0.2f) return 1.0f;
+                if (soc > 0.15f) return 0.5f + (soc - 0.15f) / 0.05f * 0.5f;
+                if (soc > 0.1f) return 0.25f + (soc - 0.1f) / 0.05f * 0.25f;
+                return 0.0f;
+            }
         }
 
         // 电池簇告警数据
@@ -873,6 +853,12 @@ namespace EssSimulator.EssSimModelApi
         // 电池堆数据
         public class BatteryStack
         {
+            [System.Runtime.Serialization.IgnoreDataMember]
+            public float NominalEnergyKWh { get; set; } = 5016f;
+
+            [System.Runtime.Serialization.IgnoreDataMember]
+            public float MaxCRate { get; set; } = 0.5f;
+
             public int StackId { get; set; } // 堆编号
 
             // 堆基本信息
@@ -957,30 +943,9 @@ namespace EssSimulator.EssSimModelApi
             { 
                 get
                 {
-                    // 额定容量是5016kwh，0.5c充电功率为2508kw，同时根据当前soc调整最大充电功率，当大于80%时线性降低到1/2，当大于85%时为1/4，当大于90%时为0
-                    if (SOC.HasValue)
-                    {
-                        if (SOC.Value < 0.8f)
-                        {
-                            return 2508f;
-                        }
-                        else if (SOC.Value < 0.85f)
-                        {
-                            return 2508f * (1 - (SOC.Value - 0.8f) / 0.05f * 0.5f);
-                        }
-                        else if (SOC.Value < 0.9f)
-                        {
-                            return 2508f * 0.5f * (1 - (SOC.Value - 0.85f) / 0.05f * 0.5f);
-                        }
-                        else
-                        {
-                            return 0f;
-                        }
-                    }
-                    else
-                    {
-                        return null;
-                    }
+                    if (!SOC.HasValue) return null;
+                    float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
+                    return basePower * GetChargePowerFactor(SOC.Value);
                 }
             } 
 
@@ -988,30 +953,9 @@ namespace EssSimulator.EssSimModelApi
             { 
                 get
                 {
-                    // 额定容量是5016kwh，0.5c放电功率为2508kw，同时根据当前soc调整最大放电功率，当小于20%时线性降低到1/2，当小于15%时为1/4，当小于10%时为0
-                    if (SOC.HasValue)
-                    {
-                        if (SOC.Value > 0.2f)
-                        {
-                            return 2508f;
-                        }
-                        else if (SOC.Value > 0.15f)
-                        {
-                            return 2508f * (SOC.Value - 0.15f) / 0.05f * 0.5f + 2508f * 0.5f;
-                        }
-                        else if (SOC.Value > 0.1f)
-                        {
-                            return 2508f * 0.5f * (SOC.Value - 0.1f) / 0.05f * 0.5f;
-                        }
-                        else
-                        {
-                            return 0f;
-                        }
-                    }
-                    else
-                    {
-                        return null;
-                    }
+                    if (!SOC.HasValue) return null;
+                    float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
+                    return basePower * GetDischargePowerFactor(SOC.Value);
                 }
             } 
 
@@ -1051,32 +995,34 @@ namespace EssSimulator.EssSimModelApi
             { 
                 get
                 {
-                    // 额定容量是5016kwh，根据当前soc计算可用充电容量
-                    if (SOC.HasValue)
-                    {
-                        return 5016f * (1 - SOC.Value);
-                    }
-                    else
-                    {
-                        return null;
-                    }
+                    if (!SOC.HasValue) return null;
+                    return NominalEnergyKWh * (1 - SOC.Value);
                 }
             } // 可用充电容量
             public float? AvailableDischargeCapacity 
             { 
                 get
                 {
-                    // 额定容量是5016kwh，根据当前soc计算可用放电容量
-                    if (SOC.HasValue)
-                    {
-                        return 5016f * SOC.Value;
-                    }
-                    else
-                    {
-                        return null;
-                    }
+                    if (!SOC.HasValue) return null;
+                    return NominalEnergyKWh * SOC.Value;
                 }
             } // 可用放电容量
+
+            private static float GetChargePowerFactor(float soc)
+            {
+                if (soc < 0.8f) return 1.0f;
+                if (soc < 0.85f) return 1.0f - (soc - 0.8f) / 0.05f * 0.5f;
+                if (soc < 0.9f) return 0.5f - (soc - 0.85f) / 0.05f * 0.25f;
+                return 0.0f;
+            }
+
+            private static float GetDischargePowerFactor(float soc)
+            {
+                if (soc > 0.2f) return 1.0f;
+                if (soc > 0.15f) return 0.5f + (soc - 0.15f) / 0.05f * 0.5f;
+                if (soc > 0.1f) return 0.25f + (soc - 0.1f) / 0.05f * 0.25f;
+                return 0.0f;
+            }
 
             // 告警信息
             public bool? BMSSystemChannelStatus { get; set; } // BMS系统通道状态

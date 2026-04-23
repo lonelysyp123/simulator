@@ -30,6 +30,22 @@ namespace EssSimulator.EssSimModelApi
             for (int i = 0; i < _unitCount; i++)
             {
                 _bmsDataList[i] = BmsDataGenerator.GenerateSampleData(1, _clusterCounts[i]);
+                var bmsCfg = bmsCfgList[i];
+                var stack = _bmsDataList[i].BatteryStacks[0];
+                float clusterEnergyKWh = (float)(
+                    bmsCfg.PackCount
+                    * bmsCfg.CellSeriesCount
+                    * bmsCfg.CellParallelCount
+                    * bmsCfg.CellNominalVoltage
+                    * bmsCfg.CellNominalCapacity
+                    / 1000.0);
+                stack.NominalEnergyKWh = clusterEnergyKWh * bmsCfg.ClusterCount;
+                stack.MaxCRate = 0.5f;
+                foreach (var cluster in stack.Cluseter)
+                {
+                    cluster.Measurements.NominalEnergyKWh = clusterEnergyKWh;
+                    cluster.Measurements.MaxCRate = 0.5f;
+                }
                 store.Register($"bms{i + 1}", _bmsDataList[i]);
             }
         }
