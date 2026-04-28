@@ -179,6 +179,7 @@ namespace EssSimulator
                     services.Configure<SimulatorConfig>(ctx.Configuration.GetSection(SimulatorConfig.Section));
                     services.Configure<PcsPhysicalConfig>(ctx.Configuration.GetSection(PcsPhysicalConfig.Section));
                     services.Configure<TransformerConfig>(ctx.Configuration.GetSection(TransformerConfig.Section));
+                    services.Configure<UnitTransformerConfig>(ctx.Configuration.GetSection(UnitTransformerConfig.Section));
                     services.Configure<LoadConfig>(ctx.Configuration.GetSection(LoadConfig.Section));
 
                     // 核心仿真模型（单例 + 托管服务，由 Host 管理生命周期和仿真主循环）
@@ -187,8 +188,9 @@ namespace EssSimulator
                         var simCfg   = sp.GetRequiredService<IOptions<SimulatorConfig>>().Value;
                         var pcsCfg   = sp.GetRequiredService<IOptions<PcsPhysicalConfig>>().Value;
                         var transCfg = sp.GetRequiredService<IOptions<TransformerConfig>>().Value;
+                        var unitTransCfg = sp.GetRequiredService<IOptions<UnitTransformerConfig>>().Value;
                         var loadCfg  = sp.GetRequiredService<IOptions<LoadConfig>>().Value;
-                        var ess = new EnergyStorageSystem(simCfg, pcsCfg, transCfg, loadCfg);
+                        var ess = new EnergyStorageSystem(simCfg, pcsCfg, transCfg, unitTransCfg, loadCfg);
                         SimulatorHost.Instance.Register("ess", ess);
                         return ess;
                     });

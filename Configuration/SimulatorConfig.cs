@@ -166,12 +166,27 @@ namespace EssSimulator.Configuration
         public const string Section = "Transformer";
 
         public double RatedPower { get; set; } = 2500;
-        public double PrimaryVoltage { get; set; } = 10500;
-        public double SecondaryVoltage { get; set; } = 690;
+        public double PrimaryVoltage { get; set; } = 220000;
+        public double SecondaryVoltage { get; set; } = 35000;
         public double NoLoadLoss { get; set; } = 50;
         public double LoadLoss { get; set; } = 200;
         public double ImpedancePercent { get; set; } = 4;
         /// <summary>并网点无功-电压影响系数（1.0=按阻抗标称影响）</summary>
+        public double ReactiveVoltageInfluenceCoefficient { get; set; } = 1.0;
+        public double NoLoadCurrentPercent { get; set; } = 2;
+    }
+
+    /// <summary>单元升压一体机变压器参数（对应 appsettings.json: UnitTransformer 节，35kV/690V）</summary>
+    public class UnitTransformerConfig
+    {
+        public const string Section = "UnitTransformer";
+
+        public double RatedPower { get; set; } = 2500;
+        public double PrimaryVoltage { get; set; } = 35000;
+        public double SecondaryVoltage { get; set; } = 690;
+        public double NoLoadLoss { get; set; } = 50;
+        public double LoadLoss { get; set; } = 200;
+        public double ImpedancePercent { get; set; } = 4;
         public double ReactiveVoltageInfluenceCoefficient { get; set; } = 1.0;
         public double NoLoadCurrentPercent { get; set; } = 2;
     }

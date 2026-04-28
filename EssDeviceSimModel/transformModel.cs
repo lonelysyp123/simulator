@@ -96,13 +96,28 @@ namespace EssSimulator.EssDeviceSimModel
             _currentState.SecondaryVoltage = primaryVoltage / turnsRatio * netVoltageFactor;
 
             // 4. 计算一次侧电流
-            double noLoadCurrent = _specs.NoLoadCurrentPercent / 100 * (_specs.RatedPower * 1000 / _specs.PrimaryVoltage);
+            // 三相口径：I_rated = S / (sqrt(3) * Uline)
+            // 空载电流按额定一次侧线电流百分比给定，并近似与一次侧电压成正比（励磁支路）。
+            double ratedPrimaryCurrent = _specs.RatedPower * 1000 / (_specs.PrimaryVoltage * Math.Sqrt(3));
+            double vRatio = _specs.PrimaryVoltage > 0 ? (primaryVoltage / _specs.PrimaryVoltage) : 0.0;
+            double noLoadCurrent = (_specs.NoLoadCurrentPercent / 100.0) * ratedPrimaryCurrent * Math.Abs(vRatio);
 
-            double loadCurrentComponent = secondaryCurrent / turnsRatio;
-            _currentState.PrimaryCurrent = Math.Sqrt(
-                Math.Pow(noLoadCurrent, 2) +
-                Math.Pow(loadCurrentComponent, 2) +
-                2 * noLoadCurrent * loadCurrentComponent * Math.Sin(Math.Acos(powerFactor)));
+            // 将负载电流拆分为有功/无功分量后再与励磁电流（近似纯无功滞后）做相量合成
+            // - powerFactor 取值范围约定为 [-1, 1]，符号由外部约定；相角用 |pf| 计算
+            double pfAbs = Math.Clamp(Math.Abs(powerFactor), 0.0, 1.0);
+            double sinPhi = Math.Sqrt(Math.Max(0.0, 1.0 - pfAbs * pfAbs));
+            double signQ = totalReactivePowerKvar >= 0 ? 1.0 : -1.0; // Q>0 视为感性（滞后）
+
+            // 负载电流（线电流）优先使用传入的 secondaryCurrent 幅值；其方向符号用于功率流向约定
+            double i2Mag = Math.Abs(secondaryCurrent);
+            double i2W = i2Mag * pfAbs;              // 有功分量（同相）
+            double i2Q = i2Mag * sinPhi * signQ;     // 无功分量（正=滞后）
+
+            // 折算到一次侧（线电流按变比折算）
+            double i1W = i2W / turnsRatio;
+            double i1Q = i2Q / turnsRatio + noLoadCurrent; // 励磁电流近似纯无功滞后
+
+            _currentState.PrimaryCurrent = Math.Sqrt(i1W * i1W + i1Q * i1Q);
             // 根据二次侧电流方向计算一次侧电流方向
             if (secondaryCurrent < 0)
             {
@@ -115,8 +130,12 @@ namespace EssSimulator.EssDeviceSimModel
             _currentState.TotalLoss = _currentState.IronLoss + _currentState.CopperLoss;
 
             // 11. 计算效率
-            double outputPower = _currentState.SecondaryVoltage * secondaryCurrent * powerFactor;
-            _currentState.Efficiency = outputPower / (outputPower + _currentState.TotalLoss);
+            // 三相有功：P = sqrt(3) * Uline * Iline * pf
+            double outputPower = Math.Sqrt(3.0) * _currentState.SecondaryVoltage * secondaryCurrent * powerFactor;
+            var pAbs = Math.Abs(outputPower);
+            _currentState.Efficiency = (pAbs + _currentState.TotalLoss) > 0
+                ? pAbs / (pAbs + _currentState.TotalLoss)
+                : 0;
 
             // 12. 温度模型
             //UpdateTemperature(timeStep);

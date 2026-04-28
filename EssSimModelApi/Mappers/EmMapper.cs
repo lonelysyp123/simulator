@@ -19,13 +19,13 @@ namespace EssSimulator.EssSimModelApi.Mappers
         public static void MapEssToEmData(EnergyStorageSystem ess, EmData emData, TimeSpan dt,
             ref double forwardKWh, ref double reverseKWh)
         {
-            var xfSt = ess._transformer.GetCurrentState();
+            var xfSt = ess._mainTransformer.GetCurrentState();
 
             // 并网电表安装位置：断路器与变压器之间（变压器一次侧）。
             // 因此电表电压/电流口径统一取变压器一次侧。
             double lineVoltage = xfSt?.PrimaryVoltage > 0
                 ? xfSt.PrimaryVoltage
-                : ess._transformer._specs.PrimaryVoltage;
+                : ess._mainTransformer._specs.PrimaryVoltage;
 
             // 并网点功率方向约定：+ 向电网送电（放电），- 从电网取电（用电）。
             double loadP = ess._loadSimulator.ActivePower;

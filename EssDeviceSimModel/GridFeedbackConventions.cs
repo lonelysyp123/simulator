@@ -13,7 +13,7 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>
         /// 并网测点名称（用于日志、注释与后续配置映射）。
         /// </summary>
-        public const string PccVoltageMeasurementPoint = "Transformer.SecondaryVoltage";
+        public const string PccVoltageMeasurementPoint = "MainTransformer.SecondaryVoltage";
 
         /// <summary>
         /// 计算并网点无功引起的电压偏移（pu）。

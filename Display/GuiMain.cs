@@ -336,10 +336,10 @@ namespace EssSimulator.Display
             var time = DateTime.Now.ToLongTimeString();
 
             bool breakerClosed = SafeGetBool("ess._breaker.IsClosed");
-            double primaryVoltage   = SafeGetDouble("ess._transformer._currentState.PrimaryVoltage");
-            double secondaryVoltage = SafeGetDouble("ess._transformer._currentState.SecondaryVoltage");
-            double primaryCurrent   = SafeGetDouble("ess._transformer._currentState.PrimaryCurrent");
-            double secondaryCurrent = SafeGetDouble("ess._transformer._currentState.SecondaryCurrent");
+            double primaryVoltage   = SafeGetDouble("ess._mainTransformer._currentState.PrimaryVoltage");
+            double secondaryVoltage = SafeGetDouble("ess._mainTransformer._currentState.SecondaryVoltage");
+            double primaryCurrent   = SafeGetDouble("ess._mainTransformer._currentState.PrimaryCurrent");
+            double secondaryCurrent = SafeGetDouble("ess._mainTransformer._currentState.SecondaryCurrent");
             double loadActivePower   = SafeGetDouble("ess._loadSimulator.ActivePower");
             double loadReactivePower = SafeGetDouble("ess._loadSimulator.ReactivePower");
             double meterIA = SafeGetDouble("em.PhaseACurrent");
@@ -354,18 +354,18 @@ namespace EssSimulator.Display
             var sb = new StringBuilder();
             sb.AppendLine();
             sb.AppendLine($"电气主接线 [{time}]  （储能单元数: {unitCount}，PCS/BMS通道数: {channelCount}）");
-            sb.AppendLine("========= 电压: 10.5 kV");
+            sb.AppendLine("========= 电压: 220 kV");
             sb.AppendLine("        |");
             sb.AppendLine($"        |   断路器: {(breakerClosed ? "合" : "分")}");
             sb.AppendLine("        |");
-            sb.AppendLine($"        |                           电表(一次侧) 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab:0.0} / {meterUbc:0.0} / {meterUca:0.0} V");
+            sb.AppendLine($"        |                           电表(一次侧) 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab/1000:0.0} / {meterUbc/1000:0.0} / {meterUca/1000:0.0} kV");
             sb.AppendLine($"        |                                     有功功率: {meterActive:0.0} kW    无功功率: {meterReactive:0.0} kvar");
             sb.AppendLine("        |");
-            sb.AppendLine($"        |                           变压器: 一次侧 {primaryVoltage / 1000:0.0} kV / {primaryCurrent:0.0} A    二次侧 {secondaryVoltage:0.0} V / {secondaryCurrent:0.0} A");
+            sb.AppendLine($"        |                           主变: 一次侧 {primaryVoltage / 1000:0.0} kV / {primaryCurrent:0.0} A    二次侧 {secondaryVoltage / 1000:0.0} kV / {secondaryCurrent:0.0} A");
             sb.AppendLine("        |");
             sb.AppendLine($"        |                                                   负载 有功 {loadActivePower:0.0} kW   无功 {loadReactivePower:0.0} kvar");
             sb.AppendLine("        |");
-            sb.AppendLine("        |----[断路器]----[电表]------[变压器]------------------[负载]");
+            sb.AppendLine("        |----[断路器]----[电表]------[主变220/35]----[35kV母线]----[负载]");
             sb.AppendLine("        |                                                |");
             sb.AppendLine("        |                                                +--- 并网点 ---+");
             sb.AppendLine("        |                                                                |");
@@ -376,6 +376,12 @@ namespace EssSimulator.Display
                 int b = u * 2 + 1;
 
                 sb.AppendLine($"        |  ====== [UNIT {u + 1}]  (PCS{a + 1}/PCS{b + 1}  对应  舱{a + 1}/舱{b + 1}) ======");
+                // 单元变（35kV/690V）状态（每单元 1 台）
+                double uXfPriV = SafeGetDouble($"ess._unitTransformers[{u}]._currentState.PrimaryVoltage");
+                double uXfSecV = SafeGetDouble($"ess._unitTransformers[{u}]._currentState.SecondaryVoltage");
+                double uXfPriI = SafeGetDouble($"ess._unitTransformers[{u}]._currentState.PrimaryCurrent");
+                double uXfSecI = SafeGetDouble($"ess._unitTransformers[{u}]._currentState.SecondaryCurrent");
+                sb.AppendLine($"        |   单元变: 一次侧 {uXfPriV/1000:0.0} kV / {uXfPriI:0.0} A   二次侧 {uXfSecV:0.0} V / {uXfSecI:0.0} A");
 
                 if (a < channelCount)
                 {
@@ -467,10 +473,10 @@ namespace EssSimulator.Display
                         {
                             // 采集数据（支持 N 路）
                             bool breakerClosed = SafeGetBool("ess._breaker.IsClosed");
-                            var primaryVoltage = SafeGetDouble("ess._transformer._currentState.PrimaryVoltage");
-                            var secondaryVoltage = SafeGetDouble("ess._transformer._currentState.SecondaryVoltage");
-                            var primaryCurrent = SafeGetDouble("ess._transformer._currentState.PrimaryCurrent");
-                            var secondaryCurrent = SafeGetDouble("ess._transformer._currentState.SecondaryCurrent");
+                            var primaryVoltage = SafeGetDouble("ess._mainTransformer._currentState.PrimaryVoltage");
+                            var secondaryVoltage = SafeGetDouble("ess._mainTransformer._currentState.SecondaryVoltage");
+                            var primaryCurrent = SafeGetDouble("ess._mainTransformer._currentState.PrimaryCurrent");
+                            var secondaryCurrent = SafeGetDouble("ess._mainTransformer._currentState.SecondaryCurrent");
                             var loadActivePower = SafeGetDouble("ess._loadSimulator.ActivePower");
                             var loadReactivePower = SafeGetDouble("ess._loadSimulator.ReactivePower");
                             var time = DateTime.Now.ToLongTimeString();
@@ -489,8 +495,8 @@ namespace EssSimulator.Display
                             acTable.AddColumn("电流");
                             acTable.AddColumn("有功(kW)");
                             acTable.AddColumn("无功(kvar)");
-                            acTable.AddRow("一次侧", $"{primaryVoltage/1000:0.0} kV", $"{primaryCurrent:0.0} A", "-", "-");
-                            acTable.AddRow("二次侧", $"{secondaryVoltage:0.0} V", $"{secondaryCurrent:0.0} A", "-", "-");
+                            acTable.AddRow("一次侧(220kV)", $"{primaryVoltage/1000:0.0} kV", $"{primaryCurrent:0.0} A", "-", "-");
+                            acTable.AddRow("二次侧(35kV)", $"{secondaryVoltage/1000:0.0} kV", $"{secondaryCurrent:0.0} A", "-", "-");
                             acTable.AddRow("负载", "-", "-", $"{loadActivePower:0.0}", $"{loadReactivePower:0.0}");
 
                             // 单元总览表（每行一个 UNIT，包含2路 PCS+2路 BMS）

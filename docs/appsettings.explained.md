@@ -144,18 +144,18 @@
 
 ---
 
-## Transformer（变压器模型参数）
+## Transformer（主变 220kV/35kV）
 
-该段绑定到 `TransformerConfig`，用于初始化 `TransformerSimulator`。
+该段绑定到 `TransformerConfig`，用于初始化主变 `TransformerSimulator`（220kV/35kV），其二次侧电压作为 **35kV 母线（PCC）** 测点，供负载与并网反馈使用。
 
 - `Transformer.RatedPower`（double，kVA）
   - **作用**：变压器额定容量，用于负载率计算与无功电压反馈等。
 
 - `Transformer.PrimaryVoltage`（double，V）
-  - **作用**：一次侧额定线电压。
+  - **作用**：主变一次侧额定线电压（例如 220kV 写 220000）。
 
 - `Transformer.SecondaryVoltage`（double，V）
-  - **作用**：二次侧额定线电压。
+  - **作用**：主变二次侧额定线电压（例如 35kV 写 35000）。
 
 - `Transformer.NoLoadLoss`（double，W）
   - **作用**：空载损耗（铁损）基准。
@@ -171,6 +171,33 @@
 
 - `Transformer.NoLoadCurrentPercent`（double，%）
   - **作用**：空载电流百分比，用于一次侧电流估算。
+
+---
+
+## UnitTransformer（单元变 35kV/690V）
+
+该段绑定到 `UnitTransformerConfig`，用于为每个储能单元创建一台单元变 `TransformerSimulator`（35kV/690V）。
+
+- `UnitTransformer.RatedPower`（double，kVA）
+  - **作用**：单元变额定容量，用于负载率与电压反馈等计算。
+
+- `UnitTransformer.PrimaryVoltage`（double，V）
+  - **作用**：单元变一次侧额定线电压（通常为 35kV → 35000）。
+
+- `UnitTransformer.SecondaryVoltage`（double，V）
+  - **作用**：单元变二次侧额定线电压（通常为 690V → 690）。
+
+- `UnitTransformer.NoLoadLoss` / `UnitTransformer.LoadLoss`（double，W）
+  - **作用**：单元变损耗参数（铁损/铜损），影响效率与电流估算。
+
+- `UnitTransformer.ImpedancePercent`（double，%）
+  - **作用**：阻抗百分比，影响二次侧电压随无功/负载的变化幅度。
+
+- `UnitTransformer.ReactiveVoltageInfluenceCoefficient`（double）
+  - **作用**：无功对电压影响的调节系数。
+
+- `UnitTransformer.NoLoadCurrentPercent`（double，%）
+  - **作用**：空载电流百分比。
 
 ---
 

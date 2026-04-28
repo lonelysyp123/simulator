@@ -60,19 +60,26 @@ namespace EssSimulator.EssDeviceSimModel
 
         //public GridState _gridState;
         public Breaker _breaker { get; set; } //断路器
-        public TransformerSimulator _transformer { get; set; }
+        public TransformerSimulator _mainTransformer { get; set; }              // 220kV/35kV 主变
+        public IReadOnlyList<TransformerSimulator> _unitTransformers { get; }   // 35kV/690V 单元变（每个 Unit 1 台）
         public ScheduledLoadSimulator _loadSimulator { get; set; }
         //private string modelName;
 
-        public EnergyStorageSystem(SimulatorConfig simCfg, PcsPhysicalConfig pcsCfg, TransformerConfig transCfg, LoadConfig loadCfg)
+        public EnergyStorageSystem(
+            SimulatorConfig simCfg,
+            PcsPhysicalConfig pcsCfg,
+            TransformerConfig transCfg,
+            UnitTransformerConfig unitTransCfg,
+            LoadConfig loadCfg)
         {
             var racks = new List<BatteryRackSimulator>();
             var pcsList = new List<PCSSimulator>();
             var bmsDeviceConfigs = simCfg.GetBmsDeviceConfigs();
             var pcsDeviceConfigs = simCfg.GetPcsDeviceConfigs();
-            int unitCount = Math.Max(1, bmsDeviceConfigs.Count);
+            int channelCount = Math.Max(1, bmsDeviceConfigs.Count); // PCS/BMS 通道数（= Unit*2）
+            int unitCount = Math.Max(1, simCfg.Devices?.Count ?? 1); // 储能单元数（每单元2路PCS+2路BMS）
 
-            for (int i = 0; i < unitCount; i++)
+            for (int i = 0; i < channelCount; i++)
             {
                 var bmsCfg = bmsDeviceConfigs[i];
                 var rackConfig = new RackConfiguration
@@ -109,7 +116,7 @@ namespace EssSimulator.EssDeviceSimModel
                 FrequencyNominal  = pcsCfg.FrequencyNominal,
                 MaxCurrent        = pcsCfg.MaxCurrent
             };
-            for (int i = 0; i < unitCount; i++)
+            for (int i = 0; i < channelCount; i++)
             {
                 var pcsDeviceCfg = i < pcsDeviceConfigs.Count ? pcsDeviceConfigs[i] : new PcsDeviceConfig();
                 var rampCfg = pcsDeviceCfg.PcsRamp ?? simCfg.Runtime.PcsRamp;
@@ -127,8 +134,8 @@ namespace EssSimulator.EssDeviceSimModel
 
             _breaker = new Breaker();
 
-            // 变压器配置（从 TransformerConfig 读取）
-            var transSpecs = new TransformerSpecifications
+            // 主变（220kV/35kV）
+            var mainSpecs = new TransformerSpecifications
             {
                 RatedPower            = transCfg.RatedPower,
                 PrimaryVoltage        = transCfg.PrimaryVoltage,
@@ -139,7 +146,26 @@ namespace EssSimulator.EssDeviceSimModel
                 ReactiveVoltageInfluenceCoefficient = transCfg.ReactiveVoltageInfluenceCoefficient,
                 NoLoadCurrentPercent  = transCfg.NoLoadCurrentPercent
             };
-            _transformer = new TransformerSimulator(transSpecs);
+            _mainTransformer = new TransformerSimulator(mainSpecs);
+
+            // 单元变（35kV/690V），每个 Unit 一台（每台带两路 PCS）
+            var unitTransformers = new List<TransformerSimulator>();
+            var unitSpecs = new TransformerSpecifications
+            {
+                RatedPower            = unitTransCfg.RatedPower,
+                PrimaryVoltage        = unitTransCfg.PrimaryVoltage,
+                SecondaryVoltage      = unitTransCfg.SecondaryVoltage,
+                NoLoadLoss            = unitTransCfg.NoLoadLoss,
+                LoadLoss              = unitTransCfg.LoadLoss,
+                ImpedancePercent      = unitTransCfg.ImpedancePercent,
+                ReactiveVoltageInfluenceCoefficient = unitTransCfg.ReactiveVoltageInfluenceCoefficient,
+                NoLoadCurrentPercent  = unitTransCfg.NoLoadCurrentPercent
+            };
+            for (int u = 0; u < unitCount; u++)
+            {
+                unitTransformers.Add(new TransformerSimulator(unitSpecs));
+            }
+            _unitTransformers = unitTransformers;
 
             // 负载配置（从 LoadConfig 读取）
             _loadSimulator = new ScheduledLoadSimulator(new List<LoadWindow>
@@ -194,9 +220,8 @@ namespace EssSimulator.EssDeviceSimModel
                 {
                     DateTime simTime = DateTime.Now;
 
-                    // PCC（电网反馈/PCS并网判据）测点仍取变压器二次侧电压；
-                    // 并网电表测点已独立调整为一次侧（见 EmMapper），两者口径不同但互不影响。
-                    var pccLineVoltageV = _transformer.GetCurrentState().SecondaryVoltage;
+                    // 35kV PCC（母线）测点：主变二次侧电压（用于负载与并网反馈）
+                    var pccLineVoltageV = _mainTransformer.GetCurrentState().SecondaryVoltage;
                     // 调用一次以刷新负载时段计划（返回值不再作为并网总电流叠加）。
                     _ = _loadSimulator.ComputeLoadCurrentA(pccLineVoltageV);
 
@@ -221,24 +246,61 @@ namespace EssSimulator.EssDeviceSimModel
                         ? (totalActiveKw >= 0 ? -totalSecCurrentMag : totalSecCurrentMag)
                         : totalSecCurrentMag;
 
-                    var priCurrent = Math.Abs(_transformer.GetCurrentState().PrimaryCurrent);
+                    var priCurrent = Math.Abs(_mainTransformer.GetCurrentState().PrimaryCurrent);
                     _breaker.Update(priCurrent);
 
                     if (_breaker.IsClosed)
                     {
                         inputVoltage = (int)_transCfg.PrimaryVoltage;
-                        _transformer.Update(inputVoltage, totalSecCurrent, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime);
-                        var secV = _transformer.GetCurrentState().SecondaryVoltage;
-                        foreach (var pcs in _pcsList)
+                        // 主变：220kV -> 35kV 母线
+                        _mainTransformer.Update(inputVoltage, totalSecCurrent, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime);
+                        var bus35kV = _mainTransformer.GetCurrentState().SecondaryVoltage;
+
+                        // 单元变：35kV -> 690V（每个 Unit 1 台，带两路 PCS）
+                        for (int u = 0; u < _unitTransformers.Count; u++)
                         {
-                            pcs.UpdateGridState(secV, _pcsCfg.FrequencyNominal, true);
+                            int a = u * 2;
+                            int b = u * 2 + 1;
+
+                            double unitP = 0, unitQ = 0;
+                            if (a < _pcsList.Count)
+                            {
+                                var st = _pcsList[a].GetCurrentState();
+                                unitP += _pcsList[a].GetGridSideActivePower();
+                                unitQ += st.ReactivePower;
+                            }
+                            if (b < _pcsList.Count)
+                            {
+                                var st = _pcsList[b].GetCurrentState();
+                                unitP += _pcsList[b].GetGridSideActivePower();
+                                unitQ += st.ReactivePower;
+                            }
+
+                            var unitS = Math.Sqrt(unitP * unitP + unitQ * unitQ);
+                            var unitPf = unitS > 0 ? unitP / unitS : 1.0;
+                            double unitSecCurrentMag = _pcsCfg.AcVoltageNominal > 0
+                                ? unitS * 1000.0 / (_pcsCfg.AcVoltageNominal * Math.Sqrt(3.0))
+                                : 0;
+                            double unitSecCurrent = Math.Abs(unitP) > 1e-6
+                                ? (unitP >= 0 ? -unitSecCurrentMag : unitSecCurrentMag)
+                                : unitSecCurrentMag;
+
+                            _unitTransformers[u].Update(bus35kV, unitSecCurrent, unitPf, unitS, unitQ, simTime);
+                            var lv690 = _unitTransformers[u].GetCurrentState().SecondaryVoltage;
+
+                            if (a < _pcsList.Count) _pcsList[a].UpdateGridState(lv690, _pcsCfg.FrequencyNominal, true);
+                            if (b < _pcsList.Count) _pcsList[b].UpdateGridState(lv690, _pcsCfg.FrequencyNominal, true);
                         }
                     }
                     else
                     {
                         inputVoltage    = 0;
                         totalSecCurrent = 0;
-                        _transformer.Update(0, 0, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime);
+                        _mainTransformer.Update(0, 0, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime);
+                        foreach (var xf in _unitTransformers)
+                        {
+                            xf.Update(0, 0, powerFactor, 0, 0, simTime);
+                        }
                         foreach (var pcs in _pcsList)
                         {
                             pcs.UpdateGridState(0, 0, false);
