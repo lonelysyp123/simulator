@@ -176,33 +176,6 @@ namespace EssSimulator.Configuration
         public double NoLoadCurrentPercent { get; set; } = 2;
     }
 
-    /// <summary>PCS 接口层默认限值配置（对应 appsettings.json: PcsDefault 节）</summary>
-    public class PcsDefaultConfig
-    {
-        public const string Section = "PcsDefault";
-
-        public float BatteryChargeProtectionVoltage { get; set; } = 950;
-        public float BatteryDischargeProtectionVoltage { get; set; } = 500;
-        public float BatteryChargeProtectionCurrent { get; set; } = 500;
-        public float BatteryDischargeProtectionCurrent { get; set; } = 550;
-
-        public float BatteryChargeCurrentLimit { get; set; } = 450;
-        public float BatteryChargeVoltageLimit { get; set; } = 950;
-        public float BatteryDischargeCurrentLimit { get; set; } = 450;
-        public float BatteryDischargeVoltageLimit { get; set; } = 450;
-        public float BatteryChargePowerLimit { get; set; } = 450;
-        public float BatteryDischargePowerLimit { get; set; } = 450;
-        public float ChargePowerLimit { get; set; } = 500;
-        public float DischargePowerLimit { get; set; } = 500;
-        public float PCSRatePower { get; set; } = 1250;
-
-        public int ActiveReactivePriority { get; set; } = 1;
-        public int FrequencyActiveSetting { get; set; } = 1;
-
-        public float EmuMaxChargePower { get; set; } = 1000;
-        public float EmuMaxDischargePower { get; set; } = 1000;
-    }
-
     /// <summary>负载仿真配置（对应 appsettings.json: Load 节）</summary>
     public class LoadConfig
     {

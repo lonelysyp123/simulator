@@ -1,4 +1,4 @@
-FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
+﻿FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,8193,u16,16,yc133,1,Rack运行状态,1
 4,8194,u16,16,yc134,1,Rack预充电阶段,1
 4,8195,u16,16,yc135,1,Rack接触器状态,1

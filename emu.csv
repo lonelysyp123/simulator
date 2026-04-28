@@ -1,4 +1,4 @@
-FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
+﻿FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,218,u16,16,status1,1,状态位1,0
 4,219,u16,16,status2,1,状态位1,0
 4,220,u16,16,status3,1,状态位1,0

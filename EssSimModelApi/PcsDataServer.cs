@@ -18,9 +18,11 @@ namespace EssSimulator.EssSimModelApi
         private readonly List<EnergyManagementData> _emuUnits = new();
         private readonly int _unitCount;
 
-        public PcsDataServer(IOptions<SimulatorConfig> simOpts, IOptions<PcsDefaultConfig> pcsOpts)
+        public PcsDataServer(
+            IOptions<SimulatorConfig> simOpts,
+            IOptions<PcsPhysicalConfig> pcsPhysicalOpts)
         {
-            var cfg = pcsOpts.Value;
+            var pcsPhy = pcsPhysicalOpts.Value;
             _unitCount = Math.Max(1, simOpts.Value.Devices?.Count ?? 1);
 
             for (int u = 0; u < _unitCount; u++)
@@ -29,12 +31,13 @@ namespace EssSimulator.EssSimModelApi
                 for (int i = 1; i <= 2; i++)
                 {
                     var pcs = new PcsData { PcsId = i };
-                    ApplyDefaultConfig(pcs, cfg);
+                    ApplyDefaultConfig(pcs, pcsPhy);
                     emu.PcsList.Add(pcs);
                 }
 
-                emu.Emu.MaxChargePower    = cfg.EmuMaxChargePower;
-                emu.Emu.MaxDischargePower = cfg.EmuMaxDischargePower;
+                // 以 PCS 物理配置为唯一真源：EMU 单元级功率上限 = 2 路 PCS 的 MaxPower 之和
+                emu.Emu.MaxChargePower    = (float)(2 * pcsPhy.MaxPower);
+                emu.Emu.MaxDischargePower = (float)(2 * pcsPhy.MaxPower);
                 _emuUnits.Add(emu);
                 SimulatorHost.Instance.Register($"emu{u + 1}", emu);
             }
@@ -65,23 +68,14 @@ namespace EssSimulator.EssSimModelApi
             }
         }
 
-        private static void ApplyDefaultConfig(PcsData pcs, PcsDefaultConfig cfg)
+        private static void ApplyDefaultConfig(PcsData pcs, PcsPhysicalConfig pcsPhy)
         {
-            pcs.BatteryChargeProtectionVoltage    = cfg.BatteryChargeProtectionVoltage;
-            pcs.BatteryDischargeProtectionVoltage = cfg.BatteryDischargeProtectionVoltage;
-            pcs.BatteryChargeProtectionCurrent    = cfg.BatteryChargeProtectionCurrent;
-            pcs.BatteryDischargeProtectionCurrent = cfg.BatteryDischargeProtectionCurrent;
-            pcs.BatteryChargeCurrentLimit         = cfg.BatteryChargeCurrentLimit;
-            pcs.BatteryChargeVoltageLimit         = cfg.BatteryChargeVoltageLimit;
-            pcs.BatteryDischargeCurrentLimit      = cfg.BatteryDischargeCurrentLimit;
-            pcs.BatteryDischargeVoltageLimit      = cfg.BatteryDischargeVoltageLimit;
-            pcs.BatteryChargePowerLimit           = cfg.BatteryChargePowerLimit;
-            pcs.BatteryDischargePowerLimit        = cfg.BatteryDischargePowerLimit;
-            pcs.ChargePowerLimit                  = cfg.ChargePowerLimit;
-            pcs.DischargePowerLimit               = cfg.DischargePowerLimit;
-            pcs.PCSRatePower                      = cfg.PCSRatePower;
-            pcs.ActiveReactivePriority            = cfg.ActiveReactivePriority;
-            pcs.FrequencyActiveSetting            = cfg.FrequencyActiveSetting;
+            // 以 PCS 配置统一：功率能力相关限值全部从 Pcs(MaxPower/RatedPower) 推导，避免与仿真不一致
+            pcs.BatteryChargePowerLimit           = (float)pcsPhy.MaxPower;
+            pcs.BatteryDischargePowerLimit        = (float)pcsPhy.MaxPower;
+            pcs.ChargePowerLimit                  = (float)pcsPhy.MaxPower;
+            pcs.DischargePowerLimit               = (float)pcsPhy.MaxPower;
+            pcs.PCSRatePower                      = (float)pcsPhy.RatedPower;
         }
     }
 }

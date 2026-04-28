@@ -336,7 +336,6 @@ namespace EssSimulator.Display
             var time = DateTime.Now.ToLongTimeString();
 
             bool breakerClosed = SafeGetBool("ess._breaker.IsClosed");
-            bool switchState  = SafeGetBool("ess._breaker.swState");
             double primaryVoltage   = SafeGetDouble("ess._transformer._currentState.PrimaryVoltage");
             double secondaryVoltage = SafeGetDouble("ess._transformer._currentState.SecondaryVoltage");
             double primaryCurrent   = SafeGetDouble("ess._transformer._currentState.PrimaryCurrent");
@@ -357,16 +356,16 @@ namespace EssSimulator.Display
             sb.AppendLine($"电气主接线 [{time}]  （储能单元数: {unitCount}，PCS/BMS通道数: {channelCount}）");
             sb.AppendLine("========= 电压: 10.5 kV");
             sb.AppendLine("        |");
-            sb.AppendLine($"        |   断路器: {(breakerClosed ? "合" : "分")}   隔离开关: {(switchState ? "合" : "分")}");
+            sb.AppendLine($"        |   断路器: {(breakerClosed ? "合" : "分")}");
+            sb.AppendLine("        |");
+            sb.AppendLine($"        |                           电表(一次侧) 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab:0.0} / {meterUbc:0.0} / {meterUca:0.0} V");
+            sb.AppendLine($"        |                                     有功功率: {meterActive:0.0} kW    无功功率: {meterReactive:0.0} kvar");
             sb.AppendLine("        |");
             sb.AppendLine($"        |                           变压器: 一次侧 {primaryVoltage / 1000:0.0} kV / {primaryCurrent:0.0} A    二次侧 {secondaryVoltage:0.0} V / {secondaryCurrent:0.0} A");
             sb.AppendLine("        |");
-            sb.AppendLine($"        |                                       电表 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab:0.0} / {meterUbc:0.0} / {meterUca:0.0} V");
-            sb.AppendLine($"        |                                       有功功率: {meterActive:0.0} kW    无功功率: {meterReactive:0.0} kvar");
-            sb.AppendLine("        |");
             sb.AppendLine($"        |                                                   负载 有功 {loadActivePower:0.0} kW   无功 {loadReactivePower:0.0} kvar");
             sb.AppendLine("        |");
-            sb.AppendLine("        |----[断路器]---[隔离开关]----[变压器]----[电表]---------[负载]");
+            sb.AppendLine("        |----[断路器]----[电表]------[变压器]------------------[负载]");
             sb.AppendLine("        |                                                |");
             sb.AppendLine("        |                                                +--- 并网点 ---+");
             sb.AppendLine("        |                                                                |");
@@ -474,15 +473,13 @@ namespace EssSimulator.Display
                             var secondaryCurrent = SafeGetDouble("ess._transformer._currentState.SecondaryCurrent");
                             var loadActivePower = SafeGetDouble("ess._loadSimulator.ActivePower");
                             var loadReactivePower = SafeGetDouble("ess._loadSimulator.ReactivePower");
-                            var switchState = SafeGetBool("ess._breaker.swState");
                             var time = DateTime.Now.ToLongTimeString();
                             int channelCount = Math.Max(1, GetEssUnitCount());
                             int unitCount = Math.Max(1, (int)Math.Ceiling(channelCount / 2.0));
 
                             // 顶部信息面板（避免 Markup 标签与中文状态混淆，改用 Text）
                             var breakerStatus = breakerClosed ? "合" : "分";
-                            var isoStatus = switchState ? "合" : "分";
-                            var headerText = new Text($"电气主接线 {time}  （单元数 {unitCount}，通道数 {channelCount}）\n状态: 断路器[{breakerStatus}] 隔离[{isoStatus}]\n操作: Tab 切换视图 | :/C 输入命令 | Esc 返回\n");
+                            var headerText = new Text($"电气主接线 {time}  （单元数 {unitCount}，通道数 {channelCount}）\n状态: 断路器[{breakerStatus}]\n操作: Tab 切换视图 | :/C 输入命令 | Esc 返回\n");
                             var header = new Panel(headerText).Border(BoxBorder.Rounded);
 
                             // 交流侧表格（一次/二次、负载）

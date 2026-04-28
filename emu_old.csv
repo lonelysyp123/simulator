@@ -1,4 +1,4 @@
-FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
+﻿FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 3,7000,u16,16,param1,1,运行状态,model=4|arg1=emu.PcsList[deviceId].OperatingStatus|arg2=|arg3=|arg4=1000
 3,7001,u32,32,param2,1000,总视在功率,model=4|arg1=emu.PcsList[deviceId].ApparentPower|arg2=|arg3=|arg4=1000
 3,7003,int32,32,param3,1000,总有功功率,model=4|arg1=emu.PcsList[deviceId].ActivePower|arg2=|arg3=|arg4=1000

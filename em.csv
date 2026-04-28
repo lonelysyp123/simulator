@@ -1,4 +1,4 @@
-FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
+﻿FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,0,int32,32,yc0,1000,A相电压,model=4|arg1=em.PhaseAVoltage|arg2= |arg3= |arg4=100
 4,2,int32,32,yc1,1000,B相电压,model=4|arg1=em.PhaseBVoltage|arg2= |arg3= |arg4=100
 4,4,int32,32,yc2,1000,C相电压,model=4|arg1=em.PhaseCVoltage|arg2= |arg3= |arg4=100

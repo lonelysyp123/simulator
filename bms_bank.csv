@@ -1,4 +1,4 @@
-FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
+﻿FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,4097,u16,16,yc0,1,一键并网开关状态,1
 4,4098,u16,16,yc1,1,Rack启用/停用状态,1
 4,4101,u16,16,yc2,1,RACK 在线状态,1

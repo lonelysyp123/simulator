@@ -5,14 +5,42 @@ using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi;
 using log4net;
 using log4net.Config;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using System.Text;
+using System.Text.Json;
 
 namespace EssSimulator
 {
     class Program
     {
+        private static Stream? LoadJsonWithCommentsAsStream(string path, bool optional)
+        {
+            if (!File.Exists(path))
+            {
+                if (optional) return null;
+                throw new FileNotFoundException($"未找到配置文件: {path}", path);
+            }
+
+            var json = File.ReadAllText(path, Encoding.UTF8);
+            var docOptions = new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            };
+
+            using var doc = JsonDocument.Parse(json, docOptions);
+            var ms = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+            {
+                doc.RootElement.WriteTo(writer);
+            }
+            ms.Position = 0;
+            return ms;
+        }
+
         private static bool IsSimulatorReady(int expectedServerCount)
         {
             var store = SimulatorHost.Instance;
@@ -126,13 +154,31 @@ namespace EssSimulator
             LogManager.GetLogger(typeof(Program)).Info("[Program] 应用启动");
 
             var host = Host.CreateDefaultBuilder(args)
+                .ConfigureAppConfiguration((ctx, cfg) =>
+                {
+                    // 改为与 autotest.json 一致的读取方式：支持 JSON 注释与尾随逗号。
+                    // 仍使用 IConfiguration/IOptions 绑定，避免影响其余逻辑。
+                    cfg.Sources.Clear();
+
+                    string baseDir = Directory.GetCurrentDirectory();
+                    string envName = ctx.HostingEnvironment.EnvironmentName;
+
+                    var baseStream = LoadJsonWithCommentsAsStream(Path.Combine(baseDir, "appsettings.json"), optional: false);
+                    if (baseStream != null) cfg.AddJsonStream(baseStream);
+
+                    var envStream = LoadJsonWithCommentsAsStream(Path.Combine(baseDir, $"appsettings.{envName}.json"), optional: true);
+                    if (envStream != null) cfg.AddJsonStream(envStream);
+
+                    // 保留环境变量与命令行覆盖能力
+                    cfg.AddEnvironmentVariables();
+                    if (args is { Length: > 0 }) cfg.AddCommandLine(args);
+                })
                 .ConfigureServices((ctx, services) =>
                 {
                     // 绑定配置节到强类型选项
                     services.Configure<SimulatorConfig>(ctx.Configuration.GetSection(SimulatorConfig.Section));
                     services.Configure<PcsPhysicalConfig>(ctx.Configuration.GetSection(PcsPhysicalConfig.Section));
                     services.Configure<TransformerConfig>(ctx.Configuration.GetSection(TransformerConfig.Section));
-                    services.Configure<PcsDefaultConfig>(ctx.Configuration.GetSection(PcsDefaultConfig.Section));
                     services.Configure<LoadConfig>(ctx.Configuration.GetSection(LoadConfig.Section));
 
                     // 核心仿真模型（单例 + 托管服务，由 Host 管理生命周期和仿真主循环）

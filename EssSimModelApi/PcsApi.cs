@@ -155,7 +155,6 @@ namespace EssSimulator.EssSimModelApi
                 public float DCCCLimit { get; set; }                // 直流恒流电流
                 public float DCCVLimit { get; set; }                // 直流恒压电压
                 public int ActiveReactivePriority { get; set; }    // 有功无功优先
-                public int FrequencyActiveSetting { get; set; }    // 频率有功设置
 
                 // 控制命令
                 public bool ChargeProhibited { get; set; }         // 禁止充电
@@ -222,7 +221,6 @@ namespace EssSimulator.EssSimModelApi
                 public bool GridPhaseSequenceAbnormal { get; set; } // 电网相序异常
                 public bool InverterSoftwareOverCurrent { get; set; } // 逆变软件过流
                 public bool DcSoftStartAbnormal { get; set; }       // 直流软启动异常
-                public bool DcIsolatorAbnormal { get; set; }        // 直流隔离开关异常
                 public bool AcFanAbnormal { get; set; }             // 交流风机异常
                 public bool AcMainSwitchAbnormal { get; set; }      // 交流主开关异常
                 public bool InternalAbnormal { get; set; }          // 内部异常
@@ -242,7 +240,7 @@ namespace EssSimulator.EssSimModelApi
                         summary |= (UInt16)(ToBit(GridPhaseSequenceAbnormal) << 8);
                         summary |= (UInt16)(ToBit(InverterSoftwareOverCurrent) << 9);
                         summary |= (UInt16)(ToBit(DcSoftStartAbnormal) << 10);
-                        summary |= (UInt16)(ToBit(DcIsolatorAbnormal) << 11);
+                        summary |= (UInt16)(ToBit(false) << 11);
                         summary |= (UInt16)(ToBit(AcFanAbnormal) << 12);
                         summary |= (UInt16)(ToBit(AcMainSwitchAbnormal) << 13);
                         summary |= (UInt16)(ToBit(false) << 14);
@@ -561,7 +559,6 @@ namespace EssSimulator.EssSimModelApi
                 // 状态信号
                 public bool CircuitBreakerClosed { get; set; }     // GYZB-断路器合闸
                 public bool CircuitBreakerOpened { get; set; }     // GYZB-断路器分闸
-                public bool IsolatorClosed { get; set; }           // GYZB-隔离刀合位
                 public bool SpringNotCharged { get; set; }         // GYZB-弹簧未储能
                 public bool RemoteIndicator { get; set; }          // GYZB-远方指示
                 public bool GroundSwitchClosed { get; set; }       // GYZB-接地刀合闸

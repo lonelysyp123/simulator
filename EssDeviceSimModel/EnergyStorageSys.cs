@@ -194,7 +194,8 @@ namespace EssSimulator.EssDeviceSimModel
                 {
                     DateTime simTime = DateTime.Now;
 
-                    // 统一测点：并网点线电压（PCC）取变压器二次侧电压。
+                    // PCC（电网反馈/PCS并网判据）测点仍取变压器二次侧电压；
+                    // 并网电表测点已独立调整为一次侧（见 EmMapper），两者口径不同但互不影响。
                     var pccLineVoltageV = _transformer.GetCurrentState().SecondaryVoltage;
                     // 调用一次以刷新负载时段计划（返回值不再作为并网总电流叠加）。
                     _ = _loadSimulator.ComputeLoadCurrentA(pccLineVoltageV);

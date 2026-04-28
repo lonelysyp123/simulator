@@ -9,8 +9,6 @@ namespace EssSimulator.EssDeviceSimModel
     public class Breaker
     {
         public bool IsClosed { get; set; } //断路器状态：闭合（true）或断开（false）
-
-        public bool swState { get; set; } //断路器 隔离开关状态 true 闭合 false 断开
         public double RatedVoltage { get; set; } //额定电压 (kV)
         public double RatedCurrent { get; set; } //额定电流 (A)
         public double FaultThreshold { get; set; } //故障电流阈值 (A)

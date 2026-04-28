@@ -21,10 +21,11 @@ namespace EssSimulator.EssSimModelApi.Mappers
         {
             var xfSt = ess._transformer.GetCurrentState();
 
-            // 统一测点：并网点线电压（PCC）取变压器二次侧电压。
-            double lineVoltage = xfSt?.SecondaryVoltage > 0
-                ? xfSt.SecondaryVoltage
-                : ess._transformer._specs.SecondaryVoltage;
+            // 并网电表安装位置：断路器与变压器之间（变压器一次侧）。
+            // 因此电表电压/电流口径统一取变压器一次侧。
+            double lineVoltage = xfSt?.PrimaryVoltage > 0
+                ? xfSt.PrimaryVoltage
+                : ess._transformer._specs.PrimaryVoltage;
 
             // 并网点功率方向约定：+ 向电网送电（放电），- 从电网取电（用电）。
             double loadP = ess._loadSimulator.ActivePower;
@@ -40,7 +41,12 @@ namespace EssSimulator.EssSimModelApi.Mappers
             }
             double totalS = Math.Sqrt(totalP * totalP + totalQ * totalQ);
             double pf     = totalS > 0 ? Math.Clamp(totalP / totalS, -1.0, 1.0) : 1.0;
-            double I      = lineVoltage > 0 ? totalS * 1000.0 / lineVoltage / Math.Sqrt(3.0) : 0.0;
+            // 一次侧电流优先采用变压器模型计算结果（包含空载电流、损耗等影响），避免仅按 S/U 反推。
+            double I = xfSt != null ? xfSt.PrimaryCurrent : 0.0;
+            if (I == 0.0)
+            {
+                I = lineVoltage > 0 ? totalS * 1000.0 / lineVoltage / Math.Sqrt(3.0) : 0.0;
+            }
 
             double phaseV = lineVoltage / Math.Sqrt(3.0);
 
