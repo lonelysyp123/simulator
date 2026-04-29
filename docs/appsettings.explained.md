@@ -17,8 +17,44 @@
 - `Simulator`：仿真运行参数、协议端口、设备清单（决定通道数）
 - `Pcs`：PCS 物理侧参数（会影响仿真行为与并网侧计算）
 - `Transformer`：变压器模型参数（影响一次/二次电压、电流、损耗等）
+- `UnitTransformer`：单元变参数（每个 Unit 一台 35kV/690V）
 - `Load`：站内负载计划（决定系统功率平衡与潮流方向）
-- `Logging`：日志等级（仅影响日志输出，不影响仿真结果）
+
+## 当前配置快照（按当前 appsettings.json）
+
+- `Simulator.Runtime`
+  - `SimStepMs = 200`
+  - `Speedup = 1.0`
+  - `NoGui = false`
+- `Simulator.Protocol`
+  - `BaseBmsModbusPort = 1501`
+  - `BmsPortStep = 1`
+  - `BaseEmuModbusPort = 1601`
+  - `EmuPortStep = 1`
+  - `EmModbusPort = 1500`
+- `Simulator.Devices`
+  - 共 `5` 个 Unit（每个 Unit 固定 2 路 PCS + 2 路 BMS）
+  - 所有 BMS 拓扑一致：`ClusterCount=12`、`PackCount=4`、`CellSeriesCount=104`、`CellParallelCount=1`
+  - 所有 BMS 单体参数一致：`CellNominalVoltage=3.2V`、`CellNominalCapacity=314Ah`
+  - 初始 SOC 配置：
+    - Unit-1: `0.55/0.50`（随机扰动 `0.03`）
+    - Unit-2~5: `0.60/0.45`（随机扰动 `0.02`）
+- `Pcs`
+  - `RatedPower=2508`、`MaxPower=2508`、`Efficiency=0.99`
+  - `DcVoltageRangeMin=1000`、`DcVoltageRangeMax=1500`
+  - `AcVoltageNominal=690`、`FrequencyNominal=50`
+  - `MaxCurrent=2200`、`GridLossCoefficient=0.11`
+- `Transformer`
+  - `RatedPower=2500`、`PrimaryVoltage=220000`、`SecondaryVoltage=35000`
+  - `NoLoadLoss=50`、`LoadLoss=200`、`ImpedancePercent=4`
+  - `ReactiveVoltageInfluenceCoefficient=1.0`、`NoLoadCurrentPercent=2`
+- `UnitTransformer`
+  - `RatedPower=2500`、`PrimaryVoltage=35000`、`SecondaryVoltage=690`
+  - `NoLoadLoss=50`、`LoadLoss=200`、`ImpedancePercent=4`
+  - `ReactiveVoltageInfluenceCoefficient=1.0`、`NoLoadCurrentPercent=2`
+- `Load`
+  - `ActivePowerPlan=-500`
+  - `ReactivePowerPlan=0`
 
 ---
 
@@ -65,13 +101,13 @@
 
 #### Simulator.Devices[i].Name
 
-- **作用**：单元名称（主要用于显示/日志）。
+- **作用**：单元名称（当前版本仅配置占位，不参与仿真计算与点位映射）。
 
 #### Simulator.Devices[i].Pcs（数组，固定 2 项）
 
 每个 PCS 子项支持：
 
-- `Name`：PCS 名称（显示/日志用途）
+- `Name`：PCS 名称（当前版本仅配置占位，不参与仿真计算与点位映射）
 - `PcsRamp`：功率爬坡参数（见下）
 
 ##### Simulator.Devices[i].Pcs[j].PcsRamp
@@ -92,15 +128,15 @@
 
 每个 BMS 子项主要决定电池拓扑、容量与初始状态：
 
-- `Name`：BMS 名称（显示/日志用途）
+- `Name`：BMS 名称（当前版本仅配置占位，不参与仿真计算与点位映射）
 - `ClusterCount`：簇数量
 - `PackCount`：每簇 Pack 数
 - `CellSeriesCount`：单体串联数
 - `CellParallelCount`：单体并联数
 - `CellNominalVoltage`：单体标称电压（V）
 - `CellNominalCapacity`：单体标称容量（Ah）
-- `CellInitialSoc`：初始 SOC（0~1）
-- `CellInitialSocRandomRange`：初始 SOC 随机扰动范围（0~1）
+- `CellInitialSoc`：初始 SOC（0~1，会传递到电芯初始化）
+- `CellInitialSocRandomRange`：初始 SOC 随机扰动范围（0~1，会传递到电芯初始化）
 - `PackInternalResistance`：Pack 等效内阻（简化模型用）
 - `ClusterInternalResistance`：Cluster 等效内阻
 - `RackInternalResistance`：Rack 等效内阻
@@ -213,11 +249,3 @@
   - **作用**：负载无功计划。
 
 ---
-
-## Logging
-
-- `Logging.LogLevel.Default`
-- `Logging.LogLevel.Microsoft`
-
-**作用**：控制日志输出等级，不影响仿真计算结果。
-
