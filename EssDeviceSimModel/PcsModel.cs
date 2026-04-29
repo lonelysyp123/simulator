@@ -107,6 +107,7 @@ namespace EssSimulator.EssDeviceSimModel
         private bool _activeRampThreadRunning;
         private Thread? _reactiveRampThread;
         private bool _reactiveRampThreadRunning;
+        private volatile bool _rampStopRequested;
         private readonly double _slope; // 爬坡斜率
         private readonly int _interval; // 间隔时间(ms)
         private readonly int _delay; // 初始延迟(ms)
@@ -159,6 +160,7 @@ namespace EssSimulator.EssDeviceSimModel
             _pendingReactiveSetpoint = 0;
             _activeRampThreadRunning = false;
             _reactiveRampThreadRunning = false;
+            _rampStopRequested = false;
         }
 
         // 获取当前状态（返回内部引用，调用方只应读取，不应直接赋值属性）
@@ -193,6 +195,12 @@ namespace EssSimulator.EssDeviceSimModel
             {
                 TransitionToGMode(GridMode.GridConnected);
             }
+
+            // 电网不可用时：立即清零功率设定并停止爬坡线程，避免“孤网仍输出功率”的不一致
+            if (!isAvailable)
+            {
+                StopRampsAndZeroPower();
+            }
         }
 
         // 模式切换
@@ -200,6 +208,12 @@ namespace EssSimulator.EssDeviceSimModel
         {
             if (_currentState.Mode == newMode) return;
             _currentState.Mode = newMode;
+
+            // 非 Normal 模式不应继续执行功率指令
+            if (newMode != OperationMode.Normal)
+            {
+                StopRampsAndZeroPower();
+            }
         }
 
                 public void TransitionToGMode(GridMode newMode)
@@ -238,8 +252,17 @@ namespace EssSimulator.EssDeviceSimModel
             }
 
             // 仅记录设定值，由后台线程分阶段逼近
+            // 电网不可用或非 Normal 时不接收功率指令（保持 0）
+            if (!_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+            {
+                StopRampsAndZeroPower();
+                return;
+            }
+
             lock (_setpointLock)
             {
+                // 恢复可用后重新允许爬坡线程运行
+                _rampStopRequested = false;
                 _pendingActiveSetpoint = activePower;
                 _pendingReactiveSetpoint = reactivePower;
             }
@@ -253,6 +276,20 @@ namespace EssSimulator.EssDeviceSimModel
                 if (_currentState.FaultType == 2 && _pendingActiveSetpoint > 0) return;
                 StartPowerRampThreadIfNeeded();
             }
+        }
+
+        private void StopRampsAndZeroPower()
+        {
+            // 1) 清零设定值
+            lock (_setpointLock)
+            {
+                _pendingActiveSetpoint = 0;
+                _pendingReactiveSetpoint = 0;
+                _rampStopRequested = true;
+            }
+            // 2) 清零当前输出（避免 UI/电池模型继续按非零功率推进）
+            _currentState.ActivePower = 0;
+            _currentState.ReactivePower = 0;
         }
 
         // 按需启动功率调节线程，避免无用的后台占用
@@ -316,6 +353,18 @@ namespace EssSimulator.EssDeviceSimModel
             Thread.Sleep((int)(_delay / _speedup)); // 初始延迟（按仿真加速倍率压缩）
             while (true)
             {
+                // 停止请求：退出线程
+                if (_rampStopRequested || !_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+                {
+                    _currentState.ActivePower = 0;
+                    lock (_setpointLock)
+                    {
+                        _activeRampThreadRunning = false;
+                        _activeRampThread = null;
+                    }
+                    return;
+                }
+
                 double desiredActive;
                 lock (_setpointLock)
                 {
@@ -338,6 +387,17 @@ namespace EssSimulator.EssDeviceSimModel
 
                 foreach (var stage in ActiveStages)
                 {
+                    if (_rampStopRequested || !_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+                    {
+                        _currentState.ActivePower = 0;
+                        lock (_setpointLock)
+                        {
+                            _activeRampThreadRunning = false;
+                            _activeRampThread = null;
+                        }
+                        return;
+                    }
+
                     // 在执行每个阶段前检查是否有新的设定值，如果有则打断并重算
                     double latestActive;
                     lock (_setpointLock)
@@ -363,6 +423,18 @@ namespace EssSimulator.EssDeviceSimModel
         {
             while (true)
             {
+                // 停止请求：退出线程
+                if (_rampStopRequested || !_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+                {
+                    _currentState.ReactivePower = 0;
+                    lock (_setpointLock)
+                    {
+                        _reactiveRampThreadRunning = false;
+                        _reactiveRampThread = null;
+                    }
+                    return;
+                }
+
                 double desiredReactive;
                 lock (_setpointLock)
                 {
@@ -384,6 +456,17 @@ namespace EssSimulator.EssDeviceSimModel
 
                 foreach (var stage in ReactiveStages)
                 {
+                    if (_rampStopRequested || !_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+                    {
+                        _currentState.ReactivePower = 0;
+                        lock (_setpointLock)
+                        {
+                            _reactiveRampThreadRunning = false;
+                            _reactiveRampThread = null;
+                        }
+                        return;
+                    }
+
                     // 在执行每个阶段前检查是否有新的设定值，如果有则打断并重算
                     double latestReactive;
                     lock (_setpointLock)

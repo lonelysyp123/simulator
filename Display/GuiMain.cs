@@ -376,6 +376,8 @@ namespace EssSimulator.Display
                 int b = u * 2 + 1;
 
                 sb.AppendLine($"        |  ====== [UNIT {u + 1}]  (PCS{a + 1}/PCS{b + 1}  对应  舱{a + 1}/舱{b + 1}) ======");
+                bool unitBreakerClosed = SafeGetBool($"ess._unitBreakers[{u}].IsClosed");
+                sb.AppendLine($"        |   高压断路器: {(unitBreakerClosed ? "合" : "分")}");
                 // 单元变（35kV/690V）状态（每单元 1 台）
                 double uXfPriV = SafeGetDouble($"ess._unitTransformers[{u}]._currentState.PrimaryVoltage");
                 double uXfSecV = SafeGetDouble($"ess._unitTransformers[{u}]._currentState.SecondaryVoltage");

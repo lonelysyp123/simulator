@@ -69,7 +69,27 @@ namespace EssSimulator.Protocol.Modbus
         {
             if (_running) return;
             _running = true;
+            // 1) 写入 CSV 常量默认值
             _slave.Write(_map.DefaultBuffer);
+
+            // 2) 控制点按对象当前值回填寄存器，确保“对象默认值”与“点位初值”一致
+            try
+            {
+                var initCtl = new Dictionary<string, object>();
+                foreach (var e in _map.ControlMaps)
+                {
+                    if (e == null || string.IsNullOrWhiteSpace(e.ParamName)) continue;
+                    if (!_map.ParamModelLookup.TryGetValue(e.ParamName, out var model) || model == null) continue;
+                    if (string.IsNullOrWhiteSpace(model.Arg1)) continue;
+                    var cur = SimServer.GetExtIfVariableVal(model.Arg1);
+                    if (cur != null) initCtl[e.ParamName] = cur;
+                }
+                if (initCtl.Count > 0) _slave.Write(initCtl);
+            }
+            catch (Exception ex)
+            {
+                _log.Warn("Init control register defaults failed.", ex);
+            }
             StartModelWorkers();
             StartControlThread();
         }

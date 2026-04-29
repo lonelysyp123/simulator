@@ -21,6 +21,9 @@ namespace EssSimulator.EssSimModelApi
             {
                 public DateTime Timestamp { get; set; } = DateTime.Now;
 
+                // 高压断路器（单元变前）开合：0=分，1=合（由 emu.csv: poweronoff 点位写入）
+                public ushort PowerOnOff { get; set; } = 1;
+
                 // 基本功率信息
                 public float OutputActivePower { get; set; }       // EMU-输出总有功功率
                 public float OutputReactivePower { get; set; }     // EMU-输出总无功功率

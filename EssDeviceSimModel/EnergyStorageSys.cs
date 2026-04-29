@@ -60,6 +60,7 @@ namespace EssSimulator.EssDeviceSimModel
 
         //public GridState _gridState;
         public Breaker _breaker { get; set; } //断路器
+        public IReadOnlyList<Breaker> _unitBreakers { get; }                 // 单元变前高压断路器（每个 Unit 1 个）
         public TransformerSimulator _mainTransformer { get; set; }              // 220kV/35kV 主变
         public IReadOnlyList<TransformerSimulator> _unitTransformers { get; }   // 35kV/690V 单元变（每个 Unit 1 台）
         public ScheduledLoadSimulator _loadSimulator { get; set; }
@@ -133,6 +134,16 @@ namespace EssSimulator.EssDeviceSimModel
             _pcsList      = pcsList;
 
             _breaker = new Breaker();
+
+            // 单元断路器（默认合闸，允许通过 emu.poweronoff 控制）
+            var unitBreakers = new List<Breaker>();
+            for (int u = 0; u < unitCount; u++)
+            {
+                var brk = new Breaker();
+                brk.IsClosed = true;
+                unitBreakers.Add(brk);
+            }
+            _unitBreakers = unitBreakers;
 
             // 主变（220kV/35kV）
             var mainSpecs = new TransformerSpecifications
@@ -262,6 +273,24 @@ namespace EssSimulator.EssDeviceSimModel
                             int a = u * 2;
                             int b = u * 2 + 1;
 
+                            // 单元断路器断开：单元变不带电，PCS 侧视为离网不可用
+                            bool unitClosed = u < _unitBreakers.Count && _unitBreakers[u].IsClosed;
+                            if (!unitClosed)
+                            {
+                                _unitTransformers[u].Update(0, 0, 1.0, 0, 0, simTime);
+                                if (a < _pcsList.Count)
+                                {
+                                    _pcsList[a].UpdateGridState(0, 0, false);
+                                    _pcsList[a].TransitionToMode(OperationMode.Standby);
+                                }
+                                if (b < _pcsList.Count)
+                                {
+                                    _pcsList[b].UpdateGridState(0, 0, false);
+                                    _pcsList[b].TransitionToMode(OperationMode.Standby);
+                                }
+                                continue;
+                            }
+
                             double unitP = 0, unitQ = 0;
                             if (a < _pcsList.Count)
                             {
@@ -288,8 +317,16 @@ namespace EssSimulator.EssDeviceSimModel
                             _unitTransformers[u].Update(bus35kV, unitSecCurrent, unitPf, unitS, unitQ, simTime);
                             var lv690 = _unitTransformers[u].GetCurrentState().SecondaryVoltage;
 
-                            if (a < _pcsList.Count) _pcsList[a].UpdateGridState(lv690, _pcsCfg.FrequencyNominal, true);
-                            if (b < _pcsList.Count) _pcsList[b].UpdateGridState(lv690, _pcsCfg.FrequencyNominal, true);
+                            if (a < _pcsList.Count)
+                            {
+                                _pcsList[a].UpdateGridState(lv690, _pcsCfg.FrequencyNominal, true);
+                                _pcsList[a].TransitionToMode(OperationMode.Normal);
+                            }
+                            if (b < _pcsList.Count)
+                            {
+                                _pcsList[b].UpdateGridState(lv690, _pcsCfg.FrequencyNominal, true);
+                                _pcsList[b].TransitionToMode(OperationMode.Normal);
+                            }
                         }
                     }
                     else

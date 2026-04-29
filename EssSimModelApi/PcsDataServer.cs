@@ -38,6 +38,7 @@ namespace EssSimulator.EssSimModelApi
                 // 以 PCS 物理配置为唯一真源：EMU 单元级功率上限 = 2 路 PCS 的 MaxPower 之和
                 emu.Emu.MaxChargePower    = (float)(2 * pcsPhy.MaxPower);
                 emu.Emu.MaxDischargePower = (float)(2 * pcsPhy.MaxPower);
+                emu.Emu.PowerOnOff        = 1; // 单元高压断路器默认合闸
                 _emuUnits.Add(emu);
                 SimulatorHost.Instance.Register($"emu{u + 1}", emu);
             }
@@ -63,6 +64,11 @@ namespace EssSimulator.EssSimModelApi
                     PcsMapper.MapPcsState(ess._pcsList[baseIdx].GetCurrentState(), emu.PcsList[0], ess._batteryRacks[baseIdx]);
                     PcsMapper.MapPcsState(ess._pcsList[baseIdx + 1].GetCurrentState(), emu.PcsList[1], ess._batteryRacks[baseIdx + 1]);
                     PcsMapper.MapEmuState(emu, new[] { ess._batteryRacks[baseIdx], ess._batteryRacks[baseIdx + 1] });
+                    // 单元高压断路器（单元变前）：由 emu.Emu.PowerOnOff 控制，0=分，1=合
+                    if (ess._unitBreakers != null && u < ess._unitBreakers.Count)
+                    {
+                        ess._unitBreakers[u].IsClosed = emu.Emu.PowerOnOff != 0;
+                    }
                     PcsMapper.ApplyEmuCommands(emu, ess, baseIdx);
                 }
             }
