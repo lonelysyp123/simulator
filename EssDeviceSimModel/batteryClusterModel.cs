@@ -62,6 +62,8 @@ namespace EssSimulator.EssDeviceSimModel
                     ParallelCount = config.PackConfig.ParallelCount,
                     NominalVoltage = config.PackConfig.NominalVoltage,
                     NominalCapacity = config.PackConfig.NominalCapacity * (1 + (_random.NextDouble() - 0.5) * 0.01), // ±1%容量差异
+                    InitialSoc = config.PackConfig.InitialSoc,
+                    InitialSocRandomRange = config.PackConfig.InitialSocRandomRange,
                     PackInternalResistance = config.PackConfig.PackInternalResistance * (1 + (_random.NextDouble() - 0.5) * 0.05), // ±5%内阻差异
                     CoolingEfficiency = config.PackConfig.CoolingEfficiency * (1 + (_random.NextDouble() - 0.5) * 0.1) // ±10%冷却效率差异
                 };
