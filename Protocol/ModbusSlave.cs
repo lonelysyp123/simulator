@@ -20,6 +20,7 @@ namespace EssSimulator
         #region Const
         private const int ADDRESS_LENGTH = 16;
         private const int BYTE_LENGTH = 8;
+        private const int COILWRITEFUNCTIONCODE = 5;
         private const int CTRLFUNCTIONCODE = 6;
         #endregion
 
@@ -52,7 +53,7 @@ namespace EssSimulator
         private Dictionary<int, int> CalcContinuerAddress(MapEntry[] pointMap)
         {
             Dictionary<int, int> addressLengthGroup = new Dictionary<int, int>();
-            var filtered = pointMap.Where(p => p.FunctionCode == 6).ToArray();
+            var filtered = pointMap.Where(p => p.FunctionCode == CTRLFUNCTIONCODE).ToArray();
             var continuerAddressGroup = filtered.OrderBy(p => p.Address).ToArray();
             int currentSpanLength = 0; // 当前连续段累计的寄存器长度
             int currentSpanItemCount = 0; // 当前连续段包含的点表条目数，因为有可能存在地址重复的点表条目或者是Size>ADDRESS_LENGTH的点表条目
@@ -146,6 +147,26 @@ namespace EssSimulator
                     }
                 }
             }
+
+            // FC05 线圈控制点按点位逐个读取（线圈区与寄存器区分离，不参与 06 连续段优化）。
+            var coilCandidates = pointMapToUse.Where(p => p.FunctionCode == COILWRITEFUNCTIONCODE).ToArray();
+            foreach (var entry in coilCandidates)
+            {
+                if (entry == null || string.IsNullOrWhiteSpace(entry.ParamName)) continue;
+                var coilRaw = ReadFunc((ushort)entry.Address, 1, COILWRITEFUNCTIONCODE, slaveId);
+                if (coilRaw == null || coilRaw.Count == 0) continue;
+                propertyDataGroup[entry.ParamName] = coilRaw[0];
+            }
+
+            // FC01 线圈读取点按点位逐个读取（用于内部轮询/调试读取）
+            var coilReadCandidates = pointMapToUse.Where(p => p.FunctionCode == 1).ToArray();
+            foreach (var entry in coilReadCandidates)
+            {
+                if (entry == null || string.IsNullOrWhiteSpace(entry.ParamName)) continue;
+                var coilRaw = ReadFunc((ushort)entry.Address, 1, 1, slaveId);
+                if (coilRaw == null || coilRaw.Count == 0) continue;
+                propertyDataGroup[entry.ParamName] = coilRaw[0];
+            }
             return propertyDataGroup;
         }
 
@@ -186,6 +207,21 @@ namespace EssSimulator
                 if (pm == null || pm.Count() == 0) continue;
                 var functionCode = pm.First().FunctionCode;
                 var currentAddress = pm.First().Address;
+                if (functionCode == COILWRITEFUNCTIONCODE)
+                {
+                    // FC05: 写单线圈，初始化默认值只需要把 0/1 或 bool 写入 Coil 区。
+                    bool coilValue = item.Value switch
+                    {
+                        bool b => b,
+                        string s when bool.TryParse(s, out var bv) => bv,
+                        string s when int.TryParse(s, out var iv) => iv != 0,
+                        _ => Convert.ToDouble(item.Value) != 0
+                    };
+                    var coilBytes = new byte[] { (byte)(coilValue ? 1 : 0) };
+                    WriteFunc(slaveId, (ushort)currentAddress, coilBytes, coilBytes.Length, functionCode);
+                    continue;
+                }
+
                 string? typeofPoint = null;
                 if (pm.First().Type == "int32")
                 {
@@ -202,6 +238,10 @@ namespace EssSimulator
                 else if (pm.First().Type == "int16")
                 {
                     typeofPoint = "System.Int16";
+                }
+                else if (pm.First().Type == "bool")
+                {
+                    typeofPoint = "System.Boolean";
                 }
                 if (typeofPoint == null)
                 {
@@ -270,23 +310,19 @@ namespace EssSimulator
                 var modbusSlave = modbusSlaveNetwork?.GetSlave(slaveId);
                 if (functionCode == 1)
                 {
-                    bool[] values = new bool[data.Length];
-                    foreach (var item in data)
-                    {
-                        bool value = item == 1;
-                        values.Append(value);
-                    }
+                    // FC01: 写多线圈（用于内部写入或扩展场景）
+                    bool[] values = data.Select(item => item == 1).ToArray();
                     modbusSlave?.DataStore.CoilDiscretes.WritePoints(address, values);
                 }
                 else if (functionCode == 2)
                 {
-                    bool[] values = new bool[data.Length];
-                    foreach (var item in data)
-                    {
-                        bool value = item == 1;
-                        values.Append(value);
-                    }
-                    modbusSlave?.DataStore.CoilInputs.WritePoints(address, values);
+                    // 暂不支持 FC02（离散输入）外部读写（避免语义混乱）
+                    log.Warn($"FC02 write ignored. Device={deviceInfoDto.name}, address={address}, len={data?.Length ?? 0}");
+                }
+                else if (functionCode == COILWRITEFUNCTIONCODE)
+                {
+                    bool[] values = data.Select(item => item == 1).ToArray();
+                    modbusSlave?.DataStore.CoilDiscretes.WritePoints(address, values);
                 }
                 else if (functionCode == 3)
                 {
@@ -313,6 +349,30 @@ namespace EssSimulator
             // }
             if (modbusSlaveNetwork == null) throw new Exception("modbusMaster is null");
             var modbusSlave = modbusSlaveNetwork.GetSlave(slaveId);
+
+            if (functionCode == 1 || functionCode == COILWRITEFUNCTIONCODE)
+            {
+                var coilRet = new List<byte[]>();
+                ushort currentCoilAddress = address;
+                while (num > 0)
+                {
+                    ushort groupCount = Math.Min(num, (ushort)120);
+                    bool[] coilData = modbusSlave.DataStore.CoilDiscretes.ReadPoints(currentCoilAddress, groupCount);
+                    foreach (var bit in coilData)
+                    {
+                        coilRet.Add(new byte[] { (byte)(bit ? 1 : 0) });
+                    }
+                    currentCoilAddress += groupCount;
+                    num -= groupCount;
+                }
+                return coilRet;
+            }
+            if (functionCode == 2)
+            {
+                // 暂不支持 FC02（离散输入）读取
+                return new List<byte[]>();
+            }
+
             List<ushort> ushorts = new List<ushort>();
             ushort currentAddress = address;
 

@@ -57,7 +57,7 @@ namespace EssSimulator.Protocol.Modbus
                 }
 
                 ParamModelLookup[entry.ParamName!] = model;
-                if (string.IsNullOrWhiteSpace(model.ModelType) || entry.FunctionCode == 6) continue;
+                if (string.IsNullOrWhiteSpace(model.ModelType) || entry.FunctionCode is 5 or 6) continue;
 
                 if (!ModelParamLookup.TryGetValue(model.ModelType, out var list))
                     ModelParamLookup[model.ModelType] = list = new List<MapEntry>();
@@ -65,7 +65,7 @@ namespace EssSimulator.Protocol.Modbus
             }
 
             DataMaps.AddRange(entries.Where(m => m.FunctionCode is 3 or 4));
-            ControlMaps.AddRange(entries.Where(m => m.FunctionCode == 6));
+            ControlMaps.AddRange(entries.Where(m => m.FunctionCode is 5 or 6));
         }
 
         private void LoadRackMap(string mapFilePath, string serverName)
@@ -83,7 +83,7 @@ namespace EssSimulator.Protocol.Modbus
                 if (model == null) continue;
 
                 RackParamModelLookup[entry.ParamName!] = model;
-                if (string.IsNullOrWhiteSpace(model.ModelType) || entry.FunctionCode == 6) continue;
+                if (string.IsNullOrWhiteSpace(model.ModelType) || entry.FunctionCode is 5 or 6) continue;
 
                 if (!RackModelParamLookup.TryGetValue(model.ModelType, out var list))
                     RackModelParamLookup[model.ModelType] = list = new List<MapEntry>();
@@ -91,7 +91,7 @@ namespace EssSimulator.Protocol.Modbus
             }
 
             RackDataMaps.AddRange(entries.Where(m => m.FunctionCode is 3 or 4));
-            RackControlMaps.AddRange(entries.Where(m => m.FunctionCode == 6));
+            RackControlMaps.AddRange(entries.Where(m => m.FunctionCode is 5 or 6));
         }
 
         private static void ApplyDeviceIdSubstitution(MapEntry[] entries, string name, bool isEmu)

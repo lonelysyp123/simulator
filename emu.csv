@@ -73,7 +73,8 @@
 4,25633,u16,16,param52,1,单元2运行状态,model=4|arg1=emuDeviceId.PcsList[1].OperationStatus|arg2=|arg3=|arg4=1000
 4,25634,u16,16,param53,1,单元2当前告警,0
 4,25635,u16,16,param54,1,单元2当前故障,0
-6,100,u16,16,poweronoff,1,高压断路器开合,model=4|arg1=emuDeviceId.Emu.PowerOnOff|arg2=|arg3=|arg4=1000
+5,4,bool,1,highvoltagebreakeronoff,1,高压断路器开合,model=4|arg1=emuDeviceId.Emu.PowerOnOff|arg2=|arg3=|arg4=1000
+5,5,bool,1,lowvoltagebreakeronoff,1,低压断路器开合,0
 6,5300,int16,16,param55,10,单元1有功功率设置值,model=4|arg1=emuDeviceId.PcsList[0].PCSActivePowerSetting|arg2=|arg3=|arg4=1000
 6,5301,int16,16,param56,10,单元1无功设置值,model=4|arg1=emuDeviceId.PcsList[0].PCSReactivePowerSetting|arg2=|arg3=|arg4=1000
 6,5302,int16,16,param57,1000,单元1功率因数设置值,0

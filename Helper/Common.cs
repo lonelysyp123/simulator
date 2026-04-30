@@ -22,6 +22,15 @@ namespace EssSimulator
         public static object DataTranslation(byte[] data, int index, int size, string type)
         {
             object result = 0;
+            if (data == null || data.Length == 0)
+                throw new ArgumentException("Data cannot be null or empty.");
+
+            // FC05/FC01 这类线圈数据通常按 1 字节传入，直接按布尔解析。
+            if (type == "System.Boolean")
+            {
+                return data[0] != 0;
+            }
+
             if (size > ADDRESS_LENGTH && type != "System.String")
             {
                 if (data == null || data.Length < 4)
@@ -49,7 +58,10 @@ namespace EssSimulator
             }
             else
             {
-                int concatenatedValue = (data[1] << 8) | data[0];
+                // 对 16 位数据兼容 1 字节输入（高字节按 0 补齐）。
+                int lo = data[0];
+                int hi = data.Length > 1 ? data[1] : 0;
+                int concatenatedValue = (hi << 8) | lo;
                 result = concatenatedValue >> index & ((1 << size) - 1);
                 if (type == "System.Int16")
                 {

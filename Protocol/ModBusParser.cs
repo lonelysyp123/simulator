@@ -50,9 +50,23 @@ namespace EssSimulator
                 Type? type = Type.GetType(typeofPoint);
                 if (type == null) throw new Exception("type is error");
                 if (item.Value == null) throw new NullReferenceException("value is null");
-                double actualValue = double.Parse(item.Value.ToString()!);
-
-                value = Convert.ChangeType(actualValue, type);
+                if (typeofPoint == "System.Boolean")
+                {
+                    // 兼容 bool / "true|false" / "0|1" / 数值输入
+                    bool bv = item.Value switch
+                    {
+                        bool b => b,
+                        string s when bool.TryParse(s, out var b) => b,
+                        string s when int.TryParse(s, out var i) => i != 0,
+                        _ => Convert.ToDouble(item.Value) != 0
+                    };
+                    value = bv;
+                }
+                else
+                {
+                    double actualValue = double.Parse(item.Value.ToString()!);
+                    value = Convert.ChangeType(actualValue, type);
+                }
 
                 byte[] resultBytes = Common.DataUnTranslation(value, typeofPoint);
                 //GetBytes方法默认转换成小端序，低位在前，所以要反转

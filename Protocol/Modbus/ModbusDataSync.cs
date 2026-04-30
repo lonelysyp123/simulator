@@ -284,6 +284,14 @@ namespace EssSimulator.Protocol.Modbus
                 if (double.TryParse(s, out var dv))      valToSet = dv;
                 else if (bool.TryParse(s, out var bv))   valToSet = bv ? 1 : 0;
             }
+
+            // FC05 解析后通常为 bool，这里统一转成 0/1，兼容当前模型里 ushort/int 类型字段。
+            var ctlEntry = _map.ControlMaps.Find(e => e != null && e.ParamName == name);
+            if (ctlEntry?.FunctionCode == 5 && valToSet is bool boolVal)
+            {
+                valToSet = boolVal ? 1 : 0;
+            }
+
             _shadowControl[name] = valToSet;
             SimServer.SetExtIfVariableVal(model.Arg1!, valToSet);
         }
