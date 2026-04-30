@@ -230,6 +230,9 @@ namespace EssSimulator.EssDeviceSimModel
                 while (await timer.WaitForNextTickAsync(stoppingToken))
                 {
                     DateTime simTime = DateTime.Now;
+                    var priCurrent = Math.Abs(_mainTransformer.GetCurrentState().PrimaryCurrent);
+                    _breaker.Update(priCurrent);
+                    _loadSimulator.SetPowered(_breaker.IsClosed);
 
                     // 35kV PCC（母线）测点：主变二次侧电压（用于负载与并网反馈）
                     var pccLineVoltageV = _mainTransformer.GetCurrentState().SecondaryVoltage;
@@ -256,9 +259,6 @@ namespace EssSimulator.EssDeviceSimModel
                     double totalSecCurrent = Math.Abs(totalActiveKw) > 1e-6
                         ? (totalActiveKw >= 0 ? -totalSecCurrentMag : totalSecCurrentMag)
                         : totalSecCurrentMag;
-
-                    var priCurrent = Math.Abs(_mainTransformer.GetCurrentState().PrimaryCurrent);
-                    _breaker.Update(priCurrent);
 
                     if (_breaker.IsClosed)
                     {

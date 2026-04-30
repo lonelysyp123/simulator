@@ -350,6 +350,8 @@ namespace EssSimulator.Display
             double meterUca = SafeGetDouble("em.LineVoltageCA");
             double meterActive = SafeGetDouble("em.TotalActivePower");
             double meterReactive = SafeGetDouble("em.TotalReactivePower");
+            double meterPowerFactor = SafeGetDouble("em.PowerFactor");
+            double meterFrequency = SafeGetDouble("em.Frequency");
 
             var sb = new StringBuilder();
             sb.AppendLine();
@@ -359,7 +361,7 @@ namespace EssSimulator.Display
             sb.AppendLine($"        |   断路器: {(breakerClosed ? "合" : "分")}");
             sb.AppendLine("        |");
             sb.AppendLine($"        |              电表(一次侧) 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab/1000:0.0} / {meterUbc/1000:0.0} / {meterUca/1000:0.0} kV");
-            sb.AppendLine($"        |              有功功率: {meterActive:0.0} kW    无功功率: {meterReactive:0.0} kvar");
+            sb.AppendLine($"        |              有功功率: {meterActive:0.0} kW    无功功率: {meterReactive:0.0} kvar    功率因数: {meterPowerFactor:0.000}    频率: {meterFrequency:0.00} Hz");
             sb.AppendLine("        |");
             sb.AppendLine($"        |                           主变: 一次侧 {primaryVoltage / 1000:0.0} kV / {primaryCurrent:0.0} A    二次侧 {secondaryVoltage / 1000:0.0} kV / {secondaryCurrent:0.0} A");
             sb.AppendLine("        |");

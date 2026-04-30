@@ -21,6 +21,7 @@ namespace EssSimulator.EssDeviceSimModel
         // 方向约定：+ 表示向电网送电（放电），- 表示从电网取电（用电）
         public double ActivePower { get; set; }  // 当前有功(kW)
         public double ReactivePower { get; set; }    // 当前无功(kvar, 约定: 正=升压支撑, 负=降压作用)
+        private bool _isPowered = true; // 厂区是否带电（主断路器分闸时为 false）
 
         private List<LoadWindow> windows;
 
@@ -40,6 +41,14 @@ namespace EssSimulator.EssDeviceSimModel
         // 找到最后一个 Start <= 当前时刻的窗口，若无则取末条（前一天延续）
         private void UpdateCurrentLoad(DateTime simTime)
         {
+            // 厂区失电：所有负载停机，负载功率强制为 0
+            if (!_isPowered)
+            {
+                ActivePower = 0;
+                ReactivePower = 0;
+                return;
+            }
+
             if (isStoppedLoadWindows)
             {
                 return;
@@ -79,6 +88,16 @@ namespace EssSimulator.EssDeviceSimModel
             // 电流方向约定与 PCS 一致：正=从网侧取电，负=向网侧送电
             var currentMag = sKva * 1000.0 / (voltage * Math.Sqrt(3.0));
             return p >= 0 ? -currentMag : currentMag;
+        }
+
+        public void SetPowered(bool isPowered)
+        {
+            _isPowered = isPowered;
+            if (!isPowered)
+            {
+                ActivePower = 0;
+                ReactivePower = 0;
+            }
         }
 
         private bool isStoppedLoadWindows = false;
