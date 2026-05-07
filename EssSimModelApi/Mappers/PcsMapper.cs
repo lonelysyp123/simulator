@@ -69,6 +69,11 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 if (simIdx < 0 || simIdx >= ess._pcsList.Count) break;
                 var pcsSim  = ess._pcsList[simIdx];
 
+                // 启停：将 EMS 的开关机命令落到物理 PCS 模型运行模式
+                // - 关机：进入 Off，清零功率并停止爬坡
+                // - 开机：进入 Normal（是否能真正输出功率仍受电网可用/故障等逻辑约束）
+                pcsSim.TransitionToMode(pcsData.pcsOnOffSwitch ? OperationMode.Normal : OperationMode.Off);
+
                 if (Math.Abs(pcsData.PCSActivePowerSetting  - pcsSim.GetCurrentState().ActivePower)  > 0 ||
                     Math.Abs(pcsData.PCSReactivePowerSetting - pcsSim.GetCurrentState().ReactivePower) > 0)
                     pcsSim.SetPowerCommand(pcsData.PCSActivePowerSetting, pcsData.PCSReactivePowerSetting);

@@ -228,6 +228,9 @@ namespace EssSimulator.Protocol.Modbus
                         }
                     }
                     catch (Exception ex) { _log.Error("Control thread error", ex); }
+
+                    // 每轮轮询后休眠，避免控制线程在“无变化”时忙等占满 CPU，影响其它 Worker/GUI。
+                    Thread.Sleep(100);
                 }
             }) { IsBackground = true, Priority = ThreadPriority.BelowNormal };
             _controlThread.Start();
@@ -285,11 +288,28 @@ namespace EssSimulator.Protocol.Modbus
                 else if (bool.TryParse(s, out var bv))   valToSet = bv ? 1 : 0;
             }
 
-            // FC05 解析后通常为 bool，这里统一转成 0/1，兼容当前模型里 ushort/int 类型字段。
+            // FC05(线圈) 解析后通常为 bool，但写入目标属性可能是 bool 或数值(ushort/int)。
+            // 规则：如果目标当前值类型是 bool，则写 bool；否则写 0/1，兼容 PowerOnOff 等数值字段。
             var ctlEntry = _map.ControlMaps.Find(e => e != null && e.ParamName == name);
-            if (ctlEntry?.FunctionCode == 5 && valToSet is bool boolVal)
+            if (ctlEntry?.FunctionCode == 5 && valToSet is bool coilBool)
             {
-                valToSet = boolVal ? 1 : 0;
+                try
+                {
+                    var current = SimServer.GetExtIfVariableVal(model.Arg1!);
+                    if (current is bool)
+                    {
+                        valToSet = coilBool;
+                    }
+                    else
+                    {
+                        valToSet = coilBool ? 1 : 0;
+                    }
+                }
+                catch
+                {
+                    // 兜底：未知目标类型时按旧逻辑写 0/1（避免影响既有 ushort 线圈点）
+                    valToSet = coilBool ? 1 : 0;
+                }
             }
 
             _shadowControl[name] = valToSet;

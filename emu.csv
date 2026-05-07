@@ -78,8 +78,8 @@
 6,5300,int16,16,param55,10,单元1有功功率设置值,model=4|arg1=emuDeviceId.PcsList[0].PCSActivePowerSetting|arg2=|arg3=|arg4=1000
 6,5301,int16,16,param56,10,单元1无功设置值,model=4|arg1=emuDeviceId.PcsList[0].PCSReactivePowerSetting|arg2=|arg3=|arg4=1000
 6,5302,int16,16,param57,1000,单元1功率因数设置值,0
-6,5303,int16,16,param58,1,单元1启停,0
+5,5303,bool,1,pcs1_startstop,1,单元1PCS启停,model=4|arg1=emuDeviceId.PcsList[0].pcsOnOffSwitch|arg2=|arg3=|arg4=1000
 6,5600,int16,16,param59,10,单元2有功功率设置值,model=4|arg1=emuDeviceId.PcsList[1].PCSActivePowerSetting|arg2=|arg3=|arg4=1000
 6,5601,int16,16,param60,10,单元2无功设置值,model=4|arg1=emuDeviceId.PcsList[1].PCSReactivePowerSetting|arg2=|arg3=|arg4=1000
 6,5602,int16,16,param61,1000,单元2功率因数设置值,0
-6,5603,int16,16,param62,1,单元2启停,0
+5,5603,bool,1,pcs2_startstop,1,单元2PCS启停,model=4|arg1=emuDeviceId.PcsList[1].pcsOnOffSwitch|arg2=|arg3=|arg4=1000

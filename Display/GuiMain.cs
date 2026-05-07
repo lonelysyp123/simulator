@@ -88,6 +88,32 @@ namespace EssSimulator.Display
             catch { return fallback; }
         }
 
+        /// <summary>PCS 在接线图上的简短状态：Modbus/EMU 侧启停与有功设定 + 物理 PCS 运行模式。</summary>
+        private static string FormatPcsControlStatus(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
+        {
+            bool cmdOn = SafeGetBool($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].pcsOnOffSwitch");
+            double pSet = SafeGetDouble($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].PCSActivePowerSetting");
+            string modeLabel = "?";
+            try
+            {
+                var m = SimServer.GetExtIfVariableVal($"ess._pcsList[{essPcsListIndex}]._currentState.Mode");
+                if (m != null)
+                {
+                    var name = m.ToString() ?? "";
+                    modeLabel = name switch
+                    {
+                        "Off" => "停机",
+                        "Standby" => "待机",
+                        "Normal" => "正常",
+                        _ => name
+                    };
+                }
+            }
+            catch { /* ignore */ }
+
+            return $"启停:{(cmdOn ? "开" : "停")} P设定:{pSet:0}kW 仿真:{modeLabel}";
+        }
+
         private CommandProcessor BuildCommandProcessor()
         {
             var commands = new List<ICommand>
@@ -394,7 +420,8 @@ namespace EssSimulator.Display
                     double soc = 100 * SafeGetDouble($"ess._batteryRacks[{a}]._currentState.MinClusterSOC");
                     double vdc = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalVoltage");
                     double idc = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalCurrent");
-                    sb.AppendLine($"        |   PCS{a + 1}: P {pa:0.0} kW  Q {pr:0.0} kvar");
+                    var pcsCtl = FormatPcsControlStatus(u, 0, a);
+                    sb.AppendLine($"        |   PCS{a + 1}: {pcsCtl}  实际 P {pa:0.0} kW  Q {pr:0.0} kvar");
                     sb.AppendLine($"        |   舱{a + 1}:  SOC {soc:0.0}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
                 }
                 sb.AppendLine("        |");
@@ -405,7 +432,8 @@ namespace EssSimulator.Display
                     double soc = 100 * SafeGetDouble($"ess._batteryRacks[{b}]._currentState.MinClusterSOC");
                     double vdc = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalVoltage");
                     double idc = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalCurrent");
-                    sb.AppendLine($"        |   PCS{b + 1}: P {pa:0.0} kW  Q {pr:0.0} kvar");
+                    var pcsCtl = FormatPcsControlStatus(u, 1, b);
+                    sb.AppendLine($"        |   PCS{b + 1}: {pcsCtl}  实际 P {pa:0.0} kW  Q {pr:0.0} kvar");
                     sb.AppendLine($"        |   舱{b + 1}:  SOC {soc:0.0}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
                 }
 
@@ -506,8 +534,8 @@ namespace EssSimulator.Display
                             // 单元总览表（每行一个 UNIT，包含2路 PCS+2路 BMS）
                             var unitTable = new Table().Border(TableBorder.Rounded).Title("储能单元");
                             unitTable.AddColumn("UNIT");
-                            unitTable.AddColumn("PCS-A P/Q");
-                            unitTable.AddColumn("PCS-B P/Q");
+                            unitTable.AddColumn("PCS-A 启停/设定/模式 | P/Q");
+                            unitTable.AddColumn("PCS-B 启停/设定/模式 | P/Q");
                             unitTable.AddColumn("舱-A SOC/V/I");
                             unitTable.AddColumn("舱-B SOC/V/I");
 
@@ -521,7 +549,8 @@ namespace EssSimulator.Display
                                 {
                                     double pa = SafeGetDouble($"ess._pcsList[{a}]._currentState.ActivePower");
                                     double pr = SafeGetDouble($"ess._pcsList[{a}]._currentState.ReactivePower");
-                                    pcsA = $"PCS{a + 1} {pa:0.0}/{pr:0.0}";
+                                    var lineA = FormatPcsControlStatus(u, 0, a);
+                                    pcsA = $"{lineA} | {pa:0.0}/{pr:0.0}";
 
                                     double s = 100 * SafeGetDouble($"ess._batteryRacks[{a}]._currentState.MinClusterSOC");
                                     double v = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalVoltage");
@@ -532,7 +561,8 @@ namespace EssSimulator.Display
                                 {
                                     double pa = SafeGetDouble($"ess._pcsList[{b}]._currentState.ActivePower");
                                     double pr = SafeGetDouble($"ess._pcsList[{b}]._currentState.ReactivePower");
-                                    pcsB = $"PCS{b + 1} {pa:0.0}/{pr:0.0}";
+                                    var lineB = FormatPcsControlStatus(u, 1, b);
+                                    pcsB = $"{lineB} | {pa:0.0}/{pr:0.0}";
 
                                     double s = 100 * SafeGetDouble($"ess._batteryRacks[{b}]._currentState.MinClusterSOC");
                                     double v = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalVoltage");

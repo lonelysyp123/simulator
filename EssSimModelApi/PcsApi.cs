@@ -163,7 +163,8 @@ namespace EssSimulator.EssSimModelApi
                 public bool ChargeProhibited { get; set; }         // 禁止充电
                 public bool DischargeProhibited { get; set; }       // 禁止放电
 
-                public bool pcsOnOffSwitch { get; set; }               // 开关机
+                /// <summary>PCS 开关机（EMS/Modbus 可写）。默认 true，便于仿真启动后即可功率调度；写 false 为停机。</summary>
+                public bool pcsOnOffSwitch { get; set; } = true;
 
                 public bool gridOnOffSwitch { get; set; }           //并离网控制及状态
 

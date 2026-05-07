@@ -534,24 +534,18 @@ namespace EssSimulator.EssDeviceSimModel
                 _currentState.FaultType = isBmsFault;
             }
 
+            // 运行模式 Off/Normal/Standby 由 TransitionToMode（EMS 启停、电网拓扑等）驱动。
+            // 此处仅在“必须故障停机”时调用 TransitionToMode(Off)，禁止在无故障时每步强制 Normal，
+            // 否则会覆盖 ApplyEmuCommands 的停机指令，造成界面在「停机/正常」间来回跳。
             if (_currentState.FaultType != 0)
             {
-                // 如果isBmsFault为3，则直接进入故障状态，如果为1，则需要判断当前充放电状态，如果正在充电则进入故障状态，否则继续运行，如果为2，则需要判断当前充放电状态，如果正在放电则进入故障状态，否则继续运行
                 // 正放负充约定：充电故障(1)阻止 ActivePower<0，放电故障(2)阻止 ActivePower>0
                 if (_currentState.FaultType == 3 ||
                     (_currentState.FaultType == 1 && _currentState.ActivePower < 0) ||
                     (_currentState.FaultType == 2 && _currentState.ActivePower > 0))
                 {
-                    _currentState.Mode = OperationMode.Off;
+                    TransitionToMode(OperationMode.Off);
                 }
-                else
-                {
-                    _currentState.Mode = OperationMode.Normal;
-                }
-            }
-            else
-            {
-                _currentState.Mode = OperationMode.Normal;
             }
 
             // 设计约束：无功目标由 EMS 主控下发，PCS 不在本地自动改写无功设定值。

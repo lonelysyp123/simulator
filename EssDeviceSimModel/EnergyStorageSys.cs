@@ -317,16 +317,12 @@ namespace EssSimulator.EssDeviceSimModel
                             _unitTransformers[u].Update(bus35kV, unitSecCurrent, unitPf, unitS, unitQ, simTime);
                             var lv690 = _unitTransformers[u].GetCurrentState().SecondaryVoltage;
 
+                            // 仅更新电网侧电压/频率/可用性；运行模式 Off/Normal 由 EMS（emu.PcsList[].pcsOnOffSwitch）
+                            // 经 PcsMapper.ApplyEmuCommands 统一驱动，此处不再每帧强制 Normal，否则会与“停机”命令来回打架。
                             if (a < _pcsList.Count)
-                            {
                                 _pcsList[a].UpdateGridState(lv690, _pcsCfg.FrequencyNominal, true);
-                                _pcsList[a].TransitionToMode(OperationMode.Normal);
-                            }
                             if (b < _pcsList.Count)
-                            {
                                 _pcsList[b].UpdateGridState(lv690, _pcsCfg.FrequencyNominal, true);
-                                _pcsList[b].TransitionToMode(OperationMode.Normal);
-                            }
                         }
                     }
                     else
