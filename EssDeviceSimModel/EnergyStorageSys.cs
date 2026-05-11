@@ -127,7 +127,10 @@ namespace EssSimulator.EssDeviceSimModel
                     gridLossCoefficient: pcsCfg.GridLossCoefficient,
                     slope: rampCfg.Slope,
                     intervalMs: rampCfg.IntervalMs,
-                    delayMs: rampCfg.DelayMs));
+                    delayMs: rampCfg.DelayMs,
+                    islandVfSlewRatePercentPerSecond: pcsCfg.IslandVfSlewRatePercentPerSecond,
+                    islandVoltageStepFaultThresholdPercent: pcsCfg.IslandVoltageStepFaultThresholdPercent,
+                    islandVoltageGridConflictThresholdPercent: pcsCfg.IslandVoltageGridConflictThresholdPercent));
             }
 
             _batteryRacks = racks;

@@ -158,6 +158,15 @@ namespace EssSimulator.Configuration
         public double MaxCurrent { get; set; } = 1588;
         /// <summary>线损相关系数（用于并网电压折算）</summary>
         public double GridLossCoefficient { get; set; } = 0.01;
+
+        /// <summary>离网 V/f：内部有效电压百分比向 EMS 设定值爬坡的最大速率（%/秒，仿真时间）。</summary>
+        public double IslandVfSlewRatePercentPerSecond { get; set; } = 20;
+
+        /// <summary>EMS 单次写入「孤岛电压百分比」若相对上次爬升超过该阈值（百分点），视为异常阶跃，置故障（急降不判）。</summary>
+        public double IslandVoltageStepFaultThresholdPercent { get; set; } = 25;
+
+        /// <summary>并网且网侧可用时，若仍保持该阈值以上的孤岛电压百分比设定，视为异常（VF 指令与并网冲突）。</summary>
+        public double IslandVoltageGridConflictThresholdPercent { get; set; } = 5;
     }
 
     /// <summary>变压器参数配置（对应 appsettings.json: Transformer 节）</summary>

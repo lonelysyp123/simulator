@@ -83,6 +83,12 @@ namespace EssSimulator.EssDeviceSimModel
         public double TotalDischargeEnergy { get; set; } // 累计放电能量(kWh)
 
         public DateTime Timestamp { get; set; }         // 状态时间戳
+
+        /// <summary>EMS 下发的孤岛电压百分比设定（0–100），用于黑启动 / 离网建压目标。</summary>
+        public double IslandVoltagePercentCommand { get; set; }
+
+        /// <summary>PCS 内部跟随后的有效百分比（0–100），用于遥测反馈。</summary>
+        public double IslandVoltagePercentEffective { get; set; }
     }
 
     // 电网状态
@@ -114,6 +120,16 @@ namespace EssSimulator.EssDeviceSimModel
         private RampCurve _activeRampCurve = RampCurve.Linear;
         private RampCurve _reactiveRampCurve = RampCurve.Linear;
         private readonly double _gridLossCoefficient; // 电网损耗系数，用于简化计算
+
+        private readonly object _islandVfLock = new();
+        private double _islandVfCommandPercent;
+        private double _islandVfEffectivePercent;
+        private double _lastIslandVfCommandPercent = -1;
+        private readonly double _islandVfSlewRatePercentPerSecond;
+        private readonly double _islandVoltageStepFaultThresholdPercent;
+        private readonly double _islandVoltageGridConflictThresholdPercent;
+        /// <summary>0=无 1=设定阶跃过大 2=并网时 VF 百分比冲突</summary>
+        private int _islandVoltageFaultCode;
         /// <summary>
         /// 仿真时间加速倍率。爬坡线程的真实 Sleep 时长 = 配置值 / Speedup，
         /// 使 PCS 爬坡速率在仿真时间轴上与主循环的 SimStep 保持一致。
@@ -133,12 +149,18 @@ namespace EssSimulator.EssDeviceSimModel
             double gridLossCoefficient = 0.01,
             double slope = 1,
             int intervalMs = 100,
-            int delayMs = 0)
+            int delayMs = 0,
+            double islandVfSlewRatePercentPerSecond = 20,
+            double islandVoltageStepFaultThresholdPercent = 25,
+            double islandVoltageGridConflictThresholdPercent = 5)
         {
             _config = config;
             _speedup = speedup > 0 ? speedup : 1.0;
             _ambientTemperature = ambientTemp;
             _gridLossCoefficient = Math.Clamp(gridLossCoefficient, 0, 0.95);
+            _islandVfSlewRatePercentPerSecond = Math.Max(0.1, islandVfSlewRatePercentPerSecond);
+            _islandVoltageStepFaultThresholdPercent = Math.Max(1, islandVoltageStepFaultThresholdPercent);
+            _islandVoltageGridConflictThresholdPercent = Math.Max(0, islandVoltageGridConflictThresholdPercent);
             _slope = slope;
             _interval = Math.Max(1, intervalMs);
             _delay = Math.Max(0, delayMs);
@@ -166,6 +188,9 @@ namespace EssSimulator.EssDeviceSimModel
         // 获取当前状态（返回内部引用，调用方只应读取，不应直接赋值属性）
         public PcsState GetCurrentState() => _currentState;
 
+        /// <summary>网侧是否视为带电可用（单元高压分闸或主网失电时为 false）。与 EMS 启停配合时用于避免与主循环 Standby 对打。</summary>
+        public bool IsGridElectricallyAvailable => _gridState.IsAvailable;
+
         /// <summary>
         /// 计算网侧有功功率（kW）。
         /// 约定：正值表示向电网送电，负值表示从电网取电。
@@ -177,6 +202,48 @@ namespace EssSimulator.EssDeviceSimModel
             var p = _currentState.ActivePower;
             var lineEfficiency = 1.0 - _gridLossCoefficient;
             return p >= 0 ? p * lineEfficiency : p / lineEfficiency;
+        }
+
+        /// <summary>EMS/Modbus 写入「孤岛电压百分比」设定（0–100），并检测单次阶跃过大等异常。</summary>
+        public void ApplyIslandVoltagePercentCommand(double percent)
+        {
+            percent = Math.Clamp(percent, 0, 100);
+            lock (_islandVfLock)
+            {
+                if (percent < 0.5 && _islandVoltageFaultCode != 0)
+                    _islandVoltageFaultCode = 0;
+
+                // 仅对「单次爬升过大」判故障（急降视为正常急停）；首次写入不判。
+                if (_lastIslandVfCommandPercent >= 0 &&
+                    percent - _lastIslandVfCommandPercent > _islandVoltageStepFaultThresholdPercent)
+                    _islandVoltageFaultCode = 1;
+
+                _lastIslandVfCommandPercent = percent;
+                _islandVfCommandPercent = percent;
+                _currentState.IslandVoltagePercentCommand = percent;
+            }
+        }
+
+        private void SlewIslandVoltagePercentTowardCommand(TimeSpan timeStep)
+        {
+            lock (_islandVfLock)
+            {
+                if (_currentState.Mode is OperationMode.Off or OperationMode.Standby)
+                    _islandVfEffectivePercent = 0;
+                else
+                {
+                    double maxStep = _islandVfSlewRatePercentPerSecond * timeStep.TotalSeconds;
+                    double target = _islandVfCommandPercent;
+                    double eff = _islandVfEffectivePercent;
+                    if (Math.Abs(target - eff) <= maxStep)
+                        _islandVfEffectivePercent = target;
+                    else
+                        _islandVfEffectivePercent = eff + Math.Sign(target - eff) * maxStep;
+                }
+
+                _currentState.IslandVoltagePercentCommand = _islandVfCommandPercent;
+                _currentState.IslandVoltagePercentEffective = _islandVfEffectivePercent;
+            }
         }
 
         // 更新电网状态
@@ -527,6 +594,8 @@ namespace EssSimulator.EssDeviceSimModel
             _currentState.Timestamp = timeStamp;
             _currentState.DcVoltage = dcVoltage;
 
+            SlewIslandVoltagePercentTowardCommand(timeStep);
+
             // 1. 检查故障条件
             CheckFaultConditions();
             if (_currentState.FaultType != 3)
@@ -629,7 +698,8 @@ namespace EssSimulator.EssDeviceSimModel
             double apparentPower = Math.Sqrt(
                 Math.Pow(gridSideActivePower, 2) +
                 Math.Pow(_currentState.ReactivePower, 2));
-            double acCurrentMag = apparentPower * 1000 / (_currentState.AcVoltage * Math.Sqrt(3));
+            double denomUg = Math.Max(_currentState.AcVoltage, 10.0);
+            double acCurrentMag = apparentPower * 1000 / (denomUg * Math.Sqrt(3));
             _currentState.AcCurrent = gridSideActivePower >= 0 ? -acCurrentMag : acCurrentMag;
         }
 
@@ -641,15 +711,17 @@ namespace EssSimulator.EssDeviceSimModel
                 : _currentState.ActivePower * _config.Efficiency;
             _currentState.DcCurrent = dcPower * 1000 / _currentState.DcVoltage;
 
-            // 交流侧参数 (作为电压源)
-            _currentState.AcVoltage = _config.AcVoltageNominal;
+            // 交流侧参数：V/f 幅值 = 额定 × 有效孤岛电压百分比（黑启动/离网建压）
+            double vMag = _config.AcVoltageNominal * (_currentState.IslandVoltagePercentEffective / 100.0);
+            _currentState.AcVoltage = Math.Max(vMag, 1.0);
             _currentState.Frequency = _config.FrequencyNominal;
 
             // 计算交流电流（带符号，正=放电，负=充电）
             double apparentPower = Math.Sqrt(
                 Math.Pow(_currentState.ActivePower, 2) +
                 Math.Pow(_currentState.ReactivePower, 2));
-            double acCurrentMag = apparentPower * 1000 / (_currentState.AcVoltage * Math.Sqrt(3));
+            double denomU = Math.Max(_currentState.AcVoltage, 10.0);
+            double acCurrentMag = apparentPower * 1000 / (denomU * Math.Sqrt(3));
             _currentState.AcCurrent = _currentState.ActivePower >= 0 ? acCurrentMag : -acCurrentMag;
         }
 
@@ -697,6 +769,27 @@ namespace EssSimulator.EssDeviceSimModel
             {
                 _currentState.FaultType = 3;
                 _currentState.FaultMessage += "Islanding detected; ";
+            }
+
+            double islandCmd;
+            int islandFaultCode;
+            lock (_islandVfLock)
+            {
+                islandCmd = _islandVfCommandPercent;
+                islandFaultCode = _islandVoltageFaultCode;
+            }
+
+            if (islandFaultCode == 1)
+            {
+                _currentState.FaultType = 3;
+                _currentState.FaultMessage += "Island voltage percent setpoint step too large; ";
+            }
+
+            if (_currentState.GMode == GridMode.GridConnected && _gridState.IsAvailable &&
+                islandCmd > _islandVoltageGridConflictThresholdPercent)
+            {
+                _currentState.FaultType = 3;
+                _currentState.FaultMessage += "Island voltage percent conflict while grid-connected; ";
             }
         }
     }

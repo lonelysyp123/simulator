@@ -36,6 +36,8 @@ namespace EssSimulator.EssSimModelApi.Mappers
             dst.TotalDischargeEnergy = (float)src.TotalDischargeEnergy;
             dst.DailyChargeEnergy    = (float)src.DailyChargeEnergy;
             dst.DailyDischargeEnergy = (float)src.DailyDischargeEnergy;
+
+            dst.IslandVoltagePercentFeedback = (float)src.IslandVoltagePercentEffective;
         }
 
         /// <summary>更新 EMU 汇总数据（运行状态、SOC 等）。</summary>
@@ -69,10 +71,27 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 if (simIdx < 0 || simIdx >= ess._pcsList.Count) break;
                 var pcsSim  = ess._pcsList[simIdx];
 
-                // 启停：将 EMS 的开关机命令落到物理 PCS 模型运行模式
-                // - 关机：进入 Off，清零功率并停止爬坡
-                // - 开机：进入 Normal（是否能真正输出功率仍受电网可用/故障等逻辑约束）
-                pcsSim.TransitionToMode(pcsData.pcsOnOffSwitch ? OperationMode.Normal : OperationMode.Off);
+                // 启停 + 网侧可用性：与 EnergyStorageSystem 一致，避免「单元高压分闸 → ESS 置 Standby」
+                // 与「每 100ms ApplyEmuCommands 因 pcsOnOffSwitch=true 又置 Normal」周期性打架。
+                // 离网建压：网侧不可用时若下发孤岛电压百分比 > 0，仍进入 Normal，由 PCS 离网 V/f 维持端电压。
+                if (!pcsData.pcsOnOffSwitch)
+                {
+                    pcsSim.ApplyIslandVoltagePercentCommand(0);
+                    pcsSim.TransitionToMode(OperationMode.Off);
+                }
+                else
+                {
+                    pcsSim.ApplyIslandVoltagePercentCommand(pcsData.IslandVoltagePercentSetting);
+                    if (!pcsSim.IsGridElectricallyAvailable)
+                    {
+                        if (pcsData.IslandVoltagePercentSetting > 0)
+                            pcsSim.TransitionToMode(OperationMode.Normal);
+                        else
+                            pcsSim.TransitionToMode(OperationMode.Standby);
+                    }
+                    else
+                        pcsSim.TransitionToMode(OperationMode.Normal);
+                }
 
                 if (Math.Abs(pcsData.PCSActivePowerSetting  - pcsSim.GetCurrentState().ActivePower)  > 0 ||
                     Math.Abs(pcsData.PCSReactivePowerSetting - pcsSim.GetCurrentState().ReactivePower) > 0)

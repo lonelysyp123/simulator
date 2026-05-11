@@ -166,6 +166,12 @@ namespace EssSimulator.EssSimModelApi
                 /// <summary>PCS 开关机（EMS/Modbus 可写）。默认 true，便于仿真启动后即可功率调度；写 false 为停机。</summary>
                 public bool pcsOnOffSwitch { get; set; } = true;
 
+                /// <summary>孤岛电压百分比设定（0–100），离网建压/黑启动由 EMS 调节；网侧无电且大于 0 时允许 PCS 进入 Normal 跑 V/f。</summary>
+                public ushort IslandVoltagePercentSetting { get; set; }
+
+                /// <summary>PCS 内部有效百分比反馈（0–100），可与设定不一致（受爬坡速率限制）。</summary>
+                public float IslandVoltagePercentFeedback { get; set; }
+
                 public bool gridOnOffSwitch { get; set; }           //并离网控制及状态
 
                 // 状态
