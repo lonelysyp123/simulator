@@ -135,6 +135,17 @@ namespace EssSimulator.EssSimModelApi
             return SetSimplePropertyValue(currentObj, lastSegment, value);
         }
 
+        private static bool ToBool(object value)
+        {
+            return value switch
+            {
+                bool b => b,
+                string s when bool.TryParse(s, out var bv) => bv,
+                string s when int.TryParse(s, out var iv) => iv != 0,
+                _ => Convert.ToDouble(value) != 0
+            };
+        }
+
         private static bool SetSimplePropertyValue(object target, string propName, object value)
         {
             var type = target.GetType();
@@ -157,6 +168,10 @@ namespace EssSimulator.EssSimModelApi
                 else if (underlyingType.IsEnum)
                 {
                     prop.SetValue(target, Enum.Parse(underlyingType, value.ToString()));
+                }
+                else if (underlyingType == typeof(bool))
+                {
+                    prop.SetValue(target, ToBool(value));
                 }
                 else
                 {

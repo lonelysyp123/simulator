@@ -219,6 +219,7 @@ namespace EssSimulator
                 .Build();
 
             var simCfg = host.Services.GetRequiredService<IOptions<SimulatorConfig>>().Value;
+            BlackStartSafety.Register(host.Services.GetRequiredService<IHostApplicationLifetime>());
 
             // 先启动 Host（后台服务会创建并启动 Modbus 从站等）
             await host.StartAsync();

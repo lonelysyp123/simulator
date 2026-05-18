@@ -89,6 +89,9 @@ namespace EssSimulator.EssDeviceSimModel
 
         /// <summary>PCS 内部跟随后的有效百分比（0–100），用于遥测反馈。</summary>
         public double IslandVoltagePercentEffective { get; set; }
+
+        /// <summary>黑启动模式是否激活（与 EMS 黑启动开启点位一致）。</summary>
+        public bool BlackStartEnabled { get; set; }
     }
 
     // 电网状态
@@ -130,6 +133,12 @@ namespace EssSimulator.EssDeviceSimModel
         private readonly double _islandVoltageGridConflictThresholdPercent;
         /// <summary>0=无 1=设定阶跃过大 2=并网时 VF 百分比冲突</summary>
         private int _islandVoltageFaultCode;
+        private bool _blackStartEnabled;
+        private readonly double _blackStartActivePowerGainKwPerPercent;
+        private readonly double _blackStartMaxActivePowerKw;
+        private readonly double _blackStartMagnetizingPowerFraction;
+        private bool _externalRunCommand;
+        private bool _externalRunRisingEdge;
         /// <summary>
         /// 仿真时间加速倍率。爬坡线程的真实 Sleep 时长 = 配置值 / Speedup，
         /// 使 PCS 爬坡速率在仿真时间轴上与主循环的 SimStep 保持一致。
@@ -152,7 +161,10 @@ namespace EssSimulator.EssDeviceSimModel
             int delayMs = 0,
             double islandVfSlewRatePercentPerSecond = 20,
             double islandVoltageStepFaultThresholdPercent = 25,
-            double islandVoltageGridConflictThresholdPercent = 5)
+            double islandVoltageGridConflictThresholdPercent = 5,
+            double blackStartActivePowerGainKwPerPercent = 15,
+            double blackStartMaxActivePowerKw = 200,
+            double blackStartMagnetizingPowerFraction = 0.02)
         {
             _config = config;
             _speedup = speedup > 0 ? speedup : 1.0;
@@ -161,12 +173,15 @@ namespace EssSimulator.EssDeviceSimModel
             _islandVfSlewRatePercentPerSecond = Math.Max(0.1, islandVfSlewRatePercentPerSecond);
             _islandVoltageStepFaultThresholdPercent = Math.Max(1, islandVoltageStepFaultThresholdPercent);
             _islandVoltageGridConflictThresholdPercent = Math.Max(0, islandVoltageGridConflictThresholdPercent);
+            _blackStartActivePowerGainKwPerPercent = Math.Max(0, blackStartActivePowerGainKwPerPercent);
+            _blackStartMaxActivePowerKw = Math.Max(0, blackStartMaxActivePowerKw);
+            _blackStartMagnetizingPowerFraction = Math.Clamp(blackStartMagnetizingPowerFraction, 0, 0.2);
             _slope = slope;
             _interval = Math.Max(1, intervalMs);
             _delay = Math.Max(0, delayMs);
             _currentState = new PcsState
             {
-                Mode = OperationMode.Standby,
+                Mode = OperationMode.Off,
                 Temperature = ambientTemp,
                 Timestamp = DateTime.Now
             };
@@ -190,6 +205,29 @@ namespace EssSimulator.EssDeviceSimModel
 
         /// <summary>网侧是否视为带电可用（单元高压分闸或主网失电时为 false）。与 EMS 启停配合时用于避免与主循环 Standby 对打。</summary>
         public bool IsGridElectricallyAvailable => _gridState.IsAvailable;
+
+        /// <summary>外部启停命令（Modbus pcsOnOffSwitch）。运行模式仅在外部写 1（0→1 边沿）或已非停机时可进入 Normal/Standby。</summary>
+        public bool IsExternalRunCommand => _externalRunCommand;
+
+        /// <summary>本周期是否检测到外部启停 0→1 边沿（每周期在 SyncExternalRunCommand 后读取一次）。</summary>
+        public bool ExternalRunRisingEdge => _externalRunRisingEdge;
+
+        /// <summary>
+        /// 同步 EMS/Modbus 启停位。停机仅由外部写 0、联锁或故障触发；禁止网侧恢复后自动离开 Off。
+        /// </summary>
+        public void SyncExternalRunCommand(bool run)
+        {
+            _externalRunRisingEdge = run && !_externalRunCommand;
+            if (!run)
+            {
+                ApplyIslandVoltagePercentCommand(0);
+                ApplyBlackStartEnabled(false);
+                if (_currentState.Mode != OperationMode.Off)
+                    TransitionToMode(OperationMode.Off);
+            }
+
+            _externalRunCommand = run;
+        }
 
         /// <summary>
         /// 计算网侧有功功率（kW）。
@@ -222,6 +260,61 @@ namespace EssSimulator.EssDeviceSimModel
                 _islandVfCommandPercent = percent;
                 _currentState.IslandVoltagePercentCommand = percent;
             }
+        }
+
+        /// <summary>EMS 写入黑启动开启；开启后由 PCS 内环根据孤岛电压百分比调节有功，忽略外部 P/Q 设定。</summary>
+        public void ApplyBlackStartEnabled(bool enabled)
+        {
+            _blackStartEnabled = enabled;
+            _currentState.BlackStartEnabled = enabled;
+            if (!enabled)
+                return;
+
+            lock (_setpointLock)
+            {
+                _rampStopRequested = true;
+                _pendingActiveSetpoint = 0;
+                _pendingReactiveSetpoint = 0;
+            }
+        }
+
+        public bool IsBlackStartActive =>
+            _blackStartEnabled &&
+            _currentState.Mode == OperationMode.Normal &&
+            _currentState.GMode == GridMode.Islanded;
+
+        /// <summary>黑启动内环：按孤岛电压百分比目标与有效值之差调节有功；无功由 V/f 固定为 0。</summary>
+        private void ApplyBlackStartPowerControl(TimeSpan timeStep)
+        {
+            if (!IsBlackStartActive)
+                return;
+
+            double cmd;
+            double eff;
+            lock (_islandVfLock)
+            {
+                cmd = _islandVfCommandPercent;
+                eff = _islandVfEffectivePercent;
+            }
+
+            double gapPercent = Math.Max(0, cmd - eff);
+            double targetP = _blackStartActivePowerGainKwPerPercent * gapPercent;
+            if (eff > 0.5)
+                targetP += _config.RatedPower * _blackStartMagnetizingPowerFraction * (eff / 100.0);
+            targetP = Math.Clamp(targetP, 0, _blackStartMaxActivePowerKw);
+
+            double maxStep = _blackStartMaxActivePowerKw * timeStep.TotalSeconds;
+            if (maxStep < 1.0)
+                maxStep = 1.0;
+            double currentP = _currentState.ActivePower;
+            if (targetP > currentP + maxStep)
+                _currentState.ActivePower = currentP + maxStep;
+            else if (targetP < currentP - maxStep)
+                _currentState.ActivePower = targetP < 0 ? 0 : targetP;
+            else
+                _currentState.ActivePower = targetP;
+
+            _currentState.ReactivePower = 0;
         }
 
         private void SlewIslandVoltagePercentTowardCommand(TimeSpan timeStep)
@@ -263,8 +356,8 @@ namespace EssSimulator.EssDeviceSimModel
                 TransitionToGMode(GridMode.GridConnected);
             }
 
-            // 电网不可用时：立即清零功率设定并停止爬坡线程，避免“孤网仍输出功率”的不一致
-            if (!isAvailable)
+            // 电网不可用且非黑启动：清零功率；黑启动由 ApplyBlackStartPowerControl 内环调节
+            if (!isAvailable && !_blackStartEnabled)
             {
                 StopRampsAndZeroPower();
             }
@@ -317,6 +410,10 @@ namespace EssSimulator.EssDeviceSimModel
                 //throw new InvalidOperationException(
                 //    $"Power command exceeds PCS capacity: {apparentPower}kVA > {_config.RatedPower * 1.1}kVA");
             }
+
+            // 黑启动开启：EMS 有功/无功设定无效
+            if (IsBlackStartActive)
+                return;
 
             // 仅记录设定值，由后台线程分阶段逼近
             // 电网不可用或非 Normal 时不接收功率指令（保持 0）
@@ -595,6 +692,7 @@ namespace EssSimulator.EssDeviceSimModel
             _currentState.DcVoltage = dcVoltage;
 
             SlewIslandVoltagePercentTowardCommand(timeStep);
+            ApplyBlackStartPowerControl(timeStep);
 
             // 1. 检查故障条件
             CheckFaultConditions();
@@ -790,6 +888,12 @@ namespace EssSimulator.EssDeviceSimModel
             {
                 _currentState.FaultType = 3;
                 _currentState.FaultMessage += "Island voltage percent conflict while grid-connected; ";
+            }
+
+            if (_blackStartEnabled && _gridState.IsAvailable)
+            {
+                _currentState.FaultType = 3;
+                _currentState.FaultMessage += "Black start enabled while grid is available; ";
             }
         }
     }

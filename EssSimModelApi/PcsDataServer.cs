@@ -48,12 +48,19 @@ namespace EssSimulator.EssSimModelApi
         {
             var store = SimulatorHost.Instance;
             EnergyStorageSystem? ess = null;
+            var startupBlackStartChecked = false;
 
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
                 ess ??= store.Get<EnergyStorageSystem>("ess");
                 if (ess == null) continue;
+
+                if (!startupBlackStartChecked)
+                {
+                    startupBlackStartChecked = true;
+                    BlackStartSafety.ValidateAll(ess, "系统初始化");
+                }
 
                 for (int u = 0; u < _unitCount; u++)
                 {

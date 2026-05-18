@@ -130,7 +130,10 @@ namespace EssSimulator.EssDeviceSimModel
                     delayMs: rampCfg.DelayMs,
                     islandVfSlewRatePercentPerSecond: pcsCfg.IslandVfSlewRatePercentPerSecond,
                     islandVoltageStepFaultThresholdPercent: pcsCfg.IslandVoltageStepFaultThresholdPercent,
-                    islandVoltageGridConflictThresholdPercent: pcsCfg.IslandVoltageGridConflictThresholdPercent));
+                    islandVoltageGridConflictThresholdPercent: pcsCfg.IslandVoltageGridConflictThresholdPercent,
+                    blackStartActivePowerGainKwPerPercent: pcsCfg.BlackStartActivePowerGainKwPerPercent,
+                    blackStartMaxActivePowerKw: pcsCfg.BlackStartMaxActivePowerKw,
+                    blackStartMagnetizingPowerFraction: pcsCfg.BlackStartMagnetizingPowerFraction));
             }
 
             _batteryRacks = racks;
@@ -294,12 +297,14 @@ namespace EssSimulator.EssDeviceSimModel
                                 if (a < _pcsList.Count)
                                 {
                                     _pcsList[a].UpdateGridState(0, 0, false);
-                                    _pcsList[a].TransitionToMode(OperationMode.Standby);
+                                    _pcsList[a].ApplyBlackStartEnabled(false);
+                                    _pcsList[a].TransitionToMode(OperationMode.Off);
                                 }
                                 if (b < _pcsList.Count)
                                 {
                                     _pcsList[b].UpdateGridState(0, 0, false);
-                                    _pcsList[b].TransitionToMode(OperationMode.Standby);
+                                    _pcsList[b].ApplyBlackStartEnabled(false);
+                                    _pcsList[b].TransitionToMode(OperationMode.Off);
                                 }
                                 continue;
                             }
@@ -350,7 +355,8 @@ namespace EssSimulator.EssDeviceSimModel
                         foreach (var pcs in _pcsList)
                         {
                             pcs.UpdateGridState(0, 0, false);
-                            pcs.TransitionToMode(OperationMode.Standby);
+                            pcs.ApplyBlackStartEnabled(false);
+                            pcs.TransitionToMode(OperationMode.Off);
                         }
                     }
 

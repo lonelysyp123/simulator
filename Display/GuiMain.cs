@@ -88,7 +88,7 @@ namespace EssSimulator.Display
             catch { return fallback; }
         }
 
-        /// <summary>PCS 在接线图上的简短状态：Modbus/EMU 侧启停与有功设定 + 物理 PCS 运行模式。</summary>
+        /// <summary>PCS 在接线图上的简短状态：Modbus/EMU 侧启停与有功设定 + 物理运行相位（停机/待机/充电/放电等）。</summary>
         private static string FormatPcsControlStatus(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
         {
             bool cmdOn = SafeGetBool($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].pcsOnOffSwitch");
@@ -97,17 +97,12 @@ namespace EssSimulator.Display
             try
             {
                 var m = SimServer.GetExtIfVariableVal($"ess._pcsList[{essPcsListIndex}]._currentState.Mode");
-                if (m != null)
-                {
-                    var name = m.ToString() ?? "";
-                    modeLabel = name switch
-                    {
-                        "Off" => "停机",
-                        "Standby" => "待机",
-                        "Normal" => "正常",
-                        _ => name
-                    };
-                }
+                double pAct = SafeGetDouble($"ess._pcsList[{essPcsListIndex}]._currentState.ActivePower");
+                bool blackStart = SafeGetBool($"ess._pcsList[{essPcsListIndex}]._currentState.BlackStartEnabled");
+                ushort fault = (ushort)SafeGetDouble($"ess._pcsList[{essPcsListIndex}]._currentState.FaultType");
+                if (m != null && Enum.TryParse<EssSimulator.EssDeviceSimModel.OperationMode>(m.ToString(), out var mode))
+                    modeLabel = EssSimulator.EssDeviceSimModel.PcsDisplayLabels.GetRunPhaseLabel(
+                        mode, pAct, blackStart, fault);
             }
             catch { /* ignore */ }
 

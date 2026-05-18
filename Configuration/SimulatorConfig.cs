@@ -167,6 +167,15 @@ namespace EssSimulator.Configuration
 
         /// <summary>并网且网侧可用时，若仍保持该阈值以上的孤岛电压百分比设定，视为异常（VF 指令与并网冲突）。</summary>
         public double IslandVoltageGridConflictThresholdPercent { get; set; } = 5;
+
+        /// <summary>黑启动：电压百分比设定与有效值每差 1% 对应的有功调节量（kW，正放）。</summary>
+        public double BlackStartActivePowerGainKwPerPercent { get; set; } = 15;
+
+        /// <summary>黑启动自动有功上限（kW）。</summary>
+        public double BlackStartMaxActivePowerKw { get; set; } = 200;
+
+        /// <summary>建压过程中按有效电压百分比附加的励磁有功（占额定功率比例，0–1）。</summary>
+        public double BlackStartMagnetizingPowerFraction { get; set; } = 0.02;
     }
 
     /// <summary>变压器参数配置（对应 appsettings.json: Transformer 节）</summary>

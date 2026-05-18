@@ -1,3 +1,5 @@
+using EssSimulator;
+using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem.EnergyManagementSystem;
@@ -13,6 +15,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
         /// <summary>将一路 PCS 物理状态同步到 PcsData DTO。</summary>
         public static void MapPcsState(PcsState src, PcsData dst, BatteryRackSimulator bms)
         {
+            dst.SimulatorMode = src.Mode;
             dst.LineVoltageAB = (float)src.AcVoltage;
             dst.LineVoltageBC = (float)src.AcVoltage;
             dst.LineVoltageCA = (float)src.AcVoltage;
@@ -38,6 +41,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
             dst.DailyDischargeEnergy = (float)src.DailyDischargeEnergy;
 
             dst.IslandVoltagePercentFeedback = (float)src.IslandVoltagePercentEffective;
+            dst.BlackStartEnabled = src.BlackStartEnabled;
         }
 
         /// <summary>更新 EMU 汇总数据（运行状态、SOC 等）。</summary>
@@ -49,14 +53,34 @@ namespace EssSimulator.EssSimModelApi.Mappers
             if (batteryRacks.Count > 0 && batteryRacks[0].GetRackState() != null)
                 emu.Emu.AverageBatterySoc = (float)batteryRacks[0].GetRackState().MinClusterSOC * 100;
 
-            // 运行状态判断（正放负充：ActivePower>0为放电，<0为充电）
+            // 运行状态判断（正放负充：ActivePower>10kW为放电，<-10kW为充电）
             bool anyDischarge = false, anyCharge = false;
             foreach (var pcs in emu.PcsList)
             {
-                if (pcs.ActivePower > 10)  anyDischarge = true;
-                if (pcs.ActivePower < -10) anyCharge   = true;
+                if (pcs.SimulatorMode == OperationMode.Off)
+                    continue;
+                if (pcs.ActivePower > PcsDisplayLabels.ActivePowerThresholdKw)  anyDischarge = true;
+                if (pcs.ActivePower < -PcsDisplayLabels.ActivePowerThresholdKw) anyCharge   = true;
             }
             emu.Emu.OperationStatus = anyDischarge ? 4 : (anyCharge ? 3 : 2);
+        }
+
+        /// <summary>
+        /// 联锁/外部停机后，将启停命令位清 0 并回写 Modbus，便于外部再次写 1 触发变位。
+        /// 不在「外部刚写 1 等待启动」时调用，否则会立刻把 Modbus 写回 0，表现为 mbpoll 成功但界面无反应。
+        /// </summary>
+        private static void ClearPcsStartStopCommand(int simIdx, PcsData pcsData)
+        {
+            if (!pcsData.pcsOnOffSwitch)
+                return;
+
+            pcsData.pcsOnOffSwitch = false;
+
+            int unitIndex0 = simIdx / 2;
+            int slotInUnit = simIdx % 2;
+            string paramName = slotInUnit == 0 ? "pcs1_startstop" : "pcs2_startstop";
+            var modbus = SimulatorHost.Instance.Get<ModbusSimServer>($"simEmu{unitIndex0 + 1}");
+            modbus?.PublishControlToSlave(paramName, false);
         }
 
         /// <summary>将 EMU 控制命令回写到 ESS 物理模型。</summary>
@@ -71,32 +95,67 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 if (simIdx < 0 || simIdx >= ess._pcsList.Count) break;
                 var pcsSim  = ess._pcsList[simIdx];
 
-                // 启停 + 网侧可用性：与 EnergyStorageSystem 一致，避免「单元高压分闸 → ESS 置 Standby」
-                // 与「每 100ms ApplyEmuCommands 因 pcsOnOffSwitch=true 又置 Normal」周期性打架。
-                // 离网建压：网侧不可用时若下发孤岛电压百分比 > 0，仍进入 Normal，由 PCS 离网 V/f 维持端电压。
-                if (!pcsData.pcsOnOffSwitch)
+                bool cmdOn = pcsData.pcsOnOffSwitch;
+                pcsSim.SyncExternalRunCommand(cmdOn);
+
+                bool mainBreakerClosed = ess._breaker.IsClosed;
+                int unitIndex = simIdx / 2;
+                bool unitBreakerClosed = unitIndex < ess._unitBreakers.Count &&
+                                         ess._unitBreakers[unitIndex].IsClosed;
+
+                if (!cmdOn)
+                    continue;
+
+                if (!mainBreakerClosed || !unitBreakerClosed)
                 {
                     pcsSim.ApplyIslandVoltagePercentCommand(0);
+                    pcsSim.ApplyBlackStartEnabled(false);
+                    pcsData.BlackStartEnabled = false;
                     pcsSim.TransitionToMode(OperationMode.Off);
-                }
-                else
-                {
-                    pcsSim.ApplyIslandVoltagePercentCommand(pcsData.IslandVoltagePercentSetting);
-                    if (!pcsSim.IsGridElectricallyAvailable)
-                    {
-                        if (pcsData.IslandVoltagePercentSetting > 0)
-                            pcsSim.TransitionToMode(OperationMode.Normal);
-                        else
-                            pcsSim.TransitionToMode(OperationMode.Standby);
-                    }
-                    else
-                        pcsSim.TransitionToMode(OperationMode.Normal);
+                    ClearPcsStartStopCommand(simIdx, pcsData);
+                    continue;
                 }
 
-                if (Math.Abs(pcsData.PCSActivePowerSetting  - pcsSim.GetCurrentState().ActivePower)  > 0 ||
-                    Math.Abs(pcsData.PCSReactivePowerSetting - pcsSim.GetCurrentState().ReactivePower) > 0)
-                    pcsSim.SetPowerCommand(pcsData.PCSActivePowerSetting, pcsData.PCSReactivePowerSetting);
+                // 外部启停为 1 且联锁满足时持续尝试进入运行（避免 0→1 边沿仅一周期未建压后永久停在 Off）
+                ApplyOperationalMode(pcsData, pcsSim, ess, simIdx);
+
+                if (pcsData.pcsOnOffSwitch && !pcsData.BlackStartEnabled)
+                {
+                    if (Math.Abs(pcsData.PCSActivePowerSetting  - pcsSim.GetCurrentState().ActivePower)  > 0 ||
+                        Math.Abs(pcsData.PCSReactivePowerSetting - pcsSim.GetCurrentState().ReactivePower) > 0)
+                        pcsSim.SetPowerCommand(pcsData.PCSActivePowerSetting, pcsData.PCSReactivePowerSetting);
+                }
             }
+        }
+
+        private static void ApplyOperationalMode(
+            PcsData pcsData,
+            PCSSimulator pcsSim,
+            EnergyStorageSystem ess,
+            int simIdx)
+        {
+            pcsSim.ApplyIslandVoltagePercentCommand(pcsData.IslandVoltagePercentSetting);
+
+            if (pcsData.BlackStartEnabled &&
+                !BlackStartSafety.TryEnableBlackStart(ess, simIdx, true))
+            {
+                pcsData.BlackStartEnabled = false;
+                pcsSim.ApplyBlackStartEnabled(false);
+                pcsSim.TransitionToMode(OperationMode.Off);
+                return;
+            }
+
+            pcsSim.ApplyBlackStartEnabled(pcsData.BlackStartEnabled);
+
+            if (!pcsSim.IsGridElectricallyAvailable)
+            {
+                if (pcsData.BlackStartEnabled || pcsData.IslandVoltagePercentSetting > 0)
+                    pcsSim.TransitionToMode(OperationMode.Normal);
+                else
+                    pcsSim.TransitionToMode(OperationMode.Standby);
+            }
+            else
+                pcsSim.TransitionToMode(OperationMode.Normal);
         }
     }
 }

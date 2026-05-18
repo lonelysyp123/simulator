@@ -2,7 +2,12 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using EssSimulator.Core;
+using EssSimulator.EssDeviceSimModel;
+using EssSimulator.EssSimModelApi.EnergyManagementSystem.EnergyManagementSystem;
+using EssSimulator.EssSimModelApi.Mappers;
 using log4net;
+using static EssSimulator.EssDeviceSimModel.EnergyStorageSystem;
 
 namespace EssSimulator.Protocol.Modbus
 {
@@ -288,32 +293,69 @@ namespace EssSimulator.Protocol.Modbus
                 else if (bool.TryParse(s, out var bv))   valToSet = bv ? 1 : 0;
             }
 
-            // FC05(线圈) 解析后通常为 bool，但写入目标属性可能是 bool 或数值(ushort/int)。
-            // 规则：如果目标当前值类型是 bool，则写 bool；否则写 0/1，兼容 PowerOnOff 等数值字段。
-            var ctlEntry = _map.ControlMaps.Find(e => e != null && e.ParamName == name);
-            if (ctlEntry?.FunctionCode == 5 && valToSet is bool coilBool)
-            {
-                try
-                {
-                    var current = SimServer.GetExtIfVariableVal(model.Arg1!);
-                    if (current is bool)
-                    {
-                        valToSet = coilBool;
-                    }
-                    else
-                    {
-                        valToSet = coilBool ? 1 : 0;
-                    }
-                }
-                catch
-                {
-                    // 兜底：未知目标类型时按旧逻辑写 0/1（避免影响既有 ushort 线圈点）
-                    valToSet = coilBool ? 1 : 0;
-                }
-            }
+            valToSet = CoerceControlValueForTarget(model.Arg1!, valToSet, name);
 
             _shadowControl[name] = valToSet;
-            SimServer.SetExtIfVariableVal(model.Arg1!, valToSet);
+            if (!SimServer.SetExtIfVariableVal(model.Arg1!, valToSet))
+            {
+                _log.Warn($"SetExtIfVariableVal failed: {model.Arg1} <= {valToSet}");
+                return;
+            }
+
+            if (name is "pcs1_startstop" or "pcs2_startstop")
+                TryApplyPcsCommandsImmediately();
+        }
+
+        /// <summary>线圈/寄存器写入目标属性时做类型对齐（避免 int 1 无法写入 bool 导致 Modbus 已为 1 但 emu 仍为 false）。</summary>
+        private object CoerceControlValueForTarget(string argPath, object valToSet, string paramName)
+        {
+            var ctlEntry = _map.ControlMaps.Find(e => e != null && e.ParamName == paramName);
+            bool isCoil = ctlEntry?.FunctionCode == 5;
+
+            bool coilBool = valToSet switch
+            {
+                bool b => b,
+                string s when bool.TryParse(s, out var bv) => bv,
+                _ => Convert.ToDouble(valToSet) != 0
+            };
+
+            if (!isCoil)
+                return valToSet;
+
+            try
+            {
+                var current = SimServer.GetExtIfVariableVal(argPath);
+                if (current is bool)
+                    return coilBool;
+            }
+            catch { /* ignore */ }
+
+            return coilBool ? 1 : 0;
+        }
+
+        /// <summary>启停点位变化后立即驱动 PCS，不等待 PcsDataServer 下一周期。</summary>
+        private void TryApplyPcsCommandsImmediately()
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_deviceInfo.name) ||
+                    !_deviceInfo.name.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                if (!int.TryParse(_deviceInfo.name.AsSpan(6), out int unit1Based) || unit1Based < 1)
+                    return;
+
+                int unit0 = unit1Based - 1;
+                var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
+                var emu = SimulatorHost.Instance.Get<EnergyManagementData>($"emu{unit1Based}");
+                if (ess == null || emu == null) return;
+
+                PcsMapper.ApplyEmuCommands(emu, ess, unit0 * 2);
+            }
+            catch (Exception ex)
+            {
+                _log.Warn("TryApplyPcsCommandsImmediately failed.", ex);
+            }
         }
 
         public object? GetDataObjectByMesurePointName(string name, IModbusSlave slave, ModbusParser parser)
@@ -333,6 +375,26 @@ namespace EssSimulator.Protocol.Modbus
         {
             if (string.IsNullOrWhiteSpace(name)) return;
             _shadowData.TryRemove(name, out _);
+        }
+
+        /// <summary>
+        /// 将控制量（线圈/寄存器）从模型回写到 Modbus 从站，并同步控制 shadow，便于外部工具读到与仿真一致的状态。
+        /// </summary>
+        public void PublishControlToSlave(string name, object value)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            SetDataObjectByMesurePointName(name, value);
+            _shadowControl[name] = value;
+
+            try
+            {
+                _slave.Write(new Dictionary<string, object> { { name, value } });
+            }
+            catch (Exception ex)
+            {
+                _log.Warn($"PublishControlToSlave failed for {name}: {ex.Message}");
+            }
         }
     }
 }

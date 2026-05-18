@@ -92,11 +92,18 @@ namespace EssSimulator
 
         // ── 外部调用接口（保持与旧版相同签名）──────────────────────
 
-        /// <summary>所有数据点列表（FunctionCode 3/4），供外部查点名使用。</summary>
+        /// <summary>数据点列表（FunctionCode 3/4），供外部查点名使用。</summary>
         public IReadOnlyList<MapEntry> DataMaps => _pointMap.DataMaps;
+
+        /// <summary>控制点列表（FunctionCode 5/6），如 pcs1_startstop。</summary>
+        public IReadOnlyList<MapEntry> ControlMaps => _pointMap.ControlMaps;
 
         public void SetDataObjectByMesurePointName(string name, object value)
             => _dataSync.SetDataObjectByMesurePointName(name, value);
+
+        /// <summary>模型控制量回写 Modbus（如联锁停机后清启停线圈）。</summary>
+        public void PublishControlToSlave(string name, object value)
+            => _dataSync.PublishControlToSlave(name, value);
 
         public void SetDataStoreByMesurePointName(string name, object value)
         {

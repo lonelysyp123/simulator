@@ -18,11 +18,14 @@ namespace EssSimulator.EssDeviceSimModel
     /// </summary>
     public class ScheduledLoadSimulator
     {
+        private const double ActivePowerFluctuationKw = 0.1;
+
         // 方向约定：+ 表示向电网送电（放电），- 表示从电网取电（用电）
         public double ActivePower { get; set; }  // 当前有功(kW)
         public double ReactivePower { get; set; }    // 当前无功(kvar, 约定: 正=升压支撑, 负=降压作用)
         private bool _isPowered = true; // 厂区是否带电（主断路器分闸时为 false）
 
+        private readonly Random _random = new Random();
         private List<LoadWindow> windows;
 
         public ScheduledLoadSimulator(List<LoadWindow> window)
@@ -68,7 +71,10 @@ namespace EssSimulator.EssDeviceSimModel
                     break; // 第一个 Start 大于当前时刻，停
                 }
             }
-            ActivePower = active.ActivePowerPlan;
+            var planP = active.ActivePowerPlan;
+            ActivePower = planP == 0
+                ? 0
+                : planP + (_random.NextDouble() * 2.0 - 1.0) * ActivePowerFluctuationKw;
             ReactivePower = active.ReactivePowerPlan;
         }
 

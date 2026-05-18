@@ -147,7 +147,9 @@ namespace EssSimulator.Display
                 return false;
             }
 
-            if (!simServer.DataMaps.Any(m => m.ParamName == dpcDeviceDataPoint))
+            bool isControlPoint = simServer.ControlMaps.Any(m => m.ParamName == dpcDeviceDataPoint);
+            bool isDataPoint    = simServer.DataMaps.Any(m => m.ParamName == dpcDeviceDataPoint);
+            if (!isControlPoint && !isDataPoint)
             {
                 message = "指定设备找不到对应数据点";
                 return false;
@@ -161,8 +163,19 @@ namespace EssSimulator.Display
                     return false;
                 }
 
-                simServer.SetDataStoreByMesurePointName(dpcDeviceDataPoint, opdata);
-                message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {dpcDeviceName}.{dpcDeviceDataPoint} 设置值为 {opdata} (若 ModelSim 不为 0 将在下一个轮询周期被覆盖)";
+                if (isControlPoint)
+                {
+                    object val = opdata;
+                    if (bool.TryParse(opdata, out var bv)) val = bv;
+                    else if (int.TryParse(opdata, out var iv)) val = iv;
+                    simServer.SetDataObjectByMesurePointName(dpcDeviceDataPoint, val);
+                    message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {dpcDeviceName}.{dpcDeviceDataPoint} 控制点设置为 {val}";
+                }
+                else
+                {
+                    simServer.SetDataStoreByMesurePointName(dpcDeviceDataPoint, opdata);
+                    message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {dpcDeviceName}.{dpcDeviceDataPoint} 设置值为 {opdata} (若 ModelSim 不为 0 将在下一个轮询周期被覆盖)";
+                }
                 return true;
             }
 

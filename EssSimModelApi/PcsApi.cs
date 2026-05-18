@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using EssSimulator.EssDeviceSimModel;
 
 namespace EssSimulator.EssSimModelApi
 {
@@ -163,14 +164,20 @@ namespace EssSimulator.EssSimModelApi
                 public bool ChargeProhibited { get; set; }         // 禁止充电
                 public bool DischargeProhibited { get; set; }       // 禁止放电
 
-                /// <summary>PCS 开关机（EMS/Modbus 可写）。默认 true，便于仿真启动后即可功率调度；写 false 为停机。</summary>
-                public bool pcsOnOffSwitch { get; set; } = true;
+                /// <summary>PCS 开关机（EMS/Modbus 可写）。默认 false，仅外部写 1 后允许进入运行；写 0 为停机。</summary>
+                public bool pcsOnOffSwitch { get; set; } = false;
+
+                /// <summary>物理仿真模式（由 MapPcsState 同步），用于 OperationStatus 与界面展示。</summary>
+                public OperationMode SimulatorMode { get; set; }
 
                 /// <summary>孤岛电压百分比设定（0–100），离网建压/黑启动由 EMS 调节；网侧无电且大于 0 时允许 PCS 进入 Normal 跑 V/f。</summary>
                 public ushort IslandVoltagePercentSetting { get; set; }
 
                 /// <summary>PCS 内部有效百分比反馈（0–100），可与设定不一致（受爬坡速率限制）。</summary>
                 public float IslandVoltagePercentFeedback { get; set; }
+
+                /// <summary>黑启动开启：EMS 有功/无功设定无效，PCS 按孤岛电压百分比内环自动调节有功（V/f 建压）。</summary>
+                public bool BlackStartEnabled { get; set; }
 
                 public bool gridOnOffSwitch { get; set; }           //并离网控制及状态
 
@@ -179,36 +186,15 @@ namespace EssSimulator.EssSimModelApi
                 { 
                     get
                     {
-                        // 0-停机，1-待机，2-故障，3-充电，4-放电，5-充电降额，6-放电降额
-                        if (AlarmSummary1 != 0 || AlarmSummary2 != 0 || AlarmSummary3 != 0)
-                        {
-                            return 2; // 故障
-                        }
-                        if (!pcsOnOffSwitch)
-                        {
-                            return 0; // 停机
-                        }
-                        if (ActivePower == 0)
-                        {
-                            return 1; // 待机
-                        }
-                        if (ActivePower > 0)
-                        {
-                            // if (ActivePower < ChargePowerLimit)
-                            // {
-                            //     return 5; // 充电降额
-                            // }
-                            return 3; // 充电
-                        }
-                        if (ActivePower < 0)
-                        {
-                            // if (-ActivePower < DischargePowerLimit)
-                            // {
-                            //     return 6; // 放电降额
-                            // }
-                            return 4; // 放电
-                        }
-                        return 0; // 待机
+                        // 0-停机，1-待机，2-故障，3-充电，4-放电（正放负充）
+                        bool hasAlarm = AlarmSummary1 != 0 || AlarmSummary2 != 0 || AlarmSummary3 != 0;
+                        return PcsDisplayLabels.ToOperationStatusCode(
+                            SimulatorMode,
+                            pcsOnOffSwitch,
+                            ActivePower,
+                            BlackStartEnabled,
+                            0,
+                            hasAlarm);
                     } 
                 }   // 运行状态
                 public float PCSActivePowerSetting { get; set; }    //有功率设置
