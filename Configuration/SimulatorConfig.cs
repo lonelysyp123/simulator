@@ -183,6 +183,12 @@ namespace EssSimulator.Configuration
         /// <summary>并网点无功-电压影响系数（1.0=按阻抗标称影响）</summary>
         public double ReactiveVoltageInfluenceCoefficient { get; set; } = 1.0;
         public double NoLoadCurrentPercent { get; set; } = 2;
+
+        public bool MagnetizingInrushEnabled { get; set; } = true;
+        public double MagnetizingInrushDvDtThresholdPuPerSec { get; set; } = 0.8;
+        public double MagnetizingInrushPeakExtraMultipleOfRatedPrimary { get; set; } = 4.0;
+        public double MagnetizingInrushDecayTimeConstantSec { get; set; } = 0.45;
+        public double MagnetizingInrushMaxExtraMultipleOfRatedPrimary { get; set; } = 12.0;
     }
 
     /// <summary>单元升压一体机变压器参数（对应 appsettings.json: UnitTransformer 节，35kV/690V）</summary>
@@ -198,6 +204,12 @@ namespace EssSimulator.Configuration
         public double ImpedancePercent { get; set; } = 4;
         public double ReactiveVoltageInfluenceCoefficient { get; set; } = 1.0;
         public double NoLoadCurrentPercent { get; set; } = 2;
+
+        public bool MagnetizingInrushEnabled { get; set; } = true;
+        public double MagnetizingInrushDvDtThresholdPuPerSec { get; set; } = 0.8;
+        public double MagnetizingInrushPeakExtraMultipleOfRatedPrimary { get; set; } = 4.0;
+        public double MagnetizingInrushDecayTimeConstantSec { get; set; } = 0.45;
+        public double MagnetizingInrushMaxExtraMultipleOfRatedPrimary { get; set; } = 12.0;
     }
 
     /// <summary>负载仿真配置（对应 appsettings.json: Load 节）</summary>

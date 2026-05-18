@@ -158,7 +158,12 @@ namespace EssSimulator.EssDeviceSimModel
                 LoadLoss              = transCfg.LoadLoss,
                 ImpedancePercent      = transCfg.ImpedancePercent,
                 ReactiveVoltageInfluenceCoefficient = transCfg.ReactiveVoltageInfluenceCoefficient,
-                NoLoadCurrentPercent  = transCfg.NoLoadCurrentPercent
+                NoLoadCurrentPercent  = transCfg.NoLoadCurrentPercent,
+                MagnetizingInrushEnabled = transCfg.MagnetizingInrushEnabled,
+                MagnetizingInrushDvDtThresholdPuPerSec = transCfg.MagnetizingInrushDvDtThresholdPuPerSec,
+                MagnetizingInrushPeakExtraMultipleOfRatedPrimary = transCfg.MagnetizingInrushPeakExtraMultipleOfRatedPrimary,
+                MagnetizingInrushDecayTimeConstantSec = transCfg.MagnetizingInrushDecayTimeConstantSec,
+                MagnetizingInrushMaxExtraMultipleOfRatedPrimary = transCfg.MagnetizingInrushMaxExtraMultipleOfRatedPrimary
             };
             _mainTransformer = new TransformerSimulator(mainSpecs);
 
@@ -173,7 +178,12 @@ namespace EssSimulator.EssDeviceSimModel
                 LoadLoss              = unitTransCfg.LoadLoss,
                 ImpedancePercent      = unitTransCfg.ImpedancePercent,
                 ReactiveVoltageInfluenceCoefficient = unitTransCfg.ReactiveVoltageInfluenceCoefficient,
-                NoLoadCurrentPercent  = unitTransCfg.NoLoadCurrentPercent
+                NoLoadCurrentPercent  = unitTransCfg.NoLoadCurrentPercent,
+                MagnetizingInrushEnabled = unitTransCfg.MagnetizingInrushEnabled,
+                MagnetizingInrushDvDtThresholdPuPerSec = unitTransCfg.MagnetizingInrushDvDtThresholdPuPerSec,
+                MagnetizingInrushPeakExtraMultipleOfRatedPrimary = unitTransCfg.MagnetizingInrushPeakExtraMultipleOfRatedPrimary,
+                MagnetizingInrushDecayTimeConstantSec = unitTransCfg.MagnetizingInrushDecayTimeConstantSec,
+                MagnetizingInrushMaxExtraMultipleOfRatedPrimary = unitTransCfg.MagnetizingInrushMaxExtraMultipleOfRatedPrimary
             };
             for (int u = 0; u < unitCount; u++)
             {
@@ -267,7 +277,7 @@ namespace EssSimulator.EssDeviceSimModel
                     {
                         inputVoltage = (int)_transCfg.PrimaryVoltage;
                         // 主变：220kV -> 35kV 母线
-                        _mainTransformer.Update(inputVoltage, totalSecCurrent, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime);
+                        _mainTransformer.Update(inputVoltage, totalSecCurrent, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime, _simStep);
                         var bus35kV = _mainTransformer.GetCurrentState().SecondaryVoltage;
 
                         // 单元变：35kV -> 690V（每个 Unit 1 台，带两路 PCS）
@@ -280,7 +290,7 @@ namespace EssSimulator.EssDeviceSimModel
                             bool unitClosed = u < _unitBreakers.Count && _unitBreakers[u].IsClosed;
                             if (!unitClosed)
                             {
-                                _unitTransformers[u].Update(0, 0, 1.0, 0, 0, simTime);
+                                _unitTransformers[u].Update(0, 0, 1.0, 0, 0, simTime, _simStep);
                                 if (a < _pcsList.Count)
                                 {
                                     _pcsList[a].UpdateGridState(0, 0, false);
@@ -317,7 +327,7 @@ namespace EssSimulator.EssDeviceSimModel
                                 ? (unitP >= 0 ? -unitSecCurrentMag : unitSecCurrentMag)
                                 : unitSecCurrentMag;
 
-                            _unitTransformers[u].Update(bus35kV, unitSecCurrent, unitPf, unitS, unitQ, simTime);
+                            _unitTransformers[u].Update(bus35kV, unitSecCurrent, unitPf, unitS, unitQ, simTime, _simStep);
                             var lv690 = _unitTransformers[u].GetCurrentState().SecondaryVoltage;
 
                             // 仅更新电网侧电压/频率/可用性；运行模式 Off/Normal 由 EMS（emu.PcsList[].pcsOnOffSwitch）
@@ -332,10 +342,10 @@ namespace EssSimulator.EssDeviceSimModel
                     {
                         inputVoltage    = 0;
                         totalSecCurrent = 0;
-                        _mainTransformer.Update(0, 0, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime);
+                        _mainTransformer.Update(0, 0, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime, _simStep);
                         foreach (var xf in _unitTransformers)
                         {
-                            xf.Update(0, 0, powerFactor, 0, 0, simTime);
+                            xf.Update(0, 0, powerFactor, 0, 0, simTime, _simStep);
                         }
                         foreach (var pcs in _pcsList)
                         {

@@ -24,6 +24,21 @@ namespace EssSimulator.EssDeviceSimModel
             public double NoLoadCurrentPercent { get; set; } // 空载电流百分比 (%)
             public double CoolingCoefficient { get; set; } = 0.01; // 冷却系数 (W/°C)
             public double ThermalTimeConstant { get; set; } = 180.0; // 热时间常数 (分钟)
+
+            /// <summary>一次电压快速抬升时是否叠加励磁涌流（近似：上升率触发 + 指数衰减，叠至无功励磁支路）。</summary>
+            public bool MagnetizingInrushEnabled { get; set; } = true;
+
+            /// <summary>一次电压标幺上升率超过该值（1/s，即每秒标幺变化）时开始注入涌流。</summary>
+            public double MagnetizingInrushDvDtThresholdPuPerSec { get; set; } = 0.8;
+
+            /// <summary>单次触发在额定一次线电流上叠加的涌流峰值倍数（经强度归一后乘到 I_rated_primary）。</summary>
+            public double MagnetizingInrushPeakExtraMultipleOfRatedPrimary { get; set; } = 4.0;
+
+            /// <summary>涌流附加电流指数衰减时间常数（秒，仿真时间）。</summary>
+            public double MagnetizingInrushDecayTimeConstantSec { get; set; } = 0.45;
+
+            /// <summary>涌流无功分量上限（相对一次额定线电流的倍数）。</summary>
+            public double MagnetizingInrushMaxExtraMultipleOfRatedPrimary { get; set; } = 12.0;
         }
 
         // 变压器运行状态
@@ -42,11 +57,17 @@ namespace EssSimulator.EssDeviceSimModel
             public double TotalLoss { get; set; }         // 总损耗 (W)
             public double PowerFactor { get; set; }        // 功率因数
             public DateTime Timestamp { get; set; }       // 状态时间
+
+            /// <summary>本步由「快速抬压励磁」模型叠加到一次无功支路的涌流分量（A，幅值）。</summary>
+            public double MagnetizingInrushCurrentPrimary { get; set; }
         }
 
         public TransformerSpecifications _specs { get; set; }
         public TransformerState _currentState { get; set; }
         private double _ambientTemperature;
+
+        private double _prevPrimaryVoltagePu = -1.0;
+        private double _inrushExtraPrimaryA;
 
         public TransformerSimulator(TransformerSpecifications specs, double ambientTemp = 25.0)
         {
@@ -64,13 +85,58 @@ namespace EssSimulator.EssDeviceSimModel
         public TransformerState GetCurrentState() => _currentState;
 
         // 更新变压器状态
-        public void Update(double primaryVoltage, double secondaryCurrent, double powerFactor, double totalApparentPowerKva, double totalReactivePowerKvar, DateTime timeStamp)
+        public void Update(
+            double primaryVoltage,
+            double secondaryCurrent,
+            double powerFactor,
+            double totalApparentPowerKva,
+            double totalReactivePowerKvar,
+            DateTime timeStamp,
+            TimeSpan simulationStep)
         {
             // 1. 更新基本参数
             _currentState.PrimaryVoltage = primaryVoltage;
             _currentState.SecondaryCurrent = secondaryCurrent;
             _currentState.PowerFactor = powerFactor;
             _currentState.Timestamp = timeStamp;
+
+            double dt = Math.Max(simulationStep.TotalSeconds, 1e-6);
+            double vN = _specs.PrimaryVoltage;
+            double vPuNow = vN > 1e-9 ? Math.Clamp(primaryVoltage / vN, 0.0, 1.5) : 0.0;
+
+            if (_specs.MagnetizingInrushEnabled)
+            {
+                double tau = Math.Max(0.05, _specs.MagnetizingInrushDecayTimeConstantSec);
+                _inrushExtraPrimaryA *= Math.Exp(-dt / tau);
+
+                if (_prevPrimaryVoltagePu >= 0.0)
+                {
+                    double dvPu = vPuNow - _prevPrimaryVoltagePu;
+                    if (dvPu > 1e-9)
+                    {
+                        double ratePuPerSec = dvPu / dt;
+                        double th = _specs.MagnetizingInrushDvDtThresholdPuPerSec;
+                        if (ratePuPerSec > th)
+                        {
+                            double iRatedPri = _specs.RatedPower * 1000 / (vN * Math.Sqrt(3));
+                            double denom = Math.Max(th * 4.0, 1e-9);
+                            double intensity = Math.Clamp((ratePuPerSec - th) / denom, 0.0, 1.0);
+                            double add = _specs.MagnetizingInrushPeakExtraMultipleOfRatedPrimary * iRatedPri * intensity;
+                            _inrushExtraPrimaryA += add;
+                            double iMax = _specs.MagnetizingInrushMaxExtraMultipleOfRatedPrimary * iRatedPri;
+                            if (_inrushExtraPrimaryA > iMax)
+                                _inrushExtraPrimaryA = iMax;
+                        }
+                    }
+                }
+
+                _prevPrimaryVoltagePu = vPuNow;
+            }
+            else
+            {
+                _inrushExtraPrimaryA = 0;
+                _prevPrimaryVoltagePu = vPuNow;
+            }
 
             // 2. 计算变比
             double turnsRatio = _specs.PrimaryVoltage / _specs.SecondaryVoltage;
@@ -115,7 +181,9 @@ namespace EssSimulator.EssDeviceSimModel
 
             // 折算到一次侧（线电流按变比折算）
             double i1W = i2W / turnsRatio;
-            double i1Q = i2Q / turnsRatio + noLoadCurrent; // 励磁电流近似纯无功滞后
+            double inrushQ = _specs.MagnetizingInrushEnabled ? _inrushExtraPrimaryA : 0.0;
+            _currentState.MagnetizingInrushCurrentPrimary = inrushQ;
+            double i1Q = i2Q / turnsRatio + noLoadCurrent + inrushQ; // 励磁 + 快速抬压涌流（无功支路）
 
             _currentState.PrimaryCurrent = Math.Sqrt(i1W * i1W + i1Q * i1Q);
             // 根据二次侧电流方向计算一次侧电流方向
@@ -192,7 +260,7 @@ namespace EssSimulator.EssDeviceSimModel
         //        // 功率因数在0.8-0.95之间波动
         //        double powerFactor = 0.875 + 0.075 * Math.Sin(i * Math.PI / 72);
 
-        //        transformer.Update(primaryVoltage, secondaryCurrent, powerFactor, TimeSpan.FromMinutes(5));
+        //        transformer.Update(primaryVoltage, secondaryCurrent, powerFactor, totalApparentPowerKva, totalReactivePowerKvar, DateTime.Now, TimeSpan.FromMinutes(5));
         //        PrintTransformerState(transformer, i + 1);
         //    }
         //}
