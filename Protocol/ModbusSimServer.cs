@@ -90,6 +90,25 @@ namespace EssSimulator
             _slave.DeviceDisconnect();
         }
 
+        /// <summary>Modbus TCP 监听是否处于活动状态（端口已绑定）。</summary>
+        public bool IsOnline => _slave.GetCommunicatorState();
+
+        /// <summary>
+        /// 开启或关闭对外 Modbus 连接：关闭时停止数据同步并释放 TCP 监听，外部客户端无法连接。
+        /// </summary>
+        public bool SetOnline(bool online, int maxRetries = 30)
+        {
+            if (online)
+            {
+                if (IsOnline) return true;
+                return Start(maxRetries);
+            }
+
+            if (!IsOnline) return true;
+            Stop();
+            return !IsOnline;
+        }
+
         // ── 外部调用接口（保持与旧版相同签名）──────────────────────
 
         /// <summary>数据点列表（FunctionCode 3/4），供外部查点名使用。</summary>

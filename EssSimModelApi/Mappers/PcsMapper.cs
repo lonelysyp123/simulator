@@ -106,7 +106,10 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 if (!cmdOn)
                     continue;
 
-                if (!mainBreakerClosed || !unitBreakerClosed)
+                bool breakersOpen = !mainBreakerClosed || !unitBreakerClosed;
+
+                // 黑启动：主断/单元高压分闸时仍允许离网建压（合闸+黑启动由 BlackStartSafety 禁止）
+                if (breakersOpen && !pcsData.BlackStartEnabled)
                 {
                     pcsSim.ApplyIslandVoltagePercentCommand(0);
                     pcsSim.ApplyBlackStartEnabled(false);
@@ -116,10 +119,10 @@ namespace EssSimulator.EssSimModelApi.Mappers
                     continue;
                 }
 
-                // 外部启停为 1 且联锁满足时持续尝试进入运行（避免 0→1 边沿仅一周期未建压后永久停在 Off）
+                // 外部启停为 1 时持续尝试进入运行（并网或黑启动离网）
                 ApplyOperationalMode(pcsData, pcsSim, ess, simIdx);
 
-                if (pcsData.pcsOnOffSwitch && !pcsData.BlackStartEnabled)
+                if (pcsData.pcsOnOffSwitch && !pcsData.BlackStartEnabled && !breakersOpen)
                 {
                     if (Math.Abs(pcsData.PCSActivePowerSetting  - pcsSim.GetCurrentState().ActivePower)  > 0 ||
                         Math.Abs(pcsData.PCSReactivePowerSetting - pcsSim.GetCurrentState().ReactivePower) > 0)

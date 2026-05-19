@@ -289,23 +289,15 @@ namespace EssSimulator.EssDeviceSimModel
                             int a = u * 2;
                             int b = u * 2 + 1;
 
-                            // 单元断路器断开：单元变不带电，PCS 侧视为离网不可用
+                            // 单元断路器断开：单元变不带电；黑启动时 PCS 仍可在 PCS 侧离网建压
                             bool unitClosed = u < _unitBreakers.Count && _unitBreakers[u].IsClosed;
                             if (!unitClosed)
                             {
                                 _unitTransformers[u].Update(0, 0, 1.0, 0, 0, simTime, _simStep);
                                 if (a < _pcsList.Count)
-                                {
-                                    _pcsList[a].UpdateGridState(0, 0, false);
-                                    _pcsList[a].ApplyBlackStartEnabled(false);
-                                    _pcsList[a].TransitionToMode(OperationMode.Off);
-                                }
+                                    ApplyPcsGridWhenUnitDeenergized(_pcsList[a]);
                                 if (b < _pcsList.Count)
-                                {
-                                    _pcsList[b].UpdateGridState(0, 0, false);
-                                    _pcsList[b].ApplyBlackStartEnabled(false);
-                                    _pcsList[b].TransitionToMode(OperationMode.Off);
-                                }
+                                    ApplyPcsGridWhenUnitDeenergized(_pcsList[b]);
                                 continue;
                             }
 
@@ -353,11 +345,7 @@ namespace EssSimulator.EssDeviceSimModel
                             xf.Update(0, 0, powerFactor, 0, 0, simTime, _simStep);
                         }
                         foreach (var pcs in _pcsList)
-                        {
-                            pcs.UpdateGridState(0, 0, false);
-                            pcs.ApplyBlackStartEnabled(false);
-                            pcs.TransitionToMode(OperationMode.Off);
-                        }
+                            ApplyPcsGridWhenUnitDeenergized(pcs);
                     }
 
                     Update(simTime, _simStep);
@@ -373,6 +361,22 @@ namespace EssSimulator.EssDeviceSimModel
                 _log.Fatal("[EnergyStorageSystem] 仿真主循环发生未处理异常，已停止", ex);
                 throw; // 重新抛出，让 Host 感知到服务崩溃
             }
+        }
+
+        /// <summary>
+        /// 单元/主网侧无电：非黑启动则停机；黑启动保留离网建压（网侧不可用，由 EMS 启停+黑启动驱动）。
+        /// </summary>
+        private void ApplyPcsGridWhenUnitDeenergized(PCSSimulator pcs)
+        {
+            if (pcs.GetCurrentState().BlackStartEnabled)
+            {
+                pcs.UpdateGridState(0, _pcsCfg.FrequencyNominal, false);
+                return;
+            }
+
+            pcs.UpdateGridState(0, 0, false);
+            pcs.ApplyBlackStartEnabled(false);
+            pcs.TransitionToMode(OperationMode.Off);
         }
 
         // 更新系统状态
