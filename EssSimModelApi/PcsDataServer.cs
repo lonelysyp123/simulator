@@ -17,13 +17,16 @@ namespace EssSimulator.EssSimModelApi
     {
         private readonly List<EnergyManagementData> _emuUnits = new();
         private readonly int _unitCount;
+        private readonly bool _autoStartPcsOnStartup;
 
         public PcsDataServer(
             IOptions<SimulatorConfig> simOpts,
             IOptions<PcsPhysicalConfig> pcsPhysicalOpts)
         {
+            var sim = simOpts.Value;
             var pcsPhy = pcsPhysicalOpts.Value;
-            _unitCount = Math.Max(1, simOpts.Value.Devices?.Count ?? 1);
+            _unitCount = Math.Max(1, sim.Devices?.Count ?? 1);
+            _autoStartPcsOnStartup = sim.Runtime.AutoStartPcsOnStartup;
 
             for (int u = 0; u < _unitCount; u++)
             {
@@ -49,6 +52,7 @@ namespace EssSimulator.EssSimModelApi
             var store = SimulatorHost.Instance;
             EnergyStorageSystem? ess = null;
             var startupBlackStartChecked = false;
+            var startupPcsStartPublished = false;
 
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
             while (await timer.WaitForNextTickAsync(stoppingToken))
@@ -60,6 +64,12 @@ namespace EssSimulator.EssSimModelApi
                 {
                     startupBlackStartChecked = true;
                     BlackStartSafety.ValidateAll(ess, "系统初始化");
+                }
+
+                if (_autoStartPcsOnStartup && !startupPcsStartPublished &&
+                    PcsMapper.TryPublishStartupPcsStartStop(ess, _unitCount))
+                {
+                    startupPcsStartPublished = true;
                 }
 
                 for (int u = 0; u < _unitCount; u++)

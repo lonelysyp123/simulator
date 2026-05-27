@@ -16,6 +16,9 @@ namespace EssSimulator.Configuration
 
         /// <summary>PCS 功率爬坡参数</summary>
         public PcsRampConfig PcsRamp { get; set; } = new();
+
+        /// <summary>协议与仿真就绪后，向各 PCS 启停线圈写入 1 并驱动并网（默认合闸工况）。</summary>
+        public bool AutoStartPcsOnStartup { get; set; } = true;
     }
 
     public class PcsRampConfig
@@ -159,23 +162,27 @@ namespace EssSimulator.Configuration
         /// <summary>线损相关系数（用于并网电压折算）</summary>
         public double GridLossCoefficient { get; set; } = 0.01;
 
-        /// <summary>离网 V/f：内部有效电压百分比向 EMS 设定值爬坡的最大速率（%/秒，仿真时间）。</summary>
-        public double IslandVfSlewRatePercentPerSecond { get; set; } = 20;
+        /// <summary>离网 V/f：有效电压向命令值过渡的最长仿真时间（ms），默认 100ms 内完成建压/降压。</summary>
+        public double IslandVoltageRampDurationMs { get; set; } = 100;
 
-        /// <summary>EMS 单次写入「孤岛电压百分比」若相对上次爬升超过该阈值（百分点），视为异常阶跃，置故障（急降不判）。</summary>
-        public double IslandVoltageStepFaultThresholdPercent { get; set; } = 25;
-
-        /// <summary>并网且网侧可用时，若仍保持该阈值以上的孤岛电压百分比设定，视为异常（VF 指令与并网冲突）。</summary>
-        public double IslandVoltageGridConflictThresholdPercent { get; set; } = 5;
-
-        /// <summary>黑启动：电压百分比设定与有效值每差 1% 对应的有功调节量（kW，正放）。</summary>
-        public double BlackStartActivePowerGainKwPerPercent { get; set; } = 15;
+        /// <summary>黑启动：孤岛电压设定与有效值每差 1V 对应的有功调节量（kW，正放）。</summary>
+        public double BlackStartActivePowerGainKwPerVolt { get; set; } = 2.174;
 
         /// <summary>黑启动自动有功上限（kW）。</summary>
         public double BlackStartMaxActivePowerKw { get; set; } = 200;
 
         /// <summary>建压过程中按有效电压百分比附加的励磁有功（占额定功率比例，0–1）。</summary>
         public double BlackStartMagnetizingPowerFraction { get; set; } = 0.02;
+
+        /// <summary>判定 690V 母线已带电的电压比例（相对 AcVoltageNominal，默认 0.85≈587V）。</summary>
+        public double BlackStartBusEnergizedFraction { get; set; } = 0.85;
+
+        /// <summary>
+        /// 黑启动稳态站用电分担（空载铁损+线损、励磁无功）：
+        /// AllOnBus=同单元所有黑启动运行 PCS 按额定功率比例分摊；
+        /// LeaderOnly=仅建压机（有效电压最高者）承担，从机不重复励磁/空载。
+        /// </summary>
+        public string BlackStartSteadyLossShareMode { get; set; } = "AllOnBus";
     }
 
     /// <summary>变压器参数配置（对应 appsettings.json: Transformer 节）</summary>
@@ -231,5 +238,26 @@ namespace EssSimulator.Configuration
 
         /// <summary>无功计划负载（kvar）</summary>
         public double ReactivePowerPlan { get; set; } = 0;
+    }
+
+    /// <summary>220kV 并网点（PCC）电压模型，与并网电表同侧（对应 appsettings.json: Pcc 节）</summary>
+    public class PccConfig
+    {
+        public const string Section = "Pcc";
+
+        /// <summary>PCC 额定线电压（V），默认 220kV</summary>
+        public double NominalLineVoltage { get; set; } = 220000;
+
+        /// <summary>并网点等效短路容量（MVA），用于 Q-V 灵敏度</summary>
+        public double ShortCircuitMva { get; set; } = 750;
+
+        /// <summary>无功引起的电压偏移限幅（±%，相对额定）</summary>
+        public double MaxVoltageShiftPercent { get; set; } = 5;
+
+        /// <summary>无功-电压影响系数（1.0=按 Q/Ssc 标称）</summary>
+        public double ReactiveVoltageInfluenceCoefficient { get; set; } = 1.0;
+
+        /// <summary>站内 35kV 母线额定线电压（V），由 PCC 电压按变比推导</summary>
+        public double StationBusNominalLineVoltage { get; set; } = 35000;
     }
 }

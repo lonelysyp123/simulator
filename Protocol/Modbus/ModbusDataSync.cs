@@ -302,7 +302,9 @@ namespace EssSimulator.Protocol.Modbus
                 return;
             }
 
-            if (name is "pcs1_startstop" or "pcs2_startstop")
+            if (name is "pcs1_startstop" or "pcs2_startstop"
+                or "pcs1_blackstart_enable" or "pcs2_blackstart_enable"
+                or "param64" or "param65")
                 TryApplyPcsCommandsImmediately();
         }
 

@@ -64,14 +64,22 @@ namespace EssSimulator.EssDeviceSimModel
         public TransformerSimulator _mainTransformer { get; set; }              // 220kV/35kV 主变
         public IReadOnlyList<TransformerSimulator> _unitTransformers { get; }   // 35kV/690V 单元变（每个 Unit 1 台）
         public ScheduledLoadSimulator _loadSimulator { get; set; }
-        //private string modelName;
+
+        /// <summary>220kV 并网点（PCC）线电压（V），与并网电表、无功调压闭环一致。</summary>
+        public double PccLineVoltageV { get; private set; }
+
+        /// <summary>35kV 站内母线线电压（V），由 PCC 电压按额定变比推导。</summary>
+        public double StationBus35LineVoltageV { get; private set; }
+
+        private readonly PccConfig _pccCfg;
 
         public EnergyStorageSystem(
             SimulatorConfig simCfg,
             PcsPhysicalConfig pcsCfg,
             TransformerConfig transCfg,
             UnitTransformerConfig unitTransCfg,
-            LoadConfig loadCfg)
+            LoadConfig loadCfg,
+            PccConfig pccCfg)
         {
             var racks = new List<BatteryRackSimulator>();
             var pcsList = new List<PCSSimulator>();
@@ -128,12 +136,11 @@ namespace EssSimulator.EssDeviceSimModel
                     slope: rampCfg.Slope,
                     intervalMs: rampCfg.IntervalMs,
                     delayMs: rampCfg.DelayMs,
-                    islandVfSlewRatePercentPerSecond: pcsCfg.IslandVfSlewRatePercentPerSecond,
-                    islandVoltageStepFaultThresholdPercent: pcsCfg.IslandVoltageStepFaultThresholdPercent,
-                    islandVoltageGridConflictThresholdPercent: pcsCfg.IslandVoltageGridConflictThresholdPercent,
-                    blackStartActivePowerGainKwPerPercent: pcsCfg.BlackStartActivePowerGainKwPerPercent,
+                    islandVoltageRampDurationMs: pcsCfg.IslandVoltageRampDurationMs,
+                    blackStartActivePowerGainKwPerVolt: pcsCfg.BlackStartActivePowerGainKwPerVolt,
                     blackStartMaxActivePowerKw: pcsCfg.BlackStartMaxActivePowerKw,
-                    blackStartMagnetizingPowerFraction: pcsCfg.BlackStartMagnetizingPowerFraction));
+                    blackStartMagnetizingPowerFraction: pcsCfg.BlackStartMagnetizingPowerFraction,
+                    blackStartBusEnergizedFraction: pcsCfg.BlackStartBusEnergizedFraction));
             }
 
             _batteryRacks = racks;
@@ -220,6 +227,9 @@ namespace EssSimulator.EssDeviceSimModel
             _simStep   = TimeSpan.FromMilliseconds(_simStepMs * _speedup);
             _transCfg  = transCfg;
             _pcsCfg    = pcsCfg;
+            _pccCfg    = pccCfg;
+            PccLineVoltageV = pccCfg.NominalLineVoltage;
+            StationBus35LineVoltageV = pccCfg.StationBusNominalLineVoltage;
         }
 
         // 仿真步长参数（由构造函数写入，ExecuteAsync 只读）
@@ -232,6 +242,8 @@ namespace EssSimulator.EssDeviceSimModel
         private readonly TransformerConfig _transCfg;
         private readonly PcsPhysicalConfig _pcsCfg;
 
+        public string GetBlackStartSteadyLossShareMode() => _pcsCfg.BlackStartSteadyLossShareMode;
+
         /// <summary>
         /// 仿真主循环（IHostedService / BackgroundService）。
         /// 由 .NET Host 在 StartAsync 时调用，stoppingToken 取消时自动退出。
@@ -240,7 +252,6 @@ namespace EssSimulator.EssDeviceSimModel
         {
             _log.Info("[EnergyStorageSystem] 仿真主循环启动");
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_simStepMs));
-            int inputVoltage = 0;
             try
             {
                 while (await timer.WaitForNextTickAsync(stoppingToken))
@@ -250,14 +261,9 @@ namespace EssSimulator.EssDeviceSimModel
                     _breaker.Update(priCurrent);
                     _loadSimulator.SetPowered(_breaker.IsClosed);
 
-                    // 35kV PCC（母线）测点：主变二次侧电压（用于负载与并网反馈）
-                    var pccLineVoltageV = _mainTransformer.GetCurrentState().SecondaryVoltage;
-                    // 调用一次以刷新负载时段计划（返回值不再作为并网总电流叠加）。
-                    _ = _loadSimulator.ComputeLoadCurrentA(pccLineVoltageV);
-
                     // 并网点功率方向约定：+ 向电网送电（放电），- 从电网取电（用电）。
                     double totalActiveKw = _loadSimulator.ActivePower;
-                    // 无功统一约定：正=升压支撑，负=降压作用。
+                    // 无功统一约定：正=升压支撑，负=降压作用（负载 + 储能，汇总到 220kV PCC）。
                     double totalReactiveLegacyKvar = _loadSimulator.ReactivePower;
                     foreach (var pcs in _pcsList)
                     {
@@ -266,11 +272,33 @@ namespace EssSimulator.EssDeviceSimModel
                         totalReactiveLegacyKvar += st.ReactivePower;
                     }
 
+                    if (_breaker.IsClosed)
+                    {
+                        PccLineVoltageV = GridFeedbackConventions.CalculatePccLineVoltage(
+                            _pccCfg.NominalLineVoltage,
+                            totalReactiveLegacyKvar,
+                            _pccCfg.ShortCircuitMva,
+                            _pccCfg.ReactiveVoltageInfluenceCoefficient,
+                            _pccCfg.MaxVoltageShiftPercent);
+                        StationBus35LineVoltageV = GridFeedbackConventions.DeriveStationBusVoltage(
+                            PccLineVoltageV,
+                            _pccCfg.NominalLineVoltage,
+                            _pccCfg.StationBusNominalLineVoltage);
+                    }
+                    else
+                    {
+                        PccLineVoltageV = 0;
+                        // 主断分闸时，35kV 母线可能仍被离网黑启动建压；此处先用上一步状态估算母线电压
+                        StationBus35LineVoltageV = EstimateIslandedBus35LineVoltageV();
+                    }
+
+                    // 负载仍在 35kV 侧，用站内母线电压换算电流（返回值不叠加到主变二次电流）。
+                    _ = _loadSimulator.ComputeLoadCurrentA(StationBus35LineVoltageV);
+
                     var totalApparentKva = Math.Sqrt(totalActiveKw * totalActiveKw + totalReactiveLegacyKvar * totalReactiveLegacyKvar);
                     var powerFactor     = totalApparentKva > 0 ? totalActiveKw / totalApparentKva : 1.0;
-                    // 用并网点净 P/Q 反算总电流，避免支路标量电流累加引入伪环流。
-                    double totalSecCurrentMag = pccLineVoltageV > 0
-                        ? totalApparentKva * 1000.0 / (pccLineVoltageV * Math.Sqrt(3.0))
+                    double totalSecCurrentMag = StationBus35LineVoltageV > 0
+                        ? totalApparentKva * 1000.0 / (StationBus35LineVoltageV * Math.Sqrt(3.0))
                         : 0;
                     double totalSecCurrent = Math.Abs(totalActiveKw) > 1e-6
                         ? (totalActiveKw >= 0 ? -totalSecCurrentMag : totalSecCurrentMag)
@@ -278,10 +306,18 @@ namespace EssSimulator.EssDeviceSimModel
 
                     if (_breaker.IsClosed)
                     {
-                        inputVoltage = (int)_transCfg.PrimaryVoltage;
-                        // 主变：220kV -> 35kV 母线
-                        _mainTransformer.Update(inputVoltage, totalSecCurrent, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime, _simStep);
-                        var bus35kV = _mainTransformer.GetCurrentState().SecondaryVoltage;
+                        // 主变：一次侧 = 220kV PCC（无功调压）；二次侧 = 变比推导，避免重复 Q 抬压
+                        _mainTransformer.Update(
+                            PccLineVoltageV,
+                            totalSecCurrent,
+                            powerFactor,
+                            totalApparentKva,
+                            totalReactiveLegacyKvar,
+                            simTime,
+                            _simStep,
+                            applyReactiveVoltageShift: false);
+                        _mainTransformer._currentState.SecondaryVoltage = StationBus35LineVoltageV;
+                        var bus35kV = StationBus35LineVoltageV;
 
                         // 单元变：35kV -> 690V（每个 Unit 1 台，带两路 PCS）
                         for (int u = 0; u < _unitTransformers.Count; u++)
@@ -289,15 +325,14 @@ namespace EssSimulator.EssDeviceSimModel
                             int a = u * 2;
                             int b = u * 2 + 1;
 
-                            // 单元断路器断开：单元变不带电；黑启动时 PCS 仍可在 PCS 侧离网建压
+                            // 单元断路器分闸：35kV 一次侧无网；黑启动/离网 V/f 在 PCS 侧建压（见 SyncUnitTransformerAfterPcsUpdate）
                             bool unitClosed = u < _unitBreakers.Count && _unitBreakers[u].IsClosed;
                             if (!unitClosed)
                             {
-                                _unitTransformers[u].Update(0, 0, 1.0, 0, 0, simTime, _simStep);
                                 if (a < _pcsList.Count)
-                                    ApplyPcsGridWhenUnitDeenergized(_pcsList[a]);
+                                    ApplyPcsGridWhenUnitDeenergized(a, _pcsList[a]);
                                 if (b < _pcsList.Count)
-                                    ApplyPcsGridWhenUnitDeenergized(_pcsList[b]);
+                                    ApplyPcsGridWhenUnitDeenergized(b, _pcsList[b]);
                                 continue;
                             }
 
@@ -337,17 +372,57 @@ namespace EssSimulator.EssDeviceSimModel
                     }
                     else
                     {
-                        inputVoltage    = 0;
-                        totalSecCurrent = 0;
-                        _mainTransformer.Update(0, 0, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime, _simStep);
-                        foreach (var xf in _unitTransformers)
+                        // 主断分闸：220kV 侧断电。
+                        // 若 35kV 母线被黑启动带电，则主变仍会被二次侧反向励磁（含暂态涌流），
+                        // 其励磁无功应由黑启动 PCS 承担。
+                        if (StationBus35LineVoltageV > 1.0)
                         {
-                            xf.Update(0, 0, powerFactor, 0, 0, simTime, _simStep);
+                            var ms = _mainTransformer._specs;
+                            double tr = ms.SecondaryVoltage > 0 ? ms.PrimaryVoltage / ms.SecondaryVoltage : 1.0;
+                            double primaryEqV = StationBus35LineVoltageV * tr;
+                            _mainTransformer.Update(
+                                primaryEqV,
+                                totalSecCurrent,
+                                powerFactor,
+                                totalApparentKva,
+                                totalReactiveLegacyKvar,
+                                simTime,
+                                _simStep,
+                                applyReactiveVoltageShift: false);
+                            _mainTransformer._currentState.SecondaryVoltage = StationBus35LineVoltageV;
+                            // 主断分闸时忽略220kV侧寄生/位移电流显示，一次侧电流固定为0A。
+                            _mainTransformer._currentState.PrimaryCurrent = 0;
                         }
-                        foreach (var pcs in _pcsList)
-                            ApplyPcsGridWhenUnitDeenergized(pcs);
+                        else
+                        {
+                            _mainTransformer.Update(0, 0, powerFactor, totalApparentKva, totalReactiveLegacyKvar, simTime, _simStep, applyReactiveVoltageShift: false);
+                            _mainTransformer._currentState.SecondaryVoltage = 0;
+                        }
+
+                        // 真实黑启动顺序：主断分 → 单元高压合 → 黑启动；仅「主断合+单元合+黑启动」由 BlackStartSafety 禁止
+                        for (int u = 0; u < _unitTransformers.Count; u++)
+                        {
+                            int a = u * 2;
+                            int b = u * 2 + 1;
+                            bool unitEnergized = u < _unitBreakers.Count && _unitBreakers[u].IsClosed;
+                            if (!unitEnergized)
+                            {
+                                _unitTransformers[u].Update(0, 0, powerFactor, 0, 0, simTime, _simStep);
+                                if (a < _pcsList.Count)
+                                    ApplyPcsGridWhenUnitDeenergized(a, _pcsList[a]);
+                                if (b < _pcsList.Count)
+                                    ApplyPcsGridWhenUnitDeenergized(b, _pcsList[b]);
+                                continue;
+                            }
+
+                            if (a < _pcsList.Count)
+                                ApplyPcsGridWhenUnitDeenergized(a, _pcsList[a]);
+                            if (b < _pcsList.Count)
+                                ApplyPcsGridWhenUnitDeenergized(b, _pcsList[b]);
+                        }
                     }
 
+                    SyncUnitTransformerAfterPcsUpdate(simTime, _simStep);
                     Update(simTime, _simStep);
                 }
             }
@@ -366,8 +441,17 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>
         /// 单元/主网侧无电：非黑启动则停机；黑启动保留离网建压（网侧不可用，由 EMS 启停+黑启动驱动）。
         /// </summary>
-        private void ApplyPcsGridWhenUnitDeenergized(PCSSimulator pcs)
+        private void ApplyPcsGridWhenUnitDeenergized(int pcsSimIndex, PCSSimulator pcs)
         {
+            int unit = pcsSimIndex / 2;
+            double busV = GetUnitAcBusVoltage(unit);
+            double energizedV = _pcsCfg.AcVoltageNominal * _pcsCfg.BlackStartBusEnergizedFraction;
+            if (busV >= energizedV)
+            {
+                pcs.UpdateGridState(busV, _pcsCfg.FrequencyNominal, false);
+                return;
+            }
+
             if (pcs.GetCurrentState().BlackStartEnabled)
             {
                 pcs.UpdateGridState(0, _pcsCfg.FrequencyNominal, false);
@@ -379,9 +463,232 @@ namespace EssSimulator.EssDeviceSimModel
             pcs.TransitionToMode(OperationMode.Off);
         }
 
+        /// <summary>PCS 是否处于离网 V/f 建压（黑启动或孤岛电压有效）。</summary>
+        private static bool IsPcsIslandVoltageBuilding(PcsState st)
+        {
+            if (st.Mode != OperationMode.Normal || st.GMode != GridMode.Islanded)
+                return false;
+            if (st.BlackStartEnabled)
+                return st.BlackStartPhase is BlackStartPhase.VoltageBuilding or BlackStartPhase.Synchronized;
+            return st.IslandVoltageEffectiveV > 1.0;
+        }
+
+        /// <summary>
+        /// 在主断分闸时估算离网 35kV 母线电压：取所有“单元高压合 + 正在离网建压”PCS 的最高二次侧电压，
+        /// 再按单元变变比折算到 35kV 侧。
+        /// </summary>
+        private double EstimateIslandedBus35LineVoltageV()
+        {
+            double bus35 = 0;
+            for (int u = 0; u < _unitTransformers.Count; u++)
+            {
+                if (u >= _unitBreakers.Count || !_unitBreakers[u].IsClosed)
+                    continue;
+
+                int a = u * 2;
+                int b = a + 1;
+                double lv690 = 0;
+
+                void Acc(int idx)
+                {
+                    if (idx < 0 || idx >= _pcsList.Count) return;
+                    var st = _pcsList[idx].GetCurrentState();
+                    if (!IsPcsIslandVoltageBuilding(st)) return;
+                    lv690 = Math.Max(lv690, st.AcVoltage);
+                }
+
+                Acc(a);
+                Acc(b);
+                if (lv690 <= 0)
+                    continue;
+
+                var specs = _unitTransformers[u]._specs;
+                double turnsRatio = specs.SecondaryVoltage > 0
+                    ? specs.PrimaryVoltage / specs.SecondaryVoltage
+                    : 1.0;
+                bus35 = Math.Max(bus35, lv690 * turnsRatio);
+            }
+            return bus35;
+        }
+
+        /// <summary>同单元 690V 母线电压（单元变二次侧与各 PCS 交流电压取大）。</summary>
+        public double GetUnitAcBusVoltage(int unitIndex)
+        {
+            double v = 0;
+            int a = unitIndex * 2;
+            int b = a + 1;
+            if (unitIndex >= 0 && unitIndex < _unitTransformers.Count)
+                v = Math.Max(v, _unitTransformers[unitIndex].GetCurrentState().SecondaryVoltage);
+            if (a >= 0 && a < _pcsList.Count)
+                v = Math.Max(v, _pcsList[a].GetCurrentState().AcVoltage);
+            if (b >= 0 && b < _pcsList.Count)
+                v = Math.Max(v, _pcsList[b].GetCurrentState().AcVoltage);
+            return v;
+        }
+
+        private void RefreshUnitBlackStartBusContext(int unitIndex)
+        {
+            double busV = GetUnitAcBusVoltage(unitIndex);
+            int a = unitIndex * 2;
+            int b = a + 1;
+            if (a >= 0 && a < _pcsList.Count)
+                _pcsList[a].RefreshBlackStartBusContext(busV);
+            if (b >= 0 && b < _pcsList.Count)
+                _pcsList[b].RefreshBlackStartBusContext(busV);
+        }
+
+        /// <summary>
+        /// PCS.Update 之后校正单元变状态：
+        /// - 主断分时，任一单元建压会在 35kV 母线上形成共享电压；
+        /// - 共享母线仅作用于已合闸单元变的一次侧受电，不直接把待机 PCS 拉成“有网可并”；
+        /// - 由单元变汇总出的站用电（励磁/损耗）再在黑启动在线 PCS 间近似均分。
+        /// </summary>
+        private void SyncUnitTransformerAfterPcsUpdate(DateTime simTime, TimeSpan simStep)
+        {
+            bool gridFeeds35kVBus = _breaker.IsClosed;
+            int unitCount = _unitTransformers.Count;
+            if (unitCount == 0)
+                return;
+
+            var unitHvClosed = new bool[unitCount];
+            var localUnitP = new double[unitCount];
+            var localUnitQ = new double[unitCount];
+            var localLv690 = new double[unitCount];
+            var unitPrimaryV = new double[unitCount];
+
+            double sharedBus35kVFromIsland = 0;
+
+            // 1) 收集每单元本地建压与功率
+            for (int u = 0; u < unitCount; u++)
+            {
+                int a = u * 2;
+                int b = u * 2 + 1;
+                unitHvClosed[u] = u < _unitBreakers.Count && _unitBreakers[u].IsClosed;
+                if (!unitHvClosed[u])
+                    continue;
+
+                void Accumulate(int pcsIdx)
+                {
+                    if (pcsIdx < 0 || pcsIdx >= _pcsList.Count) return;
+                    var st = _pcsList[pcsIdx].GetCurrentState();
+                    if (!IsPcsIslandVoltageBuilding(st)) return;
+                    localLv690[u] = Math.Max(localLv690[u], st.AcVoltage);
+                    localUnitP[u] += _pcsList[pcsIdx].GetGridSideActivePower();
+                    localUnitQ[u] += st.ReactivePower;
+                }
+
+                Accumulate(a);
+                Accumulate(b);
+
+                if (gridFeeds35kVBus || localLv690[u] <= 0)
+                    continue;
+
+                var specs = _unitTransformers[u]._specs;
+                double turnsRatio = specs.SecondaryVoltage > 0
+                    ? specs.PrimaryVoltage / specs.SecondaryVoltage
+                    : 1.0;
+                sharedBus35kVFromIsland = Math.Max(sharedBus35kVFromIsland, localLv690[u] * turnsRatio);
+            }
+
+            // 2) 将 35kV 母线电压传播到各已合闸单元变（仅变压器受电）
+            for (int u = 0; u < unitCount; u++)
+            {
+                if (!unitHvClosed[u])
+                {
+                    _unitTransformers[u].Update(0, 0, 1.0, 0, 0, simTime, simStep);
+                    continue;
+                }
+
+                var specs = _unitTransformers[u]._specs;
+                double turnsRatio = specs.SecondaryVoltage > 0
+                    ? specs.PrimaryVoltage / specs.SecondaryVoltage
+                    : 1.0;
+
+                unitPrimaryV[u] = gridFeeds35kVBus
+                    ? StationBus35LineVoltageV
+                    : sharedBus35kVFromIsland;
+
+                if (unitPrimaryV[u] <= 0)
+                {
+                    _unitTransformers[u].Update(0, 0, 1.0, 0, 0, simTime, simStep);
+                    continue;
+                }
+
+                double secV = Math.Max(unitPrimaryV[u] / Math.Max(turnsRatio, 1e-6), 1.0);
+                double unitS = Math.Sqrt(localUnitP[u] * localUnitP[u] + localUnitQ[u] * localUnitQ[u]);
+                double unitPf = unitS > 0 ? localUnitP[u] / unitS : 1.0;
+                double unitSecCurrentMag = unitS * 1000.0 / (secV * Math.Sqrt(3.0));
+                double unitSecCurrent = Math.Abs(localUnitP[u]) > 1e-6
+                    ? (localUnitP[u] >= 0 ? -unitSecCurrentMag : unitSecCurrentMag)
+                    : unitSecCurrentMag;
+
+                _unitTransformers[u].Update(
+                    unitPrimaryV[u], unitSecCurrent, unitPf, unitS, localUnitQ[u], simTime, simStep,
+                    applyReactiveVoltageShift: false);
+            }
+
+            // 3) 汇总站用电并在全母线黑启动在线 PCS 间均分
+            ApplyBlackStartStationElectricalLoadAcrossBus(localUnitP, unitPrimaryV);
+        }
+
+        /// <summary>
+        /// 汇总全 35kV 母线已受电单元变的励磁/损耗需求，并在黑启动在线 PCS 间近似均分。
+        /// </summary>
+        private void ApplyBlackStartStationElectricalLoadAcrossBus(double[] localUnitP, double[] unitPrimaryV)
+        {
+            double totalMagQ = 0;
+            double totalLossP = 0;
+            double lineCoeff = Math.Clamp(_pcsCfg.GridLossCoefficient, 0, 0.5);
+
+            for (int u = 0; u < _unitTransformers.Count; u++)
+            {
+                if (u >= unitPrimaryV.Length || unitPrimaryV[u] <= 0)
+                    continue;
+                var xf = _unitTransformers[u];
+                totalMagQ += xf.GetSecondaryMagnetizingReactiveKvar();
+                double ironKw = xf.GetSecondaryNoLoadActivePowerKw();
+                double lineKw = Math.Abs(localUnitP[u]) * lineCoeff / Math.Max(1e-6, 1.0 - lineCoeff);
+                totalLossP += ironKw + lineKw;
+            }
+
+            // 主断分闸且 35kV 母线被离网建压时，主变由二次侧反向励磁：
+            // 其暂态/稳态励磁无功同样由黑启动 PCS 承担。
+            if (!_breaker.IsClosed && StationBus35LineVoltageV > 1.0)
+                totalMagQ += _mainTransformer.GetSecondaryMagnetizingReactiveKvar();
+
+            var participants = new List<int>();
+            for (int i = 0; i < _pcsList.Count; i++)
+            {
+                var st = _pcsList[i].GetCurrentState();
+                if (st.BlackStartEnabled && IsPcsIslandVoltageBuilding(st))
+                    participants.Add(i);
+            }
+
+            for (int i = 0; i < _pcsList.Count; i++)
+            {
+                _pcsList[i].SetTransformerMagnetizingReactiveKvar(0);
+                _pcsList[i].SetBlackStartSharedLossActivePowerKw(0);
+            }
+
+            if (participants.Count == 0)
+                return;
+
+            double qEach = totalMagQ / participants.Count;
+            double pEach = totalLossP / participants.Count;
+            foreach (var idx in participants)
+            {
+                _pcsList[idx].SetTransformerMagnetizingReactiveKvar(qEach);
+                _pcsList[idx].SetBlackStartSharedLossActivePowerKw(pEach);
+            }
+        }
+
         // 更新系统状态
         private void Update(DateTime simTime, TimeSpan step)
         {
+            int unitCount = (_pcsList.Count + 1) / 2;
+            for (int u = 0; u < unitCount; u++)
+                RefreshUnitBlackStartBusContext(u);
+
             int n = Math.Min(_batteryRacks.Count, _pcsList.Count);
             for (int i = 0; i < n; i++)
             {

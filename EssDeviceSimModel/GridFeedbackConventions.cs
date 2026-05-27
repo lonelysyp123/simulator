@@ -11,9 +11,42 @@ namespace EssSimulator.EssDeviceSimModel
     public static class GridFeedbackConventions
     {
         /// <summary>
-        /// 并网测点名称（用于日志、注释与后续配置映射）。
+        /// 并网测点名称（用于日志、注释与后续配置映射）：220kV PCC / 并网电表电压。
         /// </summary>
-        public const string PccVoltageMeasurementPoint = "MainTransformer.SecondaryVoltage";
+        public const string PccVoltageMeasurementPoint = "EnergyStorageSystem.PccLineVoltageV";
+
+        /// <summary>
+        /// 由并网点总无功计算 220kV PCC 线电压（V）。
+        /// ΔU_pu = k × (Q_kvar / (S_sc_MVA × 1000))，并限幅。
+        /// </summary>
+        public static double CalculatePccLineVoltage(
+            double nominalLineVoltageV,
+            double totalReactiveKvar,
+            double shortCircuitMva,
+            double influenceCoefficient,
+            double maxVoltageShiftPercent)
+        {
+            if (nominalLineVoltageV <= 0) return 0;
+            if (shortCircuitMva <= 0) return nominalLineVoltageV;
+
+            double shortCircuitKva = shortCircuitMva * 1000.0;
+            double shiftPu = influenceCoefficient * (totalReactiveKvar / shortCircuitKva);
+            double maxShiftPu = Math.Max(0, maxVoltageShiftPercent) / 100.0;
+            shiftPu = Math.Clamp(shiftPu, -maxShiftPu, maxShiftPu);
+            return nominalLineVoltageV * (1.0 + shiftPu);
+        }
+
+        /// <summary>
+        /// 由 220kV PCC 线电压按主变额定变比推导 35kV 站内母线电压（V）。
+        /// </summary>
+        public static double DeriveStationBusVoltage(
+            double pccLineVoltageV,
+            double pccNominalLineVoltageV,
+            double stationBusNominalLineVoltageV)
+        {
+            if (pccLineVoltageV <= 0 || pccNominalLineVoltageV <= 0) return 0;
+            return pccLineVoltageV * (stationBusNominalLineVoltageV / pccNominalLineVoltageV);
+        }
 
         /// <summary>
         /// 计算并网点无功引起的电压偏移（pu）。

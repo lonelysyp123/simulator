@@ -26,6 +26,7 @@ namespace EssSimulator.Display
         // 为了兼容不同终端，类中使用了 `SafeSetCursorPosition` 和 `WriteFixedLine` 来尽量避免因光标设置失败
         // 引起的异常或输出堆叠（重复打印）。
         private static bool _isRunning = true;
+        private static volatile bool _fatalShutdownActive;
         private static int _selectedIndex = 0; // 当前选中项索引
         private static string? _lastCommand; // 仅保留上一条指令
         //private static string[] _menuItems = { "主电气接线", "电池堆簇信息", "电池单体信息","日志信息","命令输入","连接信息"};
@@ -42,6 +43,27 @@ namespace EssSimulator.Display
             Thread guiThread = new Thread(GuiThread);
             guiThread.Start();
         }
+
+        /// <summary>黑启动等严重联锁触发时调用，停止 GUI 导航并配合全屏告警。</summary>
+        public static void ActivateFatalShutdown()
+        {
+            _fatalShutdownActive = true;
+            _isRunning = false;
+        }
+
+        private static bool PollFatalOrContinue()
+        {
+            if (FatalSystemAlert.PollFatalUi())
+            {
+                Thread.Sleep(200);
+                return true;
+            }
+            return false;
+        }
+
+        private static bool IsNavigationBlocked =>
+            FatalSystemAlert.IsActive || _fatalShutdownActive;
+
         private static int GetEssUnitCount()
         {
             try
@@ -88,11 +110,53 @@ namespace EssSimulator.Display
             catch { return fallback; }
         }
 
+        /// <summary>EMS 黑启动线圈状态；开启且离网 Normal 时标注运行中。</summary>
+        private static string FormatBlackStartSwitchStatus(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
+        {
+            bool swOn = SafeGetBool($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].BlackStartEnabled");
+            if (!swOn)
+                return "关";
+
+            bool simOn = SafeGetBool($"ess._pcsList[{essPcsListIndex}]._currentState.BlackStartEnabled");
+            if (!simOn)
+                return "开(未生效)";
+
+            try
+            {
+                var m = SimServer.GetExtIfVariableVal($"ess._pcsList[{essPcsListIndex}]._currentState.Mode");
+                var g = SimServer.GetExtIfVariableVal($"ess._pcsList[{essPcsListIndex}]._currentState.GMode");
+                if (m != null && g != null &&
+                    Enum.TryParse<EssSimulator.EssDeviceSimModel.OperationMode>(m.ToString(), out var mode) &&
+                    Enum.TryParse<EssSimulator.EssDeviceSimModel.GridMode>(g.ToString(), out var gMode) &&
+                    mode == EssSimulator.EssDeviceSimModel.OperationMode.Normal &&
+                    gMode == EssSimulator.EssDeviceSimModel.GridMode.Islanded)
+                    return "开(运行中)";
+            }
+            catch { /* ignore */ }
+
+            return "开";
+        }
+
+        /// <summary>主接线图顶部：各 PCS 黑启动开关一览。</summary>
+        private static string BuildBlackStartSwitchSummary(int channelCount)
+        {
+            var parts = new List<string>();
+            for (int i = 0; i < channelCount; i++)
+            {
+                int u = i / 2;
+                int slot = i % 2;
+                string st = FormatBlackStartSwitchStatus(u, slot, i);
+                parts.Add($"PCS{i + 1}:{st}");
+            }
+            return string.Join("  ", parts);
+        }
+
         /// <summary>PCS 在接线图上的简短状态：Modbus/EMU 侧启停与有功设定 + 物理运行相位（停机/待机/充电/放电等）。</summary>
         private static string FormatPcsControlStatus(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
         {
             bool cmdOn = SafeGetBool($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].pcsOnOffSwitch");
             double pSet = SafeGetDouble($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].PCSActivePowerSetting");
+            string blackStartSw = FormatBlackStartSwitchStatus(unitIndex0, pcsSlotInUnit0, essPcsListIndex);
             string modeLabel = "?";
             try
             {
@@ -106,7 +170,7 @@ namespace EssSimulator.Display
             }
             catch { /* ignore */ }
 
-            return $"启停:{(cmdOn ? "开" : "停")} P设定:{pSet:0}kW 仿真:{modeLabel}";
+            return $"启停:{(cmdOn ? "开" : "停")} 黑启动:{blackStartSw} P设定:{pSet:0}kW 仿真:{modeLabel}";
         }
 
         private CommandProcessor BuildCommandProcessor()
@@ -249,6 +313,9 @@ namespace EssSimulator.Display
 
         private void HandleInput()
         {
+            if (PollFatalOrContinue())
+                return;
+
             // 处理菜单中的用户输入（上下选择、回车进入、ESC 退出）
             var key = Console.ReadKey(true);
 
@@ -270,6 +337,11 @@ namespace EssSimulator.Display
                     break;
 
                 case ConsoleKey.Escape:
+                    if (IsNavigationBlocked)
+                    {
+                        PollFatalOrContinue();
+                        break;
+                    }
                     // 退出程序：设置运行标志并直接退出进程
                     _isRunning = false;
                     Environment.Exit(0);
@@ -279,6 +351,12 @@ namespace EssSimulator.Display
 
         private void ExecuteCommand()
         {
+            if (IsNavigationBlocked)
+            {
+                PollFatalOrContinue();
+                return;
+            }
+
             // 根据当前菜单索引执行对应视图的绘制方法，执行前清屏
             Console.Clear();
 
@@ -318,10 +396,16 @@ namespace EssSimulator.Display
             // 循环步骤：绘制界面 -> 处理一次输入
             while (_isRunning)
             {
+                if (PollFatalOrContinue())
+                    continue;
+
                 DrawInterface();
                 HandleInput();
                 // 一次循环无需强制休眠，HandleInput 包含阻塞读取
             }
+
+            if (FatalSystemAlert.IsActive)
+                FatalSystemAlert.ForceExitProcess();
 
             // 程序退出时的清理：清屏并提示
             Console.Clear();
@@ -380,8 +464,9 @@ namespace EssSimulator.Display
             sb.AppendLine("========= 电压: 220 kV");
             sb.AppendLine("        |");
             sb.AppendLine($"        |   断路器: {(breakerClosed ? "合" : "分")}");
+            sb.AppendLine($"        |   黑启动开关: {BuildBlackStartSwitchSummary(channelCount)}");
             sb.AppendLine("        |");
-            sb.AppendLine($"        |              电表(一次侧) 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab/1000:0.0} / {meterUbc/1000:0.0} / {meterUca/1000:0.0} kV");
+            sb.AppendLine($"        |              电表(主变一次侧端子检测) 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab/1000:0.0} / {meterUbc/1000:0.0} / {meterUca/1000:0.0} kV");
             sb.AppendLine($"        |              有功功率: {meterActive:0.0} kW    无功功率: {meterReactive:0.0} kvar    功率因数: {meterPowerFactor:0.000}    频率: {meterFrequency:0.00} Hz");
             sb.AppendLine("        |");
             sb.AppendLine($"        |                           主变: 一次侧 {primaryVoltage / 1000:0.0} kV / {primaryCurrent:0.0} A    二次侧 {secondaryVoltage / 1000:0.0} kV / {secondaryCurrent:0.0} A");
@@ -456,11 +541,19 @@ namespace EssSimulator.Display
             bool isDisplaying = false;
             while (true)
             {
+                if (PollFatalOrContinue())
+                    continue;
+
                 if (Console.KeyAvailable)
                 {
                     var key = Console.ReadKey(true);
                     if (key.Key == ConsoleKey.Escape)
                     {
+                        if (IsNavigationBlocked)
+                        {
+                            PollFatalOrContinue();
+                            continue;
+                        }
                         // 退出日志视图时停止日志展示（如果正在展示）
                         if (isDisplaying)
                         {
@@ -490,6 +583,9 @@ namespace EssSimulator.Display
             Console.Clear();
             while (true)
             {
+                if (PollFatalOrContinue())
+                    continue;
+
                 if (useLive)
                 {
                     bool switchRequested = false;
@@ -498,6 +594,9 @@ namespace EssSimulator.Display
                     {
                         while (!Console.KeyAvailable)
                         {
+                            if (PollFatalOrContinue())
+                                break;
+
                             // 采集数据（支持 N 路）
                             bool breakerClosed = SafeGetBool("ess._breaker.IsClosed");
                             var primaryVoltage = SafeGetDouble("ess._mainTransformer._currentState.PrimaryVoltage");
@@ -512,7 +611,8 @@ namespace EssSimulator.Display
 
                             // 顶部信息面板（避免 Markup 标签与中文状态混淆，改用 Text）
                             var breakerStatus = breakerClosed ? "合" : "分";
-                            var headerText = new Text($"电气主接线 {time}  （单元数 {unitCount}，通道数 {channelCount}）\n状态: 断路器[{breakerStatus}]\n操作: Tab 切换视图 | :/C 输入命令 | Esc 返回\n");
+                            var blackStartSummary = BuildBlackStartSwitchSummary(channelCount);
+                            var headerText = new Text($"电气主接线 {time}  （单元数 {unitCount}，通道数 {channelCount}）\n状态: 断路器[{breakerStatus}]  黑启动开关[{blackStartSummary}]\n操作: Tab 切换视图 | :/C 输入命令 | Esc 返回\n");
                             var header = new Panel(headerText).Border(BoxBorder.Rounded);
 
                             // 交流侧表格（一次/二次、负载）
@@ -529,8 +629,8 @@ namespace EssSimulator.Display
                             // 单元总览表（每行一个 UNIT，包含2路 PCS+2路 BMS）
                             var unitTable = new Table().Border(TableBorder.Rounded).Title("储能单元");
                             unitTable.AddColumn("UNIT");
-                            unitTable.AddColumn("PCS-A 启停/设定/模式 | P/Q");
-                            unitTable.AddColumn("PCS-B 启停/设定/模式 | P/Q");
+                            unitTable.AddColumn("PCS-A 启停/黑启动/模式 | P/Q");
+                            unitTable.AddColumn("PCS-B 启停/黑启动/模式 | P/Q");
                             unitTable.AddColumn("舱-A SOC/V/I");
                             unitTable.AddColumn("舱-B SOC/V/I");
 
@@ -611,8 +711,15 @@ namespace EssSimulator.Display
                             }
                             else if (key.Key == ConsoleKey.Escape)
                             {
-                                // 退出视图
-                                switchRequested = false;
+                                if (IsNavigationBlocked)
+                                {
+                                    PollFatalOrContinue();
+                                }
+                                else
+                                {
+                                    // 退出视图
+                                    switchRequested = false;
+                                }
                             }
                         }
                     });
@@ -641,6 +748,11 @@ namespace EssSimulator.Display
                     if (Console.KeyAvailable)
                     {
                         var key = Console.ReadKey(true);
+                        if (IsNavigationBlocked)
+                        {
+                            PollFatalOrContinue();
+                            continue;
+                        }
                         if (key.Key == ConsoleKey.Tab)
                         {
                             useLive = true;
@@ -668,6 +780,9 @@ namespace EssSimulator.Display
             int bmsId = 0;
             while (true)
             {
+                if (PollFatalOrContinue())
+                    continue;
+
                 Console.Clear();
                 bmsId = Math.Clamp(bmsId, 0, unitCount - 1);
 
@@ -675,6 +790,9 @@ namespace EssSimulator.Display
                 {
                     while (!Console.KeyAvailable)
                     {
+                        if (FatalSystemAlert.IsActive)
+                            break;
+
                         string basePath = $"bms{bmsId + 1}.BatteryStacks[0]";
 
                         double totVolt = 0, totCurr = 0, soc = 0, soh = 0, maxCellV = 0, minCellV = 0;
@@ -745,6 +863,11 @@ namespace EssSimulator.Display
                 }
 
                 var key = Console.ReadKey(true);
+                if (IsNavigationBlocked)
+                {
+                    PollFatalOrContinue();
+                    continue;
+                }
                 if (key.Key == ConsoleKey.UpArrow)
                 {
                     bmsId = Math.Min(unitCount - 1, bmsId + 1);
@@ -768,6 +891,9 @@ namespace EssSimulator.Display
 
             while (true)
             {
+                if (PollFatalOrContinue())
+                    continue;
+
                 Console.Clear();
                 batlibId = Math.Clamp(batlibId, 0, unitCount - 1);
                 int clusterCount = Math.Max(1, GetClusterCount());
@@ -777,6 +903,9 @@ namespace EssSimulator.Display
                 {
                     while (!Console.KeyAvailable)
                     {
+                        if (FatalSystemAlert.IsActive)
+                            break;
+
                         string basePath = $"bms{batlibId + 1}.BatteryStacks[0]";
 
                         // 每个簇有 4 个电池包，每包 104 节单体，分成两列显示以避免过长
@@ -843,6 +972,11 @@ namespace EssSimulator.Display
                 }
 
                 var key = Console.ReadKey(true);
+                if (IsNavigationBlocked)
+                {
+                    PollFatalOrContinue();
+                    continue;
+                }
                 if (key.Key == ConsoleKey.RightArrow)
                 {
                     int cc = Math.Max(1, GetClusterCount());
@@ -945,6 +1079,9 @@ namespace EssSimulator.Display
 
             while (true)
             {
+                if (PollFatalOrContinue())
+                    continue;
+
                 var input = ReadCommandLineWithLastHistory("> ");
                 if (input == "exit")
                 {
@@ -967,6 +1104,9 @@ namespace EssSimulator.Display
 
             while (!Console.KeyAvailable)
             {
+                if (FatalSystemAlert.IsActive)
+                    break;
+
                 Console.SetCursorPosition(0, 0);
                 // 打印本机地址和端口信息（只显示已启用且非回环接口）
                 foreach (NetworkInterface netInterface in NetworkInterface.GetAllNetworkInterfaces())

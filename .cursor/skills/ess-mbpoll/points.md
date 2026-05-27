@@ -11,13 +11,13 @@
 | param55 | 6 | 5300 | int16 | 10 | 4 | PCS1 有功 kW |
 | param56 | 6 | 5301 | int16 | 10 | 4 | PCS1 无功 kvar |
 | param57 | 6 | 5302 | int16 | 1000 | 4 | PCS1 功率因数 |
-| param64 | 6 | 5304 | u16 | 1 | 4 | PCS1 孤岛电压% |
+| param64 | 6 | 5304 | u16 | 1 | 4 | PCS1 孤岛电压V 0-690 |
 | pcs1_blackstart_enable | 5 | 5305 | bool | 1 | 0 | PCS1 黑启动 |
 | pcs1_startstop | 5 | 5303 | bool | 1 | 0 | PCS1 启停 |
 | param59 | 6 | 5600 | int16 | 10 | 4 | PCS2 有功 kW |
 | param60 | 6 | 5601 | int16 | 10 | 4 | PCS2 无功 kvar |
 | param61 | 6 | 5602 | int16 | 1000 | 4 | PCS2 功率因数 |
-| param65 | 6 | 5604 | u16 | 1 | 4 | PCS2 孤岛电压% |
+| param65 | 6 | 5604 | u16 | 1 | 4 | PCS2 孤岛电压V 0-690 |
 | pcs2_blackstart_enable | 5 | 5605 | bool | 1 | 0 | PCS2 黑启动 |
 | pcs2_startstop | 5 | 5603 | bool | 1 | 0 | PCS2 启停 |
 

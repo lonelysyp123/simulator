@@ -58,7 +58,16 @@ namespace EssSimulator.EssDeviceSimModel
             public double PowerFactor { get; set; }        // 功率因数
             public DateTime Timestamp { get; set; }       // 状态时间
 
-            /// <summary>本步由「快速抬压励磁」模型叠加到一次无功支路的涌流分量（A，幅值）。</summary>
+            /// <summary>本步空载励磁电流折算到二次侧（A，无功滞后分量）。</summary>
+            public double MagnetizingNoLoadCurrentSecondary { get; set; }
+
+            /// <summary>本步涌流折算到二次侧（A，无功滞后分量）。</summary>
+            public double MagnetizingInrushCurrentSecondary { get; set; }
+
+            /// <summary>空载+涌流，二次侧无功励磁总电流（A）。</summary>
+            public double MagnetizingCurrentSecondary { get; set; }
+
+            /// <summary>本步涌流在一次侧无功支路的分量（A，由二次侧按变比反算，便于监视）。</summary>
             public double MagnetizingInrushCurrentPrimary { get; set; }
         }
 
@@ -84,6 +93,19 @@ namespace EssSimulator.EssDeviceSimModel
         // 获取当前状态
         public TransformerState GetCurrentState() => _currentState;
 
+        /// <summary>二次侧励磁（空载+涌流）对应的感性无功需求（kvar，正=滞后/升压支撑）。</summary>
+        public double GetSecondaryMagnetizingReactiveKvar()
+        {
+            double v = _currentState.SecondaryVoltage;
+            double iMag = _currentState.MagnetizingCurrentSecondary;
+            if (v < 1.0 || iMag < 1e-6)
+                return 0;
+            return Math.Sqrt(3.0) * v * iMag / 1000.0;
+        }
+
+        /// <summary>二次侧空载有功（铁损，kW）。</summary>
+        public double GetSecondaryNoLoadActivePowerKw() => Math.Max(0, _currentState.IronLoss / 1000.0);
+
         // 更新变压器状态
         public void Update(
             double primaryVoltage,
@@ -92,15 +114,19 @@ namespace EssSimulator.EssDeviceSimModel
             double totalApparentPowerKva,
             double totalReactivePowerKvar,
             DateTime timeStamp,
-            TimeSpan simulationStep)
+            TimeSpan simulationStep,
+            bool applyReactiveVoltageShift = true)
         {
             // 1. 更新基本参数
             _currentState.PrimaryVoltage = primaryVoltage;
-            _currentState.SecondaryCurrent = secondaryCurrent;
+            double loadSecondaryCurrent = secondaryCurrent;
             _currentState.PowerFactor = powerFactor;
             _currentState.Timestamp = timeStamp;
 
             double dt = Math.Max(simulationStep.TotalSeconds, 1e-6);
+            double turnsRatio = _specs.SecondaryVoltage > 1e-9
+                ? _specs.PrimaryVoltage / _specs.SecondaryVoltage
+                : 1.0;
             double vN = _specs.PrimaryVoltage;
             double vPuNow = vN > 1e-9 ? Math.Clamp(primaryVoltage / vN, 0.0, 1.5) : 0.0;
 
@@ -138,59 +164,67 @@ namespace EssSimulator.EssDeviceSimModel
                 _prevPrimaryVoltagePu = vPuNow;
             }
 
-            // 2. 计算变比
-            double turnsRatio = _specs.PrimaryVoltage / _specs.SecondaryVoltage;
-
-            // 3. 计算负载率与二次侧电压
+            // 2. 计算负载率与二次侧电压
             // 额定电流按三相线电压口径：I = S / (sqrt(3) * Uline)
             double ratedSecondaryCurrent = _specs.RatedPower * 1000 / (_specs.SecondaryVoltage * Math.Sqrt(3));
-            _currentState.LoadRatio = ratedSecondaryCurrent > 0
-                ? secondaryCurrent / ratedSecondaryCurrent
-                : 0;
 
             // 并网点电压采用 Q 线性反馈（漏抗主导近似）：
             // - Q > 0 抬升电压
             // - Q < 0 下拉电压
             // 在固定 P 条件下，+/-Q 对称。
-            double zPu = _specs.ImpedancePercent / 100.0;
-            double reactiveShiftPu = GridFeedbackConventions.CalculatePccReactiveVoltageShiftPu(
-                totalReactivePowerKvar,
-                _specs.RatedPower,
-                zPu,
-                _specs.ReactiveVoltageInfluenceCoefficient);
-            double netVoltageFactor = 1 + reactiveShiftPu;
+            double netVoltageFactor = 1.0;
+            if (applyReactiveVoltageShift)
+            {
+                double zPu = _specs.ImpedancePercent / 100.0;
+                double reactiveShiftPu = GridFeedbackConventions.CalculatePccReactiveVoltageShiftPu(
+                    totalReactivePowerKvar,
+                    _specs.RatedPower,
+                    zPu,
+                    _specs.ReactiveVoltageInfluenceCoefficient);
+                netVoltageFactor = 1 + reactiveShiftPu;
+            }
             _currentState.SecondaryVoltage = primaryVoltage / turnsRatio * netVoltageFactor;
 
-            // 4. 计算一次侧电流
-            // 三相口径：I_rated = S / (sqrt(3) * Uline)
-            // 空载电流按额定一次侧线电流百分比给定，并近似与一次侧电压成正比（励磁支路）。
+            // 3. 励磁/涌流：先在一次侧判定与积累，再按变比 n=V1/V2 折算到二次（I2_mag = I1_mag × n）
             double ratedPrimaryCurrent = _specs.RatedPower * 1000 / (_specs.PrimaryVoltage * Math.Sqrt(3));
             double vRatio = _specs.PrimaryVoltage > 0 ? (primaryVoltage / _specs.PrimaryVoltage) : 0.0;
-            double noLoadCurrent = (_specs.NoLoadCurrentPercent / 100.0) * ratedPrimaryCurrent * Math.Abs(vRatio);
+            double noLoadPrimaryA = (_specs.NoLoadCurrentPercent / 100.0) * ratedPrimaryCurrent * Math.Abs(vRatio);
+            double inrushPrimaryA = _specs.MagnetizingInrushEnabled ? _inrushExtraPrimaryA : 0.0;
+            _currentState.MagnetizingInrushCurrentPrimary = inrushPrimaryA;
 
-            // 将负载电流拆分为有功/无功分量后再与励磁电流（近似纯无功滞后）做相量合成
-            // - powerFactor 取值范围约定为 [-1, 1]，符号由外部约定；相角用 |pf| 计算
+            double noLoadSecondaryA = noLoadPrimaryA * turnsRatio;
+            double inrushSecondaryA = inrushPrimaryA * turnsRatio;
+            double magnetizingSecondaryA = noLoadSecondaryA + inrushSecondaryA;
+            _currentState.MagnetizingNoLoadCurrentSecondary = noLoadSecondaryA;
+            _currentState.MagnetizingInrushCurrentSecondary = inrushSecondaryA;
+            _currentState.MagnetizingCurrentSecondary = magnetizingSecondaryA;
+
+            // 4. 负载电流 + 二次侧励磁电流相量合成
             double pfAbs = Math.Clamp(Math.Abs(powerFactor), 0.0, 1.0);
             double sinPhi = Math.Sqrt(Math.Max(0.0, 1.0 - pfAbs * pfAbs));
-            double signQ = totalReactivePowerKvar >= 0 ? 1.0 : -1.0; // Q>0 视为感性（滞后）
+            double signQ = totalReactivePowerKvar >= 0 ? 1.0 : -1.0;
 
-            // 负载电流（线电流）优先使用传入的 secondaryCurrent 幅值；其方向符号用于功率流向约定
-            double i2Mag = Math.Abs(secondaryCurrent);
-            double i2W = i2Mag * pfAbs;              // 有功分量（同相）
-            double i2Q = i2Mag * sinPhi * signQ;     // 无功分量（正=滞后）
+            double i2Mag = Math.Abs(loadSecondaryCurrent);
+            double i2W = i2Mag * pfAbs;
+            double i2Q = i2Mag * sinPhi * signQ;
+            double i2QTotal = i2Q + magnetizingSecondaryA;
 
-            // 折算到一次侧（线电流按变比折算）
+            double i2TotalMag = Math.Sqrt(i2W * i2W + i2QTotal * i2QTotal);
+            // SecondaryCurrent 对外表示变压器二次侧端口实际负载电流（不含励磁支路）。
+            // 励磁/涌流分量单独通过 Magnetizing* 字段暴露，避免待机时出现“二次侧大电流”误解。
+            _currentState.SecondaryCurrent = loadSecondaryCurrent;
+
+            _currentState.LoadRatio = ratedSecondaryCurrent > 0
+                ? Math.Abs(loadSecondaryCurrent) / ratedSecondaryCurrent
+                : 0;
+
             double i1W = i2W / turnsRatio;
-            double inrushQ = _specs.MagnetizingInrushEnabled ? _inrushExtraPrimaryA : 0.0;
-            _currentState.MagnetizingInrushCurrentPrimary = inrushQ;
-            double i1Q = i2Q / turnsRatio + noLoadCurrent + inrushQ; // 励磁 + 快速抬压涌流（无功支路）
-
+            double i1Q = i2QTotal / turnsRatio;
             _currentState.PrimaryCurrent = Math.Sqrt(i1W * i1W + i1Q * i1Q);
-            // 根据二次侧电流方向计算一次侧电流方向
-            if (secondaryCurrent < 0)
-            {
+            if (loadSecondaryCurrent < 0 && Math.Abs(i2W) >= 1e-6)
                 _currentState.PrimaryCurrent = -_currentState.PrimaryCurrent;
-            }
+            else if (loadSecondaryCurrent < 0 && i2QTotal < 0)
+                _currentState.PrimaryCurrent = -Math.Abs(_currentState.PrimaryCurrent);
 
             // 10. 计算损耗
             _currentState.IronLoss = _specs.NoLoadLoss * Math.Pow(primaryVoltage / _specs.PrimaryVoltage, 2);
@@ -199,7 +233,7 @@ namespace EssSimulator.EssDeviceSimModel
 
             // 11. 计算效率
             // 三相有功：P = sqrt(3) * Uline * Iline * pf
-            double outputPower = Math.Sqrt(3.0) * _currentState.SecondaryVoltage * secondaryCurrent * powerFactor;
+            double outputPower = Math.Sqrt(3.0) * _currentState.SecondaryVoltage * loadSecondaryCurrent * powerFactor;
             var pAbs = Math.Abs(outputPower);
             _currentState.Efficiency = (pAbs + _currentState.TotalLoss) > 0
                 ? pAbs / (pAbs + _currentState.TotalLoss)

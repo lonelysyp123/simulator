@@ -28,6 +28,14 @@ namespace EssSimulator.EssDeviceSimModel
         GridConnected,  // 并网
         Islanded        // 离网
     }
+
+    /// <summary>黑启动子状态：建压（V/f）或同步并联（母线已带电）。</summary>
+    public enum BlackStartPhase
+    {
+        Inactive = 0,
+        VoltageBuilding = 1,
+        Synchronized = 2
+    }
     
     // PCS配置参数
     public class PcsConfiguration
@@ -84,14 +92,17 @@ namespace EssSimulator.EssDeviceSimModel
 
         public DateTime Timestamp { get; set; }         // 状态时间戳
 
-        /// <summary>EMS 下发的孤岛电压百分比设定（0–100），用于黑启动 / 离网建压目标。</summary>
-        public double IslandVoltagePercentCommand { get; set; }
+        /// <summary>EMS 下发的孤岛电压设定（V，线电压幅值，0–交流额定）。</summary>
+        public double IslandVoltageCommandV { get; set; }
 
-        /// <summary>PCS 内部跟随后的有效百分比（0–100），用于遥测反馈。</summary>
-        public double IslandVoltagePercentEffective { get; set; }
+        /// <summary>PCS 内部跟随后的有效孤岛电压（V），用于遥测反馈与 V/f 输出。</summary>
+        public double IslandVoltageEffectiveV { get; set; }
 
         /// <summary>黑启动模式是否激活（与 EMS 黑启动开启点位一致）。</summary>
         public bool BlackStartEnabled { get; set; }
+
+        /// <summary>黑启动子状态：建压 / 同步并联 / 未激活。</summary>
+        public BlackStartPhase BlackStartPhase { get; set; }
     }
 
     // 电网状态
@@ -125,18 +136,25 @@ namespace EssSimulator.EssDeviceSimModel
         private readonly double _gridLossCoefficient; // 电网损耗系数，用于简化计算
 
         private readonly object _islandVfLock = new();
-        private double _islandVfCommandPercent;
-        private double _islandVfEffectivePercent;
-        private double _lastIslandVfCommandPercent = -1;
-        private readonly double _islandVfSlewRatePercentPerSecond;
-        private readonly double _islandVoltageStepFaultThresholdPercent;
-        private readonly double _islandVoltageGridConflictThresholdPercent;
-        /// <summary>0=无 1=设定阶跃过大 2=并网时 VF 百分比冲突</summary>
-        private int _islandVoltageFaultCode;
+        private double _islandVfCommandV;
+        private double _islandVfEffectiveV;
+        /// <summary>孤岛电压有效值向命令值过渡的最长仿真时间（秒）；建压/降压均在此时间内完成，便于快 dV/dt 触发励磁涌流。</summary>
+        private readonly double _islandVoltageRampDurationSec;
         private bool _blackStartEnabled;
-        private readonly double _blackStartActivePowerGainKwPerPercent;
+        private readonly double _blackStartActivePowerGainKwPerVolt;
         private readonly double _blackStartMaxActivePowerKw;
         private readonly double _blackStartMagnetizingPowerFraction;
+        private readonly double _blackStartBusEnergizedFraction;
+        private double _unitBusVoltageV;
+        private BlackStartPhase _blackStartPhase = BlackStartPhase.Inactive;
+        private double _transformerMagnetizingReactiveKvar;
+        private double _blackStartSharedLossActivePowerKw;
+        /// <summary>EMS 负荷有功/无功（爬坡线程），与站用电叠加后受额定功率限制。</summary>
+        private double _loadActivePowerKw;
+        private double _loadReactivePowerKvar;
+        private ushort _latchedFaultType;
+        private string? _latchedFaultMessage;
+        private bool _faultTripLatched;
         private bool _externalRunCommand;
         private bool _externalRunRisingEdge;
         /// <summary>
@@ -159,23 +177,21 @@ namespace EssSimulator.EssDeviceSimModel
             double slope = 1,
             int intervalMs = 100,
             int delayMs = 0,
-            double islandVfSlewRatePercentPerSecond = 20,
-            double islandVoltageStepFaultThresholdPercent = 25,
-            double islandVoltageGridConflictThresholdPercent = 5,
-            double blackStartActivePowerGainKwPerPercent = 15,
+            double islandVoltageRampDurationMs = 100,
+            double blackStartActivePowerGainKwPerVolt = 2.174,
             double blackStartMaxActivePowerKw = 200,
-            double blackStartMagnetizingPowerFraction = 0.02)
+            double blackStartMagnetizingPowerFraction = 0.02,
+            double blackStartBusEnergizedFraction = 0.85)
         {
             _config = config;
             _speedup = speedup > 0 ? speedup : 1.0;
             _ambientTemperature = ambientTemp;
             _gridLossCoefficient = Math.Clamp(gridLossCoefficient, 0, 0.95);
-            _islandVfSlewRatePercentPerSecond = Math.Max(0.1, islandVfSlewRatePercentPerSecond);
-            _islandVoltageStepFaultThresholdPercent = Math.Max(1, islandVoltageStepFaultThresholdPercent);
-            _islandVoltageGridConflictThresholdPercent = Math.Max(0, islandVoltageGridConflictThresholdPercent);
-            _blackStartActivePowerGainKwPerPercent = Math.Max(0, blackStartActivePowerGainKwPerPercent);
+            _islandVoltageRampDurationSec = Math.Max(0.001, islandVoltageRampDurationMs / 1000.0);
+            _blackStartActivePowerGainKwPerVolt = Math.Max(0, blackStartActivePowerGainKwPerVolt);
             _blackStartMaxActivePowerKw = Math.Max(0, blackStartMaxActivePowerKw);
             _blackStartMagnetizingPowerFraction = Math.Clamp(blackStartMagnetizingPowerFraction, 0, 0.2);
+            _blackStartBusEnergizedFraction = Math.Clamp(blackStartBusEnergizedFraction, 0.5, 1.0);
             _slope = slope;
             _interval = Math.Max(1, intervalMs);
             _delay = Math.Max(0, delayMs);
@@ -212,6 +228,9 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>本周期是否检测到外部启停 0→1 边沿（每周期在 SyncExternalRunCommand 后读取一次）。</summary>
         public bool ExternalRunRisingEdge => _externalRunRisingEdge;
 
+        /// <summary>已发生故障跳闸并锁存，需外部启停先写 0 再写 1 方可清除后重新启动。</summary>
+        public bool HasLatchedFaultTrip => _faultTripLatched;
+
         /// <summary>
         /// 同步 EMS/Modbus 启停位。停机仅由外部写 0、联锁或故障触发；禁止网侧恢复后自动离开 Off。
         /// </summary>
@@ -220,13 +239,42 @@ namespace EssSimulator.EssDeviceSimModel
             _externalRunRisingEdge = run && !_externalRunCommand;
             if (!run)
             {
-                ApplyIslandVoltagePercentCommand(0);
+                ClearLatchedFault();
+                ApplyIslandVoltageCommand(0);
                 ApplyBlackStartEnabled(false);
                 if (_currentState.Mode != OperationMode.Off)
                     TransitionToMode(OperationMode.Off);
             }
+            else if (_externalRunRisingEdge)
+            {
+                // 外部重新发启动脉冲时清除历史故障；保持启停=1 时不自动复归
+                ClearLatchedFault();
+            }
 
             _externalRunCommand = run;
+        }
+
+        private void ClearLatchedFault()
+        {
+            _faultTripLatched = false;
+            _latchedFaultType = 0;
+            _latchedFaultMessage = null;
+            _currentState.FaultType = 0;
+            _currentState.FaultMessage = null;
+        }
+
+        private void LatchFault(ushort faultType, string message)
+        {
+            if (faultType == 0)
+                return;
+            _faultTripLatched = true;
+            _latchedFaultType = faultType;
+            if (string.IsNullOrEmpty(_latchedFaultMessage))
+                _latchedFaultMessage = message;
+            else if (!string.IsNullOrEmpty(message) && _latchedFaultMessage.IndexOf(message, StringComparison.Ordinal) < 0)
+                _latchedFaultMessage += message;
+            _currentState.FaultType = _latchedFaultType;
+            _currentState.FaultMessage = _latchedFaultMessage;
         }
 
         /// <summary>
@@ -242,125 +290,211 @@ namespace EssSimulator.EssDeviceSimModel
             return p >= 0 ? p * lineEfficiency : p / lineEfficiency;
         }
 
-        /// <summary>EMS/Modbus 写入「孤岛电压百分比」设定（0–100），并检测单次阶跃过大等异常。</summary>
-        public void ApplyIslandVoltagePercentCommand(double percent)
+        /// <summary>EMS/Modbus 写入孤岛电压设定（V）。黑启动同步模式下忽略。</summary>
+        public void ApplyIslandVoltageCommand(double voltageV)
         {
-            percent = Math.Clamp(percent, 0, 100);
+            if (_blackStartEnabled && _blackStartPhase == BlackStartPhase.Synchronized)
+                return;
+
+            double maxV = _config.AcVoltageNominal;
+            voltageV = Math.Clamp(voltageV, 0, maxV);
             lock (_islandVfLock)
             {
-                if (percent < 0.5 && _islandVoltageFaultCode != 0)
-                    _islandVoltageFaultCode = 0;
-
-                // 仅对「单次爬升过大」判故障（急降视为正常急停）；首次写入不判。
-                if (_lastIslandVfCommandPercent >= 0 &&
-                    percent - _lastIslandVfCommandPercent > _islandVoltageStepFaultThresholdPercent)
-                    _islandVoltageFaultCode = 1;
-
-                _lastIslandVfCommandPercent = percent;
-                _islandVfCommandPercent = percent;
-                _currentState.IslandVoltagePercentCommand = percent;
+                _islandVfCommandV = voltageV;
+                _currentState.IslandVoltageCommandV = voltageV;
             }
         }
 
-        /// <summary>EMS 写入黑启动开启；开启后由 PCS 内环根据孤岛电压百分比调节有功，忽略外部 P/Q 设定。</summary>
+        /// <summary>EMS 写入黑启动开启。</summary>
         public void ApplyBlackStartEnabled(bool enabled)
         {
             _blackStartEnabled = enabled;
             _currentState.BlackStartEnabled = enabled;
             if (!enabled)
+            {
+                _blackStartPhase = BlackStartPhase.Inactive;
+                _currentState.BlackStartPhase = BlackStartPhase.Inactive;
                 return;
+            }
 
+            // 黑启动构网不接收外部功率模式设定，切入时清空并停止爬坡线程残留
             lock (_setpointLock)
             {
                 _rampStopRequested = true;
                 _pendingActiveSetpoint = 0;
                 _pendingReactiveSetpoint = 0;
             }
+            _loadActivePowerKw = 0;
+            _loadReactivePowerKvar = 0;
         }
+
+        private bool CanAcceptPowerCommand =>
+            _currentState.Mode == OperationMode.Normal &&
+            _gridState.IsAvailable;
+
+        private static void ClampApparentPower(ref double activeKw, ref double reactiveKvar, double ratedKva, double overload = 1.1)
+        {
+            double s = Math.Sqrt(activeKw * activeKw + reactiveKvar * reactiveKvar);
+            double maxS = ratedKva * overload;
+            if (s <= maxS || s < 1e-6)
+                return;
+            double scale = maxS / s;
+            activeKw *= scale;
+            reactiveKvar *= scale;
+        }
+
+        /// <summary>主循环刷新同单元 690V 母线电压，判定建压/同步阶段。</summary>
+        public void RefreshBlackStartBusContext(double unitBusVoltageV)
+        {
+            _unitBusVoltageV = Math.Max(0, unitBusVoltageV);
+            if (!_blackStartEnabled)
+            {
+                _blackStartPhase = BlackStartPhase.Inactive;
+                _currentState.BlackStartPhase = BlackStartPhase.Inactive;
+                return;
+            }
+
+            double nom = Math.Max(_config.AcVoltageNominal, 1.0);
+            double energizedV = nom * _blackStartBusEnergizedFraction;
+            bool busEnergized = _unitBusVoltageV >= energizedV;
+
+            if (busEnergized)
+                _blackStartPhase = BlackStartPhase.Synchronized;
+            else
+                _blackStartPhase = BlackStartPhase.VoltageBuilding;
+
+            _currentState.BlackStartPhase = _blackStartPhase;
+
+            if (_blackStartPhase == BlackStartPhase.Synchronized)
+            {
+                double v = Math.Clamp(_unitBusVoltageV, 0, nom);
+                lock (_islandVfLock)
+                {
+                    _islandVfEffectiveV = v;
+                    _currentState.IslandVoltageEffectiveV = v;
+                }
+            }
+        }
+
+        public BlackStartPhase GetBlackStartPhase() => _blackStartPhase;
+
+        public bool IsBlackStartSynchronized =>
+            _blackStartEnabled && _blackStartPhase == BlackStartPhase.Synchronized;
 
         public bool IsBlackStartActive =>
             _blackStartEnabled &&
             _currentState.Mode == OperationMode.Normal &&
             _currentState.GMode == GridMode.Islanded;
 
-        /// <summary>黑启动内环：按孤岛电压百分比目标与有效值之差调节有功；无功由 V/f 固定为 0。</summary>
+        /// <summary>单元变二次侧励磁/涌流折算的无功需求（kvar，由主循环在每步变压器更新后写入）。</summary>
+        public void SetTransformerMagnetizingReactiveKvar(double reactiveKvar) =>
+            _transformerMagnetizingReactiveKvar = Math.Max(0, reactiveKvar);
+
+        /// <summary>黑启动：分摊的站用电有功（铁损+线损，kW）。</summary>
+        public void SetBlackStartSharedLossActivePowerKw(double activeKw) =>
+            _blackStartSharedLossActivePowerKw = Math.Max(0, activeKw);
+
+        /// <summary>
+        /// 黑启动构网：站用电（励磁无功+铁损/线损+建压有功）+ EMS 负荷 P/Q，总输出受额定功率与 MaxPower 限制。
+        /// </summary>
         private void ApplyBlackStartPowerControl(TimeSpan timeStep)
         {
             if (!IsBlackStartActive)
                 return;
 
-            double cmd;
-            double eff;
-            lock (_islandVfLock)
+            double loadP = _loadActivePowerKw;
+            double loadQ = _loadReactivePowerKvar;
+            double stationP = _blackStartSharedLossActivePowerKw;
+            double stationQ = _transformerMagnetizingReactiveKvar;
+
+            if (_blackStartPhase == BlackStartPhase.VoltageBuilding)
             {
-                cmd = _islandVfCommandPercent;
-                eff = _islandVfEffectivePercent;
+                double cmdV;
+                double effV;
+                lock (_islandVfLock)
+                {
+                    cmdV = _islandVfCommandV;
+                    effV = _islandVfEffectiveV;
+                }
+
+                double gapV = Math.Max(0, cmdV - effV);
+                double buildP = _blackStartActivePowerGainKwPerVolt * gapV;
+                stationP = Math.Max(stationP, buildP);
+
+                double maxStep = _blackStartMaxActivePowerKw * timeStep.TotalSeconds;
+                if (maxStep < 1.0)
+                    maxStep = 1.0;
+                double buildTarget = stationP + loadP;
+                double currentP = _currentState.ActivePower;
+                if (buildTarget > currentP + maxStep)
+                    buildTarget = currentP + maxStep;
+                else if (buildTarget < currentP - maxStep)
+                    buildTarget = buildTarget < 0 ? 0 : buildTarget;
+                stationP = Math.Max(0, buildTarget - loadP);
             }
 
-            double gapPercent = Math.Max(0, cmd - eff);
-            double targetP = _blackStartActivePowerGainKwPerPercent * gapPercent;
-            if (eff > 0.5)
-                targetP += _config.RatedPower * _blackStartMagnetizingPowerFraction * (eff / 100.0);
-            targetP = Math.Clamp(targetP, 0, _blackStartMaxActivePowerKw);
+            double targetP = stationP + loadP;
+            double targetQ = stationQ + loadQ;
+            targetP = Math.Clamp(targetP, -_config.MaxPower, _config.MaxPower);
+            targetQ = Math.Clamp(targetQ, -_config.MaxPower, _config.MaxPower);
+            ClampApparentPower(ref targetP, ref targetQ, _config.RatedPower);
 
-            double maxStep = _blackStartMaxActivePowerKw * timeStep.TotalSeconds;
-            if (maxStep < 1.0)
-                maxStep = 1.0;
-            double currentP = _currentState.ActivePower;
-            if (targetP > currentP + maxStep)
-                _currentState.ActivePower = currentP + maxStep;
-            else if (targetP < currentP - maxStep)
-                _currentState.ActivePower = targetP < 0 ? 0 : targetP;
-            else
-                _currentState.ActivePower = targetP;
-
-            _currentState.ReactivePower = 0;
+            _currentState.ActivePower = targetP;
+            _currentState.ReactivePower = targetQ;
         }
 
-        private void SlewIslandVoltagePercentTowardCommand(TimeSpan timeStep)
+        /// <summary>
+        /// 有效孤岛电压在 <see cref="_islandVoltageRampDurationSec"/> 内线性趋近命令值（默认 100ms），
+        /// 替代原 V/s 慢爬坡，使 0→690V 等阶跃能产生足够快的一次侧 dV/dt 与励磁涌流。
+        /// </summary>
+        private void UpdateIslandVoltageEffectiveTowardCommand(TimeSpan timeStep)
         {
+            if (_blackStartEnabled && _blackStartPhase == BlackStartPhase.Synchronized)
+                return;
+
             lock (_islandVfLock)
             {
                 if (_currentState.Mode is OperationMode.Off or OperationMode.Standby)
-                    _islandVfEffectivePercent = 0;
+                    _islandVfEffectiveV = 0;
                 else
                 {
-                    double maxStep = _islandVfSlewRatePercentPerSecond * timeStep.TotalSeconds;
-                    double target = _islandVfCommandPercent;
-                    double eff = _islandVfEffectivePercent;
-                    if (Math.Abs(target - eff) <= maxStep)
-                        _islandVfEffectivePercent = target;
+                    double target = _islandVfCommandV;
+                    double eff = _islandVfEffectiveV;
+                    double gap = target - eff;
+                    if (Math.Abs(gap) < 1e-6)
+                        _islandVfEffectiveV = target;
                     else
-                        _islandVfEffectivePercent = eff + Math.Sign(target - eff) * maxStep;
+                    {
+                        double dt = Math.Max(timeStep.TotalSeconds, 1e-6);
+                        double rampFrac = Math.Min(1.0, dt / _islandVoltageRampDurationSec);
+                        _islandVfEffectiveV = eff + gap * rampFrac;
+                    }
                 }
 
-                _currentState.IslandVoltagePercentCommand = _islandVfCommandPercent;
-                _currentState.IslandVoltagePercentEffective = _islandVfEffectivePercent;
+                _currentState.IslandVoltageCommandV = _islandVfCommandV;
+                _currentState.IslandVoltageEffectiveV = _islandVfEffectiveV;
             }
         }
 
-        // 更新电网状态
-        public void UpdateGridState(double voltage, double frequency, bool isAvailable)
+        /// <summary>
+        /// 更新网侧电压/频率。<paramref name="isUtilityGridAvailable"/> 仅表示 220kV/35kV 主网带电；
+        /// 同单元另一台 PCS 建压的 690V 母线不等同于主网，不得置 true（否则黑启动会报「电网可用」故障）。
+        /// </summary>
+        public void UpdateGridState(double voltage, double frequency, bool isUtilityGridAvailable)
         {
             _gridState.Voltage = voltage / (1 - _gridLossCoefficient);
             _gridState.Frequency = frequency;
-            _gridState.IsAvailable = isAvailable;
+            _gridState.IsAvailable = isUtilityGridAvailable;
 
-            // 电网状态变化时自动切换模式
-            if (!isAvailable && _currentState.GMode == GridMode.GridConnected)
-            {
+            if (!isUtilityGridAvailable && _currentState.GMode == GridMode.GridConnected)
                 TransitionToGMode(GridMode.Islanded);
-            }
-            else if (isAvailable && _currentState.GMode == GridMode.Islanded)
-            {
+            else if (isUtilityGridAvailable && _currentState.GMode == GridMode.Islanded && !_blackStartEnabled)
                 TransitionToGMode(GridMode.GridConnected);
-            }
 
-            // 电网不可用且非黑启动：清零功率；黑启动由 ApplyBlackStartPowerControl 内环调节
-            if (!isAvailable && !_blackStartEnabled)
-            {
+            if (!isUtilityGridAvailable && !_blackStartEnabled)
                 StopRampsAndZeroPower();
-            }
+            else if (IsBlackStartActive && _currentState.Mode == OperationMode.Normal)
+                _rampStopRequested = false;
         }
 
         // 模式切换
@@ -399,6 +533,10 @@ namespace EssSimulator.EssDeviceSimModel
             //     //throw new InvalidOperationException("PCS is not in power delivery mode");
             // }
 
+            // 黑启动构网：功率由站用电模型自动计算，不响应 EMS/外部功率指令
+            if (IsBlackStartActive)
+                return;
+
             // 功率限制检查
             activePower = Math.Max(-_config.MaxPower, Math.Min(_config.MaxPower, activePower));
             reactivePower = Math.Max(-_config.MaxPower, Math.Min(_config.MaxPower, reactivePower));
@@ -411,13 +549,10 @@ namespace EssSimulator.EssDeviceSimModel
                 //    $"Power command exceeds PCS capacity: {apparentPower}kVA > {_config.RatedPower * 1.1}kVA");
             }
 
-            // 黑启动开启：EMS 有功/无功设定无效
-            if (IsBlackStartActive)
+            if (_faultTripLatched)
                 return;
 
-            // 仅记录设定值，由后台线程分阶段逼近
-            // 电网不可用或非 Normal 时不接收功率指令（保持 0）
-            if (!_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+            if (!CanAcceptPowerCommand)
             {
                 StopRampsAndZeroPower();
                 return;
@@ -454,6 +589,8 @@ namespace EssSimulator.EssDeviceSimModel
             // 2) 清零当前输出（避免 UI/电池模型继续按非零功率推进）
             _currentState.ActivePower = 0;
             _currentState.ReactivePower = 0;
+            _loadActivePowerKw = 0;
+            _loadReactivePowerKvar = 0;
         }
 
         // 按需启动功率调节线程，避免无用的后台占用
@@ -518,9 +655,11 @@ namespace EssSimulator.EssDeviceSimModel
             while (true)
             {
                 // 停止请求：退出线程
-                if (_rampStopRequested || !_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+                if (_rampStopRequested || !CanAcceptPowerCommand)
                 {
-                    _currentState.ActivePower = 0;
+                    _loadActivePowerKw = 0;
+                    if (!IsBlackStartActive)
+                        _currentState.ActivePower = 0;
                     lock (_setpointLock)
                     {
                         _activeRampThreadRunning = false;
@@ -535,7 +674,7 @@ namespace EssSimulator.EssDeviceSimModel
                     desiredActive = _pendingActiveSetpoint;
                 }
 
-                double currentActive = _currentState.ActivePower;
+                double currentActive = IsBlackStartActive ? _loadActivePowerKw : _currentState.ActivePower;
                 var ActiveStages = ComputePowerRampStages(currentActive, desiredActive, _activeRampCurve);
 
                 // 如果当前已达到目标且没有阶段需要执行，则退出线程节省资源
@@ -551,9 +690,11 @@ namespace EssSimulator.EssDeviceSimModel
 
                 foreach (var stage in ActiveStages)
                 {
-                    if (_rampStopRequested || !_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+                    if (_rampStopRequested || !CanAcceptPowerCommand)
                     {
-                        _currentState.ActivePower = 0;
+                        _loadActivePowerKw = 0;
+                        if (!IsBlackStartActive)
+                            _currentState.ActivePower = 0;
                         lock (_setpointLock)
                         {
                             _activeRampThreadRunning = false;
@@ -562,23 +703,19 @@ namespace EssSimulator.EssDeviceSimModel
                         return;
                     }
 
-                    // 在执行每个阶段前检查是否有新的设定值，如果有则打断并重算
                     double latestActive;
                     lock (_setpointLock)
                     {
                         latestActive = _pendingActiveSetpoint;
                     }
                     if (Math.Abs(latestActive - desiredActive) > 0)
-                    {
-                        // 设定发生变化，跳出重新计算
                         break;
-                    }
 
-                    // 爬坡延迟按仿真加速倍率压缩，使仿真时间轴上的爬坡速率与配置一致
                     Thread.Sleep(Math.Max(1, (int)(stage.DelayMs / _speedup)));
 
-                    // 根据阶段目标更新无功功率
-                    _currentState.ActivePower = stage.Target;
+                    _loadActivePowerKw = stage.Target;
+                    if (!IsBlackStartActive)
+                        _currentState.ActivePower = stage.Target;
                 }
             }
         }
@@ -588,9 +725,11 @@ namespace EssSimulator.EssDeviceSimModel
             while (true)
             {
                 // 停止请求：退出线程
-                if (_rampStopRequested || !_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+                if (_rampStopRequested || !CanAcceptPowerCommand)
                 {
-                    _currentState.ReactivePower = 0;
+                    _loadReactivePowerKvar = 0;
+                    if (!IsBlackStartActive)
+                        _currentState.ReactivePower = 0;
                     lock (_setpointLock)
                     {
                         _reactiveRampThreadRunning = false;
@@ -605,7 +744,7 @@ namespace EssSimulator.EssDeviceSimModel
                     desiredReactive = _pendingReactiveSetpoint;
                 }
 
-                double currentReactive = _currentState.ReactivePower;
+                double currentReactive = IsBlackStartActive ? _loadReactivePowerKvar : _currentState.ReactivePower;
                 var ReactiveStages = ComputePowerRampStages(currentReactive, desiredReactive, _reactiveRampCurve);
                 // 如果当前已达到目标且没有阶段需要执行，则退出线程节省资源
                 if (ReactiveStages.Count == 0)
@@ -620,9 +759,11 @@ namespace EssSimulator.EssDeviceSimModel
 
                 foreach (var stage in ReactiveStages)
                 {
-                    if (_rampStopRequested || !_gridState.IsAvailable || _currentState.Mode != OperationMode.Normal)
+                    if (_rampStopRequested || !CanAcceptPowerCommand)
                     {
-                        _currentState.ReactivePower = 0;
+                        _loadReactivePowerKvar = 0;
+                        if (!IsBlackStartActive)
+                            _currentState.ReactivePower = 0;
                         lock (_setpointLock)
                         {
                             _reactiveRampThreadRunning = false;
@@ -631,23 +772,19 @@ namespace EssSimulator.EssDeviceSimModel
                         return;
                     }
 
-                    // 在执行每个阶段前检查是否有新的设定值，如果有则打断并重算
                     double latestReactive;
                     lock (_setpointLock)
                     {
                         latestReactive = _pendingReactiveSetpoint;
                     }
                     if (Math.Abs(latestReactive - desiredReactive) > 0)
-                    {
-                        // 设定发生变化，跳出重新计算
                         break;
-                    }
 
-                    // 爬坡延迟按仿真加速倍率压缩，使仿真时间轴上的爬坡速率与配置一致
                     Thread.Sleep(Math.Max(1, (int)(stage.DelayMs / _speedup)));
 
-                    // 根据阶段目标更新当前功率
-                    _currentState.ReactivePower = stage.Target;
+                    _loadReactivePowerKvar = stage.Target;
+                    if (!IsBlackStartActive)
+                        _currentState.ReactivePower = stage.Target;
                 }
             }
         }
@@ -691,34 +828,18 @@ namespace EssSimulator.EssDeviceSimModel
             _currentState.Timestamp = timeStamp;
             _currentState.DcVoltage = dcVoltage;
 
-            SlewIslandVoltagePercentTowardCommand(timeStep);
-            ApplyBlackStartPowerControl(timeStep);
+            UpdateIslandVoltageEffectiveTowardCommand(timeStep);
 
-            // 1. 检查故障条件
-            CheckFaultConditions();
-            if (_currentState.FaultType != 3)
+            // 1) 先确定本步目标功率，再基于该功率计算电气量，避免保护判断滞后一拍
+            if (IsBlackStartActive)
+                ApplyBlackStartPowerControl(timeStep);
+            else
             {
-                _currentState.FaultType = isBmsFault;
+                _currentState.ActivePower = _loadActivePowerKw;
+                _currentState.ReactivePower = _loadReactivePowerKvar;
             }
 
-            // 运行模式 Off/Normal/Standby 由 TransitionToMode（EMS 启停、电网拓扑等）驱动。
-            // 此处仅在“必须故障停机”时调用 TransitionToMode(Off)，禁止在无故障时每步强制 Normal，
-            // 否则会覆盖 ApplyEmuCommands 的停机指令，造成界面在「停机/正常」间来回跳。
-            if (_currentState.FaultType != 0)
-            {
-                // 正放负充约定：充电故障(1)阻止 ActivePower<0，放电故障(2)阻止 ActivePower>0
-                if (_currentState.FaultType == 3 ||
-                    (_currentState.FaultType == 1 && _currentState.ActivePower < 0) ||
-                    (_currentState.FaultType == 2 && _currentState.ActivePower > 0))
-                {
-                    TransitionToMode(OperationMode.Off);
-                }
-            }
-
-            // 设计约束：无功目标由 EMS 主控下发，PCS 不在本地自动改写无功设定值。
-            // 因此这里不调用本地 Volt-Var 控制逻辑，避免覆盖 EMS 设定。
-
-            // 2. 根据模式更新状态
+            // 2) 根据模式更新电气量（过流等保护基于本步 P/Q 与 AcCurrent）
             switch (_currentState.Mode)
             {
                 case OperationMode.Off:
@@ -730,25 +851,33 @@ namespace EssSimulator.EssDeviceSimModel
                     break;
                 case OperationMode.Normal:
                     if (_currentState.GMode == GridMode.GridConnected)
-                    {
                         UpdateGridConnectedState();
-                    }
                     else if (_currentState.GMode == GridMode.Islanded)
-                    {
                         UpdateIslandedState();
-                    }
                     else
-                    {
                         UpdateStandbyState();
-                    }
                     break;
                 default:
                     UpdateStandbyState();
                     break;
             }
 
-            // 3. 更新温度模型
             UpdateTemperatureModel(timeStep);
+
+            CheckFaultConditions();
+            if (isBmsFault != 0)
+                LatchFault(isBmsFault, $"BMS fault ({isBmsFault}); ");
+
+            if (_currentState.FaultType != 0)
+            {
+                if (_currentState.FaultType == 3 ||
+                    (_currentState.FaultType == 1 && _currentState.ActivePower < 0) ||
+                    (_currentState.FaultType == 2 && _currentState.ActivePower > 0))
+                {
+                    TransitionToMode(OperationMode.Off);
+                    UpdateStandbyState();
+                }
+            }
 
             // 4. 更新充放电能量统计（正放负充：ActivePower>0为放电，<0为充电）
             double energyChange = _currentState.ActivePower * timeStep.TotalHours; // kWh
@@ -809,9 +938,8 @@ namespace EssSimulator.EssDeviceSimModel
                 : _currentState.ActivePower * _config.Efficiency;
             _currentState.DcCurrent = dcPower * 1000 / _currentState.DcVoltage;
 
-            // 交流侧参数：V/f 幅值 = 额定 × 有效孤岛电压百分比（黑启动/离网建压）
-            double vMag = _config.AcVoltageNominal * (_currentState.IslandVoltagePercentEffective / 100.0);
-            _currentState.AcVoltage = Math.Max(vMag, 1.0);
+            // 交流侧参数：V/f 幅值 = 有效孤岛电压（V）
+            _currentState.AcVoltage = Math.Max(_currentState.IslandVoltageEffectiveV, 1.0);
             _currentState.Frequency = _config.FrequencyNominal;
 
             // 计算交流电流（带符号，正=放电，负=充电）
@@ -837,63 +965,53 @@ namespace EssSimulator.EssDeviceSimModel
 
         private void CheckFaultConditions()
         {
-            _currentState.FaultType = 0;
-            _currentState.FaultMessage = "";
+            if (_faultTripLatched)
+            {
+                _currentState.FaultType = _latchedFaultType;
+                _currentState.FaultMessage = _latchedFaultMessage;
+                return;
+            }
 
-            // 检查直流电压范围
+            ushort instantFault = 0;
+            var msg = new StringBuilder();
+
             if (_currentState.DcVoltage < _config.DcVoltageRangeMin * 0.9 ||
                 _currentState.DcVoltage > _config.DcVoltageRangeMax * 1.1)
             {
-                _currentState.FaultType = 3;
-                _currentState.FaultMessage += $"DC voltage fault: {_currentState.DcVoltage}V; ";
+                instantFault = 3;
+                msg.Append($"DC voltage fault: {_currentState.DcVoltage:F1}V; ");
             }
 
-            // 检查过流
             if (Math.Abs(_currentState.AcCurrent) > _config.MaxCurrent)
             {
-                _currentState.FaultType = 3;
-                _currentState.FaultMessage += $"Over current: {_currentState.AcCurrent}A; ";
+                instantFault = 3;
+                msg.Append($"Over current: {_currentState.AcCurrent:F1}A (limit {_config.MaxCurrent:F0}A); ");
             }
 
-            // 检查温度
-            if (_currentState.Temperature > 70.0) // 假设70°C为过热阈值
+            if (_currentState.Temperature > 70.0)
             {
-                _currentState.FaultType = 3;
-                _currentState.FaultMessage += $"Over temperature: {_currentState.Temperature}°C; ";
+                instantFault = 3;
+                msg.Append($"Over temperature: {_currentState.Temperature:F1}°C; ");
             }
 
-            // 检查孤岛保护 (仅并网模式)
             if (_currentState.GMode == GridMode.GridConnected && !_gridState.IsAvailable)
             {
-                _currentState.FaultType = 3;
-                _currentState.FaultMessage += "Islanding detected; ";
-            }
-
-            double islandCmd;
-            int islandFaultCode;
-            lock (_islandVfLock)
-            {
-                islandCmd = _islandVfCommandPercent;
-                islandFaultCode = _islandVoltageFaultCode;
-            }
-
-            if (islandFaultCode == 1)
-            {
-                _currentState.FaultType = 3;
-                _currentState.FaultMessage += "Island voltage percent setpoint step too large; ";
-            }
-
-            if (_currentState.GMode == GridMode.GridConnected && _gridState.IsAvailable &&
-                islandCmd > _islandVoltageGridConflictThresholdPercent)
-            {
-                _currentState.FaultType = 3;
-                _currentState.FaultMessage += "Island voltage percent conflict while grid-connected; ";
+                instantFault = 3;
+                msg.Append("Islanding detected; ");
             }
 
             if (_blackStartEnabled && _gridState.IsAvailable)
             {
-                _currentState.FaultType = 3;
-                _currentState.FaultMessage += "Black start enabled while grid is available; ";
+                instantFault = 3;
+                msg.Append("Black start enabled while utility grid is available; ");
+            }
+
+            if (instantFault != 0)
+                LatchFault(instantFault, msg.ToString());
+            else
+            {
+                _currentState.FaultType = 0;
+                _currentState.FaultMessage = null;
             }
         }
     }

@@ -18,6 +18,6 @@
 4,32,int32,32,yc16,1000,总无功功率,model=4|arg1=em.TotalReactivePower|arg2= |arg3= |arg4=100
 4,34,int32,32,yc17,1000,总视在功率,model=4|arg1=em.TotalApparentPower|arg2= |arg3= |arg4=100
 4,36,int32,32,yc18,1000,功率因数,model=4|arg1=em.PowerFactor|arg2= |arg3= |arg4=100
-4,38,int32,32,yc19,1000,频率,model=4|arg1=em.Frequency|arg2= |arg3= |arg4=100
+4,38,int32,32,yc19,1000,频率,50
 4,40,int32,32,yc20,1000,正向总有功电能,model=4|arg1=em.ForwardActiveEnergy|arg2= |arg3= |arg4=100
 4,42,int32,32,yc21,1000,反向总有功电能,model=4|arg1=em.ReverseActiveEnergy|arg2= |arg3= |arg4=100

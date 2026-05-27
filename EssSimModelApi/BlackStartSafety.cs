@@ -1,12 +1,14 @@
 using System.Threading;
 using EssSimulator.EssDeviceSimModel;
+using EssSimulator.Display;
 using log4net;
 using Microsoft.Extensions.Hosting;
 
 namespace EssSimulator.EssSimModelApi
 {
     /// <summary>
-    /// 黑启动与电网断路器联锁：合闸状态下开启黑启动视为电站短路风险，延时退出进程。
+    /// 黑启动与断路器联锁：仅当「主断合闸 + 所属单元高压合闸」时开启黑启动视为向电网侧建压短路风险。
+    /// 真实顺序（主断分模拟失电 → 单元高压合 → 黑启动）不受本联锁限制。
     /// </summary>
     public static class BlackStartSafety
     {
@@ -69,28 +71,18 @@ namespace EssSimulator.EssSimModelApi
                 return;
 
             const string message =
-                "【严重】电站短路风险：主断路器与单元高压断路器均为合闸时禁止黑启动，5秒后退出系统。";
-            Log.Fatal($"{message} 触发来源={trigger}, PCS#{pcsNumber}");
-            try
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(message);
-                Console.WriteLine($"触发：{trigger}（PCS #{pcsNumber}）");
-                Console.ResetColor();
-            }
-            catch
-            {
-                // 无控制台时忽略
-            }
+                "电站短路风险：主断路器与单元高压断路器均为合闸时禁止黑启动。";
+            var detail = $"触发来源：{trigger}（PCS #{pcsNumber}）";
+            Log.Fatal($"【严重】{message} {detail}");
+
+            FatalSystemAlert.Trigger(message, detail, TimeSpan.FromSeconds(5));
 
             _ = Task.Run(async () =>
             {
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 Log.Fatal("黑启动联锁：执行进程退出。");
-                if (_appLifetime != null)
-                    _appLifetime.StopApplication();
-                else
-                    Environment.Exit(1);
+                try { _appLifetime?.StopApplication(); } catch { /* ignore */ }
+                FatalSystemAlert.ForceExitProcess();
             });
         }
     }

@@ -21,11 +21,11 @@ namespace EssSimulator.EssSimModelApi.Mappers
         {
             var xfSt = ess._mainTransformer.GetCurrentState();
 
-            // 并网电表安装位置：断路器与变压器之间（变压器一次侧）。
-            // 因此电表电压/电流口径统一取变压器一次侧。
-            double lineVoltage = xfSt?.PrimaryVoltage > 0
-                ? xfSt.PrimaryVoltage
-                : ess._mainTransformer._specs.PrimaryVoltage;
+            // 主变端子检测电表：优先读取主变一次侧端子电压。
+            // 主断分闸时，若35kV侧被黑启动反送，主变一次侧可出现感应电压，电表应可见该电压。
+            double lineVoltage = xfSt != null
+                ? Math.Max(0.0, xfSt.PrimaryVoltage)
+                : (ess.PccLineVoltageV > 0 ? ess.PccLineVoltageV : 0.0);
 
             // 并网点功率方向约定：+ 向电网送电（放电），- 从电网取电（用电）。
             double loadP = ess._loadSimulator.ActivePower;
@@ -41,9 +41,20 @@ namespace EssSimulator.EssSimModelApi.Mappers
             }
             double totalS = Math.Sqrt(totalP * totalP + totalQ * totalQ);
             double pf     = totalS > 0 ? Math.Clamp(totalP / totalS, -1.0, 1.0) : 1.0;
-            // 一次侧电流优先采用变压器模型计算结果（包含空载电流、损耗等影响），避免仅按 S/U 反推。
+
+            // 主变端子检测口径下，主断分闸时端子交换功率应约为0（无外部电源通道），
+            // 保持 P/Q/S 归零可避免将站内35kV侧无功误记到220kV断开侧。
+            if (!ess._breaker.IsClosed)
+            {
+                totalP = 0;
+                totalQ = 0;
+                totalS = 0;
+                pf = 1.0;
+            }
+
+            // 一次侧电流优先采用主变模型端子电流；仅在并网闭合且端子电流缺失时用 S/U 回退估算。
             double I = xfSt != null ? xfSt.PrimaryCurrent : 0.0;
-            if (I == 0.0)
+            if (Math.Abs(I) < 1e-9 && ess._breaker.IsClosed)
             {
                 I = lineVoltage > 0 ? totalS * 1000.0 / lineVoltage / Math.Sqrt(3.0) : 0.0;
             }

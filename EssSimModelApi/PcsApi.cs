@@ -170,13 +170,13 @@ namespace EssSimulator.EssSimModelApi
                 /// <summary>物理仿真模式（由 MapPcsState 同步），用于 OperationStatus 与界面展示。</summary>
                 public OperationMode SimulatorMode { get; set; }
 
-                /// <summary>孤岛电压百分比设定（0–100），离网建压/黑启动由 EMS 调节；网侧无电且大于 0 时允许 PCS 进入 Normal 跑 V/f。</summary>
-                public ushort IslandVoltagePercentSetting { get; set; }
+                /// <summary>孤岛电压设定（V，线电压 0–690）；离网建压/黑启动由 EMS 调节。</summary>
+                public ushort IslandVoltageSetting { get; set; }
 
-                /// <summary>PCS 内部有效百分比反馈（0–100），可与设定不一致（受爬坡速率限制）。</summary>
-                public float IslandVoltagePercentFeedback { get; set; }
+                /// <summary>PCS 内部有效孤岛电压反馈（V），在 IslandVoltageRampDurationMs 内趋近设定值。</summary>
+                public float IslandVoltageFeedback { get; set; }
 
-                /// <summary>黑启动开启：EMS 有功/无功设定无效，PCS 按孤岛电压百分比内环自动调节有功（V/f 建压）。</summary>
+                /// <summary>黑启动开启：EMS 有功/无功设定无效，PCS 按孤岛电压内环自动调节有功（V/f 建压）。</summary>
                 public bool BlackStartEnabled { get; set; }
 
                 public bool gridOnOffSwitch { get; set; }           //并离网控制及状态

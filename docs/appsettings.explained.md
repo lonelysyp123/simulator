@@ -74,6 +74,10 @@
   - **作用**：是否禁用控制台可视化界面。
   - **影响**：`true` 时不启动 GUI，但后台服务（仿真、点表/协议服务等）仍正常运行。
 
+- `Simulator.Runtime.AutoStartPcsOnStartup`（bool，默认 `true`）
+  - **作用**：`ess` 与 `simEmu*` Modbus 就绪后，向 `pcs1_startstop` / `pcs2_startstop` 写入 `1` 并驱动 PCS 并网。
+  - **影响**：`false` 时保持启停线圈 `0`，须 EMS/mbpoll 手动写 `1` 才能启动。
+
 ### Simulator.Protocol
 
 - `Simulator.Protocol.BaseBmsModbusPort`（int）
@@ -180,9 +184,21 @@
 
 ---
 
+## Pcc（220kV 并网点 / 并网电表电压）
+
+该段绑定到 `PccConfig`。**无功—电压闭环与并网电表电压**均取 220kV PCC；负载与储能无功汇总为 `Q_pcc` 后计算线电压，35kV 母线由额定变比推导。
+
+- `Pcc.NominalLineVoltage`（V）：PCC 额定线电压，默认 220000。
+- `Pcc.ShortCircuitMva`（MVA）：等效短路容量，决定 Q 对电压灵敏度（越大电压越稳）。
+- `Pcc.MaxVoltageShiftPercent`（±%）：电压偏移限幅，防止非物理抬压。
+- `Pcc.ReactiveVoltageInfluenceCoefficient`：影响系数，默认 1.0。
+- `Pcc.StationBusNominalLineVoltage`（V）：站内 35kV 母线额定，用于 `U_35 = U_pcc × (35000/220000)`。
+
+---
+
 ## Transformer（主变 220kV/35kV）
 
-该段绑定到 `TransformerConfig`，用于初始化主变 `TransformerSimulator`（220kV/35kV），其二次侧电压作为 **35kV 母线（PCC）** 测点，供负载与并网反馈使用。
+该段绑定到 `TransformerConfig`，用于初始化主变 `TransformerSimulator`（220kV/35kV）。**PCC 电压由 `Pcc` 节计算**；主变二次侧为 35kV 站内母线（由 PCC 变比推导），供负载电流换算与单元变一次侧使用。
 
 - `Transformer.RatedPower`（double，kVA）
   - **作用**：变压器额定容量，用于负载率计算与无功电压反馈等。
