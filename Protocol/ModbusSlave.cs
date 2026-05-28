@@ -22,6 +22,7 @@ namespace EssSimulator
         private const int BYTE_LENGTH = 8;
         private const int COILWRITEFUNCTIONCODE = 5;
         private const int CTRLFUNCTIONCODE = 6;
+        private const int CTRLBATCHFUNCTIONCODE = 16;
         #endregion
 
         #region ReadOnly
@@ -53,7 +54,9 @@ namespace EssSimulator
         private Dictionary<int, int> CalcContinuerAddress(MapEntry[] pointMap)
         {
             Dictionary<int, int> addressLengthGroup = new Dictionary<int, int>();
-            var filtered = pointMap.Where(p => p.FunctionCode == CTRLFUNCTIONCODE).ToArray();
+            var filtered = pointMap
+                .Where(p => p.FunctionCode == CTRLFUNCTIONCODE || p.FunctionCode == CTRLBATCHFUNCTIONCODE)
+                .ToArray();
             var continuerAddressGroup = filtered.OrderBy(p => p.Address).ToArray();
             int currentSpanLength = 0; // 当前连续段累计的寄存器长度
             int currentSpanItemCount = 0; // 当前连续段包含的点表条目数，因为有可能存在地址重复的点表条目或者是Size>ADDRESS_LENGTH的点表条目
@@ -122,7 +125,9 @@ namespace EssSimulator
             foreach (var continuerAddress in ctrlContinuerAddressGroup)
             {
                 // 预筛功能码，避免内层重复 LINQ 分配
-                var candidates = pointMapToUse.Where(p => p.FunctionCode == CTRLFUNCTIONCODE).ToArray();
+                var candidates = pointMapToUse
+                    .Where(p => p.FunctionCode == CTRLFUNCTIONCODE || p.FunctionCode == CTRLBATCHFUNCTIONCODE)
+                    .ToArray();
                 List<byte[]> data = ReadFunc((ushort)continuerAddress.Key, (ushort)continuerAddress.Value, CTRLFUNCTIONCODE, slaveId);
                 for (int i = 0; i < continuerAddress.Value; i++)
                 {
@@ -329,6 +334,11 @@ namespace EssSimulator
                     var usdata = Common.ConvertBytesToUShorts(data);
                     modbusSlave?.DataStore.HoldingRegisters.WritePoints(address, usdata);
                 }
+                else if (functionCode == CTRLBATCHFUNCTIONCODE)
+                {
+                    var usdata = Common.ConvertBytesToUShorts(data);
+                    modbusSlave?.DataStore.HoldingRegisters.WritePoints(address, usdata);
+                }
                 else if (functionCode == 4)
                 {
                     var usdata = Common.ConvertBytesToUShorts(data);
@@ -380,7 +390,7 @@ namespace EssSimulator
             {
                 ushort[] data;
                 ushort groupCount = Math.Min(num, (ushort)120);
-                if (functionCode == 3 || functionCode == CTRLFUNCTIONCODE)
+                if (functionCode == 3 || functionCode == CTRLFUNCTIONCODE || functionCode == CTRLBATCHFUNCTIONCODE)
                 {
                     data = modbusSlave.DataStore.HoldingRegisters.ReadPoints(currentAddress, groupCount);
                 }

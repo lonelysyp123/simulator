@@ -64,6 +64,8 @@ namespace EssSimulator.Display
         private static bool IsNavigationBlocked =>
             FatalSystemAlert.IsActive || _fatalShutdownActive;
 
+        private const int MainLineUnitsPerSection = 4;
+
         private static int GetEssUnitCount()
         {
             try
@@ -72,6 +74,19 @@ namespace EssSimulator.Display
                 return list is System.Collections.ICollection c ? c.Count : 0;
             }
             catch { return 2; }
+        }
+
+        private static int GetMainLineSectionCount(int unitsPerSection)
+        {
+            int channelCount = Math.Max(1, GetEssUnitCount());
+            int unitCount = Math.Max(1, (int)Math.Ceiling(channelCount / 2.0));
+            return Math.Max(1, (int)Math.Ceiling(unitCount / (double)Math.Max(1, unitsPerSection)));
+        }
+
+        private static int ClampMainLineSectionIndex(int requestedSectionIndex, int unitsPerSection)
+        {
+            int sectionCount = GetMainLineSectionCount(unitsPerSection);
+            return Math.Clamp(requestedSectionIndex, 0, sectionCount - 1);
         }
 
         /// <summary>从 bms1 数据模型读取簇数量（与 Simulator.ClusterCount 一致），失败时回退 12。</summary>
@@ -138,10 +153,10 @@ namespace EssSimulator.Display
         }
 
         /// <summary>主接线图顶部：各 PCS 黑启动开关一览。</summary>
-        private static string BuildBlackStartSwitchSummary(int channelCount)
+        private static string BuildBlackStartSwitchSummary(int channelStart, int channelEndExclusive)
         {
             var parts = new List<string>();
-            for (int i = 0; i < channelCount; i++)
+            for (int i = channelStart; i < channelEndExclusive; i++)
             {
                 int u = i / 2;
                 int slot = i % 2;
@@ -434,10 +449,16 @@ namespace EssSimulator.Display
         }
 
         /// <summary>ASCII 主接线图：按“储能单元（每单元2路PCS+2路BMS）”动态分组展示。</summary>
-        private void DrawMainLine()
+        private void DrawMainLine(int sectionIndex, int unitsPerSection)
         {
             int channelCount = Math.Max(1, GetEssUnitCount());
             int unitCount = Math.Max(1, (int)Math.Ceiling(channelCount / 2.0));
+            int sectionCount = Math.Max(1, (int)Math.Ceiling(unitCount / (double)Math.Max(1, unitsPerSection)));
+            sectionIndex = Math.Clamp(sectionIndex, 0, sectionCount - 1);
+            int unitStart = sectionIndex * unitsPerSection;
+            int unitEndExclusive = Math.Min(unitCount, unitStart + unitsPerSection);
+            int channelStart = unitStart * 2;
+            int channelEndExclusive = Math.Min(channelCount, unitEndExclusive * 2);
             var time = DateTime.Now.ToLongTimeString();
 
             bool breakerClosed = SafeGetBool("ess._breaker.IsClosed");
@@ -461,10 +482,11 @@ namespace EssSimulator.Display
             var sb = new StringBuilder();
             sb.AppendLine();
             sb.AppendLine($"电气主接线 [{time}]  （储能单元数: {unitCount}，PCS/BMS通道数: {channelCount}）");
+            sb.AppendLine($"当前显示区域: {sectionIndex + 1}/{sectionCount}  （UNIT {unitStart + 1} ~ UNIT {unitEndExclusive}）");
             sb.AppendLine("========= 电压: 220 kV");
             sb.AppendLine("        |");
             sb.AppendLine($"        |   断路器: {(breakerClosed ? "合" : "分")}");
-            sb.AppendLine($"        |   黑启动开关: {BuildBlackStartSwitchSummary(channelCount)}");
+            sb.AppendLine($"        |   黑启动开关: {BuildBlackStartSwitchSummary(channelStart, channelEndExclusive)}");
             sb.AppendLine("        |");
             sb.AppendLine($"        |              电表(主变一次侧端子检测) 相电流 A/B/C: {meterIA:0.0} / {meterIB:0.0} / {meterIC:0.0} A    线电压 AB/BC/CA: {meterUab/1000:0.0} / {meterUbc/1000:0.0} / {meterUca/1000:0.0} kV");
             sb.AppendLine($"        |              有功功率: {meterActive:0.0} kW    无功功率: {meterReactive:0.0} kvar    功率因数: {meterPowerFactor:0.000}    频率: {meterFrequency:0.00} Hz");
@@ -478,7 +500,7 @@ namespace EssSimulator.Display
             sb.AppendLine("        |                                                +--- 并网点 ---+");
             sb.AppendLine("        |                                                                |");
 
-            for (int u = unitCount - 1; u >= 0; u--)
+            for (int u = unitEndExclusive - 1; u >= unitStart; u--)
             {
                 int a = u * 2;
                 int b = u * 2 + 1;
@@ -524,7 +546,7 @@ namespace EssSimulator.Display
                 }
             }
             sb.AppendLine();
-            sb.AppendLine("操作: Tab 切换视图 | :/C 输入命令 | Esc 返回");
+            sb.AppendLine("操作: ↑/↓ 切换显示区域 | Tab 切换视图 | :/C 输入命令 | Esc 返回");
 
             SafeSetCursorPosition(0, 0);
             Console.Write(sb.ToString());
@@ -579,6 +601,7 @@ namespace EssSimulator.Display
         {
             // Tab 切换 Spectre.Console 实时视图 与 原 ASCII 图
             bool useLive = false;
+            int sectionIndex = 0;
             var processor = BuildCommandProcessor();
             Console.Clear();
             while (true)
@@ -589,6 +612,7 @@ namespace EssSimulator.Display
                 if (useLive)
                 {
                     bool switchRequested = false;
+                    bool keepLiveMode = false;
                     bool commandRequested = false;
                     AnsiConsole.Live(new Panel("主电气接线").RoundedBorder().Border(BoxBorder.Rounded)).Start(ctx =>
                     {
@@ -608,11 +632,17 @@ namespace EssSimulator.Display
                             var time = DateTime.Now.ToLongTimeString();
                             int channelCount = Math.Max(1, GetEssUnitCount());
                             int unitCount = Math.Max(1, (int)Math.Ceiling(channelCount / 2.0));
+                            int sectionCount = Math.Max(1, (int)Math.Ceiling(unitCount / (double)MainLineUnitsPerSection));
+                            int currentSectionIndex = Math.Clamp(sectionIndex, 0, sectionCount - 1);
+                            int unitStart = currentSectionIndex * MainLineUnitsPerSection;
+                            int unitEndExclusive = Math.Min(unitCount, unitStart + MainLineUnitsPerSection);
+                            int channelStart = unitStart * 2;
+                            int channelEndExclusive = Math.Min(channelCount, unitEndExclusive * 2);
 
                             // 顶部信息面板（避免 Markup 标签与中文状态混淆，改用 Text）
                             var breakerStatus = breakerClosed ? "合" : "分";
-                            var blackStartSummary = BuildBlackStartSwitchSummary(channelCount);
-                            var headerText = new Text($"电气主接线 {time}  （单元数 {unitCount}，通道数 {channelCount}）\n状态: 断路器[{breakerStatus}]  黑启动开关[{blackStartSummary}]\n操作: Tab 切换视图 | :/C 输入命令 | Esc 返回\n");
+                            var blackStartSummary = BuildBlackStartSwitchSummary(channelStart, channelEndExclusive);
+                            var headerText = new Text($"电气主接线 {time}  （单元数 {unitCount}，通道数 {channelCount}）\n当前显示区域: {currentSectionIndex + 1}/{sectionCount}（UNIT {unitStart + 1} ~ UNIT {unitEndExclusive}）\n状态: 断路器[{breakerStatus}]  黑启动开关[{blackStartSummary}]\n操作: ↑/↓ 切换显示区域 | Tab 切换视图 | :/C 输入命令 | Esc 返回\n");
                             var header = new Panel(headerText).Border(BoxBorder.Rounded);
 
                             // 交流侧表格（一次/二次、负载）
@@ -634,7 +664,7 @@ namespace EssSimulator.Display
                             unitTable.AddColumn("舱-A SOC/V/I");
                             unitTable.AddColumn("舱-B SOC/V/I");
 
-                            for (int u = 0; u < unitCount; u++)
+                            for (int u = unitStart; u < unitEndExclusive; u++)
                             {
                                 int a = u * 2;
                                 int b = u * 2 + 1;
@@ -703,6 +733,18 @@ namespace EssSimulator.Display
                             {
                                 switchRequested = true;
                             }
+                            else if (key.Key == ConsoleKey.UpArrow)
+                            {
+                                sectionIndex = ClampMainLineSectionIndex(sectionIndex - 1, MainLineUnitsPerSection);
+                                switchRequested = true;
+                                keepLiveMode = true;
+                            }
+                            else if (key.Key == ConsoleKey.DownArrow)
+                            {
+                                sectionIndex = ClampMainLineSectionIndex(sectionIndex + 1, MainLineUnitsPerSection);
+                                switchRequested = true;
+                                keepLiveMode = true;
+                            }
                             else if ((key.Key == ConsoleKey.Oem2 && key.Modifiers == ConsoleModifiers.Shift) ||
                                      key.Key == ConsoleKey.C)
                             {
@@ -737,13 +779,13 @@ namespace EssSimulator.Display
                             break;
                         }
                     }
-                    useLive = false;
+                    useLive = keepLiveMode;
                     Console.Clear();
                 }
                 else
                 {
                     // ASCII 图模式
-                    DrawMainLine();
+                    DrawMainLine(sectionIndex, MainLineUnitsPerSection);
                     Thread.Sleep(200);
                     if (Console.KeyAvailable)
                     {
@@ -756,6 +798,16 @@ namespace EssSimulator.Display
                         if (key.Key == ConsoleKey.Tab)
                         {
                             useLive = true;
+                            Console.Clear();
+                        }
+                        else if (key.Key == ConsoleKey.UpArrow)
+                        {
+                            sectionIndex = ClampMainLineSectionIndex(sectionIndex - 1, MainLineUnitsPerSection);
+                            Console.Clear();
+                        }
+                        else if (key.Key == ConsoleKey.DownArrow)
+                        {
+                            sectionIndex = ClampMainLineSectionIndex(sectionIndex + 1, MainLineUnitsPerSection);
                             Console.Clear();
                         }
                         else if ((key.Key == ConsoleKey.Oem2 && key.Modifiers == ConsoleModifiers.Shift) ||

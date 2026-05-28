@@ -34,6 +34,9 @@ namespace EssSimulator.Protocol.Modbus
         private volatile bool _running;
         private Thread?       _controlThread;
         private readonly Dictionary<string, Thread> _workerThreads = new();
+        private bool IsEmuDevice =>
+            !string.IsNullOrWhiteSpace(_deviceInfo.name) &&
+            _deviceInfo.name.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase);
 
         public ModbusDataSync(IModbusSlave slave, ModbusParser parser, ModbusPointMap map,
                               DeviceInfoDto deviceInfo, int clusterCount)
@@ -227,6 +230,11 @@ namespace EssSimulator.Protocol.Modbus
                             var newValue  = kv.Value;
                             if (!_shadowControl.TryGetValue(paramName, out var prev) || !object.Equals(prev, newValue))
                             {
+                                if (IsEmuDevice)
+                                {
+                                    _log.Info(
+                                        $"[EMU-Control:change] {_deviceInfo.name}.{paramName}: {FormatValue(prev)} -> {FormatValue(newValue)}");
+                                }
                                 SetDataObjectByMesurePointName(paramName, newValue);
                                 _shadowControl[paramName] = newValue;
                             }
@@ -283,8 +291,18 @@ namespace EssSimulator.Protocol.Modbus
 
         public void SetDataObjectByMesurePointName(string name, object value)
         {
-            if (string.IsNullOrWhiteSpace(name)) return;
-            if (!_map.ParamModelLookup.TryGetValue(name, out var model)) return;
+            TrySetDataObjectByMesurePointName(name, value, updateShadow: true, out _);
+        }
+
+        private bool TrySetDataObjectByMesurePointName(
+            string name,
+            object value,
+            bool updateShadow,
+            out object appliedValue)
+        {
+            appliedValue = value;
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            if (!_map.ParamModelLookup.TryGetValue(name, out var model)) return false;
 
             object valToSet = value;
             if (value is string s)
@@ -294,18 +312,22 @@ namespace EssSimulator.Protocol.Modbus
             }
 
             valToSet = CoerceControlValueForTarget(model.Arg1!, valToSet, name);
-
-            _shadowControl[name] = valToSet;
+            appliedValue = valToSet;
             if (!SimServer.SetExtIfVariableVal(model.Arg1!, valToSet))
             {
                 _log.Warn($"SetExtIfVariableVal failed: {model.Arg1} <= {valToSet}");
-                return;
+                return false;
             }
+
+            if (updateShadow)
+                _shadowControl[name] = valToSet;
 
             if (name is "pcs1_startstop" or "pcs2_startstop"
                 or "pcs1_blackstart_enable" or "pcs2_blackstart_enable"
                 or "param64" or "param65")
                 TryApplyPcsCommandsImmediately();
+
+            return true;
         }
 
         /// <summary>线圈/寄存器写入目标属性时做类型对齐（避免 int 1 无法写入 bool 导致 Modbus 已为 1 但 emu 仍为 false）。</summary>
@@ -386,17 +408,71 @@ namespace EssSimulator.Protocol.Modbus
         {
             if (string.IsNullOrWhiteSpace(name)) return;
 
-            SetDataObjectByMesurePointName(name, value);
-            _shadowControl[name] = value;
+            if (!TrySetDataObjectByMesurePointName(name, value, updateShadow: false, out var appliedValue))
+                return;
 
             try
             {
-                _slave.Write(new Dictionary<string, object> { { name, value } });
+                _slave.Write(new Dictionary<string, object> { { name, appliedValue } });
             }
             catch (Exception ex)
             {
                 _log.Warn($"PublishControlToSlave failed for {name}: {ex.Message}");
+                return;
             }
+
+            object? readback = null;
+            bool readbackOk = false;
+            try
+            {
+                readback = GetDataObjectByMesurePointName(name, _slave, _parser);
+                readbackOk = ValuesEquivalent(appliedValue, readback);
+            }
+            catch (Exception ex)
+            {
+                _log.Warn($"PublishControlToSlave readback failed for {name}: {ex.Message}");
+            }
+
+            if (IsEmuDevice)
+            {
+                _log.Info(
+                    $"[EMU-Publish] {_deviceInfo.name}.{name} write={FormatValue(appliedValue)} readback={FormatValue(readback)} ok={readbackOk}");
+            }
+
+            // 失败不前移：仅当寄存器写入并回读一致后，才推进控制 shadow。
+            if (readbackOk)
+            {
+                _shadowControl[name] = appliedValue;
+            }
+            else
+            {
+                _log.Warn(
+                    $"PublishControlToSlave shadow not updated due to readback mismatch: {_deviceInfo.name}.{name}, write={FormatValue(appliedValue)}, readback={FormatValue(readback)}");
+            }
+        }
+
+        private static string FormatValue(object? value)
+        {
+            return value == null ? "<init>" : value.ToString() ?? "<null>";
+        }
+
+        private static bool ValuesEquivalent(object expected, object? actual)
+        {
+            if (actual == null) return false;
+            if (expected is bool || actual is bool)
+            {
+                bool exp = expected is bool eb ? eb : Convert.ToDouble(expected) != 0;
+                bool act = actual is bool ab ? ab : Convert.ToDouble(actual) != 0;
+                return exp == act;
+            }
+
+            if (double.TryParse(expected.ToString(), out var de) &&
+                double.TryParse(actual.ToString(), out var da))
+            {
+                return Math.Abs(de - da) < 1e-9;
+            }
+
+            return Equals(expected, actual);
         }
     }
 }

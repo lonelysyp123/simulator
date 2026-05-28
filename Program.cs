@@ -41,7 +41,7 @@ namespace EssSimulator
             return ms;
         }
 
-        private static bool IsSimulatorReady(int expectedServerCount)
+        private static bool IsSimulatorReady(int expectedServerCount, bool expectLocalControl)
         {
             var store = SimulatorHost.Instance;
             if (!store.Contains("ess") ||
@@ -54,6 +54,9 @@ namespace EssSimulator
             {
                 return false;
             }
+
+            if (expectLocalControl && !store.Contains("simLc1"))
+                return false;
 
             if (SimServer.serverListenInfo.Count < expectedServerCount)
             {
@@ -77,7 +80,13 @@ namespace EssSimulator
         {
             int expectedBmsCount = Math.Max(1, cfg.UnitCount);
             int expectedEmuCount = Math.Max(1, cfg.Devices?.Count ?? 1);
-            int expectedServerCount = expectedBmsCount + expectedEmuCount + 1; // BMS + EMU + EM
+            int expectedLcCount = 0;
+            if (cfg.Protocol.EnableLocalControl)
+            {
+                int emuPerGroup = Math.Max(1, cfg.Protocol.LocalControlEmuPerGroup);
+                expectedLcCount = (int)Math.Ceiling(expectedEmuCount / (double)emuPerGroup);
+            }
+            int expectedServerCount = expectedBmsCount + expectedEmuCount + expectedLcCount + 1; // BMS + EMU + LC + EM
             var timeout = TimeSpan.FromSeconds(60);
             var start = DateTime.UtcNow;
             var spinner = new[] { '|', '/', '-', '\\' };
@@ -85,7 +94,7 @@ namespace EssSimulator
 
             while ((DateTime.UtcNow - start) < timeout)
             {
-                if (IsSimulatorReady(expectedServerCount))
+                if (IsSimulatorReady(expectedServerCount, cfg.Protocol.EnableLocalControl))
                 {
                     Console.Clear();
                     return;
@@ -125,6 +134,16 @@ namespace EssSimulator
             {
                 int emuPort = cfg.Protocol.BaseEmuModbusPort + i * cfg.Protocol.EmuPortStep;
                 Console.WriteLine($"EMU 单元{i + 1} simEmu{i + 1}: Modbus TCP 端口 {emuPort}（承载 emu{i + 1}.PcsList[0..1]）");
+            }
+            if (cfg.Protocol.EnableLocalControl)
+            {
+                int emuPerGroup = Math.Max(1, cfg.Protocol.LocalControlEmuPerGroup);
+                int lcCount = (int)Math.Ceiling(unitCount / (double)emuPerGroup);
+                for (int i = 0; i < lcCount; i++)
+                {
+                    int lcPort = cfg.Protocol.BaseLocalControlModbusPort + i * cfg.Protocol.LocalControlPortStep;
+                    Console.WriteLine($"LC 聚合{i + 1} simLc{i + 1}: Modbus TCP 端口 {lcPort}（聚合 {emuPerGroup} 个 EMU / {emuPerGroup * 2} 台 PCS）");
+                }
             }
             for (int i = 0; i < Math.Max(1, cfg.UnitCount); i++)
             {
@@ -211,6 +230,14 @@ namespace EssSimulator
 
                     services.AddSingleton<EmDataService>();
                     services.AddHostedService(sp => sp.GetRequiredService<EmDataService>());
+
+                    bool enableLocalControl = ctx.Configuration.GetSection(SimulatorConfig.Section)
+                        .GetSection(nameof(SimulatorConfig.Protocol))
+                        .GetValue<bool>(nameof(ProtocolConfig.EnableLocalControl));
+                    if (enableLocalControl)
+                    {
+                        services.AddHostedService<LocalControlBridgeService>();
+                    }
 
                     // Modbus 协议服务（托管服务）
                     services.AddHostedService<ModbusHostedService>();

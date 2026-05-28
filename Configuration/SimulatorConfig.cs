@@ -49,6 +49,18 @@ namespace EssSimulator.Configuration
 
         /// <summary>电表 Modbus TCP 端口</summary>
         public int EmModbusPort { get; set; } = 1500;
+
+        /// <summary>是否启用 LocalControl 聚合协议（每路聚合 4 个 EMU / 8 台 PCS）。</summary>
+        public bool EnableLocalControl { get; set; } = false;
+
+        /// <summary>LocalControl Modbus TCP 基础端口。</summary>
+        public int BaseLocalControlModbusPort { get; set; } = 1700;
+
+        /// <summary>LocalControl 端口步长（单位：端口号）。</summary>
+        public int LocalControlPortStep { get; set; } = 1;
+
+        /// <summary>每路 LocalControl 聚合的 EMU 数。</summary>
+        public int LocalControlEmuPerGroup { get; set; } = 4;
     }
 
     public class PcsDeviceConfig

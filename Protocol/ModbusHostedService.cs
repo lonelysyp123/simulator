@@ -55,6 +55,23 @@ namespace EssSimulator
                     _servers.Add(pcs);
                 }
 
+                // LocalControl 聚合 Modbus 服务（每路聚合 N 个 EMU）
+                if (_cfg.Protocol.EnableLocalControl)
+                {
+                    int emuPerGroup = Math.Max(1, _cfg.Protocol.LocalControlEmuPerGroup);
+                    int lcCount = (int)Math.Ceiling(unitCount / (double)emuPerGroup);
+                    for (int i = 0; i < lcCount; i++)
+                    {
+                        int port = _cfg.Protocol.BaseLocalControlModbusPort + i * _cfg.Protocol.LocalControlPortStep;
+                        string name = $"simLc{i + 1}";
+                        var lc = new ModbusSimServer("lc.csv", port, name);
+                        store.Register(name, lc);
+                        lc.Start();
+                        SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
+                        _servers.Add(lc);
+                    }
+                }
+
                 // 电表 Modbus 服务
                 var em = new ModbusSimServer("em.csv", _cfg.Protocol.EmModbusPort, "simEm");
                 store.Register("simEm", em);

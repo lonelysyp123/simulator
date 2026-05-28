@@ -73,7 +73,9 @@ namespace EssSimulator.EssSimModelApi.Mappers
             emData.TotalReactivePower  = (float)totalQ;
             emData.TotalApparentPower  = (float)totalS;
             emData.PowerFactor         = (float)pf;
-            emData.Frequency           = 50.0f;
+            // 主断分闸且站内 35kV 母线未建压时，电表频率应显示 0Hz。
+            bool noBusPower = !ess._breaker.IsClosed && ess.StationBus35LineVoltageV <= 1.0;
+            emData.Frequency = noBusPower ? 0.0f : 50.0f;
 
             double hours = dt.TotalHours;
             if (totalP >= 0) forwardKWh += totalP * hours;
