@@ -65,7 +65,9 @@ namespace EssSimulator
         {
             for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
-                Thread.Sleep(1000);
+                // 首次尝试立即连接，只有重试时才等待，避免大量从站启动时线性累积 1s 延迟。
+                if (attempt > 1)
+                    Thread.Sleep(1000);
                 if (_slave == null)
                 {
                     _log.Error($"Slave is null, DeviceName: {_deviceInfo.name}");
