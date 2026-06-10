@@ -204,10 +204,21 @@ namespace EssSimulator.EssSimModelApi
                     UpdateControlShadow(lcName, "param100", blackStartGlobal);
             }
 
-            // param101: 高压断路器开合（全局） -> 组内全部 emu 高压断路器
+            // param101: 高压断路器开合（全局）
+            // 仅接受 170(0xAA, 开) / 238(0xEE, 合)；其它值忽略且不下发。
             PrimeGlobalHvBreakerShadow(store, lc, lcName, startEmu, emuPerGroup, emuCount);
-            if (TryReadChangedControl(lc, lcName, "param101", asBool: true, out var prevHvCmd, out var hvCmd))
+            if (TryReadChangedControl(lc, lcName, "param101", asBool: false, out var prevHvCmd, out var hvRawCmd))
             {
+                if (!TryNormalizeHvBreakerCommand(hvRawCmd, out var hvCmd, out var hvClosed))
+                {
+                    if (!double.IsNaN(prevHvCmd))
+                    {
+                        try { lc.SetDataStoreByMesurePointName("param101", prevHvCmd); }
+                        catch { /* 忽略回退失败，后续周期继续尝试 */ }
+                    }
+                    return;
+                }
+
                 _log.Info(
                     $"[LC-Change] {lcName}.param101: {FormatControlValue(prevHvCmd)} -> {FormatControlValue(hvCmd)}");
                 bool success = true;
@@ -219,7 +230,7 @@ namespace EssSimulator.EssSimModelApi
                     success &= TryPublishControlWithLog(
                         emu,
                         "highvoltagebreakeronoff",
-                        hvCmd,
+                        hvClosed ? 1 : 0,
                         asBool: true,
                         sourceLabel: $"{lcName}.param101");
                 }
@@ -368,7 +379,7 @@ namespace EssSimulator.EssSimModelApi
                 closed &= ToDouble(ReadParamOrDefault(emu, "highvoltagebreakeronoff")) != 0;
             }
 
-            double val = closed ? 1 : 0;
+            double val = closed ? 0xEE : 0xAA;
             _controlShadow[key] = val;
             try
             {
@@ -455,6 +466,28 @@ namespace EssSimulator.EssSimModelApi
         private static string FormatControlValue(double value)
         {
             return double.IsNaN(value) ? "<init>" : value.ToString("G");
+        }
+
+        private static bool TryNormalizeHvBreakerCommand(double rawValue, out double normalizedValue, out bool closed)
+        {
+            normalizedValue = 0;
+            closed = false;
+            int cmd = (int)Math.Round(rawValue);
+            if (cmd == 0xAA)
+            {
+                normalizedValue = 0xAA;
+                closed = false;
+                return true;
+            }
+
+            if (cmd == 0xEE)
+            {
+                normalizedValue = 0xEE;
+                closed = true;
+                return true;
+            }
+
+            return false;
         }
 
         private static double ToDouble(object raw)

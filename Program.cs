@@ -225,6 +225,8 @@ namespace EssSimulator
                     });
                     services.AddHostedService(sp => sp.GetRequiredService<BmsDataService>());
 
+                    services.AddHostedService<BmsLinkService>();
+
                     services.AddSingleton<PcsDataServer>();
                     services.AddHostedService(sp => sp.GetRequiredService<PcsDataServer>());
 

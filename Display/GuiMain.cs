@@ -185,7 +185,44 @@ namespace EssSimulator.Display
             }
             catch { /* ignore */ }
 
-            return $"启停:{(cmdOn ? "开" : "停")} 黑启动:{blackStartSw} P设定:{pSet:0}kW 仿真:{modeLabel}";
+            return $"启停控制:{(cmdOn ? "开" : "停")} 黑启动:{blackStartSw} P设定:{pSet:0}kW 设备状态:{modeLabel}";
+        }
+
+        private static string FormatGridConnectStatus(int bmsIndex0)
+        {
+            int status = (int)SafeGetDouble($"bms{bmsIndex0 + 1}.BatteryStacks[0].GridConnectStatus");
+            string label = status switch
+            {
+                0 => "未开始",
+                1 => "进行中",
+                2 => "成功",
+                3 => "失败",
+                _ => $"未知({status})"
+            };
+            bool linked = SafeGetBool($"bms{bmsIndex0 + 1}.BatteryStacks[0].IsPcsLinked");
+            return $"{label}({(linked ? "已关联" : "未关联")})";
+        }
+
+        private static string FormatBlackStartModeStatus(int bmsIndex0)
+        {
+            int status = (int)SafeGetDouble($"bms{bmsIndex0 + 1}.BatteryStacks[0].BlackStartStatus");
+            int success = (int)SafeGetDouble($"bms{bmsIndex0 + 1}.BatteryStacks[0].BlackStartEnterSuccess");
+            string statusLabel = status switch
+            {
+                0 => "空闲",
+                3 => "已进入",
+                4 => "进入失败",
+                5 => "已退出",
+                _ => $"状态{status}"
+            };
+            return $"{statusLabel} 成功:{(success == 1 ? "是" : "否")}";
+        }
+
+        private static string FormatBatteryCompartmentLine(int bmsIndex0, double soc, double vdc, double idc)
+        {
+            return
+                $"舱{bmsIndex0 + 1}:  SOC {soc:0.0}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A  " +
+                $"并离网:{FormatGridConnectStatus(bmsIndex0)}  黑启动:{FormatBlackStartModeStatus(bmsIndex0)}";
         }
 
         private CommandProcessor BuildCommandProcessor()
@@ -524,7 +561,7 @@ namespace EssSimulator.Display
                     double idc = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalCurrent");
                     var pcsCtl = FormatPcsControlStatus(u, 0, a);
                     sb.AppendLine($"        |   PCS{a + 1}: {pcsCtl}  实际 P {pa:0.0} kW  Q {pr:0.0} kvar");
-                    sb.AppendLine($"        |   舱{a + 1}:  SOC {soc:0.0}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
+                    sb.AppendLine($"        |   {FormatBatteryCompartmentLine(a, soc, vdc, idc)}");
                 }
                 sb.AppendLine("        |");
                 if (b < channelCount)
@@ -536,7 +573,7 @@ namespace EssSimulator.Display
                     double idc = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalCurrent");
                     var pcsCtl = FormatPcsControlStatus(u, 1, b);
                     sb.AppendLine($"        |   PCS{b + 1}: {pcsCtl}  实际 P {pa:0.0} kW  Q {pr:0.0} kvar");
-                    sb.AppendLine($"        |   舱{b + 1}:  SOC {soc:0.0}%  Vdc {vdc:0.0} V  Idc {idc:0.0} A");
+                    sb.AppendLine($"        |   {FormatBatteryCompartmentLine(b, soc, vdc, idc)}");
                 }
 
                 if (u > 0)
@@ -659,10 +696,10 @@ namespace EssSimulator.Display
                             // 单元总览表（每行一个 UNIT，包含2路 PCS+2路 BMS）
                             var unitTable = new Table().Border(TableBorder.Rounded).Title("储能单元");
                             unitTable.AddColumn("UNIT");
-                            unitTable.AddColumn("PCS-A 启停/黑启动/模式 | P/Q");
-                            unitTable.AddColumn("PCS-B 启停/黑启动/模式 | P/Q");
-                            unitTable.AddColumn("舱-A SOC/V/I");
-                            unitTable.AddColumn("舱-B SOC/V/I");
+                            unitTable.AddColumn("PCS-A 启停控制/黑启动/设备状态 | P/Q");
+                            unitTable.AddColumn("PCS-B 启停控制/黑启动/设备状态 | P/Q");
+                            unitTable.AddColumn("舱-A SOC/V/I | 并离网/黑启动");
+                            unitTable.AddColumn("舱-B SOC/V/I | 并离网/黑启动");
 
                             for (int u = unitStart; u < unitEndExclusive; u++)
                             {
@@ -680,7 +717,7 @@ namespace EssSimulator.Display
                                     double s = 100 * SafeGetDouble($"ess._batteryRacks[{a}]._currentState.MinClusterSOC");
                                     double v = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalVoltage");
                                     double c = SafeGetDouble($"ess._batteryRacks[{a}]._currentState.TotalCurrent");
-                                    bmsA = $"舱{a + 1} {s:0.0}%/{v:0.0}/{c:0.0}";
+                                    bmsA = $"舱{a + 1} {s:0.0}%/{v:0.0}/{c:0.0} | {FormatGridConnectStatus(a)} | {FormatBlackStartModeStatus(a)}";
                                 }
                                 if (b < channelCount)
                                 {
@@ -692,7 +729,7 @@ namespace EssSimulator.Display
                                     double s = 100 * SafeGetDouble($"ess._batteryRacks[{b}]._currentState.MinClusterSOC");
                                     double v = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalVoltage");
                                     double c = SafeGetDouble($"ess._batteryRacks[{b}]._currentState.TotalCurrent");
-                                    bmsB = $"舱{b + 1} {s:0.0}%/{v:0.0}/{c:0.0}";
+                                    bmsB = $"舱{b + 1} {s:0.0}%/{v:0.0}/{c:0.0} | {FormatGridConnectStatus(b)} | {FormatBlackStartModeStatus(b)}";
                                 }
 
                                 unitTable.AddRow($"UNIT {u + 1}", pcsA, pcsB, bmsA, bmsB);
@@ -871,6 +908,8 @@ namespace EssSimulator.Display
                         overview.AddRow("SOH (%)", $"{soh:0.0}");
                         overview.AddRow("簇内最高单体 (V)", $"{maxCellV:0.000} @ 簇{maxClusterId}/包{maxPackId}/单体{maxCellId}");
                         overview.AddRow("簇内最低单体 (V)", $"{minCellV:0.000} @ 簇{minClusterId}/包{minPackId}/单体{minCellId}");
+                        overview.AddRow("并离网状态", FormatGridConnectStatus(bmsId));
+                        overview.AddRow("黑启动模式", FormatBlackStartModeStatus(bmsId));
 
                         var clusterTable = new Table().Border(TableBorder.Rounded).Title("簇列表");
                         clusterTable.AddColumn("簇Id");

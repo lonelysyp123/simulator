@@ -33,6 +33,8 @@ namespace EssSimulator.EssDeviceSimModel
         public bool IsAlarm { get; set; }                        // 是否报警
         public ushort IsFault { get; set; }                      // 是否故障 0-无故障 1-充电故障 2-放电故障 3-其他故障
         public bool IsProtection { get; set; }                    // 是否保护动作
+        /// <summary>BMS 与 PCS 直流侧已关联（并网）；false 时 PCS 直流失电。</summary>
+        public bool IsPcsLinked { get; set; }
         public DateTime Timestamp { get; set; }                  // 状态时间
         public List<ClusterState>? ClusterStates { get; set; } //所有簇状态
     }

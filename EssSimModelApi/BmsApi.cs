@@ -861,6 +861,24 @@ namespace EssSimulator.EssSimModelApi
 
             public int StackId { get; set; } // 堆编号
 
+            /// <summary>一键并网脉冲命令：写 1 触发，处理后自动回 0。</summary>
+            public ushort GridConnectCommand { get; set; }
+
+            /// <summary>一键并网状态：0 未开始 / 1 进行中 / 2 成功 / 3 失败。</summary>
+            public ushort GridConnectStatus { get; set; }
+
+            /// <summary>BMS 与 PCS 直流侧是否已关联。</summary>
+            public bool IsPcsLinked { get; set; }
+
+            /// <summary>黑启动模式指令（param12）：写 1 进入，写 0 退出。</summary>
+            public ushort BlackStartCommand { get; set; }
+
+            /// <summary>进入黑启动模式是否成功（param5）：0 否 / 1 是。</summary>
+            public ushort BlackStartEnterSuccess { get; set; }
+
+            /// <summary>当前黑启动状态（param6）：3 已进入 / 4 进入失败 / 5 已退出。</summary>
+            public ushort BlackStartStatus { get; set; }
+
             // 堆基本信息
             public float? TotalVoltage { get; set; } // 堆端总电压
             public float? Current { get; set; } // 堆端电流

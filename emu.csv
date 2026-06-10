@@ -20,8 +20,8 @@
 4,236,u16,16,alarm9,1,故障位9,0
 4,237,u16,16,alarm10,1,故障位10,0
 4,25300,u16,16,param1,10,单元1交流侧AB电压,model=4|arg1=emuDeviceId.PcsList[0].LineVoltageAB|arg2=|arg3=|arg4=1000
-4,25301,u16,17,param2,10,单元1交流侧BC电压,model=4|arg1=emuDeviceId.PcsList[0].LineVoltageBC|arg2=|arg3=|arg4=1000
-4,25302,u16,18,param3,10,单元1交流侧CA电压,model=4|arg1=emuDeviceId.PcsList[0].LineVoltageCA|arg2=|arg3=|arg4=1000
+4,25301,u16,16,param2,10,单元1交流侧BC电压,model=4|arg1=emuDeviceId.PcsList[0].LineVoltageBC|arg2=|arg3=|arg4=1000
+4,25302,u16,16,param3,10,单元1交流侧CA电压,model=4|arg1=emuDeviceId.PcsList[0].LineVoltageCA|arg2=|arg3=|arg4=1000
 4,25303,u32,32,param4,1000,交流侧频率,50
 4,25305,u16,16,param5,10,单元1交流侧A相电流,model=4|arg1=emuDeviceId.PcsList[0].PhaseACurrent|arg2=|arg3=|arg4=1000
 4,25306,u16,16,param6,10,单元1交流侧B相电流,model=4|arg1=emuDeviceId.PcsList[0].PhaseBCurrent|arg2=|arg3=|arg4=1000
@@ -47,8 +47,8 @@
 4,25334,u16,16,param26,1,单元1当前告警,0
 4,25335,u16,16,param27,1,单元1当前故障,0
 4,25600,u16,16,param28,10,单元2交流侧AB电压,model=4|arg1=emuDeviceId.PcsList[1].LineVoltageAB|arg2=|arg3=|arg4=1000
-4,25601,u16,17,param29,10,单元2交流侧BC电压,model=4|arg1=emuDeviceId.PcsList[1].LineVoltageBC|arg2=|arg3=|arg4=1000
-4,25602,u16,18,param30,10,单元2交流侧CA电压,model=4|arg1=emuDeviceId.PcsList[1].LineVoltageCA|arg2=|arg3=|arg4=1000
+4,25601,u16,16,param29,10,单元2交流侧BC电压,model=4|arg1=emuDeviceId.PcsList[1].LineVoltageBC|arg2=|arg3=|arg4=1000
+4,25602,u16,16,param30,10,单元2交流侧CA电压,model=4|arg1=emuDeviceId.PcsList[1].LineVoltageCA|arg2=|arg3=|arg4=1000
 4,25603,u32,32,param31,1000,交流侧频率,50
 4,25605,u16,16,param32,10,单元2交流侧A相电流,model=4|arg1=emuDeviceId.PcsList[1].PhaseACurrent|arg2=|arg3=|arg4=1000
 4,25606,u16,16,param33,10,单元2交流侧B相电流,model=4|arg1=emuDeviceId.PcsList[1].PhaseBCurrent|arg2=|arg3=|arg4=1000

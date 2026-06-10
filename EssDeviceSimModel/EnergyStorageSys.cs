@@ -695,9 +695,18 @@ namespace EssSimulator.EssDeviceSimModel
                 var rackState = _batteryRacks[i].GetRackState();
                 if (rackState == null) continue;
 
-                _pcsList[i].Update(rackState.TotalVoltage, rackState.IsFault, simTime, step);
-                // 电池内部电流方向：正充负放。PCS约定正放负充，因此对电池取负
-                _batteryRacks[i].Update(-_pcsList[i].GetCurrentState().DcCurrent, 25.0, simTime, step);
+                if (rackState.IsPcsLinked)
+                {
+                    _pcsList[i].Update(rackState.TotalVoltage, rackState.IsFault, simTime, step);
+                    // 电池内部电流方向：正充负放。PCS约定正放负充，因此对电池取负
+                    _batteryRacks[i].Update(-_pcsList[i].GetCurrentState().DcCurrent, 25.0, simTime, step);
+                }
+                else
+                {
+                    // BMS 离网：PCS 直流侧失电，电池侧无 PCS 电流
+                    _pcsList[i].Update(0, 0, simTime, step);
+                    _batteryRacks[i].Update(0, 25.0, simTime, step);
+                }
             }
         }
 
