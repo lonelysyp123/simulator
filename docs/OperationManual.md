@@ -53,12 +53,15 @@
 | 模块 | 路径 | 说明 |
 |---|---|---|
 | 启动入口 | `Program.cs` | 程序启动、依赖注入、托管服务注册 |
-| 配置模型 | `Configuration/SimulatorConfig.cs` | 定义仿真参数、PCS、变压器、负载配置 |
-| 系统模型 | `EssDeviceSimModel/` | 电池、PCS、变压器、断路器、负载等仿真逻辑 |
-| 数据服务 | `EssSimModelApi/` | BMS、PCS、EM 数据同步与映射；`BlackStartSafety` 联锁 |
-| 协议服务 | `Protocol/` | Modbus 服务、对象路径访问、`ModbusDataSync` 控制点同步 |
-| 交互界面 | `Display/` | GUI 菜单、命令输入、日志视图 |
-| 点表文件 | `bms_bank.csv`、`bms_rack.csv`、`emu.csv`、`em.csv` | 定义 Modbus 点位与模型映射 |
+| 配置模型 | `Configuration/SimulatorConfig.cs` | 仿真参数、PCS、变压器、负载、`DataExchange` |
+| 设备模型 | `EssDeviceSimModel/Devices/` | `PcsDevice`、`TransformerDevice`、`BreakerSimulator` 等 |
+| 网络求解 | `EssDeviceSimModel/Solver/` | `ElectricalNetwork`、`NetworkSolver`、`NetworkControlBridge` |
+| 系统编排 | `EssDeviceSimModel/EnergyStorageSys.cs` | 主循环、黑启动站用电、BMS/PCS 耦合 |
+| 数据交换 | `DataExchange/` | simEmu/simBms/simEm 点目录、遥测/控制/反馈管道 |
+| 数据服务 | `EssSimModelApi/` | Mapper、联锁；Modbus 读写由 DataExchange 驱动 |
+| 协议服务 | `Protocol/` | `ModbusHostedService`、`ModbusSimServer` |
+| 交互界面 | `Display/` | `CommandProcessor`、GUI、`dpc`/`esscmd` 命令 |
+| 点表文件 | `bms_bank.csv`、`bms_rack.csv`、`emu.csv`、`em.csv` | Modbus 点位与 `ModelSim` 映射 |
 
 ---
 
@@ -381,7 +384,7 @@ GUI 快捷键：
 
 ## 9. 控制台命令说明（当前 GUI 接入）
 
-命令定义在 `Display/Cmd.cs`。
+命令定义在 `Display/CommandProcessor.cs` 及各 `*Command.cs` 实现类。
 
 ### 9.1 `dpc`
 
@@ -616,14 +619,17 @@ breaker set false
 **行为概要：**
 
 - 点位：`pcs1_blackstart_enable` / `pcs2_blackstart_enable`（FC5 线圈）。
-- 开启黑启动且离网运行后，按同单元 **690V 母线电压**自动分两种子状态（`BlackStartPhase`）：
-  - **建压（VoltageBuilding）**：母线 &lt; 约 85% 额定（默认 587V）→ 响应 `IslandVoltageSetting` 建压；有功由电压差内环调节；承担变压器励磁无功。
-  - **同步（Synchronized）**：母线已达标（≈690V）→ **忽略**孤岛电压设定。
+- 开启黑启动且离网运行后，`BlackStartPhase` 子状态机：
+  - **Preparing**：DC 就绪自检（默认约 300ms），AC 电压/频率为 0。
+  - **SoftStarting**：V/f 软启动，电压按 `BlackStartVoltageRampVs`（默认 120V/s）爬升，频率从 47Hz 向 50Hz 爬升。
+  - **VoltageRegulating**：闭环追 `IslandVoltageSetting`，有功/无功由母线实测电压调节；建压期电流限幅 `BlackStartCurrentLimitFraction`（默认 0.45 pu），可出现过流顶死、电压爬升变慢。
+  - **Synchronized**：母线 ≥ 约 85% 额定（587V）→ **忽略**孤岛电压设定，稳态构网。
 - **黑启动总输出**（构网电源，受额定与过流保护限制）= **站用电（自动）**：
   - 站用电：励磁无功 + 铁损/线损；建压阶段另加电压差抬压有功。
 - **稳态站用电分担**：同母线黑启动运行 PCS 按**在线台数近似均分**（P/Q 均分），不依赖外部功率设定。
 - 后启动 PCS 无需下发分担比例；并入后自动参与均分。
-- 相关参数：`BlackStart*`、`BlackStartBusEnergizedFraction`（默认 0.85）。
+- 相关参数：`BlackStart*`、`BlackStartPrechargeDelayMs`、`BlackStartVoltageRampVs`、`BlackStartFrequencyStartHz`、`BlackStartReactiveVoltageGainKvarPerV`、`BlackStartCurrentLimitFraction`、`BlackStartBusEnergizedFraction`（默认 0.85）。
+- 变压器励磁涌流经 `UnitTransformerIslandSync` 转为短时 P/Q 尖峰，由同单元黑启动 PCS 承担。
 - **保护**：快建压/涌流可能过流跳闸；故障锁存，须启停 **0→1** 清除。
 - 主网合闸时勿开黑启动（`utility grid is available` 故障）。
 
@@ -635,7 +641,7 @@ breaker set false
 4. 孤岛电压设定（地址 5304，V，如分步抬升至 690）  
 5. 黑启动 = 1（地址 5305）  
 
-**联锁（`BlackStartSafety`）：**
+**联锁（`BlackStartInterlock` + `BlackStartSafety`）：**
 
 - **禁止**：**主断合闸**且**该单元高压合闸**时写黑启动 → **全屏居中红框严重故障提示**，约 5 秒后**退出整个进程**（不可 Esc 返回菜单）。  
 - **允许**：**主断分** + **单元高压合** + 黑启动（失电后单元挂接，PCS 离网 V/f 建压；单元变一次侧电压按 35kV/690V 变比随 PCS 二次电压反推）。  
@@ -695,9 +701,9 @@ esscmd link bms1 on
 本节对应代码：
 
 - `EssDeviceSimModel/GridFeedbackConventions.cs`
-- `EssDeviceSimModel/ScheduledLoadSimulator.cs`
+- `EssDeviceSimModel/Devices/LoadDevice.cs`
 - `EssDeviceSimModel/EnergyStorageSys.cs`
-- `EssDeviceSimModel/PcsModel.cs`
+- `EssDeviceSimModel/Devices/PcsDevice.*`、`EssDeviceSimModel/Solver/NetworkSolver.cs`
 
 #### 10.11.1 控制边界
 
@@ -858,10 +864,10 @@ lsof -i :1601
 
 - `appsettings.json`
 - `Configuration/SimulatorConfig.cs`
-- `Display/Cmd.cs`、`Display/GuiMain.cs`
-- `Protocol/ModbusHostedService.cs`、`Protocol/ModbusSimServer.cs`、`Protocol/Modbus/ModbusDataSync.cs`
+- `Display/CommandProcessor.cs`、`Display/GuiMain.cs`
+- `Protocol/ModbusHostedService.cs`、`Protocol/ModbusSimServer.cs`、`DataExchange/`
 - `EssSimModelApi/Mappers/PcsMapper.cs`、`EssSimModelApi/Mappers/BmsMapper.cs`、`EssSimModelApi/BlackStartSafety.cs`
-- `EssDeviceSimModel/PcsModel.cs`、`EssDeviceSimModel/EnergyStorageSys.cs`、`EssDeviceSimModel/batteryCellModel.cs`
+- `EssDeviceSimModel/Devices/PcsDevice.*`、`EssDeviceSimModel/Devices/TransformerDevice.*`、`EssDeviceSimModel/EnergyStorageSys.cs`
 - `bms_bank.csv`、`bms_rack.csv`、`emu.csv`、`em.csv`
 - `scripts/publish-windows.sh`、`scripts/publish-windows.ps1`
 - `.cursor/skills/ess-mbpoll/`（mbpoll 命令约定）
@@ -882,13 +888,12 @@ lsof -i :1601
 
 - `Program.cs`、`appsettings.json`
 - `Configuration/SimulatorConfig.cs`
-- `Display/Cmd.cs`、`Display/GuiMain.cs`
-- `Protocol/ModbusHostedService.cs`、`Protocol/ModbusSimServer.cs`、`Protocol/Modbus/ModbusDataSync.cs`
+- `Display/CommandProcessor.cs`、`Display/GuiMain.cs`
+- `Protocol/ModbusHostedService.cs`、`Protocol/ModbusSimServer.cs`、`DataExchange/`
 - `EssSimModelApi/BmsDataServer.cs`、`EssSimModelApi/PcsDataServer.cs`
 - `EssSimModelApi/Mappers/PcsMapper.cs`、`EssSimModelApi/Mappers/BmsMapper.cs`、`EssSimModelApi/BlackStartSafety.cs`
-- `EssDeviceSimModel/PcsModel.cs`、`EssDeviceSimModel/EnergyStorageSys.cs`、`EssDeviceSimModel/batteryCellModel.cs`
-- `EssDeviceSimModel/batteryHeapModel.cs`、`EssDeviceSimModel/transformModel.cs`
-- `EssDeviceSimModel/GridFeedbackConventions.cs`、`EssDeviceSimModel/ScheduledLoadSimulator.cs`
+- `EssDeviceSimModel/Devices/`、`EssDeviceSimModel/Solver/`、`EssDeviceSimModel/EnergyStorageSys.cs`
+- `EssDeviceSimModel/Battery/`、`EssDeviceSimModel/GridFeedbackConventions.cs`、`EssDeviceSimModel/Devices/LoadDevice.cs`
 - `bms_bank.csv`、`bms_rack.csv`、`emu.csv`、`em.csv`
 - `scripts/publish-windows.sh`、`scripts/windows/README-Windows.txt`
 
@@ -898,5 +903,7 @@ lsof -i :1601
 - `esscmd` 移除 PCS 功率设置，新增 `link` 协议开关
 - 启动时等待 Modbus 服务就绪；GUI 主接线支持多单元与 PCS 控制状态
 - 提供 Windows x64 自包含发布脚本
+- **架构迁移**：`PcsDevice` / `TransformerDevice` 与电气网络共用实例；`simEmu`/`simBms`/`simEm` 走 `DataExchangeSession`；AC 段由 `NetworkSolver` 主路径驱动（已删除 `PcsModel`、`transformModel`）
+- **阶段 5**：移除 Shadow 双跑、`EnableElectricalNetworkSolver` 配置项及 PCS 双写同步；`NetworkStepOrchestrator` 收敛为单一路径
 
 如代码实现与文档不一致，应以代码为准，并及时回写本文档。

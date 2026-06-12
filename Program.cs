@@ -1,5 +1,6 @@
 using EssSimulator.Configuration;
 using EssSimulator.Core;
+using EssSimulator.DataExchange.Config;
 using EssSimulator.Display;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi;
@@ -201,6 +202,7 @@ namespace EssSimulator
                     services.Configure<UnitTransformerConfig>(ctx.Configuration.GetSection(UnitTransformerConfig.Section));
                     services.Configure<LoadConfig>(ctx.Configuration.GetSection(LoadConfig.Section));
                     services.Configure<PccConfig>(ctx.Configuration.GetSection(PccConfig.Section));
+                    services.Configure<DataExchangeOptions>(ctx.Configuration.GetSection(DataExchangeOptions.Section));
 
                     // 核心仿真模型（单例 + 托管服务，由 Host 管理生命周期和仿真主循环）
                     services.AddSingleton<EnergyStorageSystem>(sp =>

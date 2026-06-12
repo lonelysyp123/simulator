@@ -154,25 +154,27 @@ namespace EssSimulator
             }
 
             // FC05 线圈控制点按点位逐个读取（线圈区与寄存器区分离，不参与 06 连续段优化）。
-            var coilCandidates = pointMapToUse.Where(p => p.FunctionCode == COILWRITEFUNCTIONCODE).ToArray();
+            ReadCoilPoints(pointMapToUse, propertyDataGroup, COILWRITEFUNCTIONCODE, slaveId);
+
+            // FC01 线圈读取点按点位逐个读取（用于内部轮询/调试读取）
+            ReadCoilPoints(pointMapToUse, propertyDataGroup, 1, slaveId);
+            return propertyDataGroup;
+        }
+
+        private void ReadCoilPoints(
+            MapEntry[] pointMapToUse,
+            Dictionary<string, object> propertyDataGroup,
+            int functionCode,
+            byte slaveId)
+        {
+            var coilCandidates = pointMapToUse.Where(p => p.FunctionCode == functionCode).ToArray();
             foreach (var entry in coilCandidates)
             {
                 if (entry == null || string.IsNullOrWhiteSpace(entry.ParamName)) continue;
-                var coilRaw = ReadFunc((ushort)entry.Address, 1, COILWRITEFUNCTIONCODE, slaveId);
+                var coilRaw = ReadFunc((ushort)entry.Address, 1, functionCode, slaveId);
                 if (coilRaw == null || coilRaw.Count == 0) continue;
                 propertyDataGroup[entry.ParamName] = coilRaw[0];
             }
-
-            // FC01 线圈读取点按点位逐个读取（用于内部轮询/调试读取）
-            var coilReadCandidates = pointMapToUse.Where(p => p.FunctionCode == 1).ToArray();
-            foreach (var entry in coilReadCandidates)
-            {
-                if (entry == null || string.IsNullOrWhiteSpace(entry.ParamName)) continue;
-                var coilRaw = ReadFunc((ushort)entry.Address, 1, 1, slaveId);
-                if (coilRaw == null || coilRaw.Count == 0) continue;
-                propertyDataGroup[entry.ParamName] = coilRaw[0];
-            }
-            return propertyDataGroup;
         }
 
         public byte[] Read(string paramName)
@@ -330,6 +332,11 @@ namespace EssSimulator
                     modbusSlave?.DataStore.CoilDiscretes.WritePoints(address, values);
                 }
                 else if (functionCode == 3)
+                {
+                    var usdata = Common.ConvertBytesToUShorts(data);
+                    modbusSlave?.DataStore.HoldingRegisters.WritePoints(address, usdata);
+                }
+                else if (functionCode == CTRLFUNCTIONCODE)
                 {
                     var usdata = Common.ConvertBytesToUShorts(data);
                     modbusSlave?.DataStore.HoldingRegisters.WritePoints(address, usdata);

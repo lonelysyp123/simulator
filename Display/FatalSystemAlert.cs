@@ -1,4 +1,5 @@
 using System.Threading;
+using log4net;
 using Spectre.Console;
 
 namespace EssSimulator.Display
@@ -8,6 +9,7 @@ namespace EssSimulator.Display
     /// </summary>
     public static class FatalSystemAlert
     {
+        private static readonly ILog Log = LogManager.GetLogger(typeof(FatalSystemAlert));
         private static int _triggered;
         private static string _message = "";
         private static string _detail = "";
@@ -55,7 +57,7 @@ namespace EssSimulator.Display
                 while (IsActive && DateTime.UtcNow < _exitAtUtc)
                 {
                     try { RenderOverlay(); }
-                    catch { /* 终端受限时忽略 */ }
+                    catch (Exception ex) { Log.Debug("严重故障 overlay 渲染失败（终端受限）", ex); }
                     Thread.Sleep(250);
                 }
 
@@ -88,7 +90,8 @@ namespace EssSimulator.Display
 
         public static void ForceExitProcess()
         {
-            try { Console.Clear(); } catch { /* ignore */ }
+            try { Console.Clear(); }
+            catch (Exception ex) { Log.Debug("退出前 Console.Clear 失败", ex); }
             Environment.Exit(1);
         }
 

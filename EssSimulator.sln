@@ -1,8 +1,10 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EssSimulator", "EssSimulator.csproj", "{5D9AD370-815E-354D-33F5-2EE481612956}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EssSimulator.Tests", "EssSimulator.Tests\EssSimulator.Tests.csproj", "{4F43A43B-B22E-46C1-B516-014935601CD8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,6 +16,10 @@ Global
 		{5D9AD370-815E-354D-33F5-2EE481612956}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5D9AD370-815E-354D-33F5-2EE481612956}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5D9AD370-815E-354D-33F5-2EE481612956}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4F43A43B-B22E-46C1-B516-014935601CD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F43A43B-B22E-46C1-B516-014935601CD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F43A43B-B22E-46C1-B516-014935601CD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F43A43B-B22E-46C1-B516-014935601CD8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

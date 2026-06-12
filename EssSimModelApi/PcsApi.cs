@@ -12,9 +12,6 @@ namespace EssSimulator.EssSimModelApi
 
     namespace EnergyManagementSystem
     {
-
-        namespace EnergyManagementSystem
-        {
             /// <summary>
             /// 能量管理单元(EMU)数据模型
             /// </summary>
@@ -616,6 +613,5 @@ namespace EssSimulator.EssSimModelApi
                 public GyzbData Gyzb { get; set; } = new GyzbData();
                 public ElectricityMeterData ElectricityMeter { get; set; } = new ElectricityMeterData();
             }
-        }
     }
 }

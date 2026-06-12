@@ -2,6 +2,7 @@ using EssSimulator.EssDeviceSimModel;
 using EssSimulator.Configuration;
 using EssSimulator.Core;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
+using EssSimulator.EssDeviceSimModel.Devices;
 using EssSimulator.EssSimModelApi.Mappers;
 using Microsoft.Extensions.Hosting;
 using System.Linq;
@@ -61,18 +62,8 @@ namespace EssSimulator.EssSimModelApi
                 ess ??= store.Get<EnergyStorageSystem>("ess");
                 if (ess == null) continue;
 
-                var racks = ess._batteryRacks;
-
-                for (int i = 0; i < _unitCount && i < racks.Count; i++)
-                {
-                    var rack    = racks[i];
-                    var bmsData = _bmsDataList[i];
-
-                    var rackState = rack.GetRackState();
-                    BmsMapper.MapRackToStack(rackState, bmsData);
-                    BmsMapper.SyncFaultToRack(bmsData, rackState);
-                    BmsMapper.MapClusters(rack, bmsData);
-                }
+                for (int i = 0; i < _unitCount && i < ess._bmsRackDevices.Count; i++)
+                    ess._bmsRackDevices[i].SyncTelemetryAndProtection(_bmsDataList[i]);
 
                 _bmsDataList[0].Timestamp = DateTime.Now;
             }
@@ -81,10 +72,10 @@ namespace EssSimulator.EssSimModelApi
         // 保留供外部（Cmd.cs 等）直接调用的告警状态机（向后兼容）
         public void UpdateStateForUnder(ref bool? l1, ref bool? l2, ref bool? l3,
             float t1, float t2, float t3, float r1, float r2, float r3, double val)
-            => BmsMapper.UpdateUnder(ref l1, ref l2, ref l3, t1, t2, t3, r1, r2, r3, val);
+            => BmsRackProtection.UpdateUnder(ref l1, ref l2, ref l3, t1, t2, t3, r1, r2, r3, val);
 
         public void UpdateStateForOver(ref bool? l1, ref bool? l2, ref bool? l3,
             float t1, float t2, float t3, float r1, float r2, float r3, double val)
-            => BmsMapper.UpdateOver(ref l1, ref l2, ref l3, t1, t2, t3, r1, r2, r3, val);
+            => BmsRackProtection.UpdateOver(ref l1, ref l2, ref l3, t1, t2, t3, r1, r2, r3, val);
     }
 }

@@ -1,6 +1,10 @@
 using EssSimulator.Configuration;
 using EssSimulator.Core;
+using EssSimulator.DataExchange;
+using EssSimulator.DataExchange.Catalog;
+using EssSimulator.DataExchange.Config;
 using EssSimulator.EssSimModelApi;
+using log4net;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -12,12 +16,17 @@ namespace EssSimulator
     /// </summary>
     public class ModbusHostedService : IHostedService
     {
+        private static readonly ILog Log = LogManager.GetLogger(typeof(ModbusHostedService));
         private readonly SimulatorConfig _cfg;
+        private readonly DataExchangeOptions _dataExchange;
         private readonly List<ModbusSimServer> _servers = new();
 
-        public ModbusHostedService(IOptions<SimulatorConfig> opts)
+        public ModbusHostedService(
+            IOptions<SimulatorConfig> opts,
+            IOptions<DataExchangeOptions> dataExchangeOpts)
         {
             _cfg = opts.Value;
+            _dataExchange = dataExchangeOpts.Value;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -34,8 +43,10 @@ namespace EssSimulator
                 {
                     int port    = _cfg.Protocol.BaseBmsModbusPort + i * _cfg.Protocol.BmsPortStep;
                     string name = $"simBms{i + 1}";
-                    int clusterCount = (i < bmsCfg.Count) ? bmsCfg[i].ClusterCount : _cfg.ClusterCount;
-                    var server  = new ModbusSimServer("bms_bank.csv", port, name, clusterCount);
+                    int clusterCount = i < bmsCfg.Count
+                        ? bmsCfg[i].ClusterCount
+                        : new BmsDeviceConfig().ClusterCount;
+                    var server  = new ModbusSimServer("bms_bank.csv", port, name, clusterCount, _dataExchange);
                     store.Register(name, server);
                     server.Start();
                     SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
@@ -48,7 +59,7 @@ namespace EssSimulator
                 {
                     int port = _cfg.Protocol.BaseEmuModbusPort + u * _cfg.Protocol.EmuPortStep;
                     string name = $"simEmu{u + 1}";
-                    var pcs = new ModbusSimServer("emu.csv", port, name);
+                    var pcs = new ModbusSimServer("emu.csv", port, name, dataExchangeOptions: _dataExchange);
                     store.Register(name, pcs);
                     pcs.Start();
                     SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
@@ -88,7 +99,7 @@ namespace EssSimulator
             foreach (var server in _servers)
             {
                 try { server.Stop(); }
-                catch { /* 忽略单个服务关闭异常 */ }
+                catch (Exception ex) { Log.Warn("关闭 Modbus 服务时异常", ex); }
             }
             return Task.CompletedTask;
         }

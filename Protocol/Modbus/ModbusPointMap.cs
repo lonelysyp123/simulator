@@ -103,12 +103,16 @@ namespace EssSimulator.Protocol.Modbus
             {
                 if (e.ModelSim != null)
                 {
-                    // BMS 点表：用 deviceId 替换为 bms1/bms2/... 的数字部分
-                    e.ModelSim = e.ModelSim.Replace("deviceId", deviceId.ToString());
+                    // BMS 点表：bmsdeviceId → bms1/bms2/...
+                    if (!isEmu)
+                        e.ModelSim = e.ModelSim.Replace("bmsdeviceId", $"bms{deviceId}", StringComparison.Ordinal);
+
+                    // 兼容旧占位符 deviceId
+                    e.ModelSim = e.ModelSim.Replace("deviceId", deviceId.ToString(), StringComparison.Ordinal);
 
                     // EMU 点表：用 emuDeviceId 替换为 emu1/emu2/... 的对象根
                     if (isEmu)
-                        e.ModelSim = e.ModelSim.Replace("emuDeviceId", $"emu{deviceId}");
+                        e.ModelSim = e.ModelSim.Replace("emuDeviceId", $"emu{deviceId}", StringComparison.Ordinal);
                 }
             }
         }

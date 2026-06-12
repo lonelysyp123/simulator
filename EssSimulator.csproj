@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="EssSimulator.Tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="log4net" Version="2.0.17" />
     <PackageReference Include="NModbus" Version="3.0.81" />
     <PackageReference Include="CsvHelper" Version="32.0.0" />

@@ -15,8 +15,10 @@
 `appsettings.json` 的顶层包含以下配置段：
 
 - `Simulator`：仿真运行参数、协议端口、设备清单（决定通道数）
+- `DataExchange`：simEmu/simBms/simEm 遥测与控制轮询间隔
 - `Pcs`：PCS 物理侧参数（会影响仿真行为与并网侧计算）
-- `Transformer`：变压器模型参数（影响一次/二次电压、电流、损耗等）
+- `Pcc`：220kV 并网点无功—电压参数
+- `Transformer`：主变模型参数（220kV/35kV）
 - `UnitTransformer`：单元变参数（每个 Unit 一台 35kV/690V）
 - `Load`：站内负载计划（决定系统功率平衡与潮流方向）
 
@@ -147,9 +149,21 @@
 
 ---
 
+## DataExchange（Modbus 与模型同步）
+
+该段绑定到 `DataExchangeOptions`，用于 `simEmu*` / `simBms*` / `simEm` 的 `DataExchangeSession`。
+
+- `DataExchange.TelemetryIntervalMs`（int，ms）
+  - **作用**：遥测管道周期：读模型 → 写 Modbus 寄存器。
+
+- `DataExchange.ControlPollIntervalMs`（int，ms）
+  - **作用**：控制管道与反馈管道周期：读 FC5/6 → 写模型 → 回写反馈线圈。
+
+---
+
 ## Pcs（PCS 物理参数，直接影响仿真行为）
 
-该段绑定到 `PcsPhysicalConfig`，并用于初始化 `PCSSimulator` 的核心配置与并网侧折算。
+该段绑定到 `PcsPhysicalConfig`，经 `PcsDeviceFactory` 生成 `PcsDevice` 配置（爬坡参数另见 `Simulator.Devices[].Pcs[].PcsRamp`）。
 
 - `Pcs.RatedPower`（double）
   - **作用**：额定容量标尺（在代码中用于视在功率检查阈值）。
@@ -198,7 +212,7 @@
 
 ## Transformer（主变 220kV/35kV）
 
-该段绑定到 `TransformerConfig`，用于初始化主变 `TransformerSimulator`（220kV/35kV）。**PCC 电压由 `Pcc` 节计算**；主变二次侧为 35kV 站内母线（由 PCC 变比推导），供负载电流换算与单元变一次侧使用。
+该段绑定到 `TransformerConfig`，经 `TransformerDeviceFactory` 创建主变 `TransformerDevice`（220kV/35kV），与 `ElectricalNetwork.MainTransformer` 共用实例。**PCC 电压由 `Pcc` 节计算**；主变二次侧为 35kV 站内母线（由 PCC 变比推导），供负载电流换算与单元变一次侧使用。
 
 - `Transformer.RatedPower`（double，kVA）
   - **作用**：变压器额定容量，用于负载率计算与无功电压反馈等。
@@ -224,11 +238,23 @@
 - `Transformer.NoLoadCurrentPercent`（double，%）
   - **作用**：空载电流百分比，用于一次侧电流估算。
 
+- `Transformer.MagnetizingInrushEnabled`（bool）
+  - **作用**：一次电压快速抬升时是否叠加励磁涌流。
+
+- `Transformer.MagnetizingInrushDvDtThresholdPuPerSec`（double，1/s）
+  - **作用**：标幺电压上升率超过该阈值时触发涌流注入。
+
+- `Transformer.MagnetizingInrushPeakExtraMultipleOfRatedPrimary` / `MagnetizingInrushMaxExtraMultipleOfRatedPrimary`（double）
+  - **作用**：涌流峰值与上限（相对一次额定线电流倍数）。
+
+- `Transformer.MagnetizingInrushDecayTimeConstantSec`（double，s）
+  - **作用**：涌流附加电流指数衰减时间常数。
+
 ---
 
 ## UnitTransformer（单元变 35kV/690V）
 
-该段绑定到 `UnitTransformerConfig`，用于为每个储能单元创建一台单元变 `TransformerSimulator`（35kV/690V）。
+该段绑定到 `UnitTransformerConfig`，经 `TransformerDeviceFactory` 为每个储能单元创建一台 `TransformerDevice`（35kV/690V），与 `ElectricalNetwork.UnitTransformers[u]` 共用实例。励磁涌流字段含义同 `Transformer` 节。
 
 - `UnitTransformer.RatedPower`（double，kVA）
   - **作用**：单元变额定容量，用于负载率与电压反馈等计算。

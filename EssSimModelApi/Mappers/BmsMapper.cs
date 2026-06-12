@@ -1,6 +1,6 @@
 using EssSimulator.EssDeviceSimModel;
+using EssSimulator.EssDeviceSimModel.Devices;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
-using static EssSimulator.EssDeviceSimModel.BatteryRackSimulator;
 
 namespace EssSimulator.EssSimModelApi.Mappers
 {
@@ -157,126 +157,20 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 var minT = tempDict.Aggregate((a, b) => a.Value < b.Value ? a : b);
                 m.MaxCellTemp     = maxT.Value; m.MaxCellTempId = maxT.Key;
                 m.MinCellTemp     = minT.Value; m.MinCellTempId = minT.Key;
-
-                // 告警状态机 — 属性不能作为 ref，使用局部变量
-                var thr = clu.Thresholds;
-                var alm = clu.Alarms;
-
-                var minVoltList = Enumerable.Range(0, clusterConfig.PackCount)
-                    .Select(j => (float)cs.PackStates[j].MinCellVoltage).ToList();
-                var maxVoltList = Enumerable.Range(0, clusterConfig.PackCount)
-                    .Select(j => (float)cs.PackStates[j].MaxCellVoltage).ToList();
-                var minTempList = Enumerable.Range(0, clusterConfig.PackCount)
-                    .Select(j => (float)cs.PackStates[j].MinCellTemp).ToList();
-                var maxTempList = Enumerable.Range(0, clusterConfig.PackCount)
-                    .Select(j => (float)cs.PackStates[j].MaxCellTemp).ToList();
-
-                bool? l1, l2, l3;
-
-                // 簇电压过低
-                (l1, l2, l3) = (alm.UndervoltageProtection, alm.UndervoltageAlarm, alm.UndervoltageFault);
-                UpdateUnder(ref l1, ref l2, ref l3, thr.UndervoltageThreshold1!.Value, thr.UndervoltageThreshold2!.Value, thr.UndervoltageThreshold3!.Value, thr.UndervoltageRecovery1!.Value, thr.UndervoltageRecovery2!.Value, thr.UndervoltageRecovery3!.Value, (float)cs.TotalVoltage);
-                (alm.UndervoltageProtection, alm.UndervoltageAlarm, alm.UndervoltageFault) = (l1, l2, l3);
-
-                // 簇电压过高
-                (l1, l2, l3) = (alm.OvervoltageProtection, alm.OvervoltageAlarm, alm.OvervoltageFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.OvervoltageThreshold1!.Value, thr.OvervoltageThreshold2!.Value, thr.OvervoltageThreshold3!.Value, thr.OvervoltageRecovery1!.Value, thr.OvervoltageRecovery2!.Value, thr.OvervoltageRecovery3!.Value, (float)cs.TotalVoltage);
-                (alm.OvervoltageProtection, alm.OvervoltageAlarm, alm.OvervoltageFault) = (l1, l2, l3);
-
-                // 充电过流
-                (l1, l2, l3) = (alm.ChargeOvercurrentProtection, alm.ChargeOvercurrentAlarm, alm.ChargeOvercurrentFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.ChargeOvercurrentThreshold1!.Value, thr.ChargeOvercurrentThreshold2!.Value, thr.ChargeOvercurrentThreshold3!.Value, thr.ChargeOvercurrentRecovery1!.Value, thr.ChargeOvercurrentRecovery2!.Value, thr.ChargeOvercurrentRecovery3!.Value, (float)(-cs.TotalCurrent));
-                (alm.ChargeOvercurrentProtection, alm.ChargeOvercurrentAlarm, alm.ChargeOvercurrentFault) = (l1, l2, l3);
-
-                // 放电过流
-                (l1, l2, l3) = (alm.DischargeOvercurrentProtection, alm.DischargeOvercurrentAlarm, alm.DischargeOvercurrentFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.DischargeOvercurrentThreshold1!.Value, thr.DischargeOvercurrentThreshold2!.Value, thr.DischargeOvercurrentThreshold3!.Value, thr.DischargeOvercurrentRecovery1!.Value, thr.DischargeOvercurrentRecovery2!.Value, thr.DischargeOvercurrentRecovery3!.Value, (float)cs.TotalCurrent);
-                (alm.DischargeOvercurrentProtection, alm.DischargeOvercurrentAlarm, alm.DischargeOvercurrentFault) = (l1, l2, l3);
-
-                // 单体电压过低
-                (l1, l2, l3) = (alm.CellUnderVoltageProtection, alm.CellUnderVoltageAlarm, alm.CellUnderVoltageFault);
-                UpdateUnder(ref l1, ref l2, ref l3, thr.CellUndervoltageThreshold1!.Value, thr.CellUndervoltageThreshold2!.Value, thr.CellUndervoltageThreshold3!.Value, thr.CellUndervoltageRecovery1!.Value, thr.CellUndervoltageRecovery2!.Value, thr.CellUndervoltageRecovery3!.Value, minVoltList.Min());
-                (alm.CellUnderVoltageProtection, alm.CellUnderVoltageAlarm, alm.CellUnderVoltageFault) = (l1, l2, l3);
-
-                // 单体电压过高
-                (l1, l2, l3) = (alm.CellOverVoltageProtection, alm.CellOverVoltageAlarm, alm.CellOverVoltageFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.CellOvervoltageThreshold1!.Value, thr.CellOvervoltageThreshold2!.Value, thr.CellOvervoltageThreshold3!.Value, thr.CellOvervoltageRecovery1!.Value, thr.CellOvervoltageRecovery2!.Value, thr.CellOvervoltageRecovery3!.Value, maxVoltList.Max());
-                (alm.CellOverVoltageProtection, alm.CellOverVoltageAlarm, alm.CellOverVoltageFault) = (l1, l2, l3);
-
-                // 单体压差过大
-                (l1, l2, l3) = (alm.VoltageDifferenceProtection, alm.VoltageDifferenceAlarm, alm.VoltageDifferenceFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.CellVoltageDifferenceThreshold1!.Value, thr.CellVoltageDifferenceThreshold2!.Value, thr.CellVoltageDifferenceThreshold3!.Value, thr.CellVoltageDifferenceRecovery1!.Value, thr.CellVoltageDifferenceRecovery2!.Value, thr.CellVoltageDifferenceRecovery3!.Value, maxVoltList.Max() - minVoltList.Min());
-                (alm.VoltageDifferenceProtection, alm.VoltageDifferenceAlarm, alm.VoltageDifferenceFault) = (l1, l2, l3);
-
-                // 单体温差过大
-                (l1, l2, l3) = (alm.TempDifferenceProtection, alm.TempDifferenceAlarm, alm.TempDifferenceFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.CellTempDifferenceThreshold1!.Value, thr.CellTempDifferenceThreshold2!.Value, thr.CellTempDifferenceThreshold3!.Value, thr.CellTempDifferenceRecovery1!.Value, thr.CellTempDifferenceRecovery2!.Value, thr.CellTempDifferenceRecovery3!.Value, maxTempList.Max() - minTempList.Min());
-                (alm.TempDifferenceProtection, alm.TempDifferenceAlarm, alm.TempDifferenceFault) = (l1, l2, l3);
-
-                // SOC过低
-                (l1, l2, l3) = (alm.LowSOCProtection, alm.LowSOCAlarm, alm.LowSOCFault);
-                UpdateUnder(ref l1, ref l2, ref l3, thr.LowSOCTreshold1!.Value, thr.LowSOCTreshold2!.Value, thr.LowSOCTreshold3!.Value, thr.LowSOCRecovery1!.Value, thr.LowSOCRecovery2!.Value, thr.LowSOCRecovery3!.Value, (float)cs.MinPackSOC);
-                (alm.LowSOCProtection, alm.LowSOCAlarm, alm.LowSOCFault) = (l1, l2, l3);
-
-                // 充电温度过高
-                (l1, l2, l3) = (alm.CellChargeHighTempProtection, alm.CellChargeHighTempAlarm, alm.CellChargeHighTempFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.ChargeHighTempThreshold1!.Value, thr.ChargeHighTempThreshold2!.Value, thr.ChargeHighTempThreshold3!.Value, thr.ChargeHighTempRecovery1!.Value, thr.ChargeHighTempRecovery2!.Value, thr.ChargeHighTempRecovery3!.Value, maxTempList.Max());
-                (alm.CellChargeHighTempProtection, alm.CellChargeHighTempAlarm, alm.CellChargeHighTempFault) = (l1, l2, l3);
-
-                // 充电温度过低
-                (l1, l2, l3) = (alm.CellChargeLowTempProtection, alm.CellChargeLowTempAlarm, alm.CellChargeLowTempFault);
-                UpdateUnder(ref l1, ref l2, ref l3, thr.ChargeLowTempThreshold1!.Value, thr.ChargeLowTempThreshold2!.Value, thr.ChargeLowTempThreshold3!.Value, thr.ChargeLowTempRecovery1!.Value, thr.ChargeLowTempRecovery2!.Value, thr.ChargeLowTempRecovery3!.Value, minTempList.Min());
-                (alm.CellChargeLowTempProtection, alm.CellChargeLowTempAlarm, alm.CellChargeLowTempFault) = (l1, l2, l3);
-
-                // 绝缘值过低
-                (l1, l2, l3) = (alm.InsulationProtection, alm.InsulationAlarm, alm.InsulationFault);
-                UpdateUnder(ref l1, ref l2, ref l3, thr.InsulationThreshold1!.Value, thr.InsulationThreshold2!.Value, thr.InsulationThreshold3!.Value, thr.InsulationRecovery1!.Value, thr.InsulationRecovery2!.Value, thr.InsulationRecovery3!.Value, m.Insulation!.Value);
-                (alm.InsulationProtection, alm.InsulationAlarm, alm.InsulationFault) = (l1, l2, l3);
-
-                // 放电温度过高
-                (l1, l2, l3) = (alm.CellDischargeHighTempProtection, alm.CellDischargeHighTempAlarm, alm.CellDischargeHighTempFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.DischargeHighTempThreshold1!.Value, thr.DischargeHighTempThreshold2!.Value, thr.DischargeHighTempThreshold3!.Value, thr.DischargeHighTempRecovery1!.Value, thr.DischargeHighTempRecovery2!.Value, thr.DischargeHighTempRecovery3!.Value, maxTempList.Max());
-                (alm.CellDischargeHighTempProtection, alm.CellDischargeHighTempAlarm, alm.CellDischargeHighTempFault) = (l1, l2, l3);
-
-                // 放电温度过低
-                (l1, l2, l3) = (alm.CellDischargeLowTempProtection, alm.CellDischargeLowTempAlarm, alm.CellDischargeLowTempFault);
-                UpdateUnder(ref l1, ref l2, ref l3, thr.DischargeLowTempThreshold1!.Value, thr.DischargeLowTempThreshold2!.Value, thr.DischargeLowTempThreshold3!.Value, thr.DischargeLowTempRecovery1!.Value, thr.DischargeLowTempRecovery2!.Value, thr.DischargeLowTempRecovery3!.Value, minTempList.Min());
-                (alm.CellDischargeLowTempProtection, alm.CellDischargeLowTempAlarm, alm.CellDischargeLowTempFault) = (l1, l2, l3);
-
-                // 高压箱连接器温度过高
-                (l1, l2, l3) = (alm.BatteryBoxBusbarHighTempProtection, alm.BatteryBoxBusbarHighTempAlarm, alm.BatteryBoxBusbarHighTempFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.HVBHighTempThreshold1!.Value, thr.HVBHighTempThreshold2!.Value, thr.HVBHighTempThreshold3!.Value, thr.HVBHighTempRecovery1!.Value, thr.HVBHighTempRecovery2!.Value, thr.HVBHighTempRecovery3!.Value, 26.0f);
-                (alm.BatteryBoxBusbarHighTempProtection, alm.BatteryBoxBusbarHighTempAlarm, alm.BatteryBoxBusbarHighTempFault) = (l1, l2, l3);
             }
+
+            BmsRackProtection.EvaluateAllClusters(rackSim, bmsData);
         }
 
-        // ── 三级告警状态机（使用局部 ref 变量）───────────────────────
-
+        /// <summary>向后兼容：委托至 <see cref="BmsRackProtection.UpdateUnder"/>。</summary>
         public static void UpdateUnder(ref bool? l1, ref bool? l2, ref bool? l3,
-            float t1, float t2, float t3, float r1, float r2, float r3, double val)
-        {
-            if (l3 == true)
-            { if (val > r3) { l3 = false; l2 = true; } }
-            else if (l2 == true)
-            { if (val <= t3) { l3 = true; l2 = false; } else if (val > r2) { l2 = false; l1 = true; } }
-            else if (l1 == true)
-            { if (val <= t2) { l2 = true; l1 = false; } else if (val > r1) { l1 = false; } }
-            else
-            { if (val <= t1) { l1 = true; } }
-        }
+            float t1, float t2, float t3, float r1, float r2, float r3, double val) =>
+            BmsRackProtection.UpdateUnder(ref l1, ref l2, ref l3, t1, t2, t3, r1, r2, r3, val);
 
+        /// <summary>向后兼容：委托至 <see cref="BmsRackProtection.UpdateOver"/>。</summary>
         public static void UpdateOver(ref bool? l1, ref bool? l2, ref bool? l3,
-            float t1, float t2, float t3, float r1, float r2, float r3, double val)
-        {
-            if (l3 == true)
-            { if (val < r3) { l3 = false; l2 = true; } }
-            else if (l2 == true)
-            { if (val >= t3) { l3 = true; l2 = false; } else if (val < r2) { l2 = false; l1 = true; } }
-            else if (l1 == true)
-            { if (val >= t2) { l2 = true; l1 = false; } else if (val < r1) { l1 = false; } }
-            else
-            { if (val >= t1) { l1 = true; } }
-        }
+            float t1, float t2, float t3, float r1, float r2, float r3, double val) =>
+            BmsRackProtection.UpdateOver(ref l1, ref l2, ref l3, t1, t2, t3, r1, r2, r3, val);
 
         // ── 极值查找 ──────────────────────────────────────────────────
 

@@ -1,10 +1,8 @@
 using EssSimulator;
 using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
-using EssSimulator.Protocol;
+using EssSimulator.EssDeviceSimModel.Devices;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
-using EssSimulator.EssSimModelApi.EnergyManagementSystem.EnergyManagementSystem;
-using static EssSimulator.EssDeviceSimModel.EnergyStorageSystem;
 
 namespace EssSimulator.EssSimModelApi.Mappers
 {
@@ -68,8 +66,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
         }
 
         /// <summary>
-        /// 联锁/外部停机后，将启停命令位清 0 并回写 Modbus，便于外部再次写 1 触发变位。
-        /// 不在「外部刚写 1 等待启动」时调用，否则会立刻把 Modbus 写回 0，表现为 mbpoll 成功但界面无反应。
+        /// 联锁/外部停机后，将启停命令位清 0（Modbus 回写由 DataExchange 反馈管道负责）。
         /// </summary>
         private static void ClearPcsStartStopCommand(int simIdx, PcsData pcsData)
         {
@@ -77,26 +74,19 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 return;
 
             pcsData.pcsOnOffSwitch = false;
-
-            int unitIndex0 = simIdx / 2;
-            int slotInUnit = simIdx % 2;
-            string paramName = slotInUnit == 0 ? "pcs1_startstop" : "pcs2_startstop";
-            var modbus = SimulatorHost.Instance.Get<ModbusSimServer>($"simEmu{unitIndex0 + 1}");
-            modbus?.PublishControlToSlave(paramName, false);
         }
 
         /// <summary>
-        /// 启动完成后向 Modbus 启停线圈写 1（同步 emu 并立即 ApplyEmuCommands）。
-        /// Modbus 从站未就绪时返回 false，调用方可在下一周期重试。
+        /// 启动完成后置位启停命令并立即 ApplyEmuCommands。
+        /// 返回 false 表示 emu/ess 尚未就绪，调用方可在下一周期重试。
         /// </summary>
-        public static bool TryPublishStartupPcsStartStop(EnergyStorageSystem ess, int unitCount)
+        public static bool TryApplyStartupPcsStartStop(EnergyStorageSystem ess, int unitCount)
         {
             bool allReady = true;
             for (int u = 0; u < unitCount; u++)
             {
-                var modbus = SimulatorHost.Instance.Get<ModbusSimServer>($"simEmu{u + 1}");
                 var emu = SimulatorHost.Instance.Get<EnergyManagementData>($"emu{u + 1}");
-                if (modbus == null || emu == null)
+                if (emu == null)
                 {
                     allReady = false;
                     continue;
@@ -109,8 +99,8 @@ namespace EssSimulator.EssSimModelApi.Mappers
                     continue;
                 }
 
-                modbus.PublishControlToSlave("pcs1_startstop", true);
-                modbus.PublishControlToSlave("pcs2_startstop", true);
+                emu.PcsList[0].pcsOnOffSwitch = true;
+                emu.PcsList[1].pcsOnOffSwitch = true;
                 ApplyEmuCommands(emu, ess, baseIdx);
             }
 
@@ -123,12 +113,6 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 return;
 
             pcsData.BlackStartEnabled = false;
-
-            int unitIndex0 = simIdx / 2;
-            int slotInUnit = simIdx % 2;
-            string paramName = slotInUnit == 0 ? "pcs1_blackstart_enable" : "pcs2_blackstart_enable";
-            var modbus = SimulatorHost.Instance.Get<ModbusSimServer>($"simEmu{unitIndex0 + 1}");
-            modbus?.PublishControlToSlave(paramName, false);
         }
 
         /// <summary>将 EMU 控制命令回写到 ESS 物理模型。</summary>
@@ -146,13 +130,15 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 bool cmdOn = pcsData.pcsOnOffSwitch;
                 pcsSim.SyncExternalRunCommand(cmdOn);
 
-                bool mainBreakerClosed = ess._breaker.IsClosed;
+                bool mainBreakerClosed = ess.IsMainBreakerClosed;
                 int unitIdx = simIdx / 2;
-                bool unitBreakerClosed = unitIdx < ess._unitBreakers.Count &&
-                                         ess._unitBreakers[unitIdx].IsClosed;
+                bool unitBreakerClosed = ess.IsUnitBreakerClosed(unitIdx);
 
                 if (!cmdOn)
+                {
+                    ess.PushPcsChannelToNetwork(simIdx);
                     continue;
+                }
 
                 bool breakersOpen = !mainBreakerClosed || !unitBreakerClosed;
 
@@ -164,21 +150,26 @@ namespace EssSimulator.EssSimModelApi.Mappers
                     ClearBlackStartCommand(simIdx, pcsData);
                     pcsSim.TransitionToMode(OperationMode.Off);
                     ClearPcsStartStopCommand(simIdx, pcsData);
+                    ess.PushPcsChannelToNetwork(simIdx);
                     continue;
                 }
 
                 ApplyOperationalMode(pcsData, pcsSim, ess, simIdx);
 
                 if (!pcsData.pcsOnOffSwitch || breakersOpen || pcsData.BlackStartEnabled)
+                {
+                    ess.PushPcsChannelToNetwork(simIdx);
                     continue;
+                }
 
                 pcsSim.SetPowerCommand(pcsData.PCSActivePowerSetting, pcsData.PCSReactivePowerSetting);
+                ess.PushPcsChannelToNetwork(simIdx);
             }
         }
 
         private static void ApplyOperationalMode(
             PcsData pcsData,
-            PCSSimulator pcsSim,
+            PcsDevice pcsSim,
             EnergyStorageSystem ess,
             int simIdx)
         {
@@ -191,16 +182,14 @@ namespace EssSimulator.EssSimModelApi.Mappers
 
             double maxIslandV = pcsSim._config.AcVoltageNominal;
 
-            if (pcsData.BlackStartEnabled &&
-                !BlackStartSafety.TryEnableBlackStart(ess, simIdx, true))
+            if (!ess.TrySetPcsBlackStart(simIdx, pcsData.BlackStartEnabled))
             {
                 pcsSim.ApplyBlackStartEnabled(false);
+                BlackStartSafety.ReportViolation("开启黑启动", simIdx + 1);
                 ClearBlackStartCommand(simIdx, pcsData);
                 pcsSim.TransitionToMode(OperationMode.Off);
                 return;
             }
-
-            pcsSim.ApplyBlackStartEnabled(pcsData.BlackStartEnabled);
 
             int unit = simIdx / 2;
             double busV = ess.GetUnitAcBusVoltage(unit);

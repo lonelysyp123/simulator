@@ -2,6 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using EssSimulator.DataExchange;
+using EssSimulator.DataExchange.Catalog;
+using EssSimulator.DataExchange.Config;
+using EssSimulator.Protocol.Modbus;
 using log4net;
 
 namespace EssSimulator
@@ -19,9 +23,8 @@ namespace EssSimulator
     }
 
     /// <summary>
-    /// Modbus TCP 从站门面类（精简版）。
-    /// CSV 加载委托给 <see cref="EssSimulator.Protocol.Modbus.ModbusPointMap"/>，
-    /// 数据同步委托给 <see cref="EssSimulator.Protocol.Modbus.ModbusDataSync"/>。
+    /// Modbus TCP 从站门面类。
+    /// simEmu*/simBms*/simEm 固定走 <see cref="DataExchangeSession"/>；simLc* 仍走 <see cref="ModbusDataSync"/>。
     /// </summary>
     public class ModbusSimServer
     {
@@ -30,9 +33,14 @@ namespace EssSimulator
         private readonly ModbusParser      _parser;
         private readonly DeviceInfoDto     _deviceInfo;
         private readonly EssSimulator.Protocol.Modbus.ModbusPointMap  _pointMap;
-        private readonly EssSimulator.Protocol.Modbus.ModbusDataSync  _dataSync;
+        private readonly IModbusSyncBackend _dataSync;
 
-        public ModbusSimServer(string mapFilePath, int modbusPort, string serverName, int clusterCount = 0)
+        public ModbusSimServer(
+            string mapFilePath,
+            int modbusPort,
+            string serverName,
+            int clusterCount = 0,
+            DataExchangeOptions? dataExchangeOptions = null)
         {
             // 1. 加载点表（含 rack 点表）
             _pointMap = new EssSimulator.Protocol.Modbus.ModbusPointMap(mapFilePath, serverName, clusterCount);
@@ -51,11 +59,23 @@ namespace EssSimulator
             _slave  = new ModbusTCPSlave(_deviceInfo, _pointMap.RawMaps, tcpComm, clusterCount);
             _parser = new ModbusParser(_pointMap.RawMaps);
 
-            // 3. 创建数据同步器
-            _dataSync = new EssSimulator.Protocol.Modbus.ModbusDataSync(
-                _slave, _parser, _pointMap, _deviceInfo, clusterCount);
-            // 控制台输出由启动阶段统一负责，避免与 GUI 输出互相打断
+            if (RequiresDataExchange(serverName))
+            {
+                var options = dataExchangeOptions ?? new DataExchangeOptions();
+                var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName, options);
+                _dataSync = new DataExchangeSession(
+                    _slave, _parser, catalog, _deviceInfo, options, clusterCount);
+            }
+            else
+            {
+                _dataSync = new ModbusDataSync(_slave, _parser, _pointMap, _deviceInfo, clusterCount);
+            }
         }
+
+        private static bool RequiresDataExchange(string serverName) =>
+            serverName.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase)
+            || serverName.StartsWith("simBms", StringComparison.OrdinalIgnoreCase)
+            || serverName.Equals("simEm", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// 尝试连接并启动所有 worker 线程。

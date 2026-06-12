@@ -19,6 +19,7 @@ namespace EssSimulator.Configuration
 
         /// <summary>协议与仿真就绪后，向各 PCS 启停线圈写入 1 并驱动并网（默认合闸工况）。</summary>
         public bool AutoStartPcsOnStartup { get; set; } = true;
+
     }
 
     public class PcsRampConfig
@@ -144,18 +145,6 @@ namespace EssSimulator.Configuration
             }
             return list;
         }
-
-        public int ClusterCount => GetBmsDeviceConfigs().First().ClusterCount;
-        public int PackCount => GetBmsDeviceConfigs().First().PackCount;
-        public int CellSeriesCount => GetBmsDeviceConfigs().First().CellSeriesCount;
-        public int CellParallelCount => GetBmsDeviceConfigs().First().CellParallelCount;
-        public double CellNominalVoltage => GetBmsDeviceConfigs().First().CellNominalVoltage;
-        public double CellNominalCapacity => GetBmsDeviceConfigs().First().CellNominalCapacity;
-        public double CellInitialSoc => GetBmsDeviceConfigs().First().CellInitialSoc;
-        public double CellInitialSocRandomRange => GetBmsDeviceConfigs().First().CellInitialSocRandomRange;
-        public double PackInternalResistance => GetBmsDeviceConfigs().First().PackInternalResistance;
-        public double ClusterInternalResistance => GetBmsDeviceConfigs().First().ClusterInternalResistance;
-        public double RackInternalResistance => GetBmsDeviceConfigs().First().RackInternalResistance;
     }
 
     /// <summary>PCS 物理参数配置（对应 appsettings.json: Pcs 节）</summary>
@@ -188,6 +177,24 @@ namespace EssSimulator.Configuration
 
         /// <summary>判定 690V 母线已带电的电压比例（相对 AcVoltageNominal，默认 0.85≈587V）。</summary>
         public double BlackStartBusEnergizedFraction { get; set; } = 0.85;
+
+        /// <summary>黑启动准备阶段时长（ms）：DC 就绪自检，AC 保持 0。</summary>
+        public double BlackStartPrechargeDelayMs { get; set; } = 300;
+
+        /// <summary>软启动电压爬坡速率（V/s，线电压）。</summary>
+        public double BlackStartVoltageRampVs { get; set; } = 120;
+
+        /// <summary>软启动起始频率（Hz）。</summary>
+        public double BlackStartFrequencyStartHz { get; set; } = 47;
+
+        /// <summary>频率爬升最大速率（Hz/s）。</summary>
+        public double BlackStartFrequencyRampHzPerSec { get; set; } = 12;
+
+        /// <summary>建压期无功电压支撑（kvar/V，正=升压）。</summary>
+        public double BlackStartReactiveVoltageGainKvarPerV { get; set; } = 4.0;
+
+        /// <summary>建压期交流电流限幅（相对 MaxCurrent 比例，0–1）。</summary>
+        public double BlackStartCurrentLimitFraction { get; set; } = 0.45;
 
         /// <summary>
         /// 黑启动稳态站用电分担（空载铁损+线损、励磁无功）：

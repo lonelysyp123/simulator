@@ -34,7 +34,10 @@ namespace EssSimulator.Display
             {
                 log.Info("[LogDisplay] 日志显示已启动");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                log.Warn("[LogDisplay] 日志显示启动提示失败", ex);
+            }
         }
 
         public static void StartLogFileWatcher()
@@ -57,7 +60,10 @@ namespace EssSimulator.Display
                     Directory.CreateDirectory(logsDir);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                log.Warn($"[LogDisplay] 创建日志目录失败: {logsDir}", ex);
+            }
 
             _logWatcher.Path = logsDir;
             _logWatcher.Filter = "*.log";

@@ -2,7 +2,6 @@ using EssSimulator.Configuration;
 using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
-using EssSimulator.EssSimModelApi.EnergyManagementSystem.EnergyManagementSystem;
 using EssSimulator.EssSimModelApi.Mappers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -10,8 +9,8 @@ using Microsoft.Extensions.Options;
 namespace EssSimulator.EssSimModelApi
 {
     /// <summary>
-    /// PCS/EMU 数据同步后台服务（100 ms 周期）。
-    /// 具体映射逻辑委托给 <see cref="PcsMapper"/>。
+    /// PCS/EMU 数据同步后台服务（100 ms 周期）：纯 ESS ↔ DTO，不含 Modbus。
+    /// Modbus 读写由 DataExchangeSession 负责。
     /// </summary>
     public class PcsDataServer : BackgroundService
     {
@@ -38,10 +37,9 @@ namespace EssSimulator.EssSimModelApi
                     emu.PcsList.Add(pcs);
                 }
 
-                // 以 PCS 物理配置为唯一真源：EMU 单元级功率上限 = 2 路 PCS 的 MaxPower 之和
                 emu.Emu.MaxChargePower    = (float)(2 * pcsPhy.MaxPower);
                 emu.Emu.MaxDischargePower = (float)(2 * pcsPhy.MaxPower);
-                emu.Emu.PowerOnOff        = 1; // 单元高压断路器默认合闸
+                emu.Emu.PowerOnOff        = 1;
                 _emuUnits.Add(emu);
                 SimulatorHost.Instance.Register($"emu{u + 1}", emu);
             }
@@ -52,7 +50,7 @@ namespace EssSimulator.EssSimModelApi
             var store = SimulatorHost.Instance;
             EnergyStorageSystem? ess = null;
             var startupBlackStartChecked = false;
-            var startupPcsStartPublished = false;
+            var startupPcsApplied = false;
 
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
             while (await timer.WaitForNextTickAsync(stoppingToken))
@@ -66,34 +64,19 @@ namespace EssSimulator.EssSimModelApi
                     BlackStartSafety.ValidateAll(ess, "系统初始化");
                 }
 
-                if (_autoStartPcsOnStartup && !startupPcsStartPublished &&
-                    PcsMapper.TryPublishStartupPcsStartStop(ess, _unitCount))
+                if (_autoStartPcsOnStartup && !startupPcsApplied &&
+                    PcsMapper.TryApplyStartupPcsStartStop(ess, _unitCount))
                 {
-                    startupPcsStartPublished = true;
+                    startupPcsApplied = true;
                 }
 
                 for (int u = 0; u < _unitCount; u++)
-                {
-                    int baseIdx = u * 2;
-                    if (baseIdx + 1 >= ess._pcsList.Count || baseIdx + 1 >= ess._batteryRacks.Count) break;
-
-                    var emu = _emuUnits[u];
-                    PcsMapper.MapPcsState(ess._pcsList[baseIdx].GetCurrentState(), emu.PcsList[0], ess._batteryRacks[baseIdx]);
-                    PcsMapper.MapPcsState(ess._pcsList[baseIdx + 1].GetCurrentState(), emu.PcsList[1], ess._batteryRacks[baseIdx + 1]);
-                    PcsMapper.MapEmuState(emu, new[] { ess._batteryRacks[baseIdx], ess._batteryRacks[baseIdx + 1] });
-                    // 单元高压断路器（单元变前）：由 emu.Emu.PowerOnOff 控制，0=分，1=合
-                    if (ess._unitBreakers != null && u < ess._unitBreakers.Count)
-                    {
-                        ess._unitBreakers[u].IsClosed = emu.Emu.PowerOnOff != 0;
-                    }
-                    PcsMapper.ApplyEmuCommands(emu, ess, baseIdx);
-                }
+                    PcsEmuSynchronizer.SyncUnit(ess, _emuUnits[u], u, u * 2);
             }
         }
 
         private static void ApplyDefaultConfig(PcsData pcs, PcsPhysicalConfig pcsPhy)
         {
-            // 以 PCS 配置统一：功率能力相关限值全部从 Pcs(MaxPower/RatedPower) 推导，避免与仿真不一致
             pcs.BatteryChargePowerLimit           = (float)pcsPhy.MaxPower;
             pcs.BatteryDischargePowerLimit        = (float)pcsPhy.MaxPower;
             pcs.ChargePowerLimit                  = (float)pcsPhy.MaxPower;

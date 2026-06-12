@@ -54,38 +54,18 @@ namespace EssSimulator.EssDeviceSimModel
         /// - Q > 0 => 正偏移量，表示电压抬升；
         /// - Q < 0 => 负偏移量，表示电压下拉。
         /// </summary>
-        /// <param name="legacyReactiveKvar">并网点总无功（kvar）</param>
+        /// <param name="totalReactiveKvar">并网点总无功（kvar）</param>
         /// <param name="ratedPowerKva">额定容量（kVA）</param>
         /// <param name="impedancePu">等效阻抗（pu）</param>
         /// <param name="influenceCoefficient">无功电压影响系数（无量纲）</param>
         public static double CalculatePccReactiveVoltageShiftPu(
-            double legacyReactiveKvar,
+            double totalReactiveKvar,
             double ratedPowerKva,
             double impedancePu,
             double influenceCoefficient)
         {
             if (ratedPowerKva <= 0) return 0;
-            return influenceCoefficient * impedancePu * (legacyReactiveKvar / ratedPowerKva);
-        }
-
-        /// <summary>
-        /// 在当前 legacy 负载模型下应用电压反馈。
-        /// 现行为：
-        /// - Q > 0 时按 k 上抬电压；
-        /// - Q < 0 时按 k 下拉电压；
-        /// - Qlegacy = 0 时电压不变。
-        /// </summary>
-        public static double ApplyLegacyLoadVoltageFeedback(double inputVoltage, double legacyReactiveKvar, double k)
-        {
-            if (legacyReactiveKvar > 0)
-            {
-                return inputVoltage + legacyReactiveKvar * k;
-            }
-            if (legacyReactiveKvar < 0)
-            {
-                return inputVoltage + legacyReactiveKvar * k;
-            }
-            return inputVoltage;
+            return influenceCoefficient * impedancePu * (totalReactiveKvar / ratedPowerKva);
         }
     }
 }

@@ -3,11 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using EssSimulator.Core;
-using EssSimulator.EssDeviceSimModel;
-using EssSimulator.EssSimModelApi.EnergyManagementSystem.EnergyManagementSystem;
-using EssSimulator.EssSimModelApi.Mappers;
 using log4net;
-using static EssSimulator.EssDeviceSimModel.EnergyStorageSystem;
 
 namespace EssSimulator.Protocol.Modbus
 {
@@ -16,7 +12,7 @@ namespace EssSimulator.Protocol.Modbus
     ///   - 按 modelType 分组，每组一个 Worker 周期写入数据寄存器
     ///   - 独立控制线程（syncThread）轮询控制寄存器，有变化时回写模型
     /// </summary>
-    public class ModbusDataSync
+    public partial class ModbusDataSync : IModbusSyncBackend
     {
         private readonly IModbusSlave   _slave;
         private readonly ModbusParser   _parser;
@@ -106,7 +102,8 @@ namespace EssSimulator.Protocol.Modbus
         {
             _running = false;
             foreach (var kv in _workerThreads)
-                try { if (kv.Value.IsAlive) kv.Value.Join(2000); } catch { }
+                try { if (kv.Value.IsAlive) kv.Value.Join(2000); }
+                catch (Exception ex) { _log.Warn($"Worker 线程 Join 异常: {kv.Key}", ex); }
             _workerThreads.Clear();
             if (_controlThread != null && _controlThread.IsAlive)
                 _controlThread.Join(2000);
@@ -322,11 +319,6 @@ namespace EssSimulator.Protocol.Modbus
             if (updateShadow)
                 _shadowControl[name] = valToSet;
 
-            if (name is "pcs1_startstop" or "pcs2_startstop"
-                or "pcs1_blackstart_enable" or "pcs2_blackstart_enable"
-                or "param64" or "param65")
-                TryApplyPcsCommandsImmediately();
-
             return true;
         }
 
@@ -352,34 +344,12 @@ namespace EssSimulator.Protocol.Modbus
                 if (current is bool)
                     return coilBool;
             }
-            catch { /* ignore */ }
-
-            return coilBool ? 1 : 0;
-        }
-
-        /// <summary>启停点位变化后立即驱动 PCS，不等待 PcsDataServer 下一周期。</summary>
-        private void TryApplyPcsCommandsImmediately()
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(_deviceInfo.name) ||
-                    !_deviceInfo.name.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                if (!int.TryParse(_deviceInfo.name.AsSpan(6), out int unit1Based) || unit1Based < 1)
-                    return;
-
-                int unit0 = unit1Based - 1;
-                var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
-                var emu = SimulatorHost.Instance.Get<EnergyManagementData>($"emu{unit1Based}");
-                if (ess == null || emu == null) return;
-
-                PcsMapper.ApplyEmuCommands(emu, ess, unit0 * 2);
-            }
             catch (Exception ex)
             {
-                _log.Warn("TryApplyPcsCommandsImmediately failed.", ex);
+                _log.Debug($"CoerceControlValueForTarget 读取 {argPath} 失败，使用数值回退", ex);
             }
+
+            return coilBool ? 1 : 0;
         }
 
         public object? GetDataObjectByMesurePointName(string name, IModbusSlave slave, ModbusParser parser)
