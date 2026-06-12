@@ -70,20 +70,11 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                     Connection = priIn.Connection,
                     LineVoltageV = priIn.LineVoltageV,
                     LineCurrentA = secIn.LineCurrentA,
-                    ActivePowerKw = secIn.ActivePowerKw,
-                    ReactivePowerKvar = secIn.ReactivePowerKvar,
+                    PhaseAngleDeg = secIn.PhaseAngleDeg,
                     FrequencyHz = priIn.FrequencyHz
                 };
 
-                AcPortHelper.WriteAcOutput(Primary, new AcInternalQuantities
-                {
-                    Connection = passed.Connection,
-                    LineVoltageV = passed.LineVoltageV,
-                    LineCurrentA = secIn.LineCurrentA,
-                    ActivePowerKw = passed.ActivePowerKw,
-                    ReactivePowerKvar = passed.ReactivePowerKvar,
-                    FrequencyHz = passed.FrequencyHz
-                });
+                AcPortHelper.WriteAcOutput(Primary, passed);
                 AcPortHelper.WriteAcOutput(Secondary, passed);
                 return;
             }
@@ -93,8 +84,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 Connection = priIn.Connection,
                 LineVoltageV = priIn.LineVoltageV,
                 LineCurrentA = 0,
-                ActivePowerKw = priIn.ActivePowerKw,
-                ReactivePowerKvar = priIn.ReactivePowerKvar,
+                PhaseAngleDeg = 0,
                 FrequencyHz = priIn.FrequencyHz
             });
             AcPortHelper.WriteAcOutput(Secondary, new AcInternalQuantities
@@ -102,8 +92,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 Connection = secIn.Connection,
                 LineVoltageV = secIn.LineVoltageV > 1.0 ? secIn.LineVoltageV : 0,
                 LineCurrentA = 0,
-                ActivePowerKw = 0,
-                ReactivePowerKvar = secIn.ReactivePowerKvar,
+                PhaseAngleDeg = 0,
                 FrequencyHz = secIn.FrequencyHz
             });
         }

@@ -14,7 +14,6 @@ namespace EssSimulator.EssDeviceSimModel.Model
         public ThreePhaseConnection AcConnection { get; set; } = ThreePhaseConnection.Star;
 
         public double GridLossCoefficient { get; set; } = 0.01;
-        public double Speedup { get; set; } = 1.0;
         public double RampSlope { get; set; } = 1;
         public int RampIntervalMs { get; set; } = 100;
         public int RampDelayMs { get; set; } = 0;

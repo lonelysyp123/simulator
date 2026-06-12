@@ -87,6 +87,28 @@ public class AcQuantityConverterTests
     }
 
     [Fact]
+    public void FromLineVoltageAndPower_RoundTripsActiveAndReactivePower()
+    {
+        var qty = AcQuantityConverter.FromLineVoltageAndPower(
+            220_000, 50_000, 20_000, ThreePhaseConnection.Star);
+
+        Assert.Equal(50_000, qty.ActivePowerKw, 1.0);
+        Assert.Equal(20_000, qty.ReactivePowerKvar, 1.0);
+        Assert.Equal(141.2, qty.LineCurrentA, 0.5);
+        Assert.Equal(21.8, qty.PhaseAngleDeg, 0.5);
+    }
+
+    [Fact]
+    public void FromLineVoltageAndPower_ImportPower_UsesQuadrantPhaseAngle()
+    {
+        var qty = AcQuantityConverter.FromLineVoltageAndPower(
+            220_000, -50_000, 20_000, ThreePhaseConnection.Star);
+
+        Assert.Equal(-50_000, qty.ActivePowerKw, 1.0);
+        Assert.Equal(20_000, qty.ReactivePowerKvar, 1.0);
+    }
+
+    [Fact]
     public void MeterPtCt_ScalesPrimaryToSecondaryAndBack()
     {
         var primary = AcQuantityConverter.FromLineVoltageAndPower(

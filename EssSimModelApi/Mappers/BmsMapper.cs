@@ -5,8 +5,8 @@ using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 namespace EssSimulator.EssSimModelApi.Mappers
 {
     /// <summary>
-    /// 将 ESS 物理模型数据映射到 BMS 接口数据对象。
-    /// 所有方法均为纯函数（无副作用），由 BmsDataService 调用。
+    /// 将 ESS 物理模型数据映射到 BMS 接口数据对象（物理 → DTO，无副作用）。
+    /// 保护评估与 Rack 故障回写由 <see cref="BmsRackProtection"/> 负责。
     /// </summary>
     public static class BmsMapper
     {
@@ -53,58 +53,6 @@ namespace EssSimulator.EssSimModelApi.Mappers
             stack.MinCellSOC      = (float)rack.MinClusterSOC;
             stack.CumulativeChargeEnergy    = (float)rack.TotalChargeEnergy;
             stack.CumulativeDischargeEnergy = (float)rack.TotalDischargeEnergy;
-        }
-
-        /// <summary>
-        /// 将 BMS 故障标志反向写回物理模型 RackState.IsFault/IsAlarm/IsProtection。
-        /// </summary>
-        /// <param name="bmsData">BMS 数据对象</param>
-        /// <param name="rack">目标物理 Rack 状态</param>
-        /// <param name="stackIndex">读取的 Stack 索引，默认为 0</param>
-        public static void SyncFaultToRack(BatteryManagementSystemData bmsData, RackState rack, int stackIndex = 0)
-        {
-            var stack = bmsData.BatteryStacks[stackIndex];
-
-            // 根据 BMS 上报的充/放电故障标志编码 IsFault
-            if (stack.BMSFaultSummary != 0)
-            {
-                rack.IsFault = (ushort)((stack.IsChargeFault, stack.IsDischargeFault) switch
-                {
-                    (true,  true)  => 3,  // 充放电均故障
-                    (true,  false) => 1,  // 仅充电故障
-                    (false, true)  => 2,  // 仅放电故障
-                    (false, false) => 3   // BMSFaultSummary 有故障但标志未细分 → 按其他故障处理
-                });
-            }
-            else
-            {
-                rack.IsFault = 0;
-            }
-
-            // SOC 过高（≥95%）：满电，禁止充电 → 叠加充电故障(1)
-            if (stack.SOC >= 0.95f)
-            {
-                rack.IsFault = (ushort)(rack.IsFault == 0 ? 1        // 无故障     → 充电故障
-                                      : rack.IsFault == 2 ? 3        // 放电故障   → 升级为全故障
-                                      : rack.IsFault);               // 已含充电故障，保留
-            }
-
-            // SOC 过低（≤5%）：电量耗尽，禁止放电 → 叠加放电故障(2)
-            if (stack.SOC <= 0.05f)
-            {
-                rack.IsFault = (ushort)(rack.IsFault == 0 ? 2        // 无故障     → 放电故障
-                                      : rack.IsFault == 1 ? 3        // 充电故障   → 升级为全故障
-                                      : rack.IsFault);               // 已含放电故障，保留
-            }
-
-            // SOH 过低（≤5%）：健康度极低，充放电均应禁止 → 强制全故障(3)
-            if (stack.SOH <= 0.05f)
-            {
-                rack.IsFault = 3;
-            }
-
-            rack.IsAlarm      = stack.BMSAlarmSummary      != 0;
-            rack.IsProtection = stack.BMSProtectionSummary != 0;
         }
 
         // ── 簇级数据映射 ──────────────────────────────────────────────
@@ -158,8 +106,6 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 m.MaxCellTemp     = maxT.Value; m.MaxCellTempId = maxT.Key;
                 m.MinCellTemp     = minT.Value; m.MinCellTempId = minT.Key;
             }
-
-            BmsRackProtection.EvaluateAllClusters(rackSim, bmsData);
         }
 
         /// <summary>向后兼容：委托至 <see cref="BmsRackProtection.UpdateUnder"/>。</summary>

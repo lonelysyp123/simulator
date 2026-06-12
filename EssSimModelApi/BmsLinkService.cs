@@ -12,13 +12,22 @@ namespace EssSimulator.EssSimModelApi
     /// </summary>
     public class BmsLinkService : BackgroundService
     {
+        private bool _startupGridLinkApplied;
+
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
-                if (SimulatorHost.Instance.Get<EnergyStorageSystem>("ess") == null)
+                var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
+                if (ess == null)
                     continue;
+
+                if (!_startupGridLinkApplied)
+                {
+                    BmsLinkEngine.ApplyStartupGridLinks(ess);
+                    _startupGridLinkApplied = true;
+                }
 
                 BmsLinkEngine.ApplyAllChannels();
             }

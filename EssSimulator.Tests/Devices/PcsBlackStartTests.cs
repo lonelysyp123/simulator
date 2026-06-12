@@ -86,4 +86,22 @@ public class PcsBlackStartTests
         double iEst = sKva * 1000 / (Math.Max(st.AcVoltage, 10) * Math.Sqrt(3));
         Assert.True(iEst <= 1000 * 0.31);
     }
+
+    [Fact]
+    public void TryGetIslandBusVoltageInjection_ReturnsRampVoltageDuringSoftStart()
+    {
+        var pcs = CreateDevice();
+        pcs.ApplyBlackStartEnabled(true);
+        pcs.ApplyIslandVoltageCommand(690);
+        pcs.UpdateGridState(0, 50, false);
+        pcs.TransitionToMode(OperationMode.Normal);
+        pcs.TransitionToGMode(GridMode.Islanded);
+        pcs.Update(1200, 0, DateTime.UtcNow, TimeSpan.FromMilliseconds(200));
+        pcs.Update(1200, 0, DateTime.UtcNow.AddMilliseconds(200), TimeSpan.FromMilliseconds(200));
+
+        Assert.Equal(BlackStartPhase.SoftStarting, pcs.GetBlackStartPhase());
+        Assert.True(pcs.TryGetIslandBusVoltageInjection(out var v, out var f));
+        Assert.True(v > 1.0);
+        Assert.True(f >= 47);
+    }
 }

@@ -47,6 +47,30 @@ namespace EssSimulator.EssSimModelApi.Bms
                 ApplyForChannel(i);
         }
 
+        /// <summary>启动时按 DTO 默认并网状态（GridConnectStatus=2）建立 PCS↔BMS 物理链路。</summary>
+        public static void ApplyStartupGridLinks(EnergyStorageSystem ess)
+        {
+            var store = SimulatorHost.Instance;
+            int count = Math.Min(ess._bmsRackDevices.Count, ess._pcsList.Count);
+            for (int i = 0; i < count; i++)
+            {
+                var bmsData = store.Get<BatteryManagementSystemData>($"bms{i + 1}");
+                if (bmsData?.BatteryStacks == null || bmsData.BatteryStacks.Count == 0)
+                    continue;
+
+                var stack = bmsData.BatteryStacks[0];
+                if (stack.GridConnectStatus != GridStatusSuccess && !stack.IsPcsLinked)
+                    continue;
+
+                if (stack.IsPcsLinked && ess._bmsRackDevices[i].IsLinked)
+                    continue;
+
+                SetLinked(ess, i, stack, linked: true);
+                stack.GridConnectStatus = GridStatusSuccess;
+                Log.Info($"[BmsLink] startup grid-connect bms{i + 1}, status=2");
+            }
+        }
+
         private static void ApplyLinkLogic(int bmsIndex, BatteryStack stack, BmsRackDevice bms, EnergyStorageSystem ess)
         {
             if (stack.IsPcsLinked && stack.BMSFaultSummary > 0)

@@ -11,6 +11,7 @@ namespace EssSimulator.EssDeviceSimModel
     using EssSimulator.EssDeviceSimModel.Battery;
     using EssSimulator.EssDeviceSimModel.Devices;
     using EssSimulator.EssDeviceSimModel.Model;
+    using EssSimulator.EssDeviceSimModel.Propagation;
     using EssSimulator.EssDeviceSimModel.Solver;
     using EssSimulator.EssSimModelApi;
     using EssSimulator.EssSimModelApi.BatteryManagementSystem;
@@ -83,7 +84,18 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>新电气网络（阶段 4 起始终初始化）。</summary>
         public ElectricalNetwork ElectricalNetwork => _electricalNetwork;
 
+        /// <summary>电气输出订阅路由（设备间互相注册）。</summary>
+        public ElectricalSignalRouter SignalRouter { get; }
+
+        /// <summary>径向前推回代引擎（<see cref="Configuration.RuntimeConfig.UseElectricalPropagation"/> 为 true 时非空）。</summary>
+        public RadialPowerSweepEngine? PowerSweepEngine { get; }
+
+        /// <summary>径向网络母线图。</summary>
+        public RadialNetworkGraph? RadialGraph { get; }
+
         private readonly ElectricalNetwork _electricalNetwork;
+        private readonly bool _useElectricalPropagation;
+        private readonly int _propagationIntervalMs;
 
         public EnergyStorageSystem(
             SimulatorConfig simCfg,
@@ -91,7 +103,8 @@ namespace EssSimulator.EssDeviceSimModel
             TransformerConfig transCfg,
             UnitTransformerConfig unitTransCfg,
             LoadConfig loadCfg,
-            PccConfig pccCfg)
+            PccConfig pccCfg,
+            MeterConfig meterCfg)
         {
             var racks = new List<BatteryRackSimulator>();
             var bmsRackDevices = new List<BmsRackDevice>();
@@ -115,7 +128,7 @@ namespace EssSimulator.EssDeviceSimModel
             {
                 var pcsDeviceCfg = i < pcsDeviceConfigs.Count ? pcsDeviceConfigs[i] : new Configuration.PcsDeviceConfig();
                 var rampCfg = pcsDeviceCfg.PcsRamp ?? simCfg.Runtime.PcsRamp;
-                var cfg = PcsDeviceFactory.CreateConfig(pcsCfg, rampCfg, simCfg.Speedup);
+                var cfg = PcsDeviceFactory.CreateConfig(pcsCfg, rampCfg);
                 int u = i / 2;
                 int ch = i % 2;
                 pcsList.Add(PcsDeviceFactory.Create($"pcs_u{u}_ch{ch}", cfg));
@@ -157,18 +170,22 @@ namespace EssSimulator.EssDeviceSimModel
             DailyCharge    = new Dictionary<DateTime, double>();
             DailyDischarge = new Dictionary<DateTime, double>();
 
-            // 保存仿真步长参数，供 ExecuteAsync 使用
-            _simStepMs = simCfg.SimStepMs;
-            _speedup   = simCfg.Speedup;
-            // _simStep = 真实休眠间隔 × 加速倍率，即每次 tick 推进的仿真时间量
-            _simStep   = TimeSpan.FromMilliseconds(_simStepMs * _speedup);
+            // 保存仿真时钟参数
+            double integrationMult = simCfg.IntegrationStepMultiplier;
+            _integrationMultiplier = integrationMult > 0 ? integrationMult : 1.0;
+            _lastCycleUtc = DateTime.UtcNow;
             _transCfg  = transCfg;
             _pcsCfg    = pcsCfg;
+            _useElectricalPropagation = simCfg.Runtime.UseElectricalPropagation;
+            _propagationIntervalMs = Math.Max(10, simCfg.Runtime.PropagationIntervalMs);
             PccLineVoltageV = pccCfg.NominalLineVoltage;
             StationBus35LineVoltageV = pccCfg.StationBusNominalLineVoltage;
 
+            SignalRouter = new ElectricalSignalRouter();
+
             _electricalNetwork = NetworkTopologyBuilder.Build(
                 simCfg, pcsCfg, transCfg, unitTransCfg, loadCfg, pccCfg,
+                meterCfg: meterCfg,
                 bmsRackDevices: _bmsRackDevices,
                 externalPcsDevices: pcsList,
                 externalMainTransformer: _mainTransformer,
@@ -176,7 +193,22 @@ namespace EssSimulator.EssDeviceSimModel
                 externalLoadDevice: _loadDevice,
                 legacyEss: this);
 
-            _log.Info("[EnergyStorageSystem] 电气网络 Solver 主路径已启用");
+            if (_useElectricalPropagation)
+            {
+                RadialGraph = new RadialNetworkGraph(_electricalNetwork, pccCfg, pcsCfg);
+                PowerSweepEngine = new RadialPowerSweepEngine(
+                    RadialGraph,
+                    this,
+                    pccCfg,
+                    pcsCfg,
+                    simCfg.Runtime.PropagationQuvMaxIterations,
+                    simCfg.Runtime.PropagationVoltageTolerancePu);
+                _log.Info($"[EnergyStorageSystem] 母线前推回代已启用（{_propagationIntervalMs} ms）");
+            }
+            else
+            {
+                _log.Info("[EnergyStorageSystem] 电气网络 Solver 主路径已启用");
+            }
         }
 
         /// <summary>阶段 4 起固定为 Solver 主路径 + 网络控制面。</summary>
@@ -259,13 +291,26 @@ namespace EssSimulator.EssDeviceSimModel
             NetworkControlBridge.SetBmsPcsLinked(_electricalNetwork, _bmsRackDevices[channelIndex], channelIndex, linked);
         }
 
-        // 仿真步长参数（由构造函数写入，ExecuteAsync 只读）
-        // _simStepMs : 主循环的真实休眠间隔（ms），决定 CPU 占用率
-        // _speedup   : 仿真加速倍率，传给所有物理模型的时间步长 = _simStepMs × _speedup
-        // _simStep   : 传给物理模型的仿真时间步长（= _simStepMs × _speedup ms）
-        private readonly int            _simStepMs;
-        private readonly double         _speedup;
-        private readonly TimeSpan       _simStep;
+        // 仿真时钟：每次主循环 / 电压源 SolveCycle 回调时，用真实墙钟间隔作为 dt
+        private DateTime _lastCycleUtc;
+        private readonly double _integrationMultiplier;
+
+        /// <summary>电压源（Grid）激活周期（ms），主循环休眠间隔。</summary>
+        public int LoopIntervalMs => _propagationIntervalMs;
+
+        private (TimeSpan elapsed, TimeSpan integrationElapsed) AdvanceCycleClock()
+        {
+            var now = DateTime.UtcNow;
+            var elapsed = now - _lastCycleUtc;
+            _lastCycleUtc = now;
+
+            if (elapsed <= TimeSpan.Zero)
+                elapsed = TimeSpan.FromMilliseconds(1);
+
+            var integrationElapsed = TimeSpan.FromTicks((long)(elapsed.Ticks * _integrationMultiplier));
+            return (elapsed, integrationElapsed);
+        }
+
         private readonly TransformerConfig _transCfg;
         private readonly PcsPhysicalConfig _pcsCfg;
 
@@ -278,17 +323,26 @@ namespace EssSimulator.EssDeviceSimModel
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _log.Info("[EnergyStorageSystem] 仿真主循环启动");
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_simStepMs));
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_propagationIntervalMs));
             try
             {
                 while (await timer.WaitForNextTickAsync(stoppingToken))
                 {
-                    DateTime simTime = DateTime.Now;
-                    NetworkStepOrchestrator.SolverPrimaryStep(
-                        _electricalNetwork, this, simTime, _simStep, _pcsCfg);
+                    var (elapsed, integrationElapsed) = AdvanceCycleClock();
+                    DateTime simTime = DateTime.UtcNow;
 
-                    Update(simTime, _simStep);
-                    SyncUnitTransformerAfterPcsUpdate(simTime, _simStep);
+                    if (_useElectricalPropagation && PowerSweepEngine != null)
+                    {
+                        PowerSweepEngine.SolveCycle(simTime, elapsed, integrationElapsed);
+                    }
+                    else
+                    {
+                        NetworkStepOrchestrator.SolverPrimaryStep(
+                            _electricalNetwork, this, simTime, elapsed, integrationElapsed, _pcsCfg);
+                    }
+
+                    Update(simTime, elapsed, integrationElapsed);
+                    SyncUnitTransformerAfterPcsUpdate(simTime, elapsed);
                     RefreshAllUnitBlackStartBusContexts();
                     NetworkControlBridge.SyncBmsLinksFromRacks(_electricalNetwork, _bmsRackDevices);
                 }
@@ -378,7 +432,7 @@ namespace EssSimulator.EssDeviceSimModel
                 simStep);
 
         // 更新系统状态
-        private void Update(DateTime simTime, TimeSpan step)
+        private void Update(DateTime simTime, TimeSpan elapsed, TimeSpan integrationElapsed)
         {
             int n = Math.Min(_bmsRackDevices.Count, _pcsList.Count);
             for (int i = 0; i < n; i++)
@@ -390,14 +444,13 @@ namespace EssSimulator.EssDeviceSimModel
                     var rackState = bms.Rack.GetRackState();
                     if (rackState == null) continue;
 
-                    _pcsList[i].Update(rackState.TotalVoltage, rackState.IsFault, simTime, step);
-                    // 电池内部电流方向：正充负放。PCS约定正放负充，因此对电池取负
-                    bms.UpdatePhysics(-_pcsList[i].GetCurrentState().DcCurrent, 25.0, simTime, step);
+                    _pcsList[i].Update(rackState.TotalVoltage, rackState.IsFault, simTime, elapsed, integrationElapsed);
+                    bms.UpdatePhysics(-_pcsList[i].GetCurrentState().DcCurrent, 25.0, simTime, integrationElapsed);
                 }
                 else
                 {
-                    _pcsList[i].Update(0, 0, simTime, step);
-                    bms.UpdatePhysics(0, 25.0, simTime, step);
+                    _pcsList[i].Update(0, 0, simTime, elapsed, integrationElapsed);
+                    bms.UpdatePhysics(0, 25.0, simTime, integrationElapsed);
                 }
             }
         }

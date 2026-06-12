@@ -7,8 +7,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
     {
         public static ModelPcsDeviceConfig CreateConfig(
             PcsPhysicalConfig pcsCfg,
-            PcsRampConfig rampCfg,
-            double speedup)
+            PcsRampConfig rampCfg)
         {
             return new ModelPcsDeviceConfig
             {
@@ -21,7 +20,6 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 FrequencyHz = pcsCfg.FrequencyNominal,
                 MaxCurrentA = pcsCfg.MaxCurrent,
                 GridLossCoefficient = pcsCfg.GridLossCoefficient,
-                Speedup = speedup,
                 RampSlope = rampCfg.Slope,
                 RampIntervalMs = rampCfg.IntervalMs,
                 RampDelayMs = rampCfg.DelayMs,

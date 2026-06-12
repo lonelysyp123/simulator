@@ -58,7 +58,7 @@ public class ControlFeedbackPipelineTests
     }
 
     [Fact]
-    public void RunOnce_EdgeClear_WritesModbusZeroAndUpdatesShadow()
+    public void RunOnce_Hold_KeepsModbusOneWhenSimulationOn()
     {
         var binding = new PointBinding
         {
@@ -72,7 +72,7 @@ public class ControlFeedbackPipelineTests
             },
             ParamName = "pcs1_startstop",
             Target = new DataTarget { RootKey = "emu1", PropertyPath = "PcsList[0].pcsOnOffSwitch" },
-            Semantics = ControlSemantics.Edge
+            Semantics = ControlSemantics.Hold
         };
 
         var catalog = new PointCatalog
@@ -86,17 +86,17 @@ public class ControlFeedbackPipelineTests
         var simulation = new FakeSimulationAdapter();
         var modbus = new FakeModbusAdapter();
         var shadow = new ShadowStore();
-        shadow.SeedControl("pcs1_startstop", 1);
+        shadow.SeedControl("pcs1_startstop", 0);
 
-        simulation.Set("emu1.PcsList[0].pcsOnOffSwitch", false);
-        modbus.WritePoints(new Dictionary<string, object> { { "pcs1_startstop", 1 } });
+        simulation.Set("emu1.PcsList[0].pcsOnOffSwitch", true);
+        modbus.WritePoints(new Dictionary<string, object> { { "pcs1_startstop", 0 } });
 
         var pipeline = new ControlFeedbackPipeline(
             catalog, simulation, modbus, shadow, "simEmu1", logFeedback: false);
 
         pipeline.RunOnce();
 
-        Assert.Equal(0, Convert.ToInt32(modbus.Registers["pcs1_startstop"]));
+        Assert.Equal(1, Convert.ToInt32(modbus.Registers["pcs1_startstop"]));
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class ControlFeedbackPipelineTests
             },
             ParamName = "pcs1_startstop",
             Target = new DataTarget { RootKey = "emu1", PropertyPath = "PcsList[0].pcsOnOffSwitch" },
-            Semantics = ControlSemantics.Edge
+            Semantics = ControlSemantics.Hold
         };
 
         var catalog = new PointCatalog

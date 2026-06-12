@@ -57,7 +57,17 @@ namespace EssSimulator.DataExchange.Pipeline
                 if (!_shadow.TryDetectControlChange(binding.ParamName, newValue, out var previous))
                     continue;
 
-                var applied = CoerceControlValue(binding, newValue);
+                object applied;
+                if (binding.Semantics == ControlSemantics.Edge)
+                {
+                    if (!TryResolveEdgeTransition(previous, newValue, out var edgeApplied))
+                        continue;
+                    applied = edgeApplied;
+                }
+                else
+                {
+                    applied = CoerceControlValue(binding, newValue);
+                }
                 if (!_simulation.Write(binding.Target.FullPath, applied))
                 {
                     _log.Warn($"Control write failed: {binding.Target.FullPath} <= {applied}");
@@ -84,6 +94,39 @@ namespace EssSimulator.DataExchange.Pipeline
                 }
             }
         }
+
+        /// <summary>
+        /// 边沿型控制点（如黑启动）：仅 0→1 / 1→0 变化时写入仿真。
+        /// </summary>
+        private bool TryResolveEdgeTransition(object? previous, object incoming, out object? applied)
+        {
+            applied = null;
+            bool prevOn = CoerceToBool(previous);
+            bool nextOn = CoerceToBool(incoming);
+
+            if (nextOn && !prevOn)
+            {
+                applied = true;
+                return true;
+            }
+
+            if (!nextOn && prevOn)
+            {
+                applied = false;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool CoerceToBool(object? value) =>
+            value switch
+            {
+                null => false,
+                bool b => b,
+                string s when bool.TryParse(s, out var bv) => bv,
+                _ => Convert.ToDouble(value) != 0
+            };
 
         private object CoerceControlValue(PointBinding binding, object valToSet)
         {

@@ -57,10 +57,10 @@ public class DataPointChangeCommand() : ICommand
 
         var objectsCollect = SimulatorHost.Instance;
         var obj = objectsCollect.Get<object>(dpcDeviceName);
-        ModbusSimServer? simServer = obj as ModbusSimServer;
+        IModbusRegisterServer? simServer = obj as IModbusRegisterServer;
         if (simServer == null)
         {
-            message = "找不到对应的设备模型";
+            message = "找不到对应的 Modbus 设备";
             return false;
         }
 

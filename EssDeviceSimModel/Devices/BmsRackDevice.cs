@@ -68,7 +68,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         /// <summary>并网链路写入（Rack 状态 SSOT）。</summary>
         public void SetPcsLinked(bool linked) => IsLinked = linked;
 
-        /// <summary>将物理量映射到 BMS DTO、评估簇级阈值并回写 Rack 故障态。</summary>
+        /// <summary>将物理量映射到 BMS DTO，评估簇级/Rack 级保护并回写 Rack 故障态。</summary>
         public void SyncTelemetryAndProtection(BatteryManagementSystemData bmsData)
         {
             var rackState = _rack.GetRackState();
@@ -76,8 +76,9 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 return;
 
             BmsMapper.MapRackToStack(rackState, bmsData);
-            BmsMapper.MapClusters(_rack, bmsData); // 遥测映射 + BmsRackProtection 阈值评估
-            BmsMapper.SyncFaultToRack(bmsData, rackState);
+            BmsMapper.MapClusters(_rack, bmsData);
+            BmsRackProtection.EvaluateAllClusters(_rack, bmsData);
+            BmsRackProtection.ApplyRackFaultSummary(bmsData, rackState);
             RefreshFaultState();
         }
 

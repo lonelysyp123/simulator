@@ -24,7 +24,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             _legacyEss = legacyEss;
         }
 
-        public void Step(TimeSpan step)
+        public void Step(TimeSpan step, TimeSpan meterIntegrationStep)
         {
             var context = BuildContext();
             double bus35V = _network.StationBus35LineVoltageV > 1.0
@@ -84,13 +84,12 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                     Connection = raw.Connection,
                     LineVoltageV = raw.LineVoltageV,
                     LineCurrentA = 0,
-                    ActivePowerKw = 0,
-                    ReactivePowerKvar = 0,
+                    PhaseAngleDeg = 0,
                     FrequencyHz = bus35V > 1.0 ? _pcsCfg.FrequencyNominal : 0
                 };
             }
 
-            _network.PccMeter.SampleFrom(primarySample, step);
+            _network.PccMeter.SampleFrom(primarySample, meterIntegrationStep);
             PublishBusQuantities();
         }
 
@@ -330,8 +329,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 Connection = connection,
                 LineVoltageV = currentIntent.LineVoltageV,
                 LineCurrentA = currentIntent.LineCurrentA,
-                ActivePowerKw = currentIntent.ActivePowerKw,
-                ReactivePowerKvar = currentIntent.ReactivePowerKvar,
+                PhaseAngleDeg = currentIntent.PhaseAngleDeg,
                 FrequencyHz = currentIntent.FrequencyHz
             });
         }

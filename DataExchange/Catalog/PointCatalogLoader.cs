@@ -11,8 +11,8 @@ namespace EssSimulator.DataExchange.Catalog
     {
         private static readonly Dictionary<string, ControlSemantics> EmuDefaultSemantics = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["pcs1_startstop"] = ControlSemantics.Edge,
-            ["pcs2_startstop"] = ControlSemantics.Edge,
+            ["pcs1_startstop"] = ControlSemantics.Hold,
+            ["pcs2_startstop"] = ControlSemantics.Hold,
             ["pcs1_blackstart_enable"] = ControlSemantics.Edge,
             ["pcs2_blackstart_enable"] = ControlSemantics.Edge,
             ["highvoltagebreakeronoff"] = ControlSemantics.Hold

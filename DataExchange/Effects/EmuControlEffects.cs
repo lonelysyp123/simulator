@@ -21,7 +21,8 @@ namespace EssSimulator.DataExchange.Effects
             if (ess == null || emu == null)
                 return;
 
-            PcsMapper.ApplyEmuCommands(emu, ess, (unit1Based - 1) * 2);
+            int pcsBase = (unit1Based - 1) * 2;
+            PcsMapper.ApplyEmuCommands(emu, ess, pcsBase);
         }
 
         internal static bool TryParseEmuUnit(string serverName, out int unit1Based)

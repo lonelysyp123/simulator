@@ -23,8 +23,7 @@ namespace EssSimulator.EssDeviceSimModel.Model
                 Connection = pt.Connection,
                 LineVoltageV = primary.LineVoltageV / ptRatio,
                 LineCurrentA = primary.LineCurrentA / ctRatio,
-                ActivePowerKw = primary.ActivePowerKw,
-                ReactivePowerKvar = primary.ReactivePowerKvar,
+                PhaseAngleDeg = primary.PhaseAngleDeg,
                 FrequencyHz = primary.FrequencyHz
             };
         }
@@ -45,8 +44,7 @@ namespace EssSimulator.EssDeviceSimModel.Model
                 Connection = pt.Connection,
                 LineVoltageV = secondary.LineVoltageV * ptRatio,
                 LineCurrentA = secondary.LineCurrentA * ctRatio,
-                ActivePowerKw = secondary.ActivePowerKw,
-                ReactivePowerKvar = secondary.ReactivePowerKvar,
+                PhaseAngleDeg = secondary.PhaseAngleDeg,
                 FrequencyHz = secondary.FrequencyHz
             };
         }

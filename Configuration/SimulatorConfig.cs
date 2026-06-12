@@ -8,11 +8,10 @@ namespace EssSimulator.Configuration
         /// <summary>是否禁用控制台 GUI（无头模式）</summary>
         public bool NoGui { get; set; } = false;
 
-        /// <summary>主循环真实休眠间隔（ms）</summary>
-        public int SimStepMs { get; set; } = 200;
-
-        /// <summary>仿真加速倍率</summary>
-        public double Speedup { get; set; } = 100.0;
+        /// <summary>
+        /// 积分步长倍数（无量纲）：仅放大 SOC、电能等积分量的 dt（基于真实回调间隔），不改变瞬时值动力学 dt。
+        /// </summary>
+        public double IntegrationStepMultiplier { get; set; } = 1.0;
 
         /// <summary>PCS 功率爬坡参数</summary>
         public PcsRampConfig PcsRamp { get; set; } = new();
@@ -20,6 +19,17 @@ namespace EssSimulator.Configuration
         /// <summary>协议与仿真就绪后，向各 PCS 启停线圈写入 1 并驱动并网（默认合闸工况）。</summary>
         public bool AutoStartPcsOnStartup { get; set; } = true;
 
+        /// <summary>电压源（电网）激活性传播周期（ms）。</summary>
+        public int PropagationIntervalMs { get; set; } = 100;
+
+        /// <summary>使用事件驱动电气传播替代 Solver 主循环步进。</summary>
+        public bool UseElectricalPropagation { get; set; } = true;
+
+        /// <summary>设备 Step 后 Q-U 与电压传播的最大迭代轮数（≥1，首轮为 Phase3–5 主路径）。</summary>
+        public int PropagationQuvMaxIterations { get; set; } = 3;
+
+        /// <summary>Q-U/V 迭代相对电压收敛阈值（pu，相对 PCC 额定线电压）。</summary>
+        public double PropagationVoltageTolerancePu { get; set; } = 0.001;
     }
 
     public class PcsRampConfig
@@ -98,6 +108,12 @@ namespace EssSimulator.Configuration
         public List<BmsDeviceConfig> Bms { get; set; } = new();
     }
 
+    /// <summary>储能单元列表（对应 appsettings.json: EssUnits 节，绑定到 <see cref="SimulatorConfig.Devices"/>）</summary>
+    public static class EssUnitsConfig
+    {
+        public const string Section = "EssUnits";
+    }
+
     /// <summary>顶层仿真器配置（对应 appsettings.json: Simulator 节）</summary>
     public class SimulatorConfig
     {
@@ -112,8 +128,7 @@ namespace EssSimulator.Configuration
         public int BaseModbusPort => Protocol.BaseBmsModbusPort;
         public int PcsModbusPort => Protocol.BaseEmuModbusPort;
         public int EmModbusPort => Protocol.EmModbusPort;
-        public int SimStepMs => Runtime.SimStepMs;
-        public double Speedup => Runtime.Speedup;
+        public double IntegrationStepMultiplier => Runtime.IntegrationStepMultiplier;
         public bool NoGui => Runtime.NoGui;
 
         public IReadOnlyList<BmsDeviceConfig> GetBmsDeviceConfigs()

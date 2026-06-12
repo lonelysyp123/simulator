@@ -23,10 +23,10 @@ namespace EssSimulator
     }
 
     /// <summary>
-    /// Modbus TCP 从站门面类。
-    /// simEmu*/simBms*/simEm 固定走 <see cref="DataExchangeSession"/>；simLc* 仍走 <see cref="ModbusDataSync"/>。
+    /// Modbus TCP 从站门面类（仿真设备：simEmu / simBms / simEm）。
+    /// 走 <see cref="DataExchangeSession"/> 与内部仿真模型绑定；LocalControl 见 <c>LocalControl/</c> 模块。
     /// </summary>
-    public class ModbusSimServer
+    public class ModbusSimServer : IModbusRegisterServer
     {
         private readonly ILog              _log = LogManager.GetLogger(typeof(ModbusSimServer));
         private readonly IModbusSlave      _slave;

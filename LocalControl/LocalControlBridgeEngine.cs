@@ -1,74 +1,42 @@
-using EssSimulator.Configuration;
-using EssSimulator.Core;
 using log4net;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
-namespace EssSimulator.EssSimModelApi
+namespace EssSimulator.LocalControl
 {
     /// <summary>
-    /// LocalControl 协议桥接服务：
-    /// - 上行：从 simEmuX 采集协议点，汇总写入 simLcX 的遥测点；
-    /// - 下行：监听 simLcX 控制点变化，分发写入对应 simEmuX 控制点。
-    /// 全程仅通过协议模拟对象交互，不直接触碰物理仿真对象。
+    /// LocalControl 报文转发引擎：在 simLc* 与 simEmu* 寄存器之间做聚合与分发，不触碰物理仿真。
     /// </summary>
-    public class LocalControlBridgeService : BackgroundService
+    internal sealed class LocalControlBridgeEngine
     {
-        private readonly SimulatorConfig _cfg;
+        private readonly ILog _log;
         private readonly Dictionary<string, double> _controlShadow = new();
-        private readonly ILog _log = LogManager.GetLogger(typeof(LocalControlBridgeService));
 
-        public LocalControlBridgeService(IOptions<SimulatorConfig> simOptions)
-        {
-            _cfg = simOptions.Value;
-        }
+        public LocalControlBridgeEngine(ILog log) => _log = log;
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        public void RunCycle(
+            Func<string, ModbusSimServer?> resolveEmu,
+            LocalControlModbusServer lc,
+            int lcIdx,
+            int emuPerGroup,
+            int emuCount)
         {
-            if (!_cfg.Protocol.EnableLocalControl)
+            if (!lc.IsOnline)
                 return;
 
-            var store = SimulatorHost.Instance;
-            int emuPerGroup = Math.Max(1, _cfg.Protocol.LocalControlEmuPerGroup);
-            int emuCount = Math.Max(1, _cfg.Devices?.Count ?? 1);
-            int lcCount = (int)Math.Ceiling(emuCount / (double)emuPerGroup);
-
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
-            while (await timer.WaitForNextTickAsync(stoppingToken))
-            {
-                for (int lcIdx = 0; lcIdx < lcCount; lcIdx++)
-                {
-                    string lcName = $"simLc{lcIdx + 1}";
-                    var lc = store.Get<ModbusSimServer>(lcName);
-                    if (lc == null || !lc.IsOnline) continue;
-
-                    try
-                    {
-                        SyncTelemetryForLc(store, lc, lcIdx, emuPerGroup, emuCount);
-                        ApplyLcControlsToEmu(store, lc, lcName, lcIdx, emuPerGroup, emuCount);
-                    }
-                    catch
-                    {
-                        // 协议尚未就绪或单次读写失败时忽略本周期，避免后台服务异常导致整机退出。
-                    }
-                }
-            }
+            string lcName = lc.ServerName;
+            SyncTelemetry(resolveEmu, lc, lcIdx, emuPerGroup, emuCount);
+            ApplyControls(resolveEmu, lc, lcName, lcIdx, emuPerGroup, emuCount);
         }
 
-        private void SyncTelemetryForLc(
-            SimulatorHost store,
-            ModbusSimServer lc,
+        private void SyncTelemetry(
+            Func<string, ModbusSimServer?> resolveEmu,
+            LocalControlModbusServer lc,
             int lcIdx,
             int emuPerGroup,
             int emuCount)
         {
             int startEmu = lcIdx * emuPerGroup;
-
-            // param1: 系统故障总（任一 PCS 故障）
             bool anyFault = false;
-            // param2: 黑启动模式状态（8 台均开启=1）
             bool allBlackStart = true;
-            // param3: 高压断路器状态（AA=开；EE=合）
             bool allHvClosed = true;
 
             for (int localPcs = 0; localPcs < 8; localPcs++)
@@ -83,8 +51,7 @@ namespace EssSimulator.EssSimModelApi
                     continue;
                 }
 
-                string emuName = $"simEmu{emuIndex + 1}";
-                var emu = store.Get<ModbusSimServer>(emuName);
+                var emu = resolveEmu($"simEmu{emuIndex + 1}");
                 if (emu == null || !emu.IsOnline)
                 {
                     WritePcsTelemetryDefaults(lc, localPcs);
@@ -119,9 +86,9 @@ namespace EssSimulator.EssSimModelApi
                 var blackStartVal = ReadParamOrDefault(emu, blackStartParam);
                 var hvBreakerVal = ReadParamOrDefault(emu, "highvoltagebreakeronoff");
 
-                anyFault |= ToDouble(faultVal) != 0;
-                allBlackStart &= ToDouble(blackStartVal) != 0;
-                allHvClosed &= ToDouble(hvBreakerVal) != 0;
+                anyFault |= ModbusValueConverter.ToDouble(faultVal) != 0;
+                allBlackStart &= ModbusValueConverter.ToDouble(blackStartVal) != 0;
+                allHvClosed &= ModbusValueConverter.ToDouble(hvBreakerVal) != 0;
 
                 lc.SetDataStoreByMesurePointName($"param{faultLc}", faultVal);
                 lc.SetDataStoreByMesurePointName($"param{alarmLc}", alarmVal);
@@ -137,9 +104,9 @@ namespace EssSimulator.EssSimModelApi
             lc.SetDataStoreByMesurePointName("param3", allHvClosed ? 0xEE : 0xAA);
         }
 
-        private void ApplyLcControlsToEmu(
-            SimulatorHost store,
-            ModbusSimServer lc,
+        private void ApplyControls(
+            Func<string, ModbusSimServer?> resolveEmu,
+            LocalControlModbusServer lc,
             string lcName,
             int lcIdx,
             int emuPerGroup,
@@ -151,11 +118,12 @@ namespace EssSimulator.EssSimModelApi
             {
                 int emuOffset = localPcs / 2;
                 int emuIndex = startEmu + emuOffset;
-                if (emuIndex >= emuCount) continue;
+                if (emuIndex >= emuCount)
+                    continue;
 
-                string emuName = $"simEmu{emuIndex + 1}";
-                var emu = store.Get<ModbusSimServer>(emuName);
-                if (emu == null || !emu.IsOnline) continue;
+                var emu = resolveEmu($"simEmu{emuIndex + 1}");
+                if (emu == null || !emu.IsOnline)
+                    continue;
 
                 bool slot0 = (localPcs % 2) == 0;
                 string startStopTarget = slot0 ? "pcs1_startstop" : "pcs2_startstop";
@@ -174,87 +142,85 @@ namespace EssSimulator.EssSimModelApi
                 ForwardWhenChanged(lc, lcName, $"param{islandVLc}", emu, islandVTarget, asBool: false);
             }
 
-            ApplyGlobalBlackStartControl(store, lc, lcName, startEmu, emuPerGroup, emuCount);
-            ApplyGlobalHvBreakerControl(store, lc, lcName, startEmu, emuPerGroup, emuCount);
+            ApplyGlobalBlackStartControl(resolveEmu, lc, lcName, startEmu, emuPerGroup, emuCount);
+            ApplyGlobalHvBreakerControl(resolveEmu, lc, lcName, startEmu, emuPerGroup, emuCount);
         }
 
         private void ApplyGlobalBlackStartControl(
-            SimulatorHost store,
-            ModbusSimServer lc,
+            Func<string, ModbusSimServer?> resolveEmu,
+            LocalControlModbusServer lc,
             string lcName,
             int startEmu,
             int emuPerGroup,
             int emuCount)
         {
-            PrimeGlobalBlackStartShadow(store, lc, lcName, startEmu, emuPerGroup, emuCount);
-            if (!TryReadChangedControl(lc, lcName, "param100", asBool: true, out var prevBlackStart, out var blackStartGlobal))
+            const string lcParam = "param100";
+            PrimeGlobalBlackStartShadow(resolveEmu, lc, lcName, startEmu, emuPerGroup, emuCount);
+            if (!TryReadChangedControl(lc, lcName, lcParam, asBool: true, out var prevBlackStart, out var blackStartGlobal))
                 return;
 
             _log.Info(
-                $"[LC-Change] {lcName}.param100: {FormatControlValue(prevBlackStart)} -> {FormatControlValue(blackStartGlobal)}");
+                $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevBlackStart)} -> {ModbusValueConverter.FormatControlValue(blackStartGlobal)}");
+
             bool success = true;
             int endEmu = Math.Min(emuCount, startEmu + emuPerGroup);
             for (int emuIndex = startEmu; emuIndex < endEmu; emuIndex++)
             {
-                var emu = store.Get<ModbusSimServer>($"simEmu{emuIndex + 1}");
-                if (emu == null || !emu.IsOnline) continue;
-                success &= TryPublishControlWithLog(
-                    emu,
-                    "pcs1_blackstart_enable",
-                    blackStartGlobal,
-                    asBool: true,
-                    sourceLabel: $"{lcName}.param100");
-                success &= TryPublishControlWithLog(
-                    emu,
-                    "pcs2_blackstart_enable",
-                    blackStartGlobal,
-                    asBool: true,
-                    sourceLabel: $"{lcName}.param100");
+                var emu = resolveEmu($"simEmu{emuIndex + 1}");
+                if (emu == null || !emu.IsOnline)
+                    continue;
+
+                success &= TryPublishControlWithLog(emu, "pcs1_blackstart_enable", blackStartGlobal, asBool: true, $"{lcName}.{lcParam}");
+                success &= TryPublishControlWithLog(emu, "pcs2_blackstart_enable", blackStartGlobal, asBool: true, $"{lcName}.{lcParam}");
             }
 
             if (success)
-                UpdateControlShadow(lcName, "param100", blackStartGlobal);
+                UpdateControlShadow(lcName, lcParam, blackStartGlobal);
         }
 
         private void ApplyGlobalHvBreakerControl(
-            SimulatorHost store,
-            ModbusSimServer lc,
+            Func<string, ModbusSimServer?> resolveEmu,
+            LocalControlModbusServer lc,
             string lcName,
             int startEmu,
             int emuPerGroup,
             int emuCount)
         {
-            PrimeGlobalHvBreakerShadow(store, lc, lcName, startEmu, emuPerGroup, emuCount);
-            if (!TryReadChangedControl(lc, lcName, "param101", asBool: false, out var prevHvCmd, out var hvRawCmd))
+            const string lcParam = "param101";
+            PrimeGlobalHvBreakerShadow(resolveEmu, lc, lcName, startEmu, emuPerGroup, emuCount);
+            if (!TryReadChangedControl(lc, lcName, lcParam, asBool: false, out var prevHvCmd, out var hvRawCmd))
                 return;
 
-            if (!TryNormalizeHvBreakerCommand(hvRawCmd, out var hvCmd, out var hvClosed))
+            if (!ModbusValueConverter.TryNormalizeHvBreakerCommand(hvRawCmd, out var hvCmd, out var hvClosed))
             {
                 RevertInvalidHvBreakerCommand(lc, lcName, prevHvCmd);
                 return;
             }
 
             _log.Info(
-                $"[LC-Change] {lcName}.param101: {FormatControlValue(prevHvCmd)} -> {FormatControlValue(hvCmd)}");
+                $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevHvCmd)} -> {ModbusValueConverter.FormatControlValue(hvCmd)}");
+
             bool success = true;
             int endEmu = Math.Min(emuCount, startEmu + emuPerGroup);
             for (int emuIndex = startEmu; emuIndex < endEmu; emuIndex++)
             {
-                var emu = store.Get<ModbusSimServer>($"simEmu{emuIndex + 1}");
-                if (emu == null || !emu.IsOnline) continue;
+                var emu = resolveEmu($"simEmu{emuIndex + 1}");
+                if (emu == null || !emu.IsOnline)
+                    continue;
+
                 success &= TryPublishControlWithLog(
                     emu,
                     "highvoltagebreakeronoff",
                     hvClosed ? 1 : 0,
                     asBool: true,
-                    sourceLabel: $"{lcName}.param101");
+                    $"{lcName}.{lcParam}");
             }
 
             if (success)
-                UpdateControlShadow(lcName, "param101", hvCmd);
+                UpdateControlShadow(lcName, lcParam, hvCmd);
         }
 
-        private void RevertInvalidHvBreakerCommand(ModbusSimServer lc, string lcName, double prevHvCmd)
+        private void RevertInvalidHvBreakerCommand(LocalControlModbusServer lc, string lcName, double prevHvCmd)
         {
             if (double.IsNaN(prevHvCmd))
                 return;
@@ -269,7 +235,7 @@ namespace EssSimulator.EssSimModelApi
             }
         }
 
-        private static void WritePcsTelemetryDefaults(ModbusSimServer lc, int localPcs)
+        private static void WritePcsTelemetryDefaults(LocalControlModbusServer lc, int localPcs)
         {
             int faultLc = localPcs < 4 ? 4 + localPcs : 32 + (localPcs - 4);
             int alarmLc = localPcs < 4 ? 8 + localPcs : 36 + (localPcs - 4);
@@ -300,7 +266,7 @@ namespace EssSimulator.EssSimModelApi
         }
 
         private void ForwardWhenChanged(
-            ModbusSimServer lc,
+            LocalControlModbusServer lc,
             string lcName,
             string lcParam,
             ModbusSimServer targetEmu,
@@ -311,40 +277,28 @@ namespace EssSimulator.EssSimModelApi
                 return;
 
             _log.Info(
-                $"[LC-Change] {lcName}.{lcParam}: {FormatControlValue(prevValue)} -> {FormatControlValue(currentValue)}");
+                $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevValue)} -> {ModbusValueConverter.FormatControlValue(currentValue)}");
 
             bool success;
             if (double.IsNaN(prevValue))
             {
-                // 初始化阶段：仅在 LC 与 EMU 当前值不一致时下发，避免把初值当作有效控制命令。
-                var targetValue = ToDouble(ReadParamOrDefault(targetEmu, targetParam));
+                var targetValue = ModbusValueConverter.ToDouble(ReadParamOrDefault(targetEmu, targetParam));
                 targetValue = asBool ? (targetValue != 0 ? 1 : 0) : targetValue;
                 success = Math.Abs(targetValue - currentValue) < 1e-9 ||
-                          TryPublishControlWithLog(
-                              targetEmu,
-                              targetParam,
-                              currentValue,
-                              asBool,
-                              sourceLabel: $"{lcName}.{lcParam}");
+                          TryPublishControlWithLog(targetEmu, targetParam, currentValue, asBool, $"{lcName}.{lcParam}");
             }
             else
             {
-                success = TryPublishControlWithLog(
-                    targetEmu,
-                    targetParam,
-                    currentValue,
-                    asBool,
-                    sourceLabel: $"{lcName}.{lcParam}");
+                success = TryPublishControlWithLog(targetEmu, targetParam, currentValue, asBool, $"{lcName}.{lcParam}");
             }
 
-            // 关键：只有下发成功后才推进 shadow，失败时保持旧值，后续周期可重试。
             if (success)
                 UpdateControlShadow(lcName, lcParam, currentValue);
         }
 
         private void PrimeGlobalBlackStartShadow(
-            SimulatorHost store,
-            ModbusSimServer lc,
+            Func<string, ModbusSimServer?> resolveEmu,
+            LocalControlModbusServer lc,
             string lcName,
             int startEmu,
             int emuPerGroup,
@@ -359,32 +313,26 @@ namespace EssSimulator.EssSimModelApi
             int endEmu = Math.Min(emuCount, startEmu + emuPerGroup);
             for (int emuIndex = startEmu; emuIndex < endEmu; emuIndex++)
             {
-                var emu = store.Get<ModbusSimServer>($"simEmu{emuIndex + 1}");
+                var emu = resolveEmu($"simEmu{emuIndex + 1}");
                 if (emu == null || !emu.IsOnline)
                 {
                     enabled = false;
                     break;
                 }
 
-                enabled &= ToDouble(ReadParamOrDefault(emu, "pcs1_blackstart_enable")) != 0;
-                enabled &= ToDouble(ReadParamOrDefault(emu, "pcs2_blackstart_enable")) != 0;
+                enabled &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, "pcs1_blackstart_enable")) != 0;
+                enabled &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, "pcs2_blackstart_enable")) != 0;
             }
 
             double val = enabled ? 1 : 0;
             _controlShadow[key] = val;
-            try
-            {
-                lc.SetDataStoreByMesurePointName(lcParam, val);
-            }
-            catch
-            {
-                // 忽略首轮对齐写失败，后续周期会再次尝试。
-            }
+            try { lc.SetDataStoreByMesurePointName(lcParam, val); }
+            catch { /* 首轮对齐失败可忽略 */ }
         }
 
         private void PrimeGlobalHvBreakerShadow(
-            SimulatorHost store,
-            ModbusSimServer lc,
+            Func<string, ModbusSimServer?> resolveEmu,
+            LocalControlModbusServer lc,
             string lcName,
             int startEmu,
             int emuPerGroup,
@@ -399,30 +347,24 @@ namespace EssSimulator.EssSimModelApi
             int endEmu = Math.Min(emuCount, startEmu + emuPerGroup);
             for (int emuIndex = startEmu; emuIndex < endEmu; emuIndex++)
             {
-                var emu = store.Get<ModbusSimServer>($"simEmu{emuIndex + 1}");
+                var emu = resolveEmu($"simEmu{emuIndex + 1}");
                 if (emu == null || !emu.IsOnline)
                 {
                     closed = false;
                     break;
                 }
 
-                closed &= ToDouble(ReadParamOrDefault(emu, "highvoltagebreakeronoff")) != 0;
+                closed &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, "highvoltagebreakeronoff")) != 0;
             }
 
             double val = closed ? 0xEE : 0xAA;
             _controlShadow[key] = val;
-            try
-            {
-                lc.SetDataStoreByMesurePointName(lcParam, val);
-            }
-            catch
-            {
-                // 忽略首轮对齐写失败，后续周期会再次尝试。
-            }
+            try { lc.SetDataStoreByMesurePointName(lcParam, val); }
+            catch { /* 首轮对齐失败可忽略 */ }
         }
 
         private bool TryReadChangedControl(
-            ModbusSimServer lc,
+            LocalControlModbusServer lc,
             string lcName,
             string param,
             bool asBool,
@@ -431,24 +373,18 @@ namespace EssSimulator.EssSimModelApi
         {
             previousValue = 0;
             currentValue = 0;
+
             object? raw;
-            try
-            {
-                raw = lc.GetDataObjectByMesurePointName(param);
-            }
-            catch
-            {
-                return false;
-            }
+            try { raw = lc.GetDataObjectByMesurePointName(param); }
+            catch { return false; }
+
             if (raw == null)
                 return false;
 
-            currentValue = ToDouble(raw);
+            currentValue = ModbusValueConverter.ToDouble(raw);
             currentValue = asBool ? (currentValue != 0 ? 1 : 0) : currentValue;
 
             string key = $"{lcName}:{param}";
-
-            // 初始化也纳入变更链路：首次视为从 shadow/未初始化 到当前值。
             if (!_controlShadow.TryGetValue(key, out var prev))
             {
                 previousValue = double.NaN;
@@ -456,16 +392,11 @@ namespace EssSimulator.EssSimModelApi
             }
 
             previousValue = prev;
-            if (Math.Abs(prev - currentValue) < 1e-9)
-                return false;
-
-            return true;
+            return Math.Abs(prev - currentValue) >= 1e-9;
         }
 
-        private void UpdateControlShadow(string lcName, string lcParam, double value)
-        {
+        private void UpdateControlShadow(string lcName, string lcParam, double value) =>
             _controlShadow[$"{lcName}:{lcParam}"] = value;
-        }
 
         private bool TryPublishControlWithLog(
             ModbusSimServer targetEmu,
@@ -491,53 +422,6 @@ namespace EssSimulator.EssSimModelApi
 
             _log.Info($"[LC-Publish:success] {sourceLabel} -> {targetEmu}.{targetParam} value={value}");
             return true;
-        }
-
-        private static string FormatControlValue(double value)
-        {
-            return double.IsNaN(value) ? "<init>" : value.ToString("G");
-        }
-
-        private static bool TryNormalizeHvBreakerCommand(double rawValue, out double normalizedValue, out bool closed)
-        {
-            normalizedValue = 0;
-            closed = false;
-            int cmd = (int)Math.Round(rawValue);
-            if (cmd == 0xAA)
-            {
-                normalizedValue = 0xAA;
-                closed = false;
-                return true;
-            }
-
-            if (cmd == 0xEE)
-            {
-                normalizedValue = 0xEE;
-                closed = true;
-                return true;
-            }
-
-            return false;
-        }
-
-        private static double ToDouble(object raw)
-        {
-            return raw switch
-            {
-                bool b => b ? 1 : 0,
-                byte v => v,
-                sbyte v => v,
-                short v => v,
-                ushort v => v,
-                int v => v,
-                uint v => v,
-                long v => v,
-                ulong v => v,
-                float v => v,
-                double v => v,
-                decimal v => (double)v,
-                _ => double.TryParse(raw.ToString(), out var parsed) ? parsed : 0
-            };
         }
     }
 }

@@ -3,7 +3,7 @@ using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 namespace EssSimulator.EssDeviceSimModel.Devices
 {
     /// <summary>
-    /// BMS 簇级三级告警状态机（保护/告警/故障）与阈值评估。
+    /// BMS 保护逻辑：簇级阈值评估 + Rack 级告警汇总回写物理状态。
     /// </summary>
     public static class BmsRackProtection
     {
@@ -109,6 +109,52 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             (l1, l2, l3) = (alm.BatteryBoxBusbarHighTempProtection, alm.BatteryBoxBusbarHighTempAlarm, alm.BatteryBoxBusbarHighTempFault);
             UpdateOver(ref l1, ref l2, ref l3, thr.HVBHighTempThreshold1!.Value, thr.HVBHighTempThreshold2!.Value, thr.HVBHighTempThreshold3!.Value, thr.HVBHighTempRecovery1!.Value, thr.HVBHighTempRecovery2!.Value, thr.HVBHighTempRecovery3!.Value, busbarTempC);
             (alm.BatteryBoxBusbarHighTempProtection, alm.BatteryBoxBusbarHighTempAlarm, alm.BatteryBoxBusbarHighTempFault) = (l1, l2, l3);
+        }
+
+        /// <summary>
+        /// Rack 级汇总：读取各簇告警汇总与 stack 级 SOC/SOH 规则，写回 <see cref="RackState"/> 故障态。
+        /// </summary>
+        public static void ApplyRackFaultSummary(
+            BatteryManagementSystemData bmsData,
+            RackState rack,
+            int stackIndex = 0)
+        {
+            var stack = bmsData.BatteryStacks[stackIndex];
+
+            if (stack.BMSFaultSummary != 0)
+            {
+                rack.IsFault = (ushort)((stack.IsChargeFault, stack.IsDischargeFault) switch
+                {
+                    (true, true) => 3,
+                    (true, false) => 1,
+                    (false, true) => 2,
+                    (false, false) => 3
+                });
+            }
+            else
+            {
+                rack.IsFault = 0;
+            }
+
+            if (stack.SOC >= 0.95f)
+            {
+                rack.IsFault = (ushort)(rack.IsFault == 0 ? 1
+                                      : rack.IsFault == 2 ? 3
+                                      : rack.IsFault);
+            }
+
+            if (stack.SOC <= 0.05f)
+            {
+                rack.IsFault = (ushort)(rack.IsFault == 0 ? 2
+                                      : rack.IsFault == 1 ? 3
+                                      : rack.IsFault);
+            }
+
+            if (stack.SOH <= 0.05f)
+                rack.IsFault = 3;
+
+            rack.IsAlarm = stack.BMSAlarmSummary != 0;
+            rack.IsProtection = stack.BMSProtectionSummary != 0;
         }
 
         public static void UpdateUnder(ref bool? l1, ref bool? l2, ref bool? l3,

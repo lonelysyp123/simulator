@@ -4,6 +4,7 @@ using EssSimulator.DataExchange.Config;
 using EssSimulator.Display;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi;
+using EssSimulator.LocalControl;
 using log4net;
 using log4net.Config;
 using Microsoft.Extensions.Configuration;
@@ -197,11 +198,20 @@ namespace EssSimulator
                 {
                     // 绑定配置节到强类型选项
                     services.Configure<SimulatorConfig>(ctx.Configuration.GetSection(SimulatorConfig.Section));
+                    services.PostConfigure<SimulatorConfig>(opt =>
+                    {
+                        var units = ctx.Configuration.GetSection(EssUnitsConfig.Section)
+                            .Get<List<EssUnitConfig>>();
+                        if (units is { Count: > 0 })
+                            opt.Devices = units;
+                    });
                     services.Configure<PcsPhysicalConfig>(ctx.Configuration.GetSection(PcsPhysicalConfig.Section));
                     services.Configure<TransformerConfig>(ctx.Configuration.GetSection(TransformerConfig.Section));
                     services.Configure<UnitTransformerConfig>(ctx.Configuration.GetSection(UnitTransformerConfig.Section));
                     services.Configure<LoadConfig>(ctx.Configuration.GetSection(LoadConfig.Section));
                     services.Configure<PccConfig>(ctx.Configuration.GetSection(PccConfig.Section));
+                    services.Configure<EssSimulator.EssDeviceSimModel.Model.MeterConfig>(
+                        ctx.Configuration.GetSection(EssSimulator.EssDeviceSimModel.Model.MeterConfig.Section));
                     services.Configure<DataExchangeOptions>(ctx.Configuration.GetSection(DataExchangeOptions.Section));
 
                     // 核心仿真模型（单例 + 托管服务，由 Host 管理生命周期和仿真主循环）
@@ -213,7 +223,9 @@ namespace EssSimulator
                         var unitTransCfg = sp.GetRequiredService<IOptions<UnitTransformerConfig>>().Value;
                         var loadCfg  = sp.GetRequiredService<IOptions<LoadConfig>>().Value;
                         var pccCfg   = sp.GetRequiredService<IOptions<PccConfig>>().Value;
-                        var ess = new EnergyStorageSystem(simCfg, pcsCfg, transCfg, unitTransCfg, loadCfg, pccCfg);
+                        var meterCfg = sp.GetRequiredService<IOptions<EssSimulator.EssDeviceSimModel.Model.MeterConfig>>().Value;
+                        var ess = new EnergyStorageSystem(
+                            simCfg, pcsCfg, transCfg, unitTransCfg, loadCfg, pccCfg, meterCfg);
                         SimulatorHost.Instance.Register("ess", ess);
                         return ess;
                     });
@@ -240,7 +252,7 @@ namespace EssSimulator
                         .GetValue<bool>(nameof(ProtocolConfig.EnableLocalControl));
                     if (enableLocalControl)
                     {
-                        services.AddHostedService<LocalControlBridgeService>();
+                        services.AddHostedService<LocalControlHostedService>();
                     }
 
                     // Modbus 协议服务（托管服务）

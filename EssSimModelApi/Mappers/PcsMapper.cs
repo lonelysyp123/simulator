@@ -66,17 +66,6 @@ namespace EssSimulator.EssSimModelApi.Mappers
         }
 
         /// <summary>
-        /// 联锁/外部停机后，将启停命令位清 0（Modbus 回写由 DataExchange 反馈管道负责）。
-        /// </summary>
-        private static void ClearPcsStartStopCommand(int simIdx, PcsData pcsData)
-        {
-            if (!pcsData.pcsOnOffSwitch)
-                return;
-
-            pcsData.pcsOnOffSwitch = false;
-        }
-
-        /// <summary>
         /// 启动完成后置位启停命令并立即 ApplyEmuCommands。
         /// 返回 false 表示 emu/ess 尚未就绪，调用方可在下一周期重试。
         /// </summary>
@@ -128,35 +117,36 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 var pcsSim  = ess._pcsList[simIdx];
 
                 bool cmdOn = pcsData.pcsOnOffSwitch;
-                pcsSim.SyncExternalRunCommand(cmdOn);
-
-                bool mainBreakerClosed = ess.IsMainBreakerClosed;
-                int unitIdx = simIdx / 2;
-                bool unitBreakerClosed = ess.IsUnitBreakerClosed(unitIdx);
 
                 if (!cmdOn)
                 {
+                    pcsSim.SyncExternalRunCommand(false);
                     ess.PushPcsChannelToNetwork(simIdx);
                     continue;
                 }
 
+                bool mainBreakerClosed = ess.IsMainBreakerClosed;
+                int unitIdx = simIdx / 2;
+                bool unitBreakerClosed = ess.IsUnitBreakerClosed(unitIdx);
                 bool breakersOpen = !mainBreakerClosed || !unitBreakerClosed;
 
                 // 无网：主断分，或该单元高压分。允许「主断分+单元合+黑启动」；禁止「主断合+单元合+黑启动」
                 if (breakersOpen && !pcsData.BlackStartEnabled)
                 {
+                    pcsSim.SyncExternalRunCommand(false);
                     pcsSim.ApplyIslandVoltageCommand(0);
                     pcsSim.ApplyBlackStartEnabled(false);
                     ClearBlackStartCommand(simIdx, pcsData);
                     pcsSim.TransitionToMode(OperationMode.Off);
-                    ClearPcsStartStopCommand(simIdx, pcsData);
                     ess.PushPcsChannelToNetwork(simIdx);
                     continue;
                 }
 
+                pcsSim.SyncExternalRunCommand(true);
+
                 ApplyOperationalMode(pcsData, pcsSim, ess, simIdx);
 
-                if (!pcsData.pcsOnOffSwitch || breakersOpen || pcsData.BlackStartEnabled)
+                if (breakersOpen || pcsData.BlackStartEnabled)
                 {
                     ess.PushPcsChannelToNetwork(simIdx);
                     continue;
@@ -176,7 +166,6 @@ namespace EssSimulator.EssSimModelApi.Mappers
             if (pcsSim.HasLatchedFaultTrip)
             {
                 pcsSim.TransitionToMode(OperationMode.Off);
-                ClearPcsStartStopCommand(simIdx, pcsData);
                 return;
             }
 

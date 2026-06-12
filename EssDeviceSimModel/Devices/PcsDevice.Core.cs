@@ -74,11 +74,6 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         private bool _faultTripLatched;
         private bool _externalRunCommand;
         private bool _externalRunRisingEdge;
-        /// <summary>
-        /// 仿真时间加速倍率。爬坡线程的真实 Sleep 时长 = 配置值 / Speedup，
-        /// 使 PCS 爬坡速率在仿真时间轴上与主循环的 SimStep 保持一致。
-        /// </summary>
-        private readonly double _speedup;
 
         public PcsDevice(string deviceId, PcsDeviceConfig deviceConfig, double ambientTemp = 25.0)
         {
@@ -95,7 +90,6 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 FrequencyNominal = deviceConfig.FrequencyHz,
                 MaxCurrent = deviceConfig.MaxCurrentA
             };
-            _speedup = deviceConfig.Speedup > 0 ? deviceConfig.Speedup : 1.0;
             _ambientTemperature = ambientTemp;
             _gridLossCoefficient = Math.Clamp(deviceConfig.GridLossCoefficient, 0, 0.95);
             _islandVoltageRampDurationSec = Math.Max(0.001, deviceConfig.IslandVoltageRampDurationMs / 1000.0);
@@ -422,8 +416,14 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         }
 
         // 更新PCS状态
-        public void Update(double dcVoltage, ushort isBmsFault, DateTime timeStamp, TimeSpan timeStep)
+        public void Update(
+            double dcVoltage,
+            ushort isBmsFault,
+            DateTime timeStamp,
+            TimeSpan timeStep,
+            TimeSpan? integrationStep = null)
         {
+            var intStep = integrationStep ?? timeStep;
             // 判断时间戳是否不再同一天，若是则重置日统计
             if (_currentState.Timestamp.Date != timeStamp.Date)
             {
@@ -490,7 +490,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             PublishPortsFromState();
 
             // 4. 更新充放电能量统计（正放负充：ActivePower>0为放电，<0为充电）
-            double energyChange = _currentState.ActivePower * timeStep.TotalHours; // kWh
+            double energyChange = _currentState.ActivePower * intStep.TotalHours; // kWh
             if (energyChange > 0)
             {
                 // 放电

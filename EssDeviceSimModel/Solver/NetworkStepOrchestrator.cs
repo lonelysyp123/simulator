@@ -16,10 +16,11 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             EnergyStorageSystem ess,
             DateTime simTime,
             TimeSpan step,
+            TimeSpan meterIntegrationStep,
             PcsPhysicalConfig pcsCfg)
         {
             SyncBeforeSolverStep(network, ess, simTime);
-            network.Solver.Step(step);
+            network.Solver.Step(step, meterIntegrationStep);
             ApplyGridResultsToEnergyStorageSystem(network, ess, simTime, step, pcsCfg);
             NetworkControlBridge.ProjectBreakersToLegacy(network, ess);
         }

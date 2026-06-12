@@ -8,6 +8,48 @@ namespace EssSimulator.Display
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(GuiStatusFormatters));
 
+        public static string FormatVoltage(double lineVoltageV) =>
+            lineVoltageV >= 1000 ? $"{lineVoltageV / 1000:0.0} kV" : $"{lineVoltageV:0.0} V";
+
+        public static string FormatAcPhasor(AcPhasorSnapshot phasor) =>
+            $"{FormatVoltage(phasor.LineVoltageV)} / {phasor.LineCurrentA:0.0} A / φ{phasor.PhaseAngleDeg:0.0}° / {phasor.FrequencyHz:0.0} Hz";
+
+        public static string FormatAcPhasorWithPower(AcPhasorSnapshot phasor) =>
+            $"{FormatAcPhasor(phasor)}  → P {phasor.ActivePowerKw:0.0} kW  Q {phasor.ReactivePowerKvar:0.0} kvar  PF {phasor.PowerFactor:0.000}";
+
+        public static string FormatBusNode(BusNodeSnapshot? bus)
+        {
+            if (bus == null)
+                return "—";
+            var p = new AcPhasorSnapshot(bus.Value.LineVoltageV, bus.Value.LineCurrentA, bus.Value.PhaseAngleDeg, bus.Value.FrequencyHz);
+            return $"{bus.Value.BusId}: {FormatAcPhasorWithPower(p)}";
+        }
+
+        public static string FormatBreakerState(bool closed, bool tripped) =>
+            tripped ? "跳闸" : closed ? "合" : "分";
+
+        public static string FormatGridModeLabel(string? gMode) => gMode switch
+        {
+            "GridConnected" => "并网",
+            "Islanded" => "离网",
+            _ => string.IsNullOrWhiteSpace(gMode) ? "?" : gMode
+        };
+
+        public static string FormatBlackStartPhaseLabel(string? phase) => phase switch
+        {
+            "Inactive" => "未激活",
+            "Preparing" => "准备",
+            "SoftStarting" => "软启动",
+            "VoltageRegulating" => "调压",
+            "Synchronized" => "已同步",
+            _ => string.IsNullOrWhiteSpace(phase) ? "—" : phase
+        };
+
+        public static string FormatPcsAcLine(PcsChannelSnapshot pcs) =>
+            $"AC {FormatAcPhasor(pcs.AcOutput)} | {FormatGridModeLabel(pcs.GridMode)}" +
+            (pcs.BlackStartEnabled ? $" | 黑启动:{FormatBlackStartPhaseLabel(pcs.BlackStartPhase)}" : "") +
+            $" | P/Q {pcs.ActivePowerKw:0.0}/{pcs.ReactivePowerKw:0.0}";
+
         public static string FormatBlackStartSwitchStatus(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
         {
             bool swOn = GuiSimDataAccess.SafeGetBool($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].BlackStartEnabled");
@@ -50,12 +92,8 @@ namespace EssSimulator.Display
             return string.Join("  ", parts);
         }
 
-        public static string FormatPcsControlStatus(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
+        public static string FormatPcsDeviceStateLabel(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
         {
-            bool cmdOn = GuiSimDataAccess.SafeGetBool($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].pcsOnOffSwitch");
-            double pSet = GuiSimDataAccess.SafeGetDouble($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].PCSActivePowerSetting");
-            string blackStartSw = FormatBlackStartSwitchStatus(unitIndex0, pcsSlotInUnit0, essPcsListIndex);
-            string modeLabel = "?";
             try
             {
                 var m = SimServer.GetExtIfVariableVal($"ess._pcsList[{essPcsListIndex}]._currentState.Mode");
@@ -63,14 +101,130 @@ namespace EssSimulator.Display
                 bool blackStart = GuiSimDataAccess.SafeGetBool($"ess._pcsList[{essPcsListIndex}]._currentState.BlackStartEnabled");
                 ushort fault = (ushort)GuiSimDataAccess.SafeGetDouble($"ess._pcsList[{essPcsListIndex}]._currentState.FaultType");
                 if (m != null && Enum.TryParse<OperationMode>(m.ToString(), out var mode))
-                    modeLabel = PcsDisplayLabels.GetRunPhaseLabel(mode, pAct, blackStart, fault);
+                    return PcsDisplayLabels.GetRunPhaseLabel(mode, pAct, blackStart, fault);
             }
             catch (Exception ex)
             {
-                Log.Debug($"FormatPcsControlStatus 读取 PCS{essPcsListIndex + 1} 模式失败", ex);
+                Log.Debug($"FormatPcsDeviceStateLabel 读取 PCS{essPcsListIndex + 1} 失败", ex);
             }
 
-            return $"启停控制:{(cmdOn ? "开" : "停")} 黑启动:{blackStartSw} P设定:{pSet:0}kW 设备状态:{modeLabel}";
+            return "?";
+        }
+
+        public static string FormatPcsDeviceStateLine(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
+        {
+            string phase = FormatPcsDeviceStateLabel(unitIndex0, pcsSlotInUnit0, essPcsListIndex);
+            bool extRun = GuiSimDataAccess.SafeGetBool($"ess._pcsList[{essPcsListIndex}].IsExternalRunCommand");
+            string suffix = extRun && phase == "停机" ? "(有令)" : "";
+            return $"设备状态:{phase}{suffix}";
+        }
+
+        public static string FormatPcsStartStopPointLine(int unitIndex0, int pcsSlotInUnit0)
+        {
+            bool coilOn = GuiSimDataAccess.GetEmuPcsStartStopCoil(unitIndex0, pcsSlotInUnit0);
+            return $"启停控制:{(coilOn ? "1" : "0")}";
+        }
+
+        public static string FormatPcsTargetPowerLine(int unitIndex0, int pcsSlotInUnit0)
+        {
+            double pSet = GuiSimDataAccess.SafeGetDouble(
+                $"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].PCSActivePowerSetting");
+            return $"目标有功:{pSet:0}kW";
+        }
+
+        public static string FormatPcsActualPowerLine(int essPcsListIndex, double activePowerKwFallback = 0)
+        {
+            double pAct = GuiSimDataAccess.SafeGetDouble(
+                $"ess._pcsList[{essPcsListIndex}]._currentState.ActivePower",
+                activePowerKwFallback);
+            return $"实时有功:{pAct:0.0}kW";
+        }
+
+        /// <summary>主接线 PCS 框紧凑文案（缩短标签，语义与完整版一致）。</summary>
+        public static string FormatPcsMainLineDeviceState(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
+        {
+            string phase = FormatPcsDeviceStateLabel(unitIndex0, pcsSlotInUnit0, essPcsListIndex);
+            bool extRun = GuiSimDataAccess.SafeGetBool($"ess._pcsList[{essPcsListIndex}].IsExternalRunCommand");
+            if (extRun && phase == "停机")
+                phase = "停(令)";
+            return $"状态:{phase}";
+        }
+
+        public static string FormatPcsMainLineStartStop(int unitIndex0, int pcsSlotInUnit0)
+        {
+            bool coilOn = GuiSimDataAccess.GetEmuPcsStartStopCoil(unitIndex0, pcsSlotInUnit0);
+            return $"启停:{(coilOn ? "1" : "0")}";
+        }
+
+        public static string FormatPcsMainLineTargetPower(int unitIndex0, int pcsSlotInUnit0)
+        {
+            double pSet = GuiSimDataAccess.SafeGetDouble(
+                $"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].PCSActivePowerSetting");
+            return $"P设:{pSet:0}kW";
+        }
+
+        public static string FormatPcsMainLineActualPower(int essPcsListIndex, double activePowerKwFallback = 0)
+        {
+            double pAct = GuiSimDataAccess.SafeGetDouble(
+                $"ess._pcsList[{essPcsListIndex}]._currentState.ActivePower",
+                activePowerKwFallback);
+            return $"P实:{pAct:0.0}kW";
+        }
+
+        public static string FormatPcsMainLineBlackStart(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
+        {
+            string st = FormatBlackStartSwitchStatus(unitIndex0, pcsSlotInUnit0, essPcsListIndex);
+            st = st switch
+            {
+                "开(运行中)" => "运",
+                "开(未生效)" => "未效",
+                _ => st
+            };
+            return $"黑:{st}";
+        }
+
+        /// <summary>主接线 BMS 框紧凑文案。</summary>
+        public static string FormatBmsMainLineGridConnect(int bmsIndex0)
+        {
+            int status = (int)GuiSimDataAccess.SafeGetDouble($"bms{bmsIndex0 + 1}.BatteryStacks[0].GridConnectStatus");
+            bool linked = GuiSimDataAccess.SafeGetBool($"bms{bmsIndex0 + 1}.BatteryStacks[0].IsPcsLinked");
+            string tag = status switch
+            {
+                0 => "未始",
+                1 => "进行",
+                2 => linked ? "已联" : "成功",
+                3 => "失败",
+                _ => $"S{status}"
+            };
+            return linked ? $"并网:{tag}" : $"并网:{tag}/离";
+        }
+
+        public static string FormatBmsMainLineBlackStart(int bmsIndex0)
+        {
+            int status = (int)GuiSimDataAccess.SafeGetDouble($"bms{bmsIndex0 + 1}.BatteryStacks[0].BlackStartStatus");
+            string tag = status switch
+            {
+                0 => "空闲",
+                3 => "进入",
+                4 => "失败",
+                5 => "退出",
+                _ => $"S{status}"
+            };
+            return $"黑启:{tag}";
+        }
+
+        public static string FormatPcsControlStatus(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
+        {
+            string blackStartSw = FormatBlackStartSwitchStatus(unitIndex0, pcsSlotInUnit0, essPcsListIndex);
+            string deviceState = FormatPcsDeviceStateLabel(unitIndex0, pcsSlotInUnit0, essPcsListIndex);
+            bool coilOn = GuiSimDataAccess.GetEmuPcsStartStopCoil(unitIndex0, pcsSlotInUnit0);
+            double pSet = GuiSimDataAccess.SafeGetDouble($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].PCSActivePowerSetting");
+            double pAct = GuiSimDataAccess.SafeGetDouble($"ess._pcsList[{essPcsListIndex}]._currentState.ActivePower");
+
+            return
+                $"设备状态:{deviceState} 启停控制:{(coilOn ? "1" : "0")} 黑启动:{blackStartSw} " +
+                $"目标有功:{pSet:0}kW 实时有功:{pAct:0.0}kW " +
+                $"模式:{FormatGridModeLabel(GuiSimDataAccess.SafeGetString($"ess._pcsList[{essPcsListIndex}]._currentState.GMode"))}";
         }
 
         public static string FormatGridConnectStatus(int bmsIndex0)

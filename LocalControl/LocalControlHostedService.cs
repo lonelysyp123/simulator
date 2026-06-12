@@ -1,0 +1,98 @@
+using EssSimulator.Configuration;
+using EssSimulator.Core;
+using log4net;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+
+namespace EssSimulator.LocalControl
+{
+    /// <summary>
+    /// LocalControl 独立托管服务：启动 simLc* Modbus 从站并运行 EMU↔LC 报文转发引擎。
+    /// 与仿真主路径解耦，仅在 <see cref="ProtocolConfig.EnableLocalControl"/> 为 true 时启用。
+    /// </summary>
+    public sealed class LocalControlHostedService : BackgroundService
+    {
+        private static readonly ILog Log = LogManager.GetLogger(typeof(LocalControlHostedService));
+        private readonly SimulatorConfig _cfg;
+        private readonly List<LocalControlModbusServer> _servers = new();
+        private readonly LocalControlBridgeEngine _bridge;
+
+        public LocalControlHostedService(IOptions<SimulatorConfig> simOptions)
+        {
+            _cfg = simOptions.Value;
+            _bridge = new LocalControlBridgeEngine(Log);
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            if (!_cfg.Protocol.EnableLocalControl)
+                return;
+
+            await StartServersWhenEmuReadyAsync(stoppingToken);
+            if (_servers.Count == 0)
+                return;
+
+            int emuPerGroup = Math.Max(1, _cfg.Protocol.LocalControlEmuPerGroup);
+            int emuCount = Math.Max(1, _cfg.Devices?.Count ?? 1);
+            var store = SimulatorHost.Instance;
+
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                for (int lcIdx = 0; lcIdx < _servers.Count; lcIdx++)
+                {
+                    var lc = _servers[lcIdx];
+                    try
+                    {
+                        _bridge.RunCycle(store.Get<ModbusSimServer>, lc, lcIdx, emuPerGroup, emuCount);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Debug($"LC 桥接周期异常 [{lc.ServerName}]", ex);
+                    }
+                }
+            }
+        }
+
+        public override Task StopAsync(CancellationToken cancellationToken)
+        {
+            foreach (var server in _servers)
+            {
+                try { server.Stop(); }
+                catch (Exception ex) { Log.Warn("关闭 LocalControl Modbus 服务时异常", ex); }
+            }
+
+            _servers.Clear();
+            return base.StopAsync(cancellationToken);
+        }
+
+        private async Task StartServersWhenEmuReadyAsync(CancellationToken stoppingToken)
+        {
+            var store = SimulatorHost.Instance;
+            int emuPerGroup = Math.Max(1, _cfg.Protocol.LocalControlEmuPerGroup);
+            int emuCount = Math.Max(1, _cfg.Devices?.Count ?? 1);
+            int lcCount = (int)Math.Ceiling(emuCount / (double)emuPerGroup);
+
+            for (int attempt = 0; attempt < 120 && !stoppingToken.IsCancellationRequested; attempt++)
+            {
+                var emu = store.Get<ModbusSimServer>("simEmu1");
+                if (emu != null && emu.IsOnline)
+                    break;
+
+                await Task.Delay(500, stoppingToken);
+            }
+
+            for (int i = 0; i < lcCount; i++)
+            {
+                int port = _cfg.Protocol.BaseLocalControlModbusPort + i * _cfg.Protocol.LocalControlPortStep;
+                string name = $"simLc{i + 1}";
+                var server = new LocalControlModbusServer("lc.csv", port, name);
+                store.Register(name, server);
+                server.Start();
+                SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}（LC 转发）";
+                _servers.Add(server);
+                Log.Info($"[LocalControl] {name} 已启动，端口 {port}");
+            }
+        }
+    }
+}

@@ -66,6 +66,9 @@ namespace EssSimulator.Protocol.Modbus
 
             DataMaps.AddRange(entries.Where(m => m.FunctionCode is 3 or 4));
             ControlMaps.AddRange(entries.Where(m => m.FunctionCode is 5 or 6 or 16));
+
+            if (mapFilePath.Contains("bms_bank", StringComparison.OrdinalIgnoreCase))
+                DefaultBuffer["param4"] = (ushort)2;
         }
 
         private void LoadRackMap(string mapFilePath, string serverName)

@@ -9,7 +9,8 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  协议层：ModbusSimServer / DataExchangeSession / ModbusDataSync │
+│  协议层：ModbusSimServer / DataExchangeSession                    │
+│  LC 转发：LocalControl/（独立 Modbus 报文聚合，不绑定仿真）         │
 │  映射层：EssSimModelApi (PcsMapper, BmsMapper, EmMapper)      │
 └───────────────────────────┬─────────────────────────────────┘
                             │ 对象路径 / ControlEffect
@@ -63,7 +64,13 @@
   - 遥测管道：周期读模型写寄存器
   - 控制管道：周期读 FC5/6 写模型；`ControlEffect` 驱动启停、黑启动、断路器等
   - 反馈管道：将模型状态回写控制线圈
-- **simLc\*** 等：仍走 `ModbusDataSync`（legacy 路径）
+- **simLc\***（可选，`EnableLocalControl=true`）：`LocalControl/` 模块（纯 Modbus 转发，见上文）
+- **AC 潮流**（`UseElectricalPropagation=true`）：`RadialPowerSweepEngine` 五相母线前推回代
+  - ① 叶子汇报 P/Q → ② 690V/35kV 汇总 → ③ Grid Q-U 定压 → ④ Coupler 链传播电压 → ⑤ 由 P/Q+V 算电流并 Step
+  - **Coupler 链**：`BUS_GRID` → `BreakerBusCoupler` → `BUS_MAIN_SEC` → `TransformerBusCoupler` → `BUS_35` → `UnitBranchCoupler` → `BUS_690`
+  - **本地电压源**：黑启动/离网 V/f 的 PCS 作为 `IBusVoltageSource` 注册到 `BUS_690`，Coupler 传播后由 `ApplyLocalVoltageSources` 合并注入
+  - **Q-U/V 迭代**：Phase5 设备 Step 后，按实测 Q 多轮 `Grid Q-U → Coupler 传播`，直至电压收敛或达到 `PropagationQuvMaxIterations`（默认 3）
+  - 母线 `SetVoltage` 触发下游 Coupler；电流由下游 P/Q 在 Coupler 内解析，不由电压源指定
 
 ### PCS 爬坡
 
@@ -129,6 +136,12 @@ dotnet test
 - [x] `BlackStartPhase` 四段：Preparing → SoftStarting → VoltageRegulating → Synchronized
 - [x] 闭环建压（母线反馈 + 软启动 V/s + 频率 47→50Hz）
 - [x] 建压期电流限幅与变压器涌流 P/Q 尖峰联动
+
+### 已完成（Coupler + 黑启动 + Q-U 迭代）
+
+- [x] Coupler 链：`IBusCoupler` + 母线 `SetVoltage` 事件驱动电压传播
+- [x] 黑启动 PCS 作为 `BUS_690` 本地电压源（`IBusVoltageSource`）
+- [x] 多轮 Q-U/V 反馈迭代（`PropagationQuvMaxIterations` / `PropagationVoltageTolerancePu`）
 
 ### 待办
 

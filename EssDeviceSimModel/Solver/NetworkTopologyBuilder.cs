@@ -80,7 +80,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                     else
                         networkPcsDevices.Add(PcsDeviceFactory.Create(
                             $"pcs_u{u}_ch{ch}",
-                            PcsDeviceFactory.CreateConfig(pcsCfg, simCfg.Runtime.PcsRamp, simCfg.Speedup)));
+                            PcsDeviceFactory.CreateConfig(pcsCfg, simCfg.Runtime.PcsRamp)));
                     if (bmsRackDevices != null && channel < bmsRackDevices.Count)
                         bmsDevices.Add(bmsRackDevices[channel]);
                     else

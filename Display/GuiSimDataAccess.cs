@@ -1,3 +1,4 @@
+using EssSimulator.Core;
 using log4net;
 
 namespace EssSimulator.Display
@@ -79,6 +80,59 @@ namespace EssSimulator.Display
                 Log.Debug($"SafeGetBool 失败: {path}", ex);
                 return fallback;
             }
+        }
+
+        public static string SafeGetString(string path, string fallback = "")
+        {
+            try
+            {
+                var o = SimServer.GetExtIfVariableVal(path);
+                return o?.ToString() ?? fallback;
+            }
+            catch (Exception ex)
+            {
+                Log.Debug($"SafeGetString 失败: {path}", ex);
+                return fallback;
+            }
+        }
+
+        public static object? TryGetObject(string path)
+        {
+            try
+            {
+                return SimServer.GetExtIfVariableVal(path);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>读取 EMU Modbus 控制线圈当前值（如 pcs1_startstop），失败时回退仿真 DTO。</summary>
+        public static bool GetEmuPcsStartStopCoil(int unitIndex0, int pcsSlotInUnit0)
+        {
+            string paramName = pcsSlotInUnit0 == 0 ? "pcs1_startstop" : "pcs2_startstop";
+            try
+            {
+                var server = SimulatorHost.Instance.Get<IModbusRegisterServer>($"simEmu{unitIndex0 + 1}");
+                if (server != null)
+                {
+                    var raw = server.GetDataObjectByMesurePointName(paramName);
+                    if (raw != null)
+                        return raw switch
+                        {
+                            bool b => b,
+                            string s when bool.TryParse(s, out var bv) => bv,
+                            _ => Convert.ToDouble(raw) != 0
+                        };
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Debug($"GetEmuPcsStartStopCoil 读 Modbus 失败: simEmu{unitIndex0 + 1}.{paramName}", ex);
+            }
+
+            return SafeGetBool($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].pcsOnOffSwitch");
         }
     }
 }

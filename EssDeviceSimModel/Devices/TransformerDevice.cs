@@ -84,7 +84,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 step,
                 applyReactiveVoltageShift: false);
 
-            PublishPorts(priIn.FrequencyHz, secIn);
+            PublishPorts(priIn.FrequencyHz, secIn, context);
         }
 
         public void Update(
@@ -249,31 +249,38 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             _currentState.Power = outputPower;
         }
 
-        private void PublishPorts(double frequencyHz, AcInternalQuantities secIn)
+        /// <summary>
+        /// 并网且电网可用时，励磁/铁损无功由无穷大电网在 PCC 侧吸收，端口只传递穿越功率（secIn）；
+        /// 离网或励磁涌流期间仍输出完整励磁分量。
+        /// </summary>
+        private void PublishPorts(double frequencyHz, AcInternalQuantities secIn, DeviceStepContext context)
         {
-            double magQ = GetSecondaryMagnetizingReactiveKvar();
-            double ironKw = GetSecondaryNoLoadActivePowerKw();
+            bool gridSlackAbsorbsMagnetizing = context.MainBreakerClosed
+                && context.UtilityGridAvailable
+                && !IsMagnetizingInrushActive();
 
-            AcPortHelper.WriteAcOutput(Primary, new AcInternalQuantities
-            {
-                Connection = _config.PrimaryConnection,
-                LineVoltageV = _currentState.PrimaryVoltage,
-                LineCurrentA = _currentState.PrimaryCurrent,
-                ActivePowerKw = secIn.ActivePowerKw + ironKw,
-                ReactivePowerKvar = secIn.ReactivePowerKvar + magQ,
-                FrequencyHz = frequencyHz
-            });
+            double magQ = gridSlackAbsorbsMagnetizing ? 0 : GetSecondaryMagnetizingReactiveKvar();
+            double ironKw = gridSlackAbsorbsMagnetizing ? 0 : GetSecondaryNoLoadActivePowerKw();
 
-            AcPortHelper.WriteAcOutput(Secondary, new AcInternalQuantities
-            {
-                Connection = _config.SecondaryConnection,
-                LineVoltageV = _currentState.SecondaryVoltage,
-                LineCurrentA = _currentState.SecondaryCurrent,
-                ActivePowerKw = secIn.ActivePowerKw,
-                ReactivePowerKvar = secIn.ReactivePowerKvar,
-                FrequencyHz = frequencyHz
-            });
+            AcPortHelper.WriteAcOutput(Primary, AcQuantityConverter.FromLineVoltageAndPower(
+                _currentState.PrimaryVoltage,
+                secIn.ActivePowerKw + ironKw,
+                secIn.ReactivePowerKvar + magQ,
+                _config.PrimaryConnection,
+                frequencyHz));
+
+            AcPortHelper.WriteAcOutput(Secondary, AcQuantityConverter.FromLineVoltageAndPower(
+                _currentState.SecondaryVoltage,
+                secIn.ActivePowerKw,
+                secIn.ReactivePowerKvar,
+                _config.SecondaryConnection,
+                frequencyHz));
         }
+
+        private bool IsMagnetizingInrushActive() =>
+            _config.MagnetizingInrushEnabled
+            && (_inrushExtraPrimaryA > 1e-3
+                || _currentState.MagnetizingInrushCurrentSecondary > 1e-3);
 
         private static ElectricalPort CreatePort(string portId, ThreePhaseConnection connection, PortKind kind)
         {

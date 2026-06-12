@@ -1,9 +1,10 @@
 using EssSimulator.EssDeviceSimModel.Interface;
 using EssSimulator.EssDeviceSimModel.Model;
+using EssSimulator.EssDeviceSimModel.Propagation;
 
 namespace EssSimulator.EssDeviceSimModel.Devices
 {
-    public sealed class GridSimulator : IGridDevice
+    public sealed class GridSimulator : IGridDevice, ISelfActivatingElectricalSource
     {
         private readonly GridConfig _config;
         private double _aggregatedReactiveKvar;
@@ -18,10 +19,13 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         public string DeviceId { get; }
         public ElectricalDeviceKind Kind => ElectricalDeviceKind.Grid;
         public ElectricalPort Port { get; }
+        public ElectricalPort OutputPort => Port;
         public IReadOnlyList<ElectricalPort> Ports => new[] { Port };
 
         public void SetAggregatedReactivePowerKvar(double totalReactiveKvar) =>
             _aggregatedReactiveKvar = totalReactiveKvar;
+
+        public void Activate(DeviceStepContext context, TimeSpan step) => Step(context, step);
 
         public void Step(DeviceStepContext context, TimeSpan step)
         {
@@ -40,7 +44,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 Connection = _config.Connection,
                 LineVoltageV = lineVoltageV,
                 LineCurrentA = 0,
-                ReactivePowerKvar = _aggregatedReactiveKvar,
+                PhaseAngleDeg = 0,
                 FrequencyHz = lineVoltageV > 1.0 ? _config.NominalFrequencyHz : 0
             };
 

@@ -42,17 +42,17 @@ public class BreakerSimulatorTests
             LineVoltageV = 220_000,
             FrequencyHz = 50
         });
-        breaker.Secondary.Input = ElectricalPortSnapshot.FromAc(new AcInternalQuantities
-        {
-            Connection = ThreePhaseConnection.Star,
-            LineCurrentA = -141,
-            ActivePowerKw = 50_000,
-            FrequencyHz = 50
-        });
+        breaker.Secondary.Input = ElectricalPortSnapshot.FromAc(
+            AcQuantityConverter.FromLineVoltageAndPower(
+                220_000,
+                50_000,
+                0,
+                ThreePhaseConnection.Star,
+                50));
 
         breaker.Step(new DeviceStepContext(), TimeSpan.FromMilliseconds(200));
 
         Assert.Equal(220_000, breaker.Secondary.Output.Ac!.Internal.LineVoltageV);
-        Assert.Equal(-141, breaker.Secondary.Output.Ac.Internal.LineCurrentA);
+        Assert.Equal(131.2, breaker.Secondary.Output.Ac.Internal.LineCurrentA, 0.5);
     }
 }

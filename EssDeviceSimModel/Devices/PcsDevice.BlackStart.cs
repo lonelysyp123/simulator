@@ -1,9 +1,46 @@
 using System;
+using EssSimulator.EssDeviceSimModel;
 
 namespace EssSimulator.EssDeviceSimModel.Devices
 {
     public sealed partial class PcsDevice
     {
+        /// <summary>
+        /// 离网/黑启动 V/f 模式下，PCS 作为 690V 母线电压源的输出（供 <see cref="Propagation.PcsBusVoltageSource"/> 使用）。
+        /// </summary>
+        public bool TryGetIslandBusVoltageInjection(out double lineVoltageV, out double frequencyHz)
+        {
+            lineVoltageV = 0;
+            frequencyHz = _config.FrequencyNominal;
+
+            if (!EssIslandBusLogic.IsPcsIslandVoltageBuilding(_currentState))
+                return false;
+
+            if (_currentState.IslandVoltageEffectiveV > 1.0)
+            {
+                lineVoltageV = _currentState.IslandVoltageEffectiveV;
+            }
+            else if (_blackStartEnabled &&
+                     _blackStartPhase is BlackStartPhase.SoftStarting
+                         or BlackStartPhase.VoltageRegulating
+                         or BlackStartPhase.Synchronized)
+            {
+                double freqRatio = Math.Clamp(
+                    _blackStartIslandFreqHz / Math.Max(_config.FrequencyNominal, 1.0),
+                    0,
+                    1);
+                lineVoltageV = _blackStartSoftCapV * freqRatio;
+            }
+
+            if (lineVoltageV <= 1.0)
+                return false;
+
+            frequencyHz = _blackStartEnabled && _blackStartPhase != BlackStartPhase.Inactive
+                ? _blackStartIslandFreqHz
+                : _config.FrequencyNominal;
+            return true;
+        }
+
         /// <summary>EMS/Modbus 写入孤岛电压设定（V）。稳态同步模式下忽略。</summary>
         public void ApplyIslandVoltageCommand(double voltageV)
         {

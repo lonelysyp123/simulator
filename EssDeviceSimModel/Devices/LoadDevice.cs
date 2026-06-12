@@ -110,12 +110,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             if (lineVoltageV <= 0)
                 return 0;
 
-            double sKva = Math.Sqrt(ActivePower * ActivePower + ReactivePower * ReactivePower);
-            if (sKva <= 0)
-                return 0;
-
-            double currentMag = sKva * 1000.0 / (lineVoltageV * Math.Sqrt(3.0));
-            return ActivePower >= 0 ? -currentMag : currentMag;
+            var phasor = AcQuantityConverter.FromPowerToPhasor(lineVoltageV, ActivePower, ReactivePower);
+            return phasor.LineCurrentA;
         }
 
         public void Step(DeviceStepContext context, TimeSpan step)

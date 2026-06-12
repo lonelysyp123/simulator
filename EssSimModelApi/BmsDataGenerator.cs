@@ -28,12 +28,12 @@ namespace EssSimulator.EssSimModelApi
                 var stack = new BatteryStack
                 {
                     StackId = i + 1,
-                    GridConnectStatus = 0,
+                    GridConnectStatus = 2,
                     GridConnectCommand = 0,
                     BlackStartCommand = 0,
                     BlackStartEnterSuccess = 0,
                     BlackStartStatus = 0,
-                    IsPcsLinked = false,
+                    IsPcsLinked = true,
                     TotalVoltage = 750 + random.Next(-50, 50),
                     Current = 100 + random.Next(-20, 20),
                     Power = 75000 + random.Next(-10000, 10000),

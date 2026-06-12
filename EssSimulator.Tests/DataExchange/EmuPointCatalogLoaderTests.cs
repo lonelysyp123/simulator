@@ -17,7 +17,7 @@ public class EmuPointCatalogLoaderTests
 
         var startStop = catalog.ControlPoints.First(p => p.ParamName == "pcs1_startstop");
         Assert.Equal("emu1", startStop.Target.RootKey);
-        Assert.Equal(ControlSemantics.Edge, startStop.Semantics);
+        Assert.Equal(ControlSemantics.Hold, startStop.Semantics);
         Assert.Equal(ControlEffectId.PcsApplyCommands, startStop.Effect);
 
         var hvBreaker = catalog.ControlPoints.First(p => p.ParamName == "highvoltagebreakeronoff");
