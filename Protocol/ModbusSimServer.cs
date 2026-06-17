@@ -42,10 +42,8 @@ namespace EssSimulator
             int clusterCount = 0,
             DataExchangeOptions? dataExchangeOptions = null)
         {
-            // 1. 加载点表（含 rack 点表）
             _pointMap = new EssSimulator.Protocol.Modbus.ModbusPointMap(mapFilePath, serverName, clusterCount);
 
-            // 2. 创建 TCP 从站
             _deviceInfo = new DeviceInfoDto
             {
                 ip             = "0.0.0.0",

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -29,21 +30,28 @@ namespace EssSimulator.Protocol.Modbus
 
         public ModbusPointMap(string mapFilePath, string serverName, int clusterCount = 0)
         {
-            LoadBankMap(mapFilePath, serverName);
-
-            if (serverName.ToLower().Contains("bms") && clusterCount > 0)
-                LoadRackMap(mapFilePath, serverName);
-        }
-
-        // ── 私有加载方法 ──────────────────────────────────────────────
-
-        private void LoadBankMap(string mapFilePath, string name)
-        {
             var entries = CSVUtil.CSV2Class<MapEntry>(mapFilePath)?.ToArray()
                 ?? throw new Exception($"Modbus bank map 读取失败: {mapFilePath}");
 
-            ApplyDeviceIdSubstitution(entries, name, isEmu: name.Contains("Emu"));
+            ApplyDeviceIdSubstitution(
+                entries,
+                serverName,
+                isEmu: serverName.Contains("Emu", StringComparison.OrdinalIgnoreCase));
+
+            IndexBankEntries(entries);
             RawMaps.Add(entries);
+
+            if (mapFilePath.Contains("bms_bank", StringComparison.OrdinalIgnoreCase))
+                DefaultBuffer.TryAdd("param4", (ushort)2);
+
+            if (serverName.Contains("bms", StringComparison.OrdinalIgnoreCase) && clusterCount > 0)
+                LoadRackMap("bms_rack.csv", serverName);
+        }
+
+        private void IndexBankEntries(MapEntry[] entries)
+        {
+            DataMaps.AddRange(entries.Where(m => m.FunctionCode is 3 or 4));
+            ControlMaps.AddRange(entries.Where(m => m.FunctionCode is 5 or 6 or 16));
 
             foreach (var entry in entries)
             {
@@ -57,23 +65,18 @@ namespace EssSimulator.Protocol.Modbus
                 }
 
                 ParamModelLookup[entry.ParamName!] = model;
-                if (string.IsNullOrWhiteSpace(model.ModelType) || entry.FunctionCode is 5 or 6 or 16) continue;
+
+                if (string.IsNullOrWhiteSpace(model.ModelType) || entry.FunctionCode is 5 or 6 or 16)
+                    continue;
 
                 if (!ModelParamLookup.TryGetValue(model.ModelType, out var list))
                     ModelParamLookup[model.ModelType] = list = new List<MapEntry>();
                 list.Add(entry);
             }
-
-            DataMaps.AddRange(entries.Where(m => m.FunctionCode is 3 or 4));
-            ControlMaps.AddRange(entries.Where(m => m.FunctionCode is 5 or 6 or 16));
-
-            if (mapFilePath.Contains("bms_bank", StringComparison.OrdinalIgnoreCase))
-                DefaultBuffer["param4"] = (ushort)2;
         }
 
-        private void LoadRackMap(string mapFilePath, string serverName)
+        private void LoadRackMap(string rackPath, string serverName)
         {
-            string rackPath = mapFilePath.Replace("bank", "rack");
             var entries = CSVUtil.CSV2Class<MapEntry>(rackPath)?.ToArray()
                 ?? throw new Exception($"Modbus rack map 读取失败: {rackPath}");
 
@@ -106,14 +109,11 @@ namespace EssSimulator.Protocol.Modbus
             {
                 if (e.ModelSim != null)
                 {
-                    // BMS 点表：bmsdeviceId → bms1/bms2/...
                     if (!isEmu)
                         e.ModelSim = e.ModelSim.Replace("bmsdeviceId", $"bms{deviceId}", StringComparison.Ordinal);
 
-                    // 兼容旧占位符 deviceId
                     e.ModelSim = e.ModelSim.Replace("deviceId", deviceId.ToString(), StringComparison.Ordinal);
 
-                    // EMU 点表：用 emuDeviceId 替换为 emu1/emu2/... 的对象根
                     if (isEmu)
                         e.ModelSim = e.ModelSim.Replace("emuDeviceId", $"emu{deviceId}", StringComparison.Ordinal);
                 }

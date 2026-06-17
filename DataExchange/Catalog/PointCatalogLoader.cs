@@ -21,13 +21,15 @@ namespace EssSimulator.DataExchange.Catalog
         private static readonly Dictionary<string, ControlSemantics> BmsDefaultSemantics = new(StringComparer.OrdinalIgnoreCase)
         {
             ["param11"] = ControlSemantics.Pulse,
-            ["param12"] = ControlSemantics.Hold
+            ["param12"] = ControlSemantics.Hold,
+            ["yc133"] = ControlSemantics.Pulse
         };
 
         private static readonly Dictionary<string, ControlEffectId> BmsDefaultEffects = new(StringComparer.OrdinalIgnoreCase)
         {
             ["param11"] = ControlEffectId.BmsApplyLinkCommands,
-            ["param12"] = ControlEffectId.BmsApplyLinkCommands
+            ["param12"] = ControlEffectId.BmsApplyLinkCommands,
+            ["yc133"] = ControlEffectId.BmsApplyLinkCommands
         };
 
         private static readonly Dictionary<string, ControlEffectId> EmuDefaultEffects = new(StringComparer.OrdinalIgnoreCase)
