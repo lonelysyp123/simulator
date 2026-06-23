@@ -2,7 +2,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,4097,u16,16,param1,1,故障总,0
 4,4098,u16,16,param2,1,系统运行状态,0
 4,4099,u16,16,param3,1,系统充放电状态,model=4|arg1=bmsdeviceId.BatteryStacks[0].ChargeDischargeStatus|arg2=|arg3=|arg4=1000
-4,4100,u16,16,param4,1,一键并网状态(默认2已并网),model=4|arg1=bmsdeviceId.BatteryStacks[0].GridConnectStatus|arg2=|arg3=|arg4=1000
+4,4100,u16,16,param4,1,一键并网状态,model=4|arg1=bmsdeviceId.BatteryStacks[0].GridConnectStatus|arg2=|arg3=|arg4=1000
 4,4113,u16,16,param5,1,进入黑启动模式是否成功,model=4|arg1=bmsdeviceId.BatteryStacks[0].BlackStartEnterSuccess|arg2=|arg3=|arg4=1000
 4,4114,u16,16,param6,1,当前黑启动状态3已进入4进入失败5已退出,model=4|arg1=bmsdeviceId.BatteryStacks[0].BlackStartStatus|arg2=|arg3=|arg4=1000
 4,8233,u16,16,param7,1000,系统SOC,model=4|arg1=bmsdeviceId.BatteryStacks[0].SOC|arg2=|arg3=|arg4=1000
