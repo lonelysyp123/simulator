@@ -9,6 +9,11 @@ namespace EssSimulator.DataExchange.Effects
     /// <summary>EMU 控制点变更后立即驱动 PCS / 单元断路器逻辑。</summary>
     public sealed class EmuPcsControlEffect : IControlEffect
     {
+        private readonly Action? _refreshTelemetry;
+
+        public EmuPcsControlEffect(Action? refreshTelemetry = null) =>
+            _refreshTelemetry = refreshTelemetry;
+
         public ControlEffectId Id => ControlEffectId.PcsApplyCommands;
 
         public void OnControlChanged(ControlEffectContext context)
@@ -23,6 +28,8 @@ namespace EssSimulator.DataExchange.Effects
 
             int pcsBase = (unit1Based - 1) * 2;
             PcsMapper.ApplyEmuCommands(emu, ess, pcsBase);
+            PcsEmuSynchronizer.SyncPcsStateFromModel(ess, emu, pcsBase);
+            _refreshTelemetry?.Invoke();
         }
 
         internal static bool TryParseEmuUnit(string serverName, out int unit1Based)

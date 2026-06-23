@@ -4,8 +4,16 @@ using System.Linq;
 
 namespace EssSimulator.EssSimModelApi.BatteryManagementSystem
 {
-public class BatteryStack
+public partial class BatteryStack
     {
+        public BatteryStack()
+        {
+            SystemAlarms = new StackSystemAlarms(this);
+        }
+
+        /// <summary>堆级系统告警视图（聚合各簇 Alarms；Modbus bank yx 可读写）。</summary>
+        [System.Runtime.Serialization.IgnoreDataMember]
+        public StackSystemAlarms SystemAlarms { get; }
         [System.Runtime.Serialization.IgnoreDataMember]
         public float NominalEnergyKWh { get; set; } = 5016f;
 

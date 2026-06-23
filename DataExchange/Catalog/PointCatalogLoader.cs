@@ -36,8 +36,12 @@ namespace EssSimulator.DataExchange.Catalog
         {
             ["pcs1_startstop"] = ControlEffectId.PcsApplyCommands,
             ["pcs2_startstop"] = ControlEffectId.PcsApplyCommands,
+            ["yx3"] = ControlEffectId.PcsApplyCommands,
+            ["yx5"] = ControlEffectId.PcsApplyCommands,
             ["pcs1_blackstart_enable"] = ControlEffectId.PcsApplyCommands,
             ["pcs2_blackstart_enable"] = ControlEffectId.PcsApplyCommands,
+            ["yx2"] = ControlEffectId.PcsApplyCommands,
+            ["yx4"] = ControlEffectId.PcsApplyCommands,
             ["param55"] = ControlEffectId.PcsApplyCommands,
             ["param56"] = ControlEffectId.PcsApplyCommands,
             ["param59"] = ControlEffectId.PcsApplyCommands,
@@ -98,7 +102,7 @@ namespace EssSimulator.DataExchange.Catalog
                     ParamName = entry.ParamName,
                     Target = target,
                     Semantics = ResolveSemantics(entry.ParamName, isEmu, isBms, options),
-                    Effect = ResolveEffect(entry.ParamName, isEmu, isBms, options)
+                    Effect = ResolveEffect(entry.ParamName, target, isEmu, isBms, options)
                 });
             }
 
@@ -153,6 +157,7 @@ namespace EssSimulator.DataExchange.Catalog
 
         private static ControlEffectId ResolveEffect(
             string paramName,
+            DataTarget target,
             bool isEmu,
             bool isBms,
             DataExchangeOptions options)
@@ -165,6 +170,18 @@ namespace EssSimulator.DataExchange.Catalog
 
             if (isBms && BmsDefaultEffects.TryGetValue(paramName, out var bmsDefault))
                 return bmsDefault;
+
+            if (isEmu)
+            {
+                if (target.PropertyPath.Contains("pcsOnOffSwitch", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("BlackStartEnabled", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("PCSActivePowerSetting", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("PCSReactivePowerSetting", StringComparison.Ordinal))
+                    return ControlEffectId.PcsApplyCommands;
+
+                if (target.PropertyPath.EndsWith(".PowerOnOff", StringComparison.Ordinal))
+                    return ControlEffectId.UnitHighVoltageBreaker;
+            }
 
             return ControlEffectId.None;
         }

@@ -30,6 +30,7 @@ namespace EssSimulator.DataExchange
         private readonly IModbusRegisterAdapter _modbusAdapter;
         private readonly ControlEffectRegistry _effects;
 
+        private readonly object _controlGate = new();
         private volatile bool _running;
         private Thread? _telemetryThread;
         private Thread? _rackTelemetryThread;
@@ -59,7 +60,7 @@ namespace EssSimulator.DataExchange
             if (serverName.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase))
             {
                 _effects
-                    .Register(new EmuPcsControlEffect())
+                    .Register(new EmuPcsControlEffect(RefreshOperationStatusTelemetry))
                     .Register(new EmuUnitBreakerEffect());
             }
             else if (serverName.StartsWith("simBms", StringComparison.OrdinalIgnoreCase))
@@ -84,11 +85,45 @@ namespace EssSimulator.DataExchange
                 catalog, _simulation, _modbusAdapter, parser, _shadow, _effects, serverName, logChanges);
             _feedbackPipeline = new ControlFeedbackPipeline(
                 catalog, _simulation, _modbusAdapter, _shadow, serverName, logChanges);
+
+            if (_options.ControlEventDriven && slave is ModbusSlave modbusSlave)
+                modbusSlave.ExternalControlWrite += OnExternalControlWrite;
+        }
+
+        private void OnExternalControlWrite(byte slaveId)
+        {
+            if (!_running)
+                return;
+
+            ThreadPool.UnsafeQueueUserWorkItem(_ =>
+            {
+                try { DrainControlPipeline(); }
+                catch (Exception ex)
+                {
+                    _log.Error($"Event-driven control drain error [{_deviceInfo.name}] slave={slaveId}", ex);
+                }
+            }, null);
+        }
+
+        private void DrainControlPipeline()
+        {
+            lock (_controlGate)
+            {
+                if (!_running)
+                    return;
+
+                _controlPipeline.RunOnce();
+            }
         }
 
         private static bool ShouldLogChanges(string? serverName) =>
             serverName?.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase) == true
             || serverName?.StartsWith("simBms", StringComparison.OrdinalIgnoreCase) == true;
+
+        private int TelemetryIntervalForDevice =>
+            _deviceInfo.name?.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase) == true
+                ? Math.Max(10, _options.EmuTelemetryIntervalMs)
+                : Math.Max(10, _options.TelemetryIntervalMs);
 
         public void Start()
         {
@@ -131,8 +166,9 @@ namespace EssSimulator.DataExchange
             _rackTelemetryThread?.Start();
             _controlThread.Start();
             _feedbackThread.Start();
-            string rackInfo = _rackTelemetryPipeline != null ? $", rackTelemetry={_options.TelemetryIntervalMs}ms×{_clusterCount}" : string.Empty;
-            _log.Info($"[DataExchange] {_deviceInfo.name} 已启动（telemetry={_options.TelemetryIntervalMs}ms, control={_options.ControlPollIntervalMs}ms, feedback={_options.ControlPollIntervalMs}ms{rackInfo}）");
+            string rackInfo = _rackTelemetryPipeline != null ? $", rackTelemetry={TelemetryIntervalForDevice}ms×{_clusterCount}" : string.Empty;
+            string controlMode = _options.ControlEventDriven ? "event+poll" : "poll";
+            _log.Info($"[DataExchange] {_deviceInfo.name} 已启动（telemetry={TelemetryIntervalForDevice}ms, control={controlMode}/{_options.ControlPollIntervalMs}ms, feedback={_options.ControlPollIntervalMs}ms{rackInfo}）");
         }
 
         public void Stop()
@@ -161,6 +197,25 @@ namespace EssSimulator.DataExchange
 
         public void InvalidateDataShadow(string name) =>
             _shadow.InvalidateTelemetry(name);
+
+        /// <summary>PCS 控制后立即刷新 OperationStatus 遥测（跳过 100ms 遥测轮询等待）。</summary>
+        private void RefreshOperationStatusTelemetry()
+        {
+            try
+            {
+                foreach (var binding in _catalog.TelemetryPoints)
+                {
+                    if (binding.Target.PropertyPath.EndsWith(".OperationStatus", StringComparison.Ordinal))
+                        _shadow.InvalidateTelemetry(binding.ParamName);
+                }
+
+                _telemetryPipeline.RunOnce();
+            }
+            catch (Exception ex)
+            {
+                _log.Warn($"Immediate OperationStatus telemetry refresh failed [{_deviceInfo.name}]", ex);
+            }
+        }
 
         public object? GetDataObjectByMesurePointName(string name, IModbusSlave slave, ModbusParser parser) =>
             _modbusAdapter.ReadParsedPoint(name);
@@ -202,7 +257,7 @@ namespace EssSimulator.DataExchange
                     _log.Error($"Telemetry loop error [{_deviceInfo.name}]", ex);
                 }
 
-                Thread.Sleep(Math.Max(10, _options.TelemetryIntervalMs));
+                Thread.Sleep(TelemetryIntervalForDevice);
             }
         }
 
@@ -222,7 +277,7 @@ namespace EssSimulator.DataExchange
                     _log.Error($"Rack telemetry loop error [{_deviceInfo.name}]", ex);
                 }
 
-                Thread.Sleep(Math.Max(10, _options.TelemetryIntervalMs));
+                Thread.Sleep(TelemetryIntervalForDevice);
             }
         }
 
@@ -232,7 +287,7 @@ namespace EssSimulator.DataExchange
             {
                 try
                 {
-                    _controlPipeline.RunOnce();
+                    DrainControlPipeline();
                 }
                 catch (Exception ex)
                 {

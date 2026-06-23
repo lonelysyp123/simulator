@@ -12,6 +12,21 @@ namespace EssSimulator.EssSimModelApi.Mappers
             int unitIndex0,
             int pcsBaseIndex)
         {
+            SyncPcsStateFromModel(ess, emu, pcsBaseIndex);
+            PcsMapper.MapEmuState(emu, new[] { ess._batteryRacks[pcsBaseIndex], ess._batteryRacks[pcsBaseIndex + 1] });
+
+            if (unitIndex0 < ess._unitBreakers.Count)
+                ess.SetUnitBreakerClosed(unitIndex0, emu.Emu.PowerOnOff != 0);
+
+            PcsMapper.ApplyEmuCommands(emu, ess, pcsBaseIndex);
+        }
+
+        /// <summary>控制命令后立即把物理 PCS 状态映射到 DTO（不重复 ApplyEmuCommands）。</summary>
+        public static void SyncPcsStateFromModel(
+            EnergyStorageSystem ess,
+            EnergyManagementData emu,
+            int pcsBaseIndex)
+        {
             if (pcsBaseIndex + 1 >= ess._pcsList.Count || pcsBaseIndex + 1 >= ess._batteryRacks.Count)
                 return;
 
@@ -23,12 +38,6 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 ess._pcsList[pcsBaseIndex + 1].GetCurrentState(),
                 emu.PcsList[1],
                 ess._batteryRacks[pcsBaseIndex + 1]);
-            PcsMapper.MapEmuState(emu, new[] { ess._batteryRacks[pcsBaseIndex], ess._batteryRacks[pcsBaseIndex + 1] });
-
-            if (unitIndex0 < ess._unitBreakers.Count)
-                ess.SetUnitBreakerClosed(unitIndex0, emu.Emu.PowerOnOff != 0);
-
-            PcsMapper.ApplyEmuCommands(emu, ess, pcsBaseIndex);
         }
     }
 }

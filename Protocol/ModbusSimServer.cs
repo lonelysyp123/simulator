@@ -147,7 +147,16 @@ namespace EssSimulator
         public void SetDataStoreByMesurePointName(string name, object value)
         {
             var buf = new Dictionary<string, object> { { name, value } };
-            try { _slave.Write(buf); }
+            try
+            {
+                if (_slave is ModbusSlave modbusSlave)
+                {
+                    using (modbusSlave.SuppressWriteNotifications())
+                        _slave.Write(buf);
+                }
+                else
+                    _slave.Write(buf);
+            }
             catch (Exception ex) { _log.Error("即时写入 Modbus 失败", ex); }
             _dataSync.InvalidateDataShadow(name);
         }

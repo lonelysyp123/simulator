@@ -1,5 +1,4 @@
-using System.Net;
-using System.Net.Sockets;
+using EssSimulator.Protocol.Modbus;
 using NModbus;
 using NModbus.Data;
 using NModbus.Device;
@@ -13,6 +12,7 @@ namespace EssSimulator
     public class ModbusTCPSlave : ModbusSlave, IModbusSlave
     {
         private readonly int rackCount;
+
         public ModbusTCPSlave(DeviceInfoDto deviceInfoDto, List<MapEntry[]> pointMaps, TCPCommunicator tcpCommunicator, int rackCount = 0) : base(deviceInfoDto, pointMaps, tcpCommunicator, rackCount)
         {
             this.rackCount = rackCount;
@@ -22,17 +22,19 @@ namespace EssSimulator
         {
             base.DeviceConnect();
 
-            // Modbus Slave
             ModbusFactory modbusFactory = new ModbusFactory();
             modbusSlaveNetwork = modbusFactory.CreateSlaveNetwork((communicator as TCPCommunicator)!.listener);
-            var modbusSlave = modbusFactory.CreateSlave(deviceInfoDto.slaveId);
+
+            var bankIndex = new ModbusControlAddressIndex(pointMap);
+            var modbusSlave = CreateSlaveWithHooks(modbusFactory, deviceInfoDto.slaveId, bankIndex);
             modbusSlaveNetwork.AddSlave(modbusSlave);
-            if (rackCount > 0)
+
+            if (rackCount > 0 && rackPointMap != null)
             {
-                //rack的从站id是N+1
+                var rackIndex = new ModbusControlAddressIndex(rackPointMap);
                 for (byte i = deviceInfoDto.slaveId; i < rackCount; i++)
                 {
-                    var rackSlave = modbusFactory.CreateSlave((byte)(i + 1));
+                    var rackSlave = CreateSlaveWithHooks(modbusFactory, (byte)(i + 1), rackIndex);
                     modbusSlaveNetwork.AddSlave(rackSlave);
                 }
             }
@@ -40,20 +42,50 @@ namespace EssSimulator
             modbusSlaveNetwork.ListenAsync();
         }
 
+        private NModbus.IModbusSlave CreateSlaveWithHooks(ModbusFactory factory, byte slaveId, ModbusControlAddressIndex index)
+        {
+            var dataStore = new SlaveDataStore();
+            AttachControlWriteHooks(dataStore, slaveId, index);
+            return factory.CreateSlave(slaveId, dataStore);
+        }
+
+        private void AttachControlWriteHooks(SlaveDataStore dataStore, byte slaveId, ModbusControlAddressIndex index)
+        {
+            if (dataStore.CoilDiscretes is PointSource<bool> coils)
+            {
+                coils.AfterWrite += (_, e) =>
+                {
+                    if (!ShouldNotifyExternalControlWrite)
+                        return;
+                    if (index.TouchesCoilWrite(e.StartAddress, e.NumberOfPoints))
+                        NotifyExternalControlWrite(slaveId);
+                };
+            }
+
+            if (dataStore.HoldingRegisters is PointSource<ushort> holding)
+            {
+                holding.AfterWrite += (_, e) =>
+                {
+                    if (!ShouldNotifyExternalControlWrite)
+                        return;
+                    if (index.TouchesHoldingWrite(e.StartAddress, e.NumberOfPoints))
+                        NotifyExternalControlWrite(slaveId);
+                };
+            }
+        }
+
         public override void DeviceDisconnect()
         {
             base.DeviceDisconnect();
-            // Modbus Slave
             if (modbusSlaveNetwork != null)
             {
                 modbusSlaveNetwork.RemoveSlave(deviceInfoDto.slaveId);
                 if (rackCount > 0)
                 {
                     for (byte i = deviceInfoDto.slaveId; i < rackCount; i++)
-                    {
                         modbusSlaveNetwork.RemoveSlave(i);
-                    }
                 }
+
                 modbusSlaveNetwork.Dispose();
                 modbusSlaveNetwork = null;
             }

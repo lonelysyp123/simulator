@@ -26,8 +26,8 @@ namespace EssSimulator
         #endregion
 
         #region ReadOnly
-        private readonly MapEntry[]? rackPointMap;
-        private readonly MapEntry[] pointMap;
+        protected readonly MapEntry[]? rackPointMap;
+        protected readonly MapEntry[] pointMap;
         protected readonly CommunicatorBase communicator;
         protected readonly DeviceInfoDto deviceInfoDto;
         #endregion
@@ -35,7 +35,11 @@ namespace EssSimulator
         protected IModbusSlaveNetwork? modbusSlaveNetwork;
         private Dictionary<int, int> CtrlContinuerAddressGroup; // function code -> 6
         private Dictionary<int, int>? CtrlContinuerAddressGroupForRack; // function code -> 6
+        private int _suppressWriteNotifyDepth;
         ILog log = LogManager.GetLogger(typeof(ModbusSlave));
+
+        /// <summary>外部 Modbus 主站写入控制区（FC5/FC6/FC16）后触发，slaveId 为 NModbus 从站号。</summary>
+        public event Action<byte>? ExternalControlWrite;
         public ModbusSlave(DeviceInfoDto deviceInfoDto, List<MapEntry[]> pointMaps, CommunicatorBase communicator, int rackCount = 0)
         {
             this.communicator = communicator;
@@ -106,6 +110,40 @@ namespace EssSimulator
         public virtual bool GetCommunicatorState()
         {
             return communicator.GetCommunicatorStatus() != 0;
+        }
+
+        /// <summary>内部回写 Modbus 时抑制 ExternalControlWrite（避免反馈/遥测写触发控制管道）。</summary>
+        public IDisposable SuppressWriteNotifications()
+        {
+            Interlocked.Increment(ref _suppressWriteNotifyDepth);
+            return new WriteNotificationSuppressScope(this);
+        }
+
+        internal bool ShouldNotifyExternalControlWrite =>
+            Volatile.Read(ref _suppressWriteNotifyDepth) == 0;
+
+        protected void NotifyExternalControlWrite(byte slaveId)
+        {
+            if (!ShouldNotifyExternalControlWrite)
+                return;
+
+            ExternalControlWrite?.Invoke(slaveId);
+        }
+
+        private sealed class WriteNotificationSuppressScope : IDisposable
+        {
+            private ModbusSlave? _owner;
+
+            public WriteNotificationSuppressScope(ModbusSlave owner) => _owner = owner;
+
+            public void Dispose()
+            {
+                if (_owner == null)
+                    return;
+
+                Interlocked.Decrement(ref _owner._suppressWriteNotifyDepth);
+                _owner = null;
+            }
         }
 
         // 优化读取方法，只读取外部能够修改的部分，也就是function code为3的
@@ -311,6 +349,14 @@ namespace EssSimulator
         }
 
         private void WriteFunc(byte slaveId, ushort address, byte[] data, int num, int functionCode)
+        {
+            using (SuppressWriteNotifications())
+            {
+                WriteFuncCore(slaveId, address, data, num, functionCode);
+            }
+        }
+
+        private void WriteFuncCore(byte slaveId, ushort address, byte[] data, int num, int functionCode)
         {
             try
             {

@@ -132,6 +132,14 @@ namespace EssSimulator.EssSimModelApi
                 public float ControlCabinetTemp { get; set; }      // 控制舱温度
                 public float ControlCabinetHumidity { get; set; }  // 控制舱湿度
                 public float IGBTMaxTemp { get; set; }            // IGBT最大温度
+
+                /// <summary>develop 点表别名（emu.csv yc34/yc61）。</summary>
+                public float IGBTTemp
+                {
+                    get => IGBTMaxTemp;
+                    set => IGBTMaxTemp = value;
+                }
+
                 public float PhaseAIGBTTemp { get; set; }            // A相IGBT温度
                 public float PhaseBIGBTTemp { get; set; }            // B相IGBT温度
                 public float PhaseCIGBTTemp { get; set; }            // C相IGBT温度

@@ -15,12 +15,12 @@ public class EmuPointCatalogLoaderTests
         Assert.True(catalog.TelemetryPoints.Count > 40);
         Assert.True(catalog.ControlPoints.Count >= 10);
 
-        var startStop = catalog.ControlPoints.First(p => p.ParamName == "pcs1_startstop");
+        var startStop = catalog.ControlPoints.First(p => p.ParamName == "yx3");
         Assert.Equal("emu1", startStop.Target.RootKey);
         Assert.Equal(ControlSemantics.Hold, startStop.Semantics);
         Assert.Equal(ControlEffectId.PcsApplyCommands, startStop.Effect);
 
-        var hvBreaker = catalog.ControlPoints.First(p => p.ParamName == "highvoltagebreakeronoff");
+        var hvBreaker = catalog.ControlPoints.First(p => p.ParamName == "yx0");
         Assert.Equal(ControlEffectId.UnitHighVoltageBreaker, hvBreaker.Effect);
     }
 
@@ -30,11 +30,11 @@ public class EmuPointCatalogLoaderTests
         var pointMap = new ModbusPointMap("emu.csv", "simEmu1");
         var options = new DataExchangeOptions
         {
-            ControlSemantics = { ["pcs1_startstop"] = "Hold" }
+            ControlSemantics = { ["yx3"] = "Hold" }
         };
 
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simEmu1", options);
-        var startStop = catalog.ControlPoints.First(p => p.ParamName == "pcs1_startstop");
+        var startStop = catalog.ControlPoints.First(p => p.ParamName == "yx3");
         Assert.Equal(ControlSemantics.Hold, startStop.Semantics);
     }
 }

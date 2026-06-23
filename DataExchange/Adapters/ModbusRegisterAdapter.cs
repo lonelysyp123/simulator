@@ -1,3 +1,5 @@
+using EssSimulator;
+
 namespace EssSimulator.DataExchange.Adapters
 {
     public sealed class ModbusRegisterAdapter : IModbusRegisterAdapter
@@ -15,14 +17,28 @@ namespace EssSimulator.DataExchange.Adapters
         {
             if (defaults.Count == 0)
                 return;
-            _slave.Write(new Dictionary<string, object>(defaults));
+
+            WriteWithSuppressedNotifications(new Dictionary<string, object>(defaults));
         }
 
         public void WritePoints(IReadOnlyDictionary<string, object> values, byte slaveId = 1)
         {
             if (values.Count == 0)
                 return;
-            _slave.Write(new Dictionary<string, object>(values), slaveId);
+
+            WriteWithSuppressedNotifications(new Dictionary<string, object>(values), slaveId);
+        }
+
+        private void WriteWithSuppressedNotifications(Dictionary<string, object> values, byte slaveId = 1)
+        {
+            if (_slave is ModbusSlave modbusSlave)
+            {
+                using (modbusSlave.SuppressWriteNotifications())
+                    _slave.Write(values, slaveId);
+                return;
+            }
+
+            _slave.Write(values, slaveId);
         }
 
         public Dictionary<string, object> ReadAllControlRaw(IReadOnlyList<string> paramNames)

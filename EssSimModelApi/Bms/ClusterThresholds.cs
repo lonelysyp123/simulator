@@ -189,6 +189,13 @@ public class ClusterThresholds
         public float? ChargeHighTempThreshold1 { get; set; } // 充电高温保护阈值
         public float? ChargeLowTempThreshold1 { get; set; } // 充电低温保护阈值
         public float? LowSOCTreshold1 { get; set; } // SOC过低保护阈值
+
+        /// <summary>develop 点表别名（bms_rack yt16/50/84）。</summary>
+        public float? LowSOCThreshold1
+        {
+            get => LowSOCTreshold1;
+            set => LowSOCTreshold1 = value;
+        }
         public float? PoleHighTempThreshold1 { get; set; } // 极柱温度过高保护阈值
         public float? InsulationThreshold1 { get; set; } // 绝缘保护阈值
         public float? CellVoltageDifferenceThreshold1 { get; set; } // 单体压差过高保护阈值
@@ -227,6 +234,13 @@ public class ClusterThresholds
         public float? ChargeHighTempThreshold2 { get; set; } // 充电高温告警阈值
         public float? ChargeLowTempThreshold2 { get; set; } // 充电低温告警阈值
         public float? LowSOCTreshold2 { get; set; } // SOC过低告警阈值
+
+        /// <summary>develop 点表别名。</summary>
+        public float? LowSOCThreshold2
+        {
+            get => LowSOCTreshold2;
+            set => LowSOCTreshold2 = value;
+        }
         public float? PoleHighTempThreshold2 { get; set; } // 极柱温度过高告警阈值
         public float? InsulationThreshold2 { get; set; } // 绝缘告警阈值
         public float? CellVoltageDifferenceThreshold2 { get; set; } // 单体压差过高告警阈值
@@ -265,6 +279,13 @@ public class ClusterThresholds
         public float? ChargeHighTempThreshold3 { get; set; } // 充电高温故障阈值
         public float? ChargeLowTempThreshold3 { get; set; } // 充电低温故障阈值
         public float? LowSOCTreshold3 { get; set; } // SOC过低故障阈值
+
+        /// <summary>develop 点表别名。</summary>
+        public float? LowSOCThreshold3
+        {
+            get => LowSOCTreshold3;
+            set => LowSOCTreshold3 = value;
+        }
         public float? PoleHighTempThreshold3 { get; set; } // 极柱温度过高故障阈值
         public float? InsulationThreshold3 { get; set; } // 绝缘故障阈值
         public float? CellVoltageDifferenceThreshold3 { get; set; } // 单体压差过高故障阈值
