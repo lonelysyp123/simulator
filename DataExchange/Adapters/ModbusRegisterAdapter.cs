@@ -18,27 +18,30 @@ namespace EssSimulator.DataExchange.Adapters
             if (defaults.Count == 0)
                 return;
 
-            WriteWithSuppressedNotifications(new Dictionary<string, object>(defaults));
+            WriteWithSuppressedNotifications(new Dictionary<string, object>(defaults), slaveId: 1, applyScale: true);
         }
 
-        public void WritePoints(IReadOnlyDictionary<string, object> values, byte slaveId = 1)
+        public void WritePoints(IReadOnlyDictionary<string, object> values, byte slaveId = 1, bool applyScale = true)
         {
             if (values.Count == 0)
                 return;
 
-            WriteWithSuppressedNotifications(new Dictionary<string, object>(values), slaveId);
+            WriteWithSuppressedNotifications(new Dictionary<string, object>(values), slaveId, applyScale);
         }
 
-        private void WriteWithSuppressedNotifications(Dictionary<string, object> values, byte slaveId = 1)
+        private void WriteWithSuppressedNotifications(
+            Dictionary<string, object> values,
+            byte slaveId = 1,
+            bool applyScale = true)
         {
             if (_slave is ModbusSlave modbusSlave)
             {
                 using (modbusSlave.SuppressWriteNotifications())
-                    _slave.Write(values, slaveId);
+                    modbusSlave.Write(values, slaveId, applyScale);
                 return;
             }
 
-            _slave.Write(values, slaveId);
+            _slave.Write(values, slaveId, applyScale);
         }
 
         public Dictionary<string, object> ReadAllControlRaw(IReadOnlyList<string> paramNames)

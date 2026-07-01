@@ -1,7 +1,7 @@
 # EssSimulator 手动性能测试报告
 
 > 测试类型：mbpoll / dpc 变位 → 监控响应延迟（**同点** + **PCS 控制→反馈**）  
-> **developer_v2.0.0**：点表与 develop 一致（yx5/yx1/yt4/yt2/yx3/yc44）；脚本位于 `scripts/perf/`  
+> **developer_v2.0.0**：点表与 develop 一致（yx5/yx1/yt4/yt2/yx3/yc44）；脚本位于 `scripts/test/perf/`  
 > **代跑时间**：2026-06-22 17:18～17:19（优化后：ControlEventDriven + 控制后立即刷 OperationStatus 遥测）
 
 ---
@@ -91,7 +91,7 @@ BMS 主站 `slave=1` 对应 `bms_bank.csv`；**rack 簇 n** 对应 **slave = n +
 | 地址 | **1001** |
 | 端口 / 从站 | **1501** / **1** |
 | dpc 触发 | `dpc simBms1.yc133 set 1` |
-| 脚本 | `python3 scripts/perf/run_tc_r01.py` |
+| 脚本 | `python3 scripts/test/perf/run_tc_r01.py` |
 
 ```bash
 while true; do
@@ -112,7 +112,7 @@ done
 | 端口 / 从站 | **1601** / **1** |
 | 模型 | `emu.Emu.PowerOnOff` |
 | dpc | `dpc simEmu1.highvoltagebreakeronoff set 1/0` |
-| 脚本 | `python3 scripts/perf/run_tc_r02.py` |
+| 脚本 | `python3 scripts/test/perf/run_tc_r02.py` |
 
 ```bash
 while true; do
@@ -132,7 +132,7 @@ done
 | 地址 | **12293** |
 | 端口 / 从站 | **1501** / **2** |
 | Scale | **10** |
-| 脚本 | `python3 scripts/perf/run_tc_r03.py` |
+| 脚本 | `python3 scripts/test/perf/run_tc_r03.py` |
 
 ```bash
 while true; do
@@ -152,7 +152,7 @@ done
 | 地址 | **5302** |
 | 端口 / 从站 | **1601** / **1** |
 | Scale | **1000** |
-| 脚本 | `python3 scripts/perf/run_tc_r04.py` |
+| 脚本 | `python3 scripts/test/perf/run_tc_r04.py` |
 
 ```bash
 while true; do
@@ -188,7 +188,7 @@ done
 
 **理论路径**：mbpoll 写 pcs1_startstop → DataExchange 控制(100ms) → **EmuPcsControlEffect** → PCS 模型变位 → PcsDataServer(100ms) → **EMU 遥测(100ms)** → param25 可读。**ΔT_status 预期 ≤ 300 ms**。
 
-**脚本**：`python3 scripts/perf/run_tc_r05_pcs.py`
+**脚本**：`python3 scripts/test/perf/run_tc_r05_pcs.py`
 
 ---
 
@@ -216,7 +216,7 @@ done
 | dpc 置位 | `dpc simBms1.yx5 set 1` |
 | dpc 复位 | `dpc simBms1.yx5 set 0` |
 | 映射路径 | `bms1.BatteryStacks[0].SystemAlarms.OvervoltageFault` |
-| 脚本代跑 | `python3 scripts/perf/run_tc_r01.py`（mbpoll 写 addr 1005，监控同址） |
+| 脚本代跑 | `python3 scripts/test/perf/run_tc_r01.py`（mbpoll 写 addr 1005，监控同址） |
 
 #### 操作步骤
 
@@ -259,7 +259,7 @@ done
 | dpc 分闸 | `dpc simEmu1.yx1 set 0` |
 | 理论路径（mbpoll 写线圈） | Modbus 线圈直写 → 同址读回 |
 | 预期 ΔT | ≤ **700 ms** |
-| 脚本代跑 | `python3 scripts/perf/run_tc_r02.py` |
+| 脚本代跑 | `python3 scripts/test/perf/run_tc_r02.py` |
 
 #### 操作步骤
 
@@ -310,7 +310,7 @@ done
 | Scale | 10（raw 13500 = 1350.0 V） |
 | 理论路径 | mbpoll 写保持寄存器 → 控制线程(100ms) → 同址读回 |
 | 预期 ΔT | ≤ **700 ms** |
-| 脚本代跑 | `python3 scripts/perf/run_tc_r03.py` |
+| 脚本代跑 | `python3 scripts/test/perf/run_tc_r03.py` |
 
 #### 操作步骤
 
@@ -351,7 +351,7 @@ done
 | Scale | 1000（raw 950 = 0.950） |
 | dpc 示例 | `dpc simEmu1.yt2 set 0.95` |
 | 预期 ΔT | ≤ **700 ms** |
-| 脚本代跑 | `python3 scripts/perf/run_tc_r04.py` |
+| 脚本代跑 | `python3 scripts/test/perf/run_tc_r04.py` |
 
 #### 操作步骤
 
@@ -392,7 +392,7 @@ done
 | 启动成功判定 | 写 yx3=1 后 yc44 首次 ∈ **{1,3,4}** |
 | 停机成功判定 | 写 yx3=0 后 yc44 首次 = **0** |
 | 预期 ΔT_status | ≤ **700 ms** |
-| 脚本代跑 | `python3 scripts/perf/run_tc_r05_pcs.py` |
+| 脚本代跑 | `python3 scripts/test/perf/run_tc_r05_pcs.py` |
 
 #### 操作步骤
 

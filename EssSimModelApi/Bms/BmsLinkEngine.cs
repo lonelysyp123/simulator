@@ -47,6 +47,77 @@ namespace EssSimulator.EssSimModelApi.Bms
                 ApplyForChannel(i);
         }
 
+        /// <summary>手动并网/离网（供 esscmd setbmsN power on|off）。</summary>
+        public static bool TrySetGridPower(int bmsIndex0, bool connect, out string message)
+        {
+            message = string.Empty;
+            var store = SimulatorHost.Instance;
+            var ess = store.Get<EnergyStorageSystem>("ess");
+            var bmsData = store.Get<BatteryManagementSystemData>($"bms{bmsIndex0 + 1}");
+            if (ess == null)
+            {
+                message = "找不到 ess 模型，请确认仿真已启动";
+                return false;
+            }
+
+            if (bmsData?.BatteryStacks == null || bmsData.BatteryStacks.Count == 0)
+            {
+                message = $"找不到 bms{bmsIndex0 + 1} 数据";
+                return false;
+            }
+
+            if (bmsIndex0 >= ess._bmsRackDevices.Count)
+            {
+                message = $"bms{bmsIndex0 + 1} 超出当前配置范围";
+                return false;
+            }
+
+            var stack = bmsData.BatteryStacks[0];
+            var bms = ess._bmsRackDevices[bmsIndex0];
+
+            if (connect)
+            {
+                if (stack.IsPcsLinked && bms.IsLinked)
+                {
+                    message = "已处于并网状态";
+                    return true;
+                }
+
+                if (stack.BMSFaultSummary > 0)
+                {
+                    message = $"并网失败：三级报警汇总={stack.BMSFaultSummary}，请先清除故障";
+                    return false;
+                }
+
+                stack.GridConnectStatus = GridStatusIdle;
+                stack.GridConnectCommand = 1;
+                ApplyForChannel(bmsIndex0);
+
+                if (!stack.IsPcsLinked || !bms.IsLinked)
+                {
+                    message = $"并网失败，GridConnectStatus={stack.GridConnectStatus}";
+                    return false;
+                }
+
+                message = "并网成功";
+                Log.Info($"[BmsLink] manual connect bms{bmsIndex0 + 1}, status=2");
+                return true;
+            }
+
+            if (!stack.IsPcsLinked && !bms.IsLinked)
+            {
+                message = "已处于离网状态";
+                return true;
+            }
+
+            ClearConnectCommandPulse(stack);
+            SetLinked(ess, bmsIndex0, stack, linked: false);
+            stack.GridConnectStatus = GridStatusIdle;
+            message = "离网成功";
+            Log.Info($"[BmsLink] manual disconnect bms{bmsIndex0 + 1}, status=0");
+            return true;
+        }
+
         /// <summary>启动时按 DTO 默认并网状态（GridConnectStatus=2）建立 PCS↔BMS 物理链路。</summary>
         public static void ApplyStartupGridLinks(EnergyStorageSystem ess)
         {

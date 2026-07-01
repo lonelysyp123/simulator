@@ -44,16 +44,27 @@ dotnet test EssSimulator.Tests/EssSimulator.Tests.csproj
 
 ## 发布
 
-**Linux ARM64（自包含单文件 + 外置配置）：**
+**发布目录**（`dist/` 仅三个版本文件夹 + 压缩包，见 `docs/dist-layout.md`）：
+
+| 版本 | 配置源 |
+|------|--------|
+| 社区版 | `configs/社区版.appsettings.json`（2 单元） |
+| 充值版 | `configs/充值版.appsettings.json` |
+| 定制版 | `configs/定制版.appsettings.json`（完整拓扑） |
 
 ```bash
-./scripts/publish-linux.sh
-# 输出: dist/linux-arm64/ ，归档 dist/EssSimulator-linux-arm64.tar.gz
+# 商业多版本
+EDITION=社区版 ./scripts/commercial/publish-windows.sh   # → dist/社区版/win-x64/
+EDITION=社区版 ./scripts/commercial/publish-linux.sh     # → dist/社区版/linux-arm64/
+./scripts/commercial/publish-all.sh                      # 三版本 × 双平台
+./scripts/commercial/sync-runtime.sh                     # 仅同步 CSV/配置/文档
+
+# 开发联调（单配置）
+./scripts/publish-windows.sh                             # → dist/win-x64/
+./scripts/publish-linux.sh                               # → dist/linux-arm64/
 ```
 
-发布包需含：`EssSimulator`、`appsettings.json`、`*.csv`、`log4net.config`、`start.sh`。
-
-**Windows x64：** `./scripts/publish-windows.sh` → `dist/win-x64/`
+发布包需含：`EssSimulator`、`appsettings.json`、`*.csv`、`log4net.config`、`start.sh` / `start.bat`。
 
 ## 联调排错清单
 

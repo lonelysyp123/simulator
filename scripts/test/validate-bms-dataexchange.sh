@@ -2,7 +2,7 @@
 # BMS DataExchange 本地验证（需仿真器已启动且 simBms1 端口 1501 可连）
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 HOST=127.0.0.1

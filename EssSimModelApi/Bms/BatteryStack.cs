@@ -104,6 +104,16 @@ public partial class BatteryStack
 
         // 电池簇管理
         public int? ManagedClusterCount { get; set; } // 管理的簇数量
+
+        /// <summary>堆内总簇数（yc46）。</summary>
+        public int TotalClusterCount =>
+            Cluseter?.Count > 0
+                ? Cluseter.Count
+                : ManagedClusterCount ?? 0;
+
+        /// <summary>当前在网簇数（yc45）：并网时为总簇数，离网时为 0。</summary>
+        public int OnlineClusterCount => IsPcsLinked ? TotalClusterCount : 0;
+
         public int? ManagedCellCount { get; set; } // 管理的单体数量
         public int? ManagedTempSensorCount { get; set; } // 管理的温感数量
 

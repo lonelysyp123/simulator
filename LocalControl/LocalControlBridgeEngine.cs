@@ -408,9 +408,9 @@ namespace EssSimulator.LocalControl
             try
             {
                 if (asBool)
-                    targetEmu.PublishControlToSlave(targetParam, value != 0);
+                    targetEmu.SetDataObjectByMesurePointName(targetParam, value != 0);
                 else
-                    targetEmu.PublishControlToSlave(targetParam, value);
+                    targetEmu.SetDataObjectByMesurePointName(targetParam, value);
             }
             catch (Exception ex)
             {

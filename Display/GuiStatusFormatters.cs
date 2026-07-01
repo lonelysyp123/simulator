@@ -129,7 +129,7 @@ namespace EssSimulator.Display
         {
             double pSet = GuiSimDataAccess.SafeGetDouble(
                 $"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].PCSActivePowerSetting");
-            return $"目标有功:{pSet:0}kW";
+            return $"目标有功:{pSet:0.0}kW";
         }
 
         public static string FormatPcsActualPowerLine(int essPcsListIndex, double activePowerKwFallback = 0)
@@ -160,7 +160,7 @@ namespace EssSimulator.Display
         {
             double pSet = GuiSimDataAccess.SafeGetDouble(
                 $"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].PCSActivePowerSetting");
-            return $"P设:{pSet:0}kW";
+            return $"P设:{pSet:0.0}kW";
         }
 
         public static string FormatPcsMainLineActualPower(int essPcsListIndex, double activePowerKwFallback = 0)
@@ -169,6 +169,21 @@ namespace EssSimulator.Display
                 $"ess._pcsList[{essPcsListIndex}]._currentState.ActivePower",
                 activePowerKwFallback);
             return $"P实:{pAct:0.0}kW";
+        }
+
+        public static string FormatPcsMainLineTargetReactive(int unitIndex0, int pcsSlotInUnit0)
+        {
+            double qSet = GuiSimDataAccess.SafeGetDouble(
+                $"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].PCSReactivePowerSetting");
+            return $"Q设:{qSet:0.0}kvar";
+        }
+
+        public static string FormatPcsMainLineActualReactive(int essPcsListIndex, double reactivePowerKvarFallback = 0)
+        {
+            double qAct = GuiSimDataAccess.SafeGetDouble(
+                $"ess._pcsList[{essPcsListIndex}]._currentState.ReactivePower",
+                reactivePowerKvarFallback);
+            return $"Q实:{qAct:0.0}kvar";
         }
 
         public static string FormatPcsMainLineBlackStart(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
@@ -223,7 +238,7 @@ namespace EssSimulator.Display
 
             return
                 $"设备状态:{deviceState} 启停控制:{(coilOn ? "1" : "0")} 黑启动:{blackStartSw} " +
-                $"目标有功:{pSet:0}kW 实时有功:{pAct:0.0}kW " +
+                $"目标有功:{pSet:0.0}kW 实时有功:{pAct:0.0}kW " +
                 $"模式:{FormatGridModeLabel(GuiSimDataAccess.SafeGetString($"ess._pcsList[{essPcsListIndex}]._currentState.GMode"))}";
         }
 

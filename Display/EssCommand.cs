@@ -1,5 +1,6 @@
 using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
+using EssSimulator.EssSimModelApi.Bms;
 using System;
 
 namespace EssSimulator.Display
@@ -7,7 +8,7 @@ namespace EssSimulator.Display
 public class EssCommand(): ICommand
 {
     public string Name => "esscmd";
-    public string Description => "Ess 操控命令（负载设置 / 协议链路开关）";
+    public string Description => "Ess 操控命令（负载 / 协议链路 / BMS 并离网）";
 
     public void Execute(string[] args)
     {
@@ -30,6 +31,12 @@ public class EssCommand(): ICommand
             return;
         }
 
+        if (verb.StartsWith("setbms", StringComparison.OrdinalIgnoreCase))
+        {
+            ExecuteSetBmsPower(args);
+            return;
+        }
+
         Console.WriteLine("未知子命令，请使用 esscmd help 查看用法");
     }
 
@@ -41,10 +48,12 @@ public class EssCommand(): ICommand
         Console.WriteLine("  link pcsN on|off               // 开启/关闭第 N 路 PCS 所属 EMU 单元的 Modbus 对外服务");
         Console.WriteLine("  link bmsN on|off               // 开启/关闭第 N 路 BMS 的 Modbus 对外服务");
         Console.WriteLine("  link status [pcsN|bmsN]        // 查看协议链路状态（省略目标则列出全部）");
+        Console.WriteLine("  setbmsN power on|off           // BMS 物理并网/离网（PCS↔BMS 直流链路）");
         Console.WriteLine();
         Console.WriteLine("说明:");
-        Console.WriteLine("  - off：关闭 TCP 监听并停止寄存器同步，外部 mbpoll/主站无法连接");
-        Console.WriteLine("  - on：重新绑定端口并恢复数据同步");
+        Console.WriteLine("  - link off：关闭 TCP 监听，模拟通信中断；与 setbms power 无关");
+        Console.WriteLine("  - setbmsN power on：触发并网，GridConnectStatus→2，IsPcsLinked=true");
+        Console.WriteLine("  - setbmsN power off：断开 PCS↔BMS 链路，GridConnectStatus→0");
         Console.WriteLine("  - 同一储能单元内 pcs(2n-1)/pcs(2n) 共用 simEmu{n}，关闭任一路会影响该单元两路 PCS");
     }
 
@@ -77,6 +86,64 @@ public class EssCommand(): ICommand
 
         ess.SetLoadCharacteristic(args[1], num);
         Console.WriteLine($"执行成功: 负载 {args[1]} = {num}");
+    }
+
+    private static void ExecuteSetBmsPower(string[] args)
+    {
+        if (args.Length != 3 ||
+            !args[1].Equals("power", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("用法: esscmd setbmsN power on|off");
+            Console.WriteLine("示例: esscmd setbms1 power on");
+            return;
+        }
+
+        if (!TryParseSetBmsIndex(args[0], out int bms1Based, out var parseMessage))
+        {
+            Console.WriteLine(parseMessage);
+            return;
+        }
+
+        if (!TryParseLinkState(args[2], out bool connect, out var stateMessage))
+        {
+            Console.WriteLine(stateMessage);
+            return;
+        }
+
+        if (!SimulatorHost.Instance.Contains($"bms{bms1Based}"))
+        {
+            Console.WriteLine($"找不到 bms{bms1Based}（超出当前配置范围）");
+            return;
+        }
+
+        if (!BmsLinkEngine.TrySetGridPower(bms1Based - 1, connect, out var result))
+        {
+            Console.WriteLine($"操作失败: {result}");
+            return;
+        }
+
+        SimulatorHost.Instance.Get<ModbusSimServer>($"simBms{bms1Based}")?.InvalidateDataShadow("yc0");
+        SimulatorHost.Instance.Get<ModbusSimServer>($"simBms{bms1Based}")?.InvalidateDataShadow("yc45");
+        Console.WriteLine($"执行成功: bms{bms1Based} {(connect ? "并网" : "离网")} — {result}");
+    }
+
+    private static bool TryParseSetBmsIndex(string verb, out int bms1Based, out string message)
+    {
+        bms1Based = 0;
+        message = string.Empty;
+        if (!verb.StartsWith("setbms", StringComparison.OrdinalIgnoreCase))
+        {
+            message = "子命令格式应为 setbmsN，例如 setbms1";
+            return false;
+        }
+
+        if (!int.TryParse(verb.AsSpan(6), out bms1Based) || bms1Based < 1)
+        {
+            message = "子命令格式应为 setbmsN，例如 setbms1";
+            return false;
+        }
+
+        return true;
     }
 
     private static void ExecuteLink(string[] args)

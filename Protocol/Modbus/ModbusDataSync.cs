@@ -232,8 +232,13 @@ namespace EssSimulator.Protocol.Modbus
                                     _log.Info(
                                         $"[EMU-Control:change] {_deviceInfo.name}.{paramName}: {FormatValue(prev)} -> {FormatValue(newValue)}");
                                 }
-                                SetDataObjectByMesurePointName(paramName, newValue);
-                                _shadowControl[paramName] = newValue;
+
+                                if (_map.ParamModelLookup.TryGetValue(paramName, out var modelEntry))
+                                {
+                                    var modelValue = CoerceControlValueForTarget(
+                                        modelEntry.Arg1!, newValue, paramName);
+                                    ApplyControlToModel(paramName, modelValue, newValue);
+                                }
                             }
                         }
                     }
@@ -288,38 +293,70 @@ namespace EssSimulator.Protocol.Modbus
 
         public void SetDataObjectByMesurePointName(string name, object value)
         {
-            TrySetDataObjectByMesurePointName(name, value, updateShadow: true, out _);
+            if (!TryCoerceControlValues(name, value, out var modbusValue, out _))
+                return;
+
+            try
+            {
+                _slave.Write(new Dictionary<string, object> { { name, modbusValue } }, applyScale: false);
+            }
+            catch (Exception ex)
+            {
+                _log.Warn($"Imperative control register write failed: {_deviceInfo.name}.{name}: {ex.Message}");
+            }
         }
 
-        private bool TrySetDataObjectByMesurePointName(
+        private void ApplyControlToModel(string name, object modelValue, object modbusShadowValue)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return;
+            if (!_map.ParamModelLookup.TryGetValue(name, out var model)) return;
+
+            if (!SimServer.SetExtIfVariableVal(model.Arg1!, modelValue))
+            {
+                _log.Warn($"SetExtIfVariableVal failed: {model.Arg1} <= {modelValue}");
+                return;
+            }
+
+            _shadowControl[name] = modbusShadowValue;
+        }
+
+        private bool TryCoerceControlValues(
             string name,
             object value,
-            bool updateShadow,
-            out object appliedValue)
+            out object modbusValue,
+            out object modelValue)
         {
-            appliedValue = value;
+            modbusValue = value;
+            modelValue = value;
             if (string.IsNullOrWhiteSpace(name)) return false;
             if (!_map.ParamModelLookup.TryGetValue(name, out var model)) return false;
 
             object valToSet = value;
             if (value is string s)
             {
-                if (double.TryParse(s, out var dv))      valToSet = dv;
-                else if (bool.TryParse(s, out var bv))   valToSet = bv ? 1 : 0;
+                if (double.TryParse(s, out var dv)) valToSet = dv;
+                else if (bool.TryParse(s, out var bv)) valToSet = bv ? 1 : 0;
             }
 
-            valToSet = CoerceControlValueForTarget(model.Arg1!, valToSet, name);
-            appliedValue = valToSet;
-            if (!SimServer.SetExtIfVariableVal(model.Arg1!, valToSet))
-            {
-                _log.Warn($"SetExtIfVariableVal failed: {model.Arg1} <= {valToSet}");
-                return false;
-            }
-
-            if (updateShadow)
-                _shadowControl[name] = valToSet;
-
+            modelValue = CoerceControlValueForTarget(model.Arg1!, valToSet, name);
+            modbusValue = CoerceModbusRegisterValue(name, valToSet);
             return true;
+        }
+
+        private object CoerceModbusRegisterValue(string paramName, object valToSet)
+        {
+            var ctlEntry = _map.ControlMaps.Find(e => e != null && e.ParamName == paramName);
+            if (ctlEntry?.FunctionCode != 5)
+                return valToSet;
+
+            bool coilBool = valToSet switch
+            {
+                bool b => b,
+                string s when bool.TryParse(s, out var bv) => bv,
+                _ => Convert.ToDouble(valToSet) != 0
+            };
+
+            return coilBool ? 1 : 0;
         }
 
         /// <summary>线圈/寄存器写入目标属性时做类型对齐（避免 int 1 无法写入 bool 导致 Modbus 已为 1 但 emu 仍为 false）。</summary>
@@ -371,19 +408,16 @@ namespace EssSimulator.Protocol.Modbus
             _shadowData.TryRemove(name, out _);
         }
 
-        /// <summary>
-        /// 将控制量（线圈/寄存器）从模型回写到 Modbus 从站，并同步控制 shadow，便于外部工具读到与仿真一致的状态。
-        /// </summary>
+        /// <summary>仿真 → Modbus 反馈：只写寄存器与 shadow，不改模型。</summary>
         public void PublishControlToSlave(string name, object value)
         {
             if (string.IsNullOrWhiteSpace(name)) return;
-
-            if (!TrySetDataObjectByMesurePointName(name, value, updateShadow: false, out var appliedValue))
+            if (!TryCoerceControlValues(name, value, out var modbusValue, out _))
                 return;
 
             try
             {
-                _slave.Write(new Dictionary<string, object> { { name, appliedValue } });
+                _slave.Write(new Dictionary<string, object> { { name, modbusValue } });
             }
             catch (Exception ex)
             {
@@ -396,7 +430,7 @@ namespace EssSimulator.Protocol.Modbus
             try
             {
                 readback = GetDataObjectByMesurePointName(name, _slave, _parser);
-                readbackOk = ValuesEquivalent(appliedValue, readback);
+                readbackOk = ValuesEquivalent(modbusValue, readback);
             }
             catch (Exception ex)
             {
@@ -406,18 +440,15 @@ namespace EssSimulator.Protocol.Modbus
             if (IsEmuDevice)
             {
                 _log.Info(
-                    $"[EMU-Publish] {_deviceInfo.name}.{name} write={FormatValue(appliedValue)} readback={FormatValue(readback)} ok={readbackOk}");
+                    $"[EMU-Publish] {_deviceInfo.name}.{name} write={FormatValue(modbusValue)} readback={FormatValue(readback)} ok={readbackOk}");
             }
 
-            // 失败不前移：仅当寄存器写入并回读一致后，才推进控制 shadow。
             if (readbackOk)
-            {
-                _shadowControl[name] = appliedValue;
-            }
+                _shadowControl[name] = modbusValue;
             else
             {
                 _log.Warn(
-                    $"PublishControlToSlave shadow not updated due to readback mismatch: {_deviceInfo.name}.{name}, write={FormatValue(appliedValue)}, readback={FormatValue(readback)}");
+                    $"PublishControlToSlave shadow not updated due to readback mismatch: {_deviceInfo.name}.{name}, write={FormatValue(modbusValue)}, readback={FormatValue(readback)}");
             }
         }
 

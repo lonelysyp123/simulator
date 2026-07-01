@@ -430,6 +430,8 @@ namespace EssSimulator.Display
                 $"V{FormatCompactV(ac.LineVoltageV)} I{ac.LineCurrentA:0}A φ{ac.PhaseAngleDeg:0}°",
                 GuiStatusFormatters.FormatPcsMainLineTargetPower(u, slotInUnit),
                 GuiStatusFormatters.FormatPcsMainLineActualPower(pcsIndex, pcs.ActivePowerKw),
+                GuiStatusFormatters.FormatPcsMainLineTargetReactive(u, slotInUnit),
+                GuiStatusFormatters.FormatPcsMainLineActualReactive(pcsIndex, pcs.ReactivePowerKw),
                 ShortPcsMode(pcs)
             };
         }

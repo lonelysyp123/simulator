@@ -27,21 +27,33 @@ namespace EssSimulator.EssDeviceSimModel
             return mode.ToString();
         }
 
-        /// <summary>与 emu 点表 OperationStatus 对齐：0停机 1待机 2故障 3充电 4放电。</summary>
+        /// <summary>
+        /// 与 emu 点表 OperationStatus 对齐：1停机 2待机 4充电运行 5放电运行 6未知状态（正放负充）。
+        /// </summary>
         public static int ToOperationStatusCode(OperationMode mode, bool externalRunCommand,
             double activePowerKw, bool blackStartEnabled, ushort faultType, bool hasAlarm)
         {
-            if (hasAlarm || faultType != 0)
-                return 2;
+            if (faultType != 0 || hasAlarm)
+                return 6;
             if (mode == OperationMode.Off || !externalRunCommand)
-                return 0;
-            if (blackStartEnabled)
                 return 1;
+            if (blackStartEnabled || mode == OperationMode.Standby)
+                return 2;
             if (activePowerKw > ActivePowerThresholdKw)
-                return 4;
+                return 5;
             if (activePowerKw < -ActivePowerThresholdKw)
-                return 3;
-            return 1;
+                return 4;
+            return 2;
         }
+
+        public static string GetOperationStatusLabel(int code) => code switch
+        {
+            1 => "停机",
+            2 => "待机",
+            4 => "充电运行",
+            5 => "放电运行",
+            6 => "未知状态",
+            _ => $"未知({code})"
+        };
     }
 }

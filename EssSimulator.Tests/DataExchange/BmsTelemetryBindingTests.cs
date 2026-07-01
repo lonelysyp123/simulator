@@ -39,7 +39,7 @@ public class BmsTelemetryBindingTests
 
         public void WriteDefaults(IReadOnlyDictionary<string, object> defaults) => WritePoints(defaults);
 
-        public void WritePoints(IReadOnlyDictionary<string, object> values, byte slaveId = 1)
+        public void WritePoints(IReadOnlyDictionary<string, object> values, byte slaveId = 1, bool applyScale = true)
         {
             foreach (var pair in values)
                 Registers[pair.Key] = pair.Value;

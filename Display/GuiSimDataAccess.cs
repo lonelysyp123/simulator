@@ -111,7 +111,7 @@ namespace EssSimulator.Display
         /// <summary>读取 EMU Modbus 控制线圈当前值（如 pcs1_startstop），失败时回退仿真 DTO。</summary>
         public static bool GetEmuPcsStartStopCoil(int unitIndex0, int pcsSlotInUnit0)
         {
-            string paramName = pcsSlotInUnit0 == 0 ? "pcs1_startstop" : "pcs2_startstop";
+            string paramName = pcsSlotInUnit0 == 0 ? "yx3" : "yx5";
             try
             {
                 var server = SimulatorHost.Instance.Get<IModbusRegisterServer>($"simEmu{unitIndex0 + 1}");

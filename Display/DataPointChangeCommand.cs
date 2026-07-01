@@ -86,7 +86,7 @@ public class DataPointChangeCommand() : ICommand
                 if (bool.TryParse(opdata, out var bv)) val = bv;
                 else if (int.TryParse(opdata, out var iv)) val = iv;
                 simServer.SetDataObjectByMesurePointName(dpcDeviceDataPoint, val);
-                message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {dpcDeviceName}.{dpcDeviceDataPoint} 控制点设置为 {val}";
+                message = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {dpcDeviceName}.{dpcDeviceDataPoint} 控制点写入寄存器原始值 {val}（工程值=原始值/Scale，经控制管道解析）";
             }
             else
             {
@@ -121,10 +121,12 @@ public class DataPointChangeCommand() : ICommand
         Console.WriteLine("  dpcname: <device>.<datapoint> 例如 pcs1.ActivePower");
         Console.WriteLine("  operation: set / get");
         Console.WriteLine("  data: set 时填写值，get 时可省略");
-        Console.WriteLine("  若 ModelSim 不为 0 ，set指令将在下一个轮询周期被覆盖");
+        Console.WriteLine("  控制点 set：写入 Modbus 原始寄存器值（与 mbpoll 一致）；工程值 = 原始值 / CSV 的 Scale");
+        Console.WriteLine("  遥测点 set：若 ModelSim 不为 0，将在下一个轮询周期被覆盖");
         Console.WriteLine("示例:");
-        Console.WriteLine("  dpc ess.yc1 get");
-        Console.WriteLine("  dpc ess.yc1 set 123.45");
+        Console.WriteLine("  dpc simEmu1.yt0 set 1000   # yt0 Scale=10 → 100 kW 有功设定");
+        Console.WriteLine("  dpc simEmu1.yx3 set 0      # PCS1 停机");
+        Console.WriteLine("  dpc simBms1.yc11 get");
     }
 }
 }

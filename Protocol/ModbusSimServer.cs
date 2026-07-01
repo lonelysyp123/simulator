@@ -164,6 +164,9 @@ namespace EssSimulator
         public object? GetDataObjectByMesurePointName(string name)
             => _dataSync.GetDataObjectByMesurePointName(name, _slave, _parser);
 
+        public void InvalidateDataShadow(string name) =>
+            _dataSync.InvalidateDataShadow(name);
+
         // ── 静态工具：解析 CSV ModelSim 列字符串 ────────────────────
 
         public static ModesimModel? GetModelParam(string modelstring)

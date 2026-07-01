@@ -42,6 +42,7 @@ namespace EssSimulator.EssSimModelApi
                     / 1000.0);
                 stack.NominalEnergyKWh = clusterEnergyKWh * bmsCfg.ClusterCount;
                 stack.MaxCRate = 0.5f;
+                stack.ManagedClusterCount = bmsCfg.ClusterCount;
                 foreach (var cluster in stack.Cluseter)
                 {
                     cluster.Measurements.NominalEnergyKWh = clusterEnergyKWh;

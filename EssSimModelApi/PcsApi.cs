@@ -33,7 +33,7 @@ namespace EssSimulator.EssSimModelApi
                 public float MaxCapacitiveReactivePower { get; set; } // EMU-最大可用容性无功
 
                 // 运行状态
-                public int OperationStatus { get; set; }           // EMU-工作状态 1、停机 2、待机 3、充电运行 4、放电运行 5、故障  6、零功率运行 7、告警
+                public int OperationStatus { get; set; }           // EMU-工作状态 1、停机 2、待机 4、充电运行 5、放电运行 6、未知状态
                 public int TotalPcsCount { get; set; }             // EMU-PCS总数
                 public int OnlinePcsCount { get; set; }            // EMU-在线PCS数
                 public int GridConnectedPcsCount { get; set; }     // EMU-并网PCS数
@@ -191,7 +191,7 @@ namespace EssSimulator.EssSimModelApi
                 { 
                     get
                     {
-                        // 0-停机，1-待机，2-故障，3-充电，4-放电（正放负充）
+                        // 1停机 2待机 4充电运行 5放电运行 6未知状态（正放负充）
                         bool hasAlarm = AlarmSummary1 != 0 || AlarmSummary2 != 0 || AlarmSummary3 != 0;
                         return PcsDisplayLabels.ToOperationStatusCode(
                             SimulatorMode,

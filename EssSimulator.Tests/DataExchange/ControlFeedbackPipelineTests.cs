@@ -38,7 +38,7 @@ public class ControlFeedbackPipelineTests
                 _registers[pair.Key] = pair.Value;
         }
 
-        public void WritePoints(IReadOnlyDictionary<string, object> values, byte slaveId = 1) =>
+        public void WritePoints(IReadOnlyDictionary<string, object> values, byte slaveId = 1, bool applyScale = true) =>
             WritePoints(values);
 
         public Dictionary<string, object> ReadAllControlRaw(IReadOnlyList<string> paramNames)

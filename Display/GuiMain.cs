@@ -29,7 +29,7 @@ namespace EssSimulator.Display
         private static bool _isRunning = true;
         private static volatile bool _fatalShutdownActive;
         private static int _selectedIndex = 0; // 当前选中项索引
-        private static string? _lastCommand; // 仅保留上一条指令
+        private static readonly CommandHistory _commandHistory = new();
         //private static string[] _menuItems = { "主电气接线", "电池堆簇信息", "电池单体信息","日志信息","命令输入","连接信息"};
         private static string[] _menuItems = { "主电气接线", "电池堆簇信息", "电池单体信息", "命令输入", "连接信息", "日志信息"};
 
@@ -99,9 +99,7 @@ namespace EssSimulator.Display
             return new CommandProcessor(commands);
         }
 
-        /// <summary>
-        /// 在当前视图内输入并执行一条指令，执行后返回原视图。
-        /// </summary>
+        /// <summary>主接线内联命令：执行一条后按任意键返回。</summary>
         private void PromptAndExecuteInlineCommand(CommandProcessor processor)
         {
             try
@@ -109,90 +107,16 @@ namespace EssSimulator.Display
                 Console.Clear();
                 Console.WriteLine("主电气接线 - 指令输入（执行后自动返回）");
                 Console.WriteLine("可用命令: esscmd / breaker / dpc / dpctest");
-                var input = ReadCommandLineWithLastHistory("cmd> ");
+                Console.WriteLine("Enter 执行  ↑↓ 历史  ←→ 编辑  Esc 清空");
+                var input = ConsoleLineReader.ReadLine("cmd> ", _commandHistory);
                 if (!string.IsNullOrWhiteSpace(input))
-                {
                     processor.ProcessCommand(input);
-                }
                 Console.WriteLine("按任意键返回主电气接线...");
                 Console.ReadKey(true);
             }
             catch
             {
                 // 忽略输入阶段异常，确保界面线程持续运行
-            }
-        }
-
-        /// <summary>
-        /// 读取单行指令，支持“上键回显上一条指令”（仅一条历史，多次上键不重复动作）。
-        /// </summary>
-        private string ReadCommandLineWithLastHistory(string prompt)
-        {
-            Console.Write(prompt);
-            var buffer = new StringBuilder();
-            int renderedLength = 0;
-            bool recalledOnce = false;
-
-            void Render()
-            {
-                string text = buffer.ToString();
-                Console.Write('\r');
-                Console.Write(prompt);
-                Console.Write(text);
-                int eraseCount = renderedLength - text.Length;
-                if (eraseCount > 0)
-                {
-                    Console.Write(new string(' ', eraseCount));
-                }
-                Console.Write('\r');
-                Console.Write(prompt);
-                Console.Write(text);
-                renderedLength = text.Length;
-            }
-
-            while (true)
-            {
-                var key = Console.ReadKey(true);
-                if (key.Key == ConsoleKey.Enter)
-                {
-                    Console.WriteLine();
-                    var input = buffer.ToString();
-                    if (!string.IsNullOrWhiteSpace(input))
-                    {
-                        _lastCommand = input;
-                    }
-                    return input;
-                }
-
-                if (key.Key == ConsoleKey.UpArrow)
-                {
-                    if (!recalledOnce && !string.IsNullOrWhiteSpace(_lastCommand))
-                    {
-                        buffer.Clear();
-                        buffer.Append(_lastCommand);
-                        recalledOnce = true;
-                        Render();
-                    }
-                    continue;
-                }
-
-                if (key.Key == ConsoleKey.Backspace)
-                {
-                    if (buffer.Length > 0)
-                    {
-                        buffer.Remove(buffer.Length - 1, 1);
-                        recalledOnce = false;
-                        Render();
-                    }
-                    continue;
-                }
-
-                if (!char.IsControl(key.KeyChar))
-                {
-                    buffer.Append(key.KeyChar);
-                    recalledOnce = false;
-                    Render();
-                }
             }
         }
 
@@ -553,7 +477,6 @@ namespace EssSimulator.Display
                             else if ((key.Key == ConsoleKey.Oem2 && key.Modifiers == ConsoleModifiers.Shift) ||
                                      key.Key == ConsoleKey.C)
                             {
-                                // ':' 键（通常是 Shift + Oem2），兼容 C 快捷键
                                 commandRequested = true;
                             }
                             else if (key.Key == ConsoleKey.Escape)
@@ -613,7 +536,6 @@ namespace EssSimulator.Display
                         else if ((key.Key == ConsoleKey.Oem2 && key.Modifiers == ConsoleModifiers.Shift) ||
                                  key.Key == ConsoleKey.C)
                         {
-                            // ':' 键（通常是 Shift + Oem2），兼容 C 快捷键
                             PromptAndExecuteInlineCommand(processor);
                             Console.Clear();
                         }
@@ -931,21 +853,22 @@ namespace EssSimulator.Display
 
             var processor = new CommandProcessor(commands);
 
+            Console.WriteLine("Enter 执行  ↑↓ 历史  ←→ 编辑  Esc 清空  exit 返回菜单");
+            Console.WriteLine();
+
             while (true)
             {
                 if (PollFatalOrContinue())
                     continue;
 
-                var input = ReadCommandLineWithLastHistory("> ");
-                if (input == "exit")
+                var input = ConsoleLineReader.ReadLine("> ", _commandHistory);
+                if (string.Equals(input, "exit", StringComparison.OrdinalIgnoreCase))
                 {
                     return;
                 }
-                if(input != null)
-                {
-                    // 将用户输入传递给命令处理器
+
+                if (!string.IsNullOrWhiteSpace(input))
                     processor.ProcessCommand(input);
-                }
             }
         }
 

@@ -53,16 +53,17 @@ namespace EssSimulator.EssSimModelApi.Mappers
             if (batteryRacks.Count > 0 && batteryRacks[0].GetRackState() != null)
                 emu.Emu.AverageBatterySoc = (float)batteryRacks[0].GetRackState().MinClusterSOC * 100;
 
-            // 运行状态判断（正放负充：ActivePower>10kW为放电，<-10kW为充电）
-            bool anyDischarge = false, anyCharge = false;
+            // 运行状态（1停机 2待机 4充电 5放电 6未知；正放负充）
+            bool anyRunning = false, anyDischarge = false, anyCharge = false;
             foreach (var pcs in emu.PcsList)
             {
                 if (pcs.SimulatorMode == OperationMode.Off)
                     continue;
+                anyRunning = true;
                 if (pcs.ActivePower > PcsDisplayLabels.ActivePowerThresholdKw)  anyDischarge = true;
                 if (pcs.ActivePower < -PcsDisplayLabels.ActivePowerThresholdKw) anyCharge   = true;
             }
-            emu.Emu.OperationStatus = anyDischarge ? 4 : (anyCharge ? 3 : 2);
+            emu.Emu.OperationStatus = anyDischarge ? 5 : (anyCharge ? 4 : (anyRunning ? 2 : 1));
         }
 
         /// <summary>

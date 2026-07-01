@@ -234,7 +234,7 @@ namespace EssSimulator
             return data.SelectMany(x => x).ToArray();
         }
 
-        public bool Write(Dictionary<string, object> data, byte slaveId = 1)
+        public bool Write(Dictionary<string, object> data, byte slaveId = 1, bool applyScale = true)
         {
             // 如果slaveid为1，则写入的是pointMap，否则写入rackPointMap
             var pointMapToUse = slaveId == 1 ? pointMap : rackPointMap;
@@ -295,38 +295,49 @@ namespace EssSimulator
 
                 actualValue = item.Value;
 
-                // 如果映射表中有 Scale 配置，则对数值进行放大/缩放后再转换为字节
-                var scale = pm.First().Scale;
                 object valueToConvert = actualValue;
-                try
+                if (applyScale)
                 {
-                    var d = Convert.ToSingle(actualValue) * scale; // 按 Scale 放大
-                    // 根据目标类型选用合适的数值类型传入 DataUnTranslation
-                    if (typeofPoint == "System.Int16")
+                    // 仿真 → Modbus 反馈：工程值 × Scale → 原始寄存器值
+                    var scale = pm.First().Scale;
+                    try
                     {
-                        valueToConvert = Convert.ToInt16(Math.Round(d));
+                        var d = Convert.ToSingle(actualValue) * scale;
+                        if (typeofPoint == "System.Int16")
+                            valueToConvert = Convert.ToInt16(Math.Round(d));
+                        else if (typeofPoint == "System.UInt16")
+                            valueToConvert = Convert.ToUInt16(Math.Round(d));
+                        else if (typeofPoint == "System.Int32")
+                            valueToConvert = Convert.ToInt32(Math.Round(d));
+                        else if (typeofPoint == "System.UInt32")
+                            valueToConvert = Convert.ToUInt32(Math.Round(d));
+                        else
+                            valueToConvert = d;
                     }
-                    else if (typeofPoint == "System.UInt16")
+                    catch (Exception ex)
                     {
-                        valueToConvert = Convert.ToUInt16(Math.Round(d));
-                    }
-                    else if (typeofPoint == "System.Int32")
-                    {
-                        valueToConvert = Convert.ToInt32(Math.Round(d));
-                    }
-                    else if (typeofPoint == "System.UInt32")
-                    {
-                        valueToConvert = Convert.ToUInt32(Math.Round(d));
-                    }
-                    else
-                    {
-                        valueToConvert = d;
+                        log.Warn($"Scale apply failed for {pm.First().ParamName}: {ex}");
+                        valueToConvert = actualValue;
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    log.Warn($"Scale apply failed for {pm.First().ParamName}: {ex}");
-                    valueToConvert = actualValue;
+                    // dpc / 外部 imperative：已是原始寄存器值，不再乘 Scale
+                    try
+                    {
+                        if (typeofPoint == "System.Int16")
+                            valueToConvert = Convert.ToInt16(Math.Round(Convert.ToDouble(actualValue)));
+                        else if (typeofPoint == "System.UInt16")
+                            valueToConvert = Convert.ToUInt16(Math.Round(Convert.ToDouble(actualValue)));
+                        else if (typeofPoint == "System.Int32")
+                            valueToConvert = Convert.ToInt32(Math.Round(Convert.ToDouble(actualValue)));
+                        else if (typeofPoint == "System.UInt32")
+                            valueToConvert = Convert.ToUInt32(Math.Round(Convert.ToDouble(actualValue)));
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Warn($"Raw register coerce failed for {pm.First().ParamName}: {ex}");
+                    }
                 }
 
                 actualValArrary = Common.DataUnTranslation(valueToConvert, typeofPoint);

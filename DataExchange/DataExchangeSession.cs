@@ -105,6 +105,24 @@ namespace EssSimulator.DataExchange
             }, null);
         }
 
+        private bool TryWriteControlRegister(string name, object value, out object appliedModbusValue)
+        {
+            appliedModbusValue = value;
+            if (string.IsNullOrWhiteSpace(name))
+                return false;
+
+            var binding = _catalog.FindControl(name);
+            if (binding == null)
+                return false;
+
+            appliedModbusValue = ControlValueCoercion.CoerceForModbusRegister(binding, value);
+            _modbusAdapter.WritePoints(
+                new Dictionary<string, object> { { name, appliedModbusValue } },
+                applyScale: false);
+            DrainControlPipeline();
+            return true;
+        }
+
         private void DrainControlPipeline()
         {
             lock (_controlGate)
@@ -184,15 +202,21 @@ namespace EssSimulator.DataExchange
             _feedbackThread = null;
         }
 
-        public void SetDataObjectByMesurePointName(string name, object value) =>
-            TrySetControl(name, value, updateShadow: true);
+        /// <summary>
+        /// 外部 imperative 写控制点（如 dpc set）：先写 Modbus 寄存器，再走控制管道，
+        /// 与 EMS/mbpoll 写线圈同路径，自动触发绑定的副作用（如 PCS 启停逻辑）。
+        /// </summary>
+        public void SetDataObjectByMesurePointName(string name, object value)
+        {
+            if (!TryWriteControlRegister(name, value, out _))
+                _log.Warn($"Imperative control write failed: {_deviceInfo.name}.{name}");
+        }
 
+        /// <summary>仿真 → Modbus 反馈（不回灌控制管道，避免重复触发副作用）。</summary>
         public void PublishControlToSlave(string name, object value)
         {
-            if (!TrySetControl(name, value, updateShadow: false, out var applied))
-                return;
-
-            _feedbackPipeline.PublishImmediate(name, applied, out _);
+            if (!_feedbackPipeline.PublishImmediate(name, value, out _))
+                _log.Warn($"Control feedback publish failed: {_deviceInfo.name}.{name}");
         }
 
         public void InvalidateDataShadow(string name) =>
@@ -315,73 +339,6 @@ namespace EssSimulator.DataExchange
             }
         }
 
-        private bool TrySetControl(string name, object value, bool updateShadow) =>
-            TrySetControl(name, value, updateShadow, out _);
-
-        private bool TrySetControl(string name, object value, bool updateShadow, out object appliedValue)
-        {
-            appliedValue = value;
-            if (string.IsNullOrWhiteSpace(name))
-                return false;
-
-            var binding = _catalog.FindControl(name);
-            if (binding == null)
-                return false;
-
-            appliedValue = CoerceForTarget(_simulation, binding, value);
-            if (!_simulation.Write(binding.Target.FullPath, appliedValue))
-            {
-                _log.Warn($"SetExtIfVariableVal failed: {binding.Target.FullPath} <= {appliedValue}");
-                return false;
-            }
-
-            if (updateShadow)
-                _shadow.CommitControl(name, appliedValue);
-
-            if (binding.Effect != ControlEffectId.None)
-            {
-                _effects.Dispatch(binding.Effect, new ControlEffectContext
-                {
-                    ServerName = _deviceInfo.name ?? string.Empty,
-                    Binding = binding,
-                    AppliedValue = appliedValue,
-                    PreviousValue = null
-                });
-            }
-
-            return true;
-        }
-
-        private static object CoerceForTarget(
-            ISimulationDataAdapter simulation,
-            PointBinding binding,
-            object valToSet)
-        {
-            if (valToSet is string s)
-            {
-                if (double.TryParse(s, out var dv))
-                    valToSet = dv;
-                else if (bool.TryParse(s, out var bv))
-                    valToSet = bv ? 1 : 0;
-            }
-
-            if (binding.Entry.FunctionCode != 5)
-                return valToSet;
-
-            bool coilBool = valToSet switch
-            {
-                bool b => b,
-                string str when bool.TryParse(str, out var bv) => bv,
-                _ => Convert.ToDouble(valToSet) != 0
-            };
-
-            var current = simulation.Read(binding.Target.FullPath);
-            if (current is bool)
-                return coilBool;
-
-            return coilBool ? 1 : 0;
-        }
-
         private static void TryJoin(Thread? thread)
         {
             if (thread == null || !thread.IsAlive)
@@ -390,8 +347,5 @@ namespace EssSimulator.DataExchange
             try { thread.Join(2000); }
             catch { /* ignore */ }
         }
-
-        private static string FormatValue(object? value) =>
-            value == null ? "<null>" : value.ToString() ?? "<null>";
     }
 }

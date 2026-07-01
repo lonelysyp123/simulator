@@ -45,7 +45,7 @@ namespace EssSimulator.DataExchange.Pipeline
                     if (raw == null)
                         continue;
 
-                    var applied = CoerceForModbus(binding, raw);
+                    var applied = ControlValueCoercion.CoerceForModbusRegister(binding, raw);
                     if (!_shadow.TryDetectControlChange(binding.ParamName, applied, out _))
                         continue;
 
@@ -69,7 +69,7 @@ namespace EssSimulator.DataExchange.Pipeline
             if (binding == null)
                 return false;
 
-            applied = CoerceForModbus(binding, value);
+            applied = ControlValueCoercion.CoerceForModbusRegister(binding, value);
             return WriteWithReadback(paramName, applied);
         }
 
@@ -123,29 +123,6 @@ namespace EssSimulator.DataExchange.Pipeline
 
         private string FeedbackLogPrefix =>
             _serverName.StartsWith("simBms", StringComparison.OrdinalIgnoreCase) ? "BMS" : "EMU";
-
-        private static object CoerceForModbus(PointBinding binding, object valToSet)
-        {
-            if (valToSet is string s)
-            {
-                if (double.TryParse(s, out var dv))
-                    valToSet = dv;
-                else if (bool.TryParse(s, out var bv))
-                    valToSet = bv ? 1 : 0;
-            }
-
-            if (binding.Entry.FunctionCode != 5)
-                return valToSet;
-
-            bool coilBool = valToSet switch
-            {
-                bool b => b,
-                string str when bool.TryParse(str, out var bv) => bv,
-                _ => Convert.ToDouble(valToSet) != 0
-            };
-
-            return coilBool ? 1 : 0;
-        }
 
         private static string FormatValue(object? value) =>
             value == null ? "<null>" : value.ToString() ?? "<null>";
