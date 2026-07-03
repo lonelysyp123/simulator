@@ -29,9 +29,9 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10021,u16,16,yc21,10,单元1交流侧BC电压,model=4|arg1=emuDeviceId.PcsList[0].LineVoltageBC|arg2=|arg3=|arg4=1000
 4,10022,u16,16,yc22,10,单元1交流侧CA电压,model=4|arg1=emuDeviceId.PcsList[0].LineVoltageCA|arg2=|arg3=|arg4=1000
 4,10023,u32,32,yc23,1000,交流侧频率,50
-4,10025,u16,16,yc24,10,单元1交流侧A相电流,model=4|arg1=emuDeviceId.PcsList[0].PhaseACurrent|arg2=|arg3=|arg4=1000
-4,10026,u16,16,yc25,10,单元1交流侧B相电流,model=4|arg1=emuDeviceId.PcsList[0].PhaseBCurrent|arg2=|arg3=|arg4=1000
-4,10027,u16,16,yc26,10,单元1交流侧C相电流,model=4|arg1=emuDeviceId.PcsList[0].PhaseCCurrent|arg2=|arg3=|arg4=1000
+4,10025,int16,16,yc24,10,单元1交流侧A相电流,model=4|arg1=emuDeviceId.PcsList[0].PhaseACurrent|arg2=|arg3=|arg4=1000
+4,10026,int16,16,yc25,10,单元1交流侧B相电流,model=4|arg1=emuDeviceId.PcsList[0].PhaseBCurrent|arg2=|arg3=|arg4=1000
+4,10027,int16,16,yc26,10,单元1交流侧C相电流,model=4|arg1=emuDeviceId.PcsList[0].PhaseCCurrent|arg2=|arg3=|arg4=1000
 4,10028,int32,32,yc27,10,单元1交流侧有功功率,model=4|arg1=emuDeviceId.PcsList[0].ActivePower|arg2=|arg3=|arg4=1000
 4,10030,int32,32,yc28,10,单元1交流侧无功功率,model=4|arg1=emuDeviceId.PcsList[0].ReactivePower|arg2=|arg3=|arg4=1000
 4,10032,int32,32,yc29,10,单元1交流侧视在功率,model=4|arg1=emuDeviceId.PcsList[0].ApparentPower|arg2=|arg3=|arg4=1000
@@ -56,9 +56,9 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10057,u16,16,yc48,10,单元2交流侧BC电压,model=4|arg1=emuDeviceId.PcsList[1].LineVoltageBC|arg2=|arg3=|arg4=1000
 4,10058,u16,16,yc49,10,单元2交流侧CA电压,model=4|arg1=emuDeviceId.PcsList[1].LineVoltageCA|arg2=|arg3=|arg4=1000
 4,10059,u32,32,yc50,1000,交流侧频率,50
-4,10061,u16,16,yc51,10,单元2交流侧A相电流,model=4|arg1=emuDeviceId.PcsList[1].PhaseACurrent|arg2=|arg3=|arg4=1000
-4,10062,u16,16,yc52,10,单元2交流侧B相电流,model=4|arg1=emuDeviceId.PcsList[1].PhaseBCurrent|arg2=|arg3=|arg4=1000
-4,10063,u16,16,yc53,10,单元2交流侧C相电流,model=4|arg1=emuDeviceId.PcsList[1].PhaseCCurrent|arg2=|arg3=|arg4=1000
+4,10061,int16,16,yc51,10,单元2交流侧A相电流,model=4|arg1=emuDeviceId.PcsList[1].PhaseACurrent|arg2=|arg3=|arg4=1000
+4,10062,int16,16,yc52,10,单元2交流侧B相电流,model=4|arg1=emuDeviceId.PcsList[1].PhaseBCurrent|arg2=|arg3=|arg4=1000
+4,10063,int16,16,yc53,10,单元2交流侧C相电流,model=4|arg1=emuDeviceId.PcsList[1].PhaseCCurrent|arg2=|arg3=|arg4=1000
 4,10064,int32,32,yc54,10,单元2交流侧有功功率,model=4|arg1=emuDeviceId.PcsList[1].ActivePower|arg2=|arg3=|arg4=1000
 4,10066,int32,32,yc55,10,单元2交流侧无功功率,model=4|arg1=emuDeviceId.PcsList[1].ReactivePower|arg2=|arg3=|arg4=1000
 4,10068,int32,32,yc56,10,单元2交流侧视在功率,model=4|arg1=emuDeviceId.PcsList[1].ApparentPower|arg2=|arg3=|arg4=1000
