@@ -22,14 +22,16 @@ namespace EssSimulator.DataExchange.Catalog
         {
             ["param11"] = ControlSemantics.Pulse,
             ["param12"] = ControlSemantics.Hold,
-            ["yc133"] = ControlSemantics.Pulse
+            ["yc133"] = ControlSemantics.Pulse,
+            ["yt0"] = ControlSemantics.Pulse
         };
 
         private static readonly Dictionary<string, ControlEffectId> BmsDefaultEffects = new(StringComparer.OrdinalIgnoreCase)
         {
             ["param11"] = ControlEffectId.BmsApplyLinkCommands,
             ["param12"] = ControlEffectId.BmsApplyLinkCommands,
-            ["yc133"] = ControlEffectId.BmsApplyLinkCommands
+            ["yc133"] = ControlEffectId.BmsApplyLinkCommands,
+            ["yt0"] = ControlEffectId.BmsApplyLinkCommands
         };
 
         private static readonly Dictionary<string, ControlEffectId> EmuDefaultEffects = new(StringComparer.OrdinalIgnoreCase)
@@ -170,6 +172,9 @@ namespace EssSimulator.DataExchange.Catalog
 
             if (isBms && BmsDefaultEffects.TryGetValue(paramName, out var bmsDefault))
                 return bmsDefault;
+
+            if (isBms && target.PropertyPath.Contains("GridConnectCommand", StringComparison.Ordinal))
+                return ControlEffectId.BmsApplyLinkCommands;
 
             if (isEmu)
             {

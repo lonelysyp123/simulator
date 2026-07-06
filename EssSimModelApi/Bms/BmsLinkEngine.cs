@@ -14,6 +14,9 @@ namespace EssSimulator.EssSimModelApi.Bms
         private const ushort GridStatusSuccess = 2;
         private const ushort GridStatusFailed = 3;
 
+        private const ushort GridConnectCmdConnect = 1;
+        private const ushort GridConnectCmdDisconnect = 2;
+
         private const ushort BlackStartStatusActive = 3;
         private const ushort BlackStartStatusEnterFailed = 4;
         private const ushort BlackStartStatusExited = 5;
@@ -90,7 +93,7 @@ namespace EssSimulator.EssSimModelApi.Bms
                 }
 
                 stack.GridConnectStatus = GridStatusIdle;
-                stack.GridConnectCommand = 1;
+                stack.GridConnectCommand = GridConnectCmdConnect;
                 ApplyForChannel(bmsIndex0);
 
                 if (!stack.IsPcsLinked || !bms.IsLinked)
@@ -110,9 +113,8 @@ namespace EssSimulator.EssSimModelApi.Bms
                 return true;
             }
 
-            ClearConnectCommandPulse(stack);
-            SetLinked(ess, bmsIndex0, stack, linked: false);
-            stack.GridConnectStatus = GridStatusIdle;
+            stack.GridConnectCommand = GridConnectCmdDisconnect;
+            ApplyForChannel(bmsIndex0);
             message = "离网成功";
             Log.Info($"[BmsLink] manual disconnect bms{bmsIndex0 + 1}, status=0");
             return true;
@@ -152,17 +154,28 @@ namespace EssSimulator.EssSimModelApi.Bms
                     $"[BmsLink] auto-disconnect bms{bmsIndex + 1}, 三级报警汇总={stack.BMSFaultSummary}, status=3");
             }
 
-            if (stack.GridConnectCommand == 0)
+            ushort cmd = stack.GridConnectCommand;
+            if (cmd == 0)
                 return;
 
-            if (stack.GridConnectStatus == GridStatusRunning || stack.GridConnectStatus == GridStatusSuccess)
+            ClearConnectCommandPulse(stack);
+
+            if (cmd == GridConnectCmdDisconnect)
             {
-                ClearConnectCommandPulse(stack);
+                TryExecuteGridDisconnect(bmsIndex, stack, bms, ess);
                 return;
             }
 
+            if (cmd != GridConnectCmdConnect)
+                return;
+
+            if (stack.GridConnectStatus == GridStatusRunning)
+                return;
+
+            if (stack.IsPcsLinked && stack.GridConnectStatus == GridStatusSuccess)
+                return;
+
             stack.GridConnectStatus = GridStatusRunning;
-            ClearConnectCommandPulse(stack);
             TryExecuteGridConnect(bmsIndex, stack, bms, ess);
         }
 
@@ -227,6 +240,23 @@ namespace EssSimulator.EssSimModelApi.Bms
             stack.GridConnectStatus = GridStatusSuccess;
             Log.Info($"[BmsLink] connect success bms{bmsIndex + 1}, status=2");
             return true;
+        }
+
+        private static void TryExecuteGridDisconnect(
+            int bmsIndex,
+            BatteryStack stack,
+            BmsRackDevice bms,
+            EnergyStorageSystem ess)
+        {
+            if (!stack.IsPcsLinked && !bms.IsLinked)
+            {
+                stack.GridConnectStatus = GridStatusIdle;
+                return;
+            }
+
+            SetLinked(ess, bmsIndex, stack, linked: false);
+            stack.GridConnectStatus = GridStatusIdle;
+            Log.Info($"[BmsLink] disconnect success bms{bmsIndex + 1}, status=0");
         }
 
         private static void SucceedBlackStartEnter(int bmsIndex, BatteryStack stack)

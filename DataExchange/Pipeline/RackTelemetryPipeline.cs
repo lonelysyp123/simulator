@@ -29,6 +29,9 @@ namespace EssSimulator.DataExchange.Pipeline
             _baseSlaveId = baseSlaveId;
         }
 
+        /// <summary>清空 rack 遥测 shadow（与 bank 遥测一同在 Modbus 重连后失效）。</summary>
+        public void ClearShadow() => _shadow.Clear();
+
         public void RunOnce()
         {
             if (_points.Count == 0 || _clusterCount <= 0)

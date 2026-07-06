@@ -33,6 +33,9 @@ namespace EssSimulator.DataExchange.Pipeline
         public void InvalidateTelemetry(string paramName) =>
             _telemetry.Remove(paramName);
 
+        /// <summary>清空遥测 shadow（Modbus 重连后 SlaveDataStore 重建，需强制全量回写）。</summary>
+        public void ClearTelemetry() => _telemetry.Clear();
+
         public static bool ValuesEqual(object? a, object? b)
         {
             if (a == null && b == null) return true;

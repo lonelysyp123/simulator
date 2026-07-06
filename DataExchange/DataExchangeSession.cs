@@ -32,6 +32,7 @@ namespace EssSimulator.DataExchange
 
         private readonly object _controlGate = new();
         private volatile bool _running;
+        private bool _hadPreviousSession;
         private Thread? _telemetryThread;
         private Thread? _rackTelemetryThread;
         private Thread? _controlThread;
@@ -148,6 +149,14 @@ namespace EssSimulator.DataExchange
             if (_running) return;
             _running = true;
 
+            // 仅 Modbus 重连（link off→on）时清空 shadow 并同步全量回写；冷启动由后台遥测线程首轮写入，避免阻塞启动。
+            if (_hadPreviousSession)
+            {
+                _shadow.ClearTelemetry();
+                _rackTelemetryPipeline?.ClearShadow();
+                RefreshTelemetryAfterReconnect();
+            }
+
             _modbusAdapter.WriteDefaults(_catalog.DefaultValues);
             InitializeControlRegistersFromSimulation();
 
@@ -191,7 +200,11 @@ namespace EssSimulator.DataExchange
 
         public void Stop()
         {
+            if (!_running && !_hadPreviousSession)
+                return;
+
             _running = false;
+            _hadPreviousSession = true;
             TryJoin(_telemetryThread);
             TryJoin(_rackTelemetryThread);
             TryJoin(_controlThread);
@@ -243,6 +256,19 @@ namespace EssSimulator.DataExchange
 
         public object? GetDataObjectByMesurePointName(string name, IModbusSlave slave, ModbusParser parser) =>
             _modbusAdapter.ReadParsedPoint(name);
+
+        private void RefreshTelemetryAfterReconnect()
+        {
+            try
+            {
+                _telemetryPipeline.RunOnce();
+                _rackTelemetryPipeline?.RunOnce();
+            }
+            catch (Exception ex)
+            {
+                _log.Warn($"Initial telemetry refresh failed [{_deviceInfo.name}]", ex);
+            }
+        }
 
         private void InitializeControlRegistersFromSimulation()
         {

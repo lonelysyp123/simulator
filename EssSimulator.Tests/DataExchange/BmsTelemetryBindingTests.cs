@@ -100,6 +100,31 @@ public class BmsTelemetryBindingTests
     }
 
     [Fact]
+    public void TelemetryPipeline_RewritesAfterShadowCleared()
+    {
+        var pointMap = new ModbusPointMap("bms_bank.csv", "simBms1", clusterCount: 12);
+        var catalog = PointCatalogLoader.FromPointMap(pointMap, "simBms1", new DataExchangeOptions());
+
+        var simulation = new FakeSimulationAdapter();
+        simulation.Set("bms1.BatteryStacks[0].SOC", 0.55f);
+
+        var modbus = new FakeModbusAdapter();
+        var shadow = new ShadowStore();
+        var pipeline = new TelemetryPipeline(catalog, simulation, modbus, shadow);
+
+        pipeline.RunOnce();
+        modbus.Registers.Clear();
+
+        pipeline.RunOnce();
+        Assert.False(modbus.Registers.ContainsKey("yc11"));
+
+        shadow.ClearTelemetry();
+        pipeline.RunOnce();
+        Assert.True(modbus.Registers.ContainsKey("yc11"));
+        Assert.Equal(0.55f, Convert.ToSingle(modbus.Registers["yc11"]));
+    }
+
+    [Fact]
     public void TelemetryPipeline_WritesYc11WhenSocChanges()
     {
         var pointMap = new ModbusPointMap("bms_bank.csv", "simBms1", clusterCount: 12);

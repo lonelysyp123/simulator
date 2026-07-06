@@ -22,7 +22,7 @@ public partial class BatteryStack
 
         public int StackId { get; set; } // 堆编号
 
-        /// <summary>一键并网脉冲命令：写 1 触发，处理后自动回 0。</summary>
+        /// <summary>一键并离网脉冲命令：写 1 并网、写 2 离网，处理后自动回 0。</summary>
         public ushort GridConnectCommand { get; set; }
 
         /// <summary>一键并网状态：0 未开始 / 1 进行中 / 2 成功 / 3 失败。</summary>
