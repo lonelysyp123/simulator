@@ -48,7 +48,10 @@ namespace EssSimulator.Display
             AppendCenteredBox(sb, "电网·BUS_GRID", BuildGridLayerLines(snap), MainBoxWidth);
             AppendSpine(sb);
 
-            AppendCenteredBox(sb, "主断·电表·主变", BuildMainStationNodeLines(snap, channelStart, channelEndExclusive), MainBoxWidth);
+            AppendCenteredBox(sb, "主断·主变", BuildMainBreakerTransformerLines(snap, channelStart, channelEndExclusive), MainBoxWidth);
+            AppendSpine(sb);
+
+            AppendCenteredBox(sb, "PCC电表", BuildMeterBoxLines(snap), MainBoxWidth);
             AppendSpine(sb);
 
             AppendLayerLabel(sb, "35kV");
@@ -489,17 +492,26 @@ namespace EssSimulator.Display
             }
         }
 
-        private static IEnumerable<string> BuildMainStationNodeLines(
+        private static IEnumerable<string> BuildMainBreakerTransformerLines(
             MainLineSnapshot snap,
             int channelStart,
             int channelEndExclusive)
         {
             yield return $"主断 {GuiStatusFormatters.FormatBreakerState(snap.MainBreakerClosed, snap.MainBreakerTripped)}";
             yield return $"黑启 {GuiStatusFormatters.BuildBlackStartSwitchSummary(channelStart, channelEndExclusive)}";
-            yield return $"电表 V {FormatCompactV(snap.MeterPrimary.LineVoltageV)} I {snap.MeterPrimary.LineCurrentA:0.0}A";
-            yield return $"P {snap.MeterPrimary.ActivePowerKw:0} Q {snap.MeterPrimary.ReactivePowerKvar:0} kvar";
             yield return $"主变 P {snap.MainTransformerSecondary.ActivePowerKw:0} Q {snap.MainTransformerSecondary.ReactivePowerKvar:0}";
         }
+
+        private static IEnumerable<string> BuildMeterBoxLines(MainLineSnapshot snap)
+        {
+            double f = snap.MeterPrimary.FrequencyHz;
+            yield return $"f {FormatCompactFrequency(f)}";
+            yield return $"V {FormatCompactV(snap.MeterPrimary.LineVoltageV)} I {snap.MeterPrimary.LineCurrentA:0.0}A";
+            yield return $"P {snap.MeterPrimary.ActivePowerKw:0} Q {snap.MeterPrimary.ReactivePowerKvar:0} kvar";
+        }
+
+        private static string FormatCompactFrequency(double frequencyHz) =>
+            frequencyHz > 0.05 ? $"{frequencyHz:0.##} Hz" : "0 Hz";
 
         private static IEnumerable<string> BuildBus35Lines(MainLineSnapshot snap)
         {

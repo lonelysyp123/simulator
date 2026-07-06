@@ -65,6 +65,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
             RefreshSeriesDevicesAfterLeafStep(context, step);
 
             RunQuvRefinementIterations(context, step);
+            SystemFrequencyResolver.Refresh(_network, context);
             SamplePccMeter(context, meterIntegrationStep, _graph.Bus35.LineVoltageV);
 
             NetworkStepOrchestrator.ApplyGridResultsToEnergyStorageSystem(
@@ -104,7 +105,8 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
             _grid.Activate(context, step);
 
             _graph.BusGrid.LineVoltageV = _network.Grid.Port.Output.Ac?.Internal.LineVoltageV ?? 0;
-            _graph.BusGrid.FrequencyHz = _graph.BusGrid.LineVoltageV > 1.0 ? _pcsCfg.FrequencyNominal : 0;
+            SystemFrequencyResolver.Refresh(_network, context);
+            _graph.BusGrid.FrequencyHz = _network.SystemFrequencyHz;
         }
 
         /// <summary>④ 电压自上而下：经 Coupler 链 Grid → 主断 → 主变 → 35kV → 单元 → 690V。</summary>
@@ -137,6 +139,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 Step = step,
                 Bus35 = _graph.Bus35,
                 PcsCfg = _pcsCfg,
+                SystemFrequencyHz = _network.SystemFrequencyHz,
                 LastBus35LineVoltageV = _lastBus35LineVoltageV,
                 StationBusNominalLineVoltageV = _pccCfg.StationBusNominalLineVoltage,
                 MainBreakerClosed = context.MainBreakerClosed
@@ -230,7 +233,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                         bus690.TotalActivePowerKw,
                         bus690.TotalReactivePowerKvar,
                         ThreePhaseConnection.Star,
-                        _pcsCfg.FrequencyNominal)
+                        _network.SystemFrequencyHz)
                     : new AcInternalQuantities
                     {
                         LineVoltageV = Math.Max(bus690.LineVoltageV, unitClosed ? _pcsCfg.AcVoltageNominal * 0.01 : 0)
@@ -286,10 +289,19 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
 
         private void SamplePccMeter(DeviceStepContext context, TimeSpan integrationStep, double bus35V)
         {
+            double systemF = _network.SystemFrequencyHz;
             AcInternalQuantities primarySample;
             if (context.MainBreakerClosed)
             {
-                primarySample = _network.MainTransformer.Primary.Output.Ac!.Internal;
+                var raw = _network.MainTransformer.Primary.Output.Ac!.Internal;
+                primarySample = new AcInternalQuantities
+                {
+                    Connection = raw.Connection,
+                    LineVoltageV = raw.LineVoltageV,
+                    LineCurrentA = raw.LineCurrentA,
+                    PhaseAngleDeg = raw.PhaseAngleDeg,
+                    FrequencyHz = systemF
+                };
             }
             else
             {
@@ -300,7 +312,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                     LineVoltageV = raw.LineVoltageV,
                     LineCurrentA = 0,
                     PhaseAngleDeg = 0,
-                    FrequencyHz = bus35V > 1.0 ? _pcsCfg.FrequencyNominal : 0
+                    FrequencyHz = systemF
                 };
             }
 
@@ -310,7 +322,12 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
         private void PublishBusQuantities()
         {
             SetBusQuantity("BUS_GRID", _network.Grid.Port.Output.Ac!.Internal);
-            SetBusQuantity("BUS_35", _graph.Bus35.ToVoltageIntent());
+            SetBusQuantity("BUS_35", new AcInternalQuantities
+            {
+                Connection = ThreePhaseConnection.Star,
+                LineVoltageV = _graph.Bus35.LineVoltageV,
+                FrequencyHz = _network.SystemFrequencyHz
+            });
         }
 
         private void SetBusQuantity(string busId, AcInternalQuantities qty)

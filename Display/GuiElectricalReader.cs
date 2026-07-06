@@ -80,6 +80,12 @@ namespace EssSimulator.Display
                 "ess.ElectricalNetwork.MainBreaker.SwitchState.IsTripped");
 
             var meter = ReadAcPhasor("ess.ElectricalNetwork.PccMeter.Telemetry.Primary");
+            double systemF = GuiSimDataAccess.SafeGetDouble("ess.ElectricalNetwork.SystemFrequencyHz");
+            if (systemF > 0.05)
+                meter = meter with { FrequencyHz = systemF };
+            else if (meter.FrequencyHz <= 0.05)
+                meter = meter with { FrequencyHz = GuiSimDataAccess.SafeGetDouble("em.Frequency") };
+
             if (meter.LineVoltageV <= 0 && meter.LineCurrentA <= 0)
             {
                 meter = new AcPhasorSnapshot(
@@ -90,7 +96,7 @@ namespace EssSimulator.Display
                             GuiSimDataAccess.SafeGetDouble("em.PhaseBCurrent"),
                             GuiSimDataAccess.SafeGetDouble("em.PhaseCCurrent"))),
                     0,
-                    GuiSimDataAccess.SafeGetDouble("em.Frequency", 50));
+                    GuiSimDataAccess.SafeGetDouble("em.Frequency"));
                 if (meter.LineCurrentA > 0)
                 {
                     double p = GuiSimDataAccess.SafeGetDouble("em.TotalActivePower");
@@ -186,7 +192,7 @@ namespace EssSimulator.Display
 
             double phi = port.PhaseAngleDeg;
             if (i > 0 && phi == 0 && port.LineCurrentA <= 0)
-                return new AcPhasorSnapshot(v, i, phi, 50);
+                return new AcPhasorSnapshot(v, i, phi, 0);
             return new AcPhasorSnapshot(v, port.LineCurrentA > 0 ? port.LineCurrentA : i, phi, port.FrequencyHz);
         }
 

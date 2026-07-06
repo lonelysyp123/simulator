@@ -32,7 +32,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 : _pccCfg.StationBusNominalLineVoltage;
 
             // S1: 负载意图（35kV 母线电压用上一步或额定）
-            SetAcInput(_network.Load.Port, bus35V, ThreePhaseConnection.Star, context);
+            SetAcInput(_network.Load.Port, bus35V, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
             _network.Load.Step(context, step);
             double totalActiveKw = _network.Load.Port.Output.Ac!.Internal.ActivePowerKw;
             double totalReactiveKvar = _network.Load.Port.Output.Ac!.Internal.ReactivePowerKvar;
@@ -43,6 +43,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             // S2: 电网 Q-U + 主变路径
             _network.Grid.SetAggregatedReactivePowerKvar(totalReactiveKvar);
             _network.Grid.Step(context, step);
+            SystemFrequencyResolver.Refresh(_network, context);
 
             double gridVoltage = _network.Grid.Port.Output.Ac!.Internal.LineVoltageV;
             WireMainPath(context, step, gridVoltage, totalActiveKw, totalReactiveKvar, ref bus35V);
@@ -57,6 +58,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             _network.Grid.SetAggregatedReactivePowerKvar(totalReactiveKvar);
             _network.Grid.Step(context, step);
             gridVoltage = _network.Grid.Port.Output.Ac!.Internal.LineVoltageV;
+            SystemFrequencyResolver.Refresh(_network, context);
             if (context.MainBreakerClosed)
             {
                 _network.PccLineVoltageV = gridVoltage;
@@ -71,10 +73,19 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             }
 
             // S8: 电表采样
+            double systemF = _network.SystemFrequencyHz;
             AcInternalQuantities primarySample;
             if (context.MainBreakerClosed)
             {
-                primarySample = _network.MainTransformer.Primary.Output.Ac!.Internal;
+                var raw = _network.MainTransformer.Primary.Output.Ac!.Internal;
+                primarySample = new AcInternalQuantities
+                {
+                    Connection = raw.Connection,
+                    LineVoltageV = raw.LineVoltageV,
+                    LineCurrentA = raw.LineCurrentA,
+                    PhaseAngleDeg = raw.PhaseAngleDeg,
+                    FrequencyHz = systemF
+                };
             }
             else
             {
@@ -85,7 +96,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                     LineVoltageV = raw.LineVoltageV,
                     LineCurrentA = 0,
                     PhaseAngleDeg = 0,
-                    FrequencyHz = bus35V > 1.0 ? _pcsCfg.FrequencyNominal : 0
+                    FrequencyHz = systemF
                 };
             }
 
@@ -114,9 +125,9 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 totalActiveKw,
                 totalReactiveKvar,
                 ThreePhaseConnection.Star,
-                _pcsCfg.FrequencyNominal);
+                _network.SystemFrequencyHz);
 
-            SetAcInput(_network.MainBreaker.Primary, gridVoltage, ThreePhaseConnection.Star, context);
+            SetAcInput(_network.MainBreaker.Primary, gridVoltage, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
             SetAcInput(_network.MainBreaker.Secondary, secCurrent, ThreePhaseConnection.Star, context);
             _network.MainBreaker.Step(context, step);
 
@@ -124,7 +135,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 ? _network.MainBreaker.Secondary.Output.Ac!.Internal.LineVoltageV
                 : 0;
 
-            SetAcInput(_network.MainTransformer.Primary, downstreamV, ThreePhaseConnection.Star, context);
+            SetAcInput(_network.MainTransformer.Primary, downstreamV, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
             SetAcInput(_network.MainTransformer.Secondary, secCurrent, ThreePhaseConnection.Star, context);
             _network.MainTransformer.Step(context, step);
 
@@ -177,14 +188,14 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                     unitP,
                     unitQ,
                     ThreePhaseConnection.Star,
-                    _pcsCfg.FrequencyNominal);
+                    _network.SystemFrequencyHz);
 
-                SetAcInput(unitBreaker.Primary, bus35V, ThreePhaseConnection.Star, context);
+                SetAcInput(unitBreaker.Primary, bus35V, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
                 SetAcInput(unitBreaker.Secondary, unitCurrent, ThreePhaseConnection.Star, context);
                 unitBreaker.Step(context, step);
 
                 double primaryV = unitClosed ? bus35V : 0;
-                SetAcInput(unitTransformer.Primary, primaryV, ThreePhaseConnection.Star, context);
+                SetAcInput(unitTransformer.Primary, primaryV, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
                 SetAcInput(unitTransformer.Secondary, unitCurrent, ThreePhaseConnection.Star, context);
                 unitTransformer.Step(context, step);
 
@@ -215,7 +226,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             bms.IsLinked = link.IsClosed;
             pcs.SetGridAvailable(gridAvailable && bus690V > 1.0);
 
-            SetAcInput(pcs.Ac, bus690V, ThreePhaseConnection.Star, context);
+            SetAcInput(pcs.Ac, bus690V, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
             pcs.Step(context, step);
 
             var dcCurrentA = pcs.Dc.Output.Dc?.CurrentA ?? 0;
@@ -293,7 +304,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             {
                 Connection = ThreePhaseConnection.Star,
                 LineVoltageV = _network.StationBus35LineVoltageV,
-                FrequencyHz = _network.StationBus35LineVoltageV > 1.0 ? _pcsCfg.FrequencyNominal : 0
+                FrequencyHz = _network.SystemFrequencyHz
             });
         }
 
@@ -308,13 +319,14 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             ElectricalPort port,
             double lineVoltageV,
             ThreePhaseConnection connection,
-            DeviceStepContext context)
+            DeviceStepContext context,
+            double systemFrequencyHz)
         {
             port.Input = ElectricalPortSnapshot.FromAc(new AcInternalQuantities
             {
                 Connection = connection,
                 LineVoltageV = lineVoltageV,
-                FrequencyHz = lineVoltageV > 1.0 ? 50 : 0
+                FrequencyHz = lineVoltageV > 1.0 ? systemFrequencyHz : 0
             });
         }
 

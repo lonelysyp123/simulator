@@ -14,6 +14,10 @@ namespace EssSimulator.Display
         public static string FormatAcPhasor(AcPhasorSnapshot phasor) =>
             $"{FormatVoltage(phasor.LineVoltageV)} / {phasor.LineCurrentA:0.0} A / φ{phasor.PhaseAngleDeg:0.0}° / {phasor.FrequencyHz:0.0} Hz";
 
+        /// <summary>变压器等无独立频率源的交流相量（仅 V/I/φ；工频由系统统一频率源决定，变压器不改变频率）。</summary>
+        public static string FormatAcPhasorViPhi(AcPhasorSnapshot phasor) =>
+            $"{FormatVoltage(phasor.LineVoltageV)} / {phasor.LineCurrentA:0.0} A / φ{phasor.PhaseAngleDeg:0.0}°";
+
         public static string FormatAcPhasorWithPower(AcPhasorSnapshot phasor) =>
             $"{FormatAcPhasor(phasor)}  → P {phasor.ActivePowerKw:0.0} kW  Q {phasor.ReactivePowerKvar:0.0} kvar  PF {phasor.PowerFactor:0.000}";
 

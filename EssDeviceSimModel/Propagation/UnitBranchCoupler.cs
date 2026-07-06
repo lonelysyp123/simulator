@@ -46,7 +46,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                     _bus690.TotalActivePowerKw,
                     _bus690.TotalReactivePowerKvar,
                     ThreePhaseConnection.Star,
-                    args.Sweep.PcsCfg.FrequencyNominal)
+                    args.Sweep.SystemFrequencyHz)
                 : new AcInternalQuantities
                 {
                     LineVoltageV = Math.Max(_bus690.LineVoltageV, args.Sweep.PcsCfg.AcVoltageNominal * 0.01)

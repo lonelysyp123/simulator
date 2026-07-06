@@ -26,6 +26,9 @@ namespace EssSimulator.EssDeviceSimModel.Solver
         public double PccLineVoltageV { get; internal set; }
         public double StationBus35LineVoltageV { get; internal set; }
 
+        /// <summary>当前步系统唯一频率（Hz），由 <see cref="SystemFrequencyResolver"/> 每步刷新。</summary>
+        public double SystemFrequencyHz { get; internal set; }
+
         public ElectricalBus? GetBus(string busId) =>
             Topology.Buses.FirstOrDefault(b => b.BusId == busId);
     }

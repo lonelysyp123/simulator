@@ -25,6 +25,7 @@ public class PcsBusVoltageSourceTests
             Step = TimeSpan.FromMilliseconds(100),
             Bus35 = new ElectricalBusNode("BUS_35", 35000),
             PcsCfg = new Configuration.PcsPhysicalConfig(),
+            SystemFrequencyHz = 50,
             LastBus35LineVoltageV = 0,
             StationBusNominalLineVoltageV = 35000,
             MainBreakerClosed = false

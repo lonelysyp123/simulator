@@ -25,6 +25,7 @@ public class BusCouplerChainTests
             Step = TimeSpan.FromMilliseconds(100),
             Bus35 = downstream,
             PcsCfg = new Configuration.PcsPhysicalConfig(),
+            SystemFrequencyHz = 50,
             LastBus35LineVoltageV = 35000,
             StationBusNominalLineVoltageV = 35000,
             MainBreakerClosed = true

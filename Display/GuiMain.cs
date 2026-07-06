@@ -410,9 +410,9 @@ namespace EssSimulator.Display
                             acTable.AddColumn("功率");
                             acTable.AddRow("PCC电表", GuiStatusFormatters.FormatAcPhasor(snap.MeterPrimary),
                                 $"P {snap.MeterPrimary.ActivePowerKw:0.0}  Q {snap.MeterPrimary.ReactivePowerKvar:0.0}");
-                            acTable.AddRow("主变一次", GuiStatusFormatters.FormatAcPhasor(snap.MainTransformerPrimary),
+                            acTable.AddRow("主变一次", GuiStatusFormatters.FormatAcPhasorViPhi(snap.MainTransformerPrimary),
                                 $"P {snap.MainTransformerPrimary.ActivePowerKw:0.0}  Q {snap.MainTransformerPrimary.ReactivePowerKvar:0.0}");
-                            acTable.AddRow("主变二次", GuiStatusFormatters.FormatAcPhasor(snap.MainTransformerSecondary),
+                            acTable.AddRow("主变二次", GuiStatusFormatters.FormatAcPhasorViPhi(snap.MainTransformerSecondary),
                                 $"P {snap.MainTransformerSecondary.ActivePowerKw:0.0}  Q {snap.MainTransformerSecondary.ReactivePowerKvar:0.0}");
                             acTable.AddRow("35kV负载", "—", $"P {snap.LoadActivePowerKw:0.0}  Q {snap.LoadReactivePowerKvar:0.0}");
 
@@ -429,7 +429,7 @@ namespace EssSimulator.Display
                                 int u = unit.UnitIndex;
                                 int a = u * 2;
                                 int b = u * 2 + 1;
-                                string xfLine = $"{GuiStatusFormatters.FormatBreakerState(unit.UnitBreakerClosed, unit.UnitBreakerTripped)} | 690V {GuiStatusFormatters.FormatAcPhasor(unit.UnitTransformerSecondary)}";
+                                string xfLine = $"{GuiStatusFormatters.FormatBreakerState(unit.UnitBreakerClosed, unit.UnitBreakerTripped)} | 690V {GuiStatusFormatters.FormatAcPhasorViPhi(unit.UnitTransformerSecondary)}";
                                 string pcsA = unit.PcsA != null ? GuiStatusFormatters.FormatPcsAcLine(unit.PcsA.Value) : "-";
                                 string pcsB = unit.PcsB != null ? GuiStatusFormatters.FormatPcsAcLine(unit.PcsB.Value) : "-";
                                 string bmsA = "-", bmsB = "-";

@@ -119,10 +119,11 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 double lv690 = unitSec.LineVoltageV;
                 bool gridAvailable = mainClosed && lv690 > pcsCfg.AcVoltageNominal * 0.1;
 
+                double gridFreq = network.SystemFrequencyHz;
                 if (a < ess._pcsList.Count)
-                    ess._pcsList[a].UpdateGridState(lv690, pcsCfg.FrequencyNominal, gridAvailable);
+                    ess._pcsList[a].UpdateGridState(lv690, gridFreq, gridAvailable);
                 if (b < ess._pcsList.Count)
-                    ess._pcsList[b].UpdateGridState(lv690, pcsCfg.FrequencyNominal, gridAvailable);
+                    ess._pcsList[b].UpdateGridState(lv690, gridFreq, gridAvailable);
             }
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssDeviceSimModel.Interface;
 using EssSimulator.EssDeviceSimModel.Model;
 
@@ -564,8 +565,9 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 : Math.Max(_currentState.IslandVoltageEffectiveV, 1.0);
             _currentState.AcVoltage = acV;
             _currentState.Frequency = _blackStartEnabled
+                && EssIslandBusLogic.IsPcsIslandVoltageBuilding(_currentState)
                 ? _blackStartIslandFreqHz
-                : _config.FrequencyNominal;
+                : 0;
 
             // 计算交流电流（带符号，正=放电，负=充电）
             double apparentPower = Math.Sqrt(

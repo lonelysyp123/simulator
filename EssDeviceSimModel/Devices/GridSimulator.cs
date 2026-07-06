@@ -25,6 +25,25 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         public void SetAggregatedReactivePowerKvar(double totalReactiveKvar) =>
             _aggregatedReactiveKvar = totalReactiveKvar;
 
+        /// <summary>电网额定线电压设定（V，220kV 写 220000）。Q-U 反馈在此基础上偏移。</summary>
+        public void SetNominalLineVoltage(double lineVoltageV)
+        {
+            if (lineVoltageV <= 0)
+                throw new ArgumentOutOfRangeException(nameof(lineVoltageV), "电网电压必须大于 0");
+            _config.NominalLineVoltageV = lineVoltageV;
+        }
+
+        /// <summary>电网额定频率设定（Hz）。并网时 PCS 跟网、电表 PCC 侧采样均取此值。</summary>
+        public void SetNominalFrequency(double frequencyHz)
+        {
+            if (frequencyHz <= 0 || frequencyHz > 75)
+                throw new ArgumentOutOfRangeException(nameof(frequencyHz), "电网频率须在 (0, 75] Hz");
+            _config.NominalFrequencyHz = frequencyHz;
+        }
+
+        public double NominalLineVoltageV => _config.NominalLineVoltageV;
+        public double NominalFrequencyHz => _config.NominalFrequencyHz;
+
         public void Activate(DeviceStepContext context, TimeSpan step) => Step(context, step);
 
         public void Step(DeviceStepContext context, TimeSpan step)

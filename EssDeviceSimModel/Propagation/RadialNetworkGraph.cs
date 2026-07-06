@@ -69,7 +69,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
         {
             Bus35.SetVoltage(
                 bus35LineVoltageV,
-                bus35LineVoltageV > 1.0 ? PcsCfg.FrequencyNominal : 0,
+                bus35LineVoltageV > 1.0 ? sweep.SystemFrequencyHz : 0,
                 sweep);
             ApplyLocalVoltageSources(sweep);
         }
@@ -92,7 +92,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 sweep.Bus35.TotalActivePowerKw,
                 sweep.Bus35.TotalReactivePowerKvar,
                 ThreePhaseConnection.Star,
-                sweep.PcsCfg.FrequencyNominal);
+                sweep.SystemFrequencyHz);
         }
 
         private void RegisterContributors(ElectricalNetwork network)

@@ -57,8 +57,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
             emData.TotalApparentPower = (float)totalS;
             emData.PowerFactor = (float)pf;
 
-            bool noBusPower = !ess.IsMainBreakerClosed && ess.StationBus35LineVoltageV <= 1.0;
-            emData.Frequency = noBusPower ? 0.0f : (float)(primary.FrequencyHz > 1.0 ? primary.FrequencyHz : 50.0);
+            emData.Frequency = (float)ess.ElectricalNetwork.SystemFrequencyHz;
 
             forwardKWh = tel.ForwardActiveEnergyKwh;
             reverseKWh = tel.ReverseActiveEnergyKwh;

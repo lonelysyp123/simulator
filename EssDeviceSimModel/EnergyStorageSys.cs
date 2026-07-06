@@ -248,6 +248,60 @@ namespace EssSimulator.EssDeviceSimModel
         public void SetLoadCharacteristic(string characteristic, double value) =>
             _loadDevice.SetLoadCharacteristic(characteristic, value);
 
+        /// <summary>运行时设定仿真电网额定线电压（V）。仅主断闭合时对外体现为 PCC 电压基准。</summary>
+        public bool TrySetGridVoltage(double lineVoltageV, out string message)
+        {
+            message = string.Empty;
+            if (lineVoltageV <= 0)
+            {
+                message = "电网电压必须大于 0（V，例如 220000）";
+                return false;
+            }
+
+            if (lineVoltageV > 1_000_000)
+            {
+                message = "电网电压超出合理范围（≤ 1000000 V）";
+                return false;
+            }
+
+            try
+            {
+                _electricalNetwork.Grid.SetNominalLineVoltage(lineVoltageV);
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                message = ex.Message;
+                return false;
+            }
+
+            message = $"电网额定线电压 = {lineVoltageV} V（主断闭合后 PCC 在此基础上叠加 Q-U 偏移）";
+            return true;
+        }
+
+        /// <summary>运行时设定仿真电网额定频率（Hz）。并网时 PCS 跟网、电表频率取此值。</summary>
+        public bool TrySetGridFrequency(double frequencyHz, out string message)
+        {
+            message = string.Empty;
+            if (frequencyHz <= 0 || frequencyHz > 75)
+            {
+                message = "电网频率须在 (0, 75] Hz";
+                return false;
+            }
+
+            try
+            {
+                _electricalNetwork.Grid.SetNominalFrequency(frequencyHz);
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                message = ex.Message;
+                return false;
+            }
+
+            message = $"电网额定频率 = {frequencyHz} Hz（主断闭合后 PCS 跟网、simEm.yc19 反映此值）";
+            return true;
+        }
+
         /// <summary>写入 PCS 黑启动开关（含断路器联锁）；违规则返回 false 且不开启。</summary>
         public bool TrySetPcsBlackStart(int pcsSimIndex, bool requested)
         {
@@ -369,13 +423,13 @@ namespace EssSimulator.EssDeviceSimModel
             double energizedV = _pcsCfg.AcVoltageNominal * _pcsCfg.BlackStartBusEnergizedFraction;
             if (busV >= energizedV)
             {
-                pcs.UpdateGridState(busV, _pcsCfg.FrequencyNominal, false);
+                pcs.UpdateGridState(busV, _electricalNetwork.SystemFrequencyHz, false);
                 return;
             }
 
             if (pcs.GetCurrentState().BlackStartEnabled)
             {
-                pcs.UpdateGridState(0, _pcsCfg.FrequencyNominal, false);
+                pcs.UpdateGridState(0, _electricalNetwork.SystemFrequencyHz, false);
                 return;
             }
 

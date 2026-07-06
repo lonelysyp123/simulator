@@ -31,6 +31,12 @@ public class EssCommand(): ICommand
             return;
         }
 
+        if (verb.Equals("setGrid", StringComparison.OrdinalIgnoreCase))
+        {
+            ExecuteSetGrid(args);
+            return;
+        }
+
         if (verb.StartsWith("setbms", StringComparison.OrdinalIgnoreCase))
         {
             ExecuteSetBmsPower(args);
@@ -48,10 +54,13 @@ public class EssCommand(): ICommand
         Console.WriteLine("  link pcsN on|off               // 开启/关闭第 N 路 PCS 所属 EMU 单元的 Modbus 对外服务");
         Console.WriteLine("  link bmsN on|off               // 开启/关闭第 N 路 BMS 的 Modbus 对外服务");
         Console.WriteLine("  link status [pcsN|bmsN]        // 查看协议链路状态（省略目标则列出全部）");
+        Console.WriteLine("  setGrid frequency <Hz>         // 设定仿真电网额定频率（并网时 PCS 跟网、电表 yc19）");
+        Console.WriteLine("  setGrid voltage <V>            // 设定仿真电网额定线电压（如 220000）");
         Console.WriteLine("  setbmsN power on|off           // BMS 物理并网/离网（PCS↔BMS 直流链路）");
         Console.WriteLine();
         Console.WriteLine("说明:");
         Console.WriteLine("  - link off：关闭 TCP 监听，模拟通信中断；与 setbms power 无关");
+        Console.WriteLine("  - setGrid：调整外部电网源；主断闭合后生效于 PCC/跟网 PCS");
         Console.WriteLine("  - setbmsN power on：触发并网，GridConnectStatus→2，IsPcsLinked=true");
         Console.WriteLine("  - setbmsN power off：断开 PCS↔BMS 链路，GridConnectStatus→0");
         Console.WriteLine("  - 同一储能单元内 pcs(2n-1)/pcs(2n) 共用 simEmu{n}，关闭任一路会影响该单元两路 PCS");
@@ -86,6 +95,62 @@ public class EssCommand(): ICommand
 
         ess.SetLoadCharacteristic(args[1], num);
         Console.WriteLine($"执行成功: 负载 {args[1]} = {num}");
+    }
+
+    private static void ExecuteSetGrid(string[] args)
+    {
+        if (args.Length != 3)
+        {
+            Console.WriteLine("用法: esscmd setGrid frequency|voltage <数值>");
+            Console.WriteLine("示例: esscmd setGrid frequency 50");
+            Console.WriteLine("      esscmd setGrid voltage 220000");
+            return;
+        }
+
+        var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
+        if (ess == null)
+        {
+            Console.WriteLine("找不到 ess 模型，请确认仿真已启动");
+            return;
+        }
+
+        if (args[1].Equals("frequency", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!double.TryParse(args[2], out var hz))
+            {
+                Console.WriteLine("请输入有效的频率数值（Hz）");
+                return;
+            }
+
+            if (!ess.TrySetGridFrequency(hz, out var message))
+            {
+                Console.WriteLine($"操作失败: {message}");
+                return;
+            }
+
+            Console.WriteLine($"执行成功: {message}");
+            return;
+        }
+
+        if (args[1].Equals("voltage", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!double.TryParse(args[2], out var volts))
+            {
+                Console.WriteLine("请输入有效的电压数值（V）");
+                return;
+            }
+
+            if (!ess.TrySetGridVoltage(volts, out var message))
+            {
+                Console.WriteLine($"操作失败: {message}");
+                return;
+            }
+
+            Console.WriteLine($"执行成功: {message}");
+            return;
+        }
+
+        Console.WriteLine("setGrid 仅支持 frequency 或 voltage");
     }
 
     private static void ExecuteSetBmsPower(string[] args)
