@@ -94,6 +94,12 @@ copy_runtime_files() {
     cp -f "$ROOT/pointmap.manifest.json" "$out/pointmap.manifest.json"
     echo "    pointmap.manifest.json"
   fi
+
+  if [[ -d "$ROOT/docs" ]]; then
+    rm -rf "$out/docs"
+    cp -R "$ROOT/docs" "$out/docs"
+    echo "    docs/"
+  fi
 }
 
 copy_platform_files() {

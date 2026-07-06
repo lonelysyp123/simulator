@@ -59,10 +59,10 @@ public class DpcAutoTestCommand() : ICommand
 
             Console.WriteLine($"[{i + 1}/{steps.Count}] {step}");
 
-            if (TryParseSleepSeconds(step, out var sleepMilliseconds))
+            if (TryParseSleepMilliseconds(step, out var sleepMilliseconds))
             {
                 Thread.Sleep(TimeSpan.FromMilliseconds(sleepMilliseconds));
-                Console.WriteLine($"等待完成: {sleepMilliseconds} 毫秒");
+                Console.WriteLine($"等待完成: {sleepMilliseconds} ms");
                 continue;
             }
 
@@ -103,19 +103,19 @@ public class DpcAutoTestCommand() : ICommand
         return [];
     }
 
-    private static bool TryParseSleepSeconds(string step, out int seconds)
+    private static bool TryParseSleepMilliseconds(string step, out int milliseconds)
     {
-        seconds = 0;
+        milliseconds = 0;
         if (step.StartsWith("sleep(", StringComparison.OrdinalIgnoreCase) && step.EndsWith(")"))
         {
             var body = step["sleep(".Length..^1].Trim();
-            return int.TryParse(body, out seconds) && seconds >= 0;
+            return int.TryParse(body, out milliseconds) && milliseconds >= 0;
         }
 
         if (step.StartsWith("sleep ", StringComparison.OrdinalIgnoreCase))
         {
             var body = step["sleep ".Length..].Trim();
-            return int.TryParse(body, out seconds) && seconds >= 0;
+            return int.TryParse(body, out milliseconds) && milliseconds >= 0;
         }
 
         return false;
@@ -183,7 +183,7 @@ public class DpcAutoTestCommand() : ICommand
         Console.WriteLine("步骤语法支持:");
         Console.WriteLine("  dpc <device.point> set <value>");
         Console.WriteLine("  dpc <device.point> get");
-        Console.WriteLine("  sleep(10) 或 sleep 10");
+        Console.WriteLine("  sleep(100) 或 sleep 100   // 单位：毫秒（ms）");
     }
 }
 }

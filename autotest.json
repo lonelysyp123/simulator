@@ -2,19 +2,19 @@
   "tests": [
     {
       "name": "xxtest",
-      "description": "示例：按阶梯下调 simEm.yc19",
+      "description": "示例：按阶梯下调 simEm.yc19（sleep 单位为 ms）",
       "steps": [
         "dpc simEm.yc19 set 49.95",
-        "sleep(10)",
+        "sleep(10000)",
         "dpc simEm.yc19 set 49.9",
-        "sleep(10)",
+        "sleep(10000)",
         "dpc simEm.yc19 set 49.8"
       ]
     },
     {
       "name": "xxtest_script",
-      "description": "示例：使用 script 字段",
-      "script": "dpc simEm.yc19 set 49.95;sleep(10);dpc simEm.yc19 set 49.9;sleep(10);dpc simEm.yc19 set 49.8;"
+      "description": "示例：使用 script 字段（sleep 单位为 ms）",
+      "script": "dpc simEm.yc19 set 49.95;sleep(10000);dpc simEm.yc19 set 49.9;sleep(10000);dpc simEm.yc19 set 49.8;"
     }
   ]
 }

@@ -33,7 +33,7 @@ dotnet test EssSimulator.Tests/EssSimulator.Tests.csproj
 
 ## 控制台命令（运行时）
 
-`help`、`esscmd`、`breaker`、`dpc` 等，详见 `docs/OperationManual.md`。
+`help`、`esscmd`、`breaker`、`dpc` 等，详见 `docs/指令详细说明.md`、`docs/用户手册.md`。
 
 ## Modbus 联调
 
@@ -44,7 +44,7 @@ dotnet test EssSimulator.Tests/EssSimulator.Tests.csproj
 
 ## 发布
 
-**发布目录**（`dist/` 仅三个版本文件夹 + 压缩包，见 `docs/dist-layout.md`）：
+**发布目录**（`dist/` 仅三个版本文件夹 + 压缩包，见 `docs/项目编译说明.md`）：
 
 | 版本 | 配置源 |
 |------|--------|
@@ -76,5 +76,9 @@ EDITION=社区版 ./scripts/commercial/publish-linux.sh     # → dist/社区版
 
 ## 文档
 
-- 操作手册：`docs/OperationManual.md`
-- 方案设计：`docs/EnergyStorageSimulationSystem.md`
+见 `docs/README.md`：
+
+- 用户手册：`docs/用户手册.md`
+- 系统设计：`docs/系统设计说明.md`
+- 编译发布：`docs/项目编译说明.md`
+- 指令说明：`docs/指令详细说明.md`

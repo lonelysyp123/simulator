@@ -11,5 +11,5 @@ Modbus 端口以 appsettings.json 中 Simulator.Protocol 为准；单元数由
 EssUnits 配置决定。替换点表时保持文件名不变（emu.csv / bms_bank.csv 等），
 重启进程生效。
 
-详细联调步骤、命令与故障排查见项目 docs/OperationManual.md 或随项目
+详细联调步骤、命令与故障排查见 docs/用户手册.md、docs/指令详细说明.md
 交付的技术文档。

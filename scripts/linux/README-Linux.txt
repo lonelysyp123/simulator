@@ -11,4 +11,4 @@ EssSimulator - Linux 快速说明
 
 默认 Modbus 端口：电表 1500，BMS1 1501，EMU1 1601（详见 README.txt）
 
-详细说明见 README.txt；技术手册见 docs/OperationManual.md（若已随包提供）
+详细说明见 README.txt；技术手册见 docs/用户手册.md（若已随包提供）

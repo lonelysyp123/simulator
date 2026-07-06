@@ -214,6 +214,6 @@ Linux 版：
 ----------------
   社区版供联调与评估使用。
 
-  详细说明见 docs/OperationManual.md（若随包提供）。
+  详细说明见 docs/用户手册.md、docs/指令详细说明.md（若随包提供）。
   对外产品名称：仿真模拟器
   工程名称：EssSimulator

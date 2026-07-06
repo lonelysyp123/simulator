@@ -71,8 +71,11 @@ EMS/测试工具 ──Modbus TCP──► ModbusSimServer + DataExchangeSession
 | 主循环 | `EssDeviceSimModel/EnergyStorageSys.cs` |
 | 数据交换 | `DataExchange/` |
 | Modbus 服务 | `Protocol/ModbusHostedService.cs` |
-| 操作手册 | `docs/OperationManual.md` |
-| 设计说明 | `docs/EnergyStorageSimulationSystem.md` |
+| 文档索引 | `docs/README.md` |
+| 用户手册 | `docs/用户手册.md` |
+| 系统设计 | `docs/系统设计说明.md` |
+| 编译发布 | `docs/项目编译说明.md` |
+| 指令说明 | `docs/指令详细说明.md` |
 | 发布（商业） | `scripts/commercial/publish-all.sh` → `dist/{社区版,充值版,定制版}/{win-x64,linux-arm64}/` |
 | 发布（开发） | `scripts/publish-windows.sh` / `publish-linux.sh` → `dist/win-x64`、`dist/linux-arm64` |
 

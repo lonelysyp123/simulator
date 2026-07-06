@@ -22,6 +22,11 @@ copy_runtime_files() {
     cp -f "$ROOT/$f" "$OUT/$f"
     echo "    $f"
   done
+  if [[ -d "$ROOT/docs" ]]; then
+    rm -rf "$OUT/docs"
+    cp -R "$ROOT/docs" "$OUT/docs"
+    echo "    docs/"
+  fi
 }
 
 cd "$ROOT"
