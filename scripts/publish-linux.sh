@@ -2,29 +2,31 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=pointmap-common.sh
+source "$ROOT/scripts/pointmap-common.sh"
+
 RID="${RID:-linux-arm64}"
 CONFIG="${CONFIG:-Debug}"
 OUT="$ROOT/dist/$RID"
 ARCHIVE="$ROOT/dist/EssSimulator-${RID}.tar.gz"
 
-# 单文件发布时 dotnet 可能漏拷内容文件，发布后再显式复制一次以确保可运行。
+# 用法: ./scripts/publish-linux.sh [common|lc|battery]
+# 或: POINTMAP_VERSION=lc ./scripts/publish-linux.sh
+POINTMAP_VERSION="${POINTMAP_VERSION:-${1:-$DEFAULT_DEV_POINTMAP_VERSION}}"
+
 RUNTIME_FILES=(
   appsettings.json
   log4net.config
-  emu.csv
-  em.csv
-  bms_bank.csv
-  bms_rack.csv
-  lc.csv
   autotest.json
 )
 
 copy_runtime_files() {
-  echo "==> Copying runtime config and point maps..."
+  echo "==> Copying runtime config (point map: $POINTMAP_VERSION)..."
   for f in "${RUNTIME_FILES[@]}"; do
     cp -f "$ROOT/$f" "$OUT/$f"
     echo "    $f"
   done
+  copy_pointmaps_to "$OUT" "$POINTMAP_VERSION"
   if [[ -d "$ROOT/docs" ]]; then
     rm -rf "$OUT/docs"
     cp -R "$ROOT/docs" "$OUT/docs"
@@ -32,9 +34,11 @@ copy_runtime_files() {
   fi
 }
 
+validate_pointmap_version "$POINTMAP_VERSION"
+
 cd "$ROOT"
 
-echo "==> Publishing EssSimulator for Linux ($RID, $CONFIG, self-contained)..."
+echo "==> Publishing EssSimulator for Linux ($RID, $CONFIG, pointmap=$POINTMAP_VERSION, self-contained)..."
 dotnet publish EssSimulator.csproj \
   -c "$CONFIG" \
   -r "$RID" \
@@ -54,6 +58,7 @@ rm -f "$ARCHIVE"
 tar -czf "$ARCHIVE" -C "$ROOT/dist" "$(basename "$OUT")"
 
 echo "Done."
+echo "  Point map: $POINTMAP_VERSION"
 echo "  Folder:  $OUT"
 echo "  Archive: $ARCHIVE"
 echo "  Contents:"

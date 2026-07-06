@@ -1,0 +1,5 @@
+{
+  "id": "battery",
+  "name": "battery",
+  "description": "Full bms_rack with pack/cell-level telemetry (voltage, temperature, etc.)"
+}

@@ -3,6 +3,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=../pointmap-common.sh
+source "$ROOT/scripts/pointmap-common.sh"
 
 EDITION_COMMUNITY="社区版"
 EDITION_RECHARGE="充值版"
@@ -11,11 +13,6 @@ ALL_EDITIONS=("$EDITION_COMMUNITY" "$EDITION_RECHARGE" "$EDITION_CUSTOM")
 
 RUNTIME_FILES=(
   log4net.config
-  emu.csv
-  em.csv
-  bms_bank.csv
-  bms_rack.csv
-  lc.csv
   autotest.json
 )
 
@@ -89,6 +86,8 @@ copy_runtime_files() {
     cp -f "$ROOT/$f" "$out/$f"
     echo "    $f"
   done
+
+  copy_pointmaps_to "$out" "$DEFAULT_COMMERCIAL_POINTMAP_VERSION"
 
   if [[ -f "$ROOT/pointmap.manifest.json" ]]; then
     cp -f "$ROOT/pointmap.manifest.json" "$out/pointmap.manifest.json"

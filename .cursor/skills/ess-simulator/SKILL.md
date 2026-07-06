@@ -27,7 +27,7 @@ disable-model-invocation: false
 3. **Modbus 读写命令** → 使用 [.cursor/skills/ess-mbpoll/SKILL.md](../ess-mbpoll/SKILL.md)，禁止默认 `-t 4`。
 4. **每答一问，先想「还缺什么信息」**：若拓扑、点表版本、单元号、现象（读值/写值/日志）未明确，**先简短列出需要用户补充的项**，再给有条件的答案；不要假设与当前 `appsettings.json` / CSV 不一致的配置。
 5. **配置即真相**：单元数、端口、PCC/站用电压、`Devices[]` 以仓库内 **`appsettings.json`** 和 **`*.csv`** 为准，勿凭记忆写死数字。
-6. **点表切换**：BMS 堆表固定文件名 `bms_bank.csv`；换方案时将目标 CSV **改名为** `bms_bank.csv` 即可。
+6. **点表切换**：源文件在 `pointmaps/{common|lc|battery}/`；本地 `./scripts/sync-pointmaps-to-root.sh [版本]`；开发发布 `./scripts/publish-linux.sh lc`；商业发布固定 `common`。
 
 ### 常见需向用户确认的信息
 
@@ -64,10 +64,11 @@ EMS/测试工具 ──Modbus TCP──► ModbusSimServer + DataExchangeSession
 | 用途 | 路径 |
 |------|------|
 | 运行配置 | `appsettings.json` |
-| BMS 堆点表 | `bms_bank.csv`（可整表替换） |
+| BMS 堆点表 | `bms_bank.csv`（源：`pointmaps/{版本}/`） |
 | BMS 簇点表 | `bms_rack.csv` |
 | PCS/EMU 点表 | `emu.csv` |
 | 电表点表 | `em.csv` |
+| 点位表目录 | `pointmaps/`（common / lc / battery） |
 | 主循环 | `EssDeviceSimModel/EnergyStorageSys.cs` |
 | 数据交换 | `DataExchange/` |
 | Modbus 服务 | `Protocol/ModbusHostedService.cs` |

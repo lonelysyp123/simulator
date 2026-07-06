@@ -10,6 +10,7 @@
 | [测试报告](./测试报告.md) | 测试、QA | 性能与 DataExchange 手动测试记录 |
 | [指令详细说明](./指令详细说明.md) | 联调、测试 | esscmd / dpc / breaker / dpctest 用法与示例 |
 | [appsettings 字段说明](./appsettings.explained.md) | 开发、集成 | `appsettings.json` 各配置段含义 |
+| [点位表版本说明](../pointmaps/README.md) | 联调、发布 | common / lc / battery 与发布参数 |
 
 ## 补充材料
 

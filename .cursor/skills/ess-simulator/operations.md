@@ -16,7 +16,7 @@ dotnet test EssSimulator.Tests/EssSimulator.Tests.csproj
 | 文件 | 作用 |
 |------|------|
 | `appsettings.json` | 单元拓扑、`Devices[]`、端口、PCC/变压器/负载、DataExchange 周期 |
-| `bms_bank.csv` | BMS 堆 Modbus 点（**换表 = 改名为此文件**） |
+| `bms_bank.csv` | BMS 堆 Modbus 点（源在 `pointmaps/{版本}/`，`sync-pointmaps-to-root.sh` 同步） |
 | `bms_rack.csv` | BMS 簇 Modbus 点 |
 | `emu.csv` | PCS/EMU 点 |
 | `em.csv` | 站用/PCC 电表点 |

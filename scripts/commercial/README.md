@@ -20,5 +20,5 @@ Windows PowerShell：`$env:EDITION="社区版"; .\scripts\commercial\publish-win
 | `publish-common.sh` | 版本解析、拷贝运行时、打 zip/tar |
 | `publish-windows.sh` / `publish-linux.sh` | 单版本单平台 |
 | `publish-all.sh` | 批量发布 |
-| `sync-runtime.sh` | 不编译，仅同步 CSV/配置 |
+| `sync-runtime.sh` | 不编译，仅同步配置/点位表（**固定 common**）/文档 |
 | `editions/*/README.txt` | 各版本随包说明 |
