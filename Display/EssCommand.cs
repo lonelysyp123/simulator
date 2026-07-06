@@ -53,7 +53,8 @@ public class EssCommand(): ICommand
         Console.WriteLine("  setLoad reactivePower <kvar>   // 手动设定负载无功");
         Console.WriteLine("  link pcsN on|off               // 开启/关闭第 N 路 PCS 所属 EMU 单元的 Modbus 对外服务");
         Console.WriteLine("  link bmsN on|off               // 开启/关闭第 N 路 BMS 的 Modbus 对外服务");
-        Console.WriteLine("  link status [pcsN|bmsN]        // 查看协议链路状态（省略目标则列出全部）");
+        Console.WriteLine("  link em on|off                 // 开启/关闭并网点电表 simEm 的 Modbus 对外服务");
+        Console.WriteLine("  link status [pcsN|bmsN|em]     // 查看协议链路状态（省略目标则列出全部）");
         Console.WriteLine("  setGrid frequency <Hz>         // 设定仿真电网额定频率（并网时 PCS 跟网、电表 yc19）");
         Console.WriteLine("  setGrid voltage <V>            // 设定仿真电网额定线电压（如 220000）");
         Console.WriteLine("  setbmsN power on|off           // BMS 物理并网/离网（PCS↔BMS 直流链路）");
@@ -232,8 +233,8 @@ public class EssCommand(): ICommand
 
         if (args.Length != 3)
         {
-            Console.WriteLine("用法: esscmd link pcsN|bmsN on|off");
-            Console.WriteLine("      esscmd link status [pcsN|bmsN]");
+            Console.WriteLine("用法: esscmd link pcsN|bmsN|em on|off");
+            Console.WriteLine("      esscmd link status [pcsN|bmsN|em]");
             return;
         }
 
@@ -295,11 +296,23 @@ public class EssCommand(): ICommand
         detail = string.Empty;
         if (string.IsNullOrWhiteSpace(target))
         {
-            detail = "请指定 pcsN 或 bmsN";
+            detail = "请指定 pcsN、bmsN 或 em";
             return false;
         }
 
         var store = SimulatorHost.Instance;
+        if (target.Equals("em", StringComparison.OrdinalIgnoreCase))
+        {
+            serverName = "simEm";
+            server = store.Get<ModbusSimServer>(serverName);
+            if (server == null)
+            {
+                detail = "找不到 simEm（电表 Modbus 未注册，请确认仿真已启动）";
+                return false;
+            }
+            return true;
+        }
+
         if (target.StartsWith("pcs", StringComparison.OrdinalIgnoreCase) &&
             int.TryParse(target.AsSpan(3), out int pcsIdx) &&
             pcsIdx >= 1)
@@ -332,7 +345,7 @@ public class EssCommand(): ICommand
             return true;
         }
 
-        detail = "目标格式应为 pcsN 或 bmsN，例如 pcs1、bms3";
+        detail = "目标格式应为 pcsN、bmsN 或 em，例如 pcs1、bms3、em";
         return false;
     }
 
@@ -340,6 +353,12 @@ public class EssCommand(): ICommand
     {
         var store = SimulatorHost.Instance;
         Console.WriteLine("协议链路状态:");
+
+        if (store.Contains("simEm"))
+        {
+            var emServer = store.Get<ModbusSimServer>("simEm");
+            Console.WriteLine(FormatLinkStatus("em", "simEm", emServer!, string.Empty));
+        }
 
         int bms = 1;
         while (store.Contains($"simBms{bms}"))
