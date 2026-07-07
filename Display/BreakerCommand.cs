@@ -4,43 +4,31 @@ using System;
 
 namespace EssSimulator.Display
 {
-public class BreakerCommand() : ICommand
-{
-    public string Name => "breaker";
-    public string Description => "breaker 操控命令 (set)";
-
-    public void Execute(string[] args)
+    public class BreakerCommand : ICommand
     {
-        if (args.Length != 2)
-        {
-            Console.WriteLine("用法: breaker <operation> <state>");
-            return;
-        }
+        public string Name => "breaker";
+        public string Description => "breaker 操控命令 (set)";
 
-        if (!bool.TryParse(args[1], out var flag))
+        public CommandResult Execute(string[] args)
         {
-            Console.WriteLine("请输入有效的数字");
-            return;
-        }
+            if (args.Length != 2)
+                return CommandResult.Fail("用法: breaker <operation> <state>");
 
-        var objectsCollect = SimulatorHost.Instance;
-        EnergyStorageSystem ess = objectsCollect.Get<EnergyStorageSystem>("ess"); ;
-        if (ess == null)
-        {
-            Console.WriteLine("找不到对应的模型");
-            return;
-        }
+            if (!bool.TryParse(args[1], out var flag))
+                return CommandResult.Fail("请输入有效的布尔值 (true/false)");
 
-        if (args[0] == "set")
-        {
-            ess.SetMainBreakerClosed(flag);
+            var objectsCollect = SimulatorHost.Instance;
+            EnergyStorageSystem ess = objectsCollect.Get<EnergyStorageSystem>("ess");
+            if (ess == null)
+                return CommandResult.Fail("找不到对应的模型");
+
+            if (args[0] == "set")
+            {
+                ess.SetMainBreakerClosed(flag);
+                return CommandResult.Ok($"执行成功: 主断路器 {(flag ? "合闸" : "分闸")}");
+            }
+
+            return CommandResult.Fail("操作命令参数不正确，仅支持 set");
         }
-        else
-        {
-            Console.WriteLine("操作命令参数不正确");
-            return;
-        }
-        Console.WriteLine($"执行成功");
     }
-}
 }

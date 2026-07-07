@@ -3,8 +3,8 @@ using log4net;
 
 namespace EssSimulator.Display
 {
-    /// <summary>主接线等视图的状态文本格式化。</summary>
-    internal static class GuiStatusFormatters
+    /// <summary>主接线等视图的状态文本格式化（Web/TUI 共用）。</summary>
+    public static class GuiStatusFormatters
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(GuiStatusFormatters));
 

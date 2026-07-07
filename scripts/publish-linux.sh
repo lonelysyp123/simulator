@@ -38,6 +38,19 @@ validate_pointmap_version "$POINTMAP_VERSION"
 
 cd "$ROOT"
 
+# 构建 B/S 前端（Vue 3 + Vite）到 wwwroot/
+build_frontend() {
+  echo "==> Building web frontend (Vue3 + Vite)..."
+  if [[ ! -d "$ROOT/web/node_modules" ]]; then
+    echo "    installing npm dependencies..."
+    (cd "$ROOT/web" && npm install)
+  fi
+  (cd "$ROOT/web" && npm run build)
+  echo "    wwwroot/ populated."
+}
+
+build_frontend
+
 echo "==> Publishing EssSimulator for Linux ($RID, $CONFIG, pointmap=$POINTMAP_VERSION, self-contained)..."
 dotnet publish EssSimulator.csproj \
   -c "$CONFIG" \

@@ -69,7 +69,7 @@ namespace EssSimulator.Display
     }
 
     /// <summary>从 ess/em 路径读取主接线电气量（对齐传播求解 V-I-φ 架构）。</summary>
-    internal static class GuiElectricalReader
+    public static class GuiElectricalReader
     {
         public static MainLineSnapshot ReadMainLine(int unitStart, int unitEndExclusive)
         {

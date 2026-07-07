@@ -1,11 +1,12 @@
 using System.Threading;
 using log4net;
-using Spectre.Console;
 
 namespace EssSimulator.Display
 {
     /// <summary>
-    /// 全进程级严重故障提示：任意界面居中红框显示，倒计时后强制退出整个系统。
+    /// 全进程级严重故障提示：黑启动联锁违规等安全事件。
+    /// B/S 改造后不再渲染控制台 overlay，改为触发事件供 Web 层（SignalR）向前端推送全屏告警，
+    /// 并在倒计时后请求应用关闭。
     /// </summary>
     public static class FatalSystemAlert
     {
@@ -14,11 +15,16 @@ namespace EssSimulator.Display
         private static string _message = "";
         private static string _detail = "";
         private static DateTime _exitAtUtc;
-        private static Thread? _overlayThread;
+
+        /// <summary>告警触发时的事件，订阅者收到后通过 SignalR 推送前端。</summary>
+        public static event Action<FatalAlertEventArgs>? AlertTriggered;
 
         public static bool IsActive => Volatile.Read(ref _triggered) == 1;
 
-        /// <summary>触发严重故障 UI 与进程退出倒计时（仅首次生效）。</summary>
+        public static string Message => _message;
+        public static string Detail => _detail;
+
+        /// <summary>触发严重故障：记录信息、通知订阅者、并安排进程退出倒计时（仅首次生效）。</summary>
         public static void Trigger(string message, string detail, TimeSpan exitDelay)
         {
             if (Interlocked.CompareExchange(ref _triggered, 1, 0) != 0)
@@ -28,74 +34,53 @@ namespace EssSimulator.Display
             _detail = detail;
             _exitAtUtc = DateTime.UtcNow + exitDelay;
 
-            GuiMain.ActivateFatalShutdown();
-            StartOverlayThread();
-        }
-
-        /// <summary>各界面循环中调用：显示居中红框并阻止正常交互。</summary>
-        /// <returns>true 表示已进入严重故障模式，调用方应跳过常规 UI。</returns>
-        public static bool PollFatalUi()
-        {
-            if (!IsActive)
-                return false;
-
-            RenderOverlay();
-
-            if (DateTime.UtcNow >= _exitAtUtc)
-                ForceExitProcess();
-
-            return true;
+            try
+            {
+                AlertTriggered?.Invoke(new FatalAlertEventArgs(message, detail, exitDelay));
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("FatalSystemAlert 订阅者通知异常", ex);
+            }
         }
 
         public static int SecondsUntilExit =>
             IsActive ? Math.Max(0, (int)Math.Ceiling((_exitAtUtc - DateTime.UtcNow).TotalSeconds)) : 0;
 
-        private static void StartOverlayThread()
+        public static FatalAlertSnapshot GetSnapshot() => new()
         {
-            _overlayThread = new Thread(() =>
-            {
-                while (IsActive && DateTime.UtcNow < _exitAtUtc)
-                {
-                    try { RenderOverlay(); }
-                    catch (Exception ex) { Log.Debug("严重故障 overlay 渲染失败（终端受限）", ex); }
-                    Thread.Sleep(250);
-                }
-
-                if (IsActive)
-                    ForceExitProcess();
-            })
-            { IsBackground = true, Name = "FatalSystemAlertOverlay" };
-            _overlayThread.Start();
-        }
-
-        public static void RenderOverlay()
-        {
-            int seconds = SecondsUntilExit;
-            var body = new Markup(
-                $"[bold red]严重故障[/]\n\n" +
-                $"{EscapeMarkup(_message)}\n\n" +
-                (string.IsNullOrWhiteSpace(_detail) ? "" : $"{EscapeMarkup(_detail)}\n\n") +
-                $"[red]{seconds} 秒后退出整个系统…[/]\n" +
-                "[dim]安全联锁已触发，请勿继续操作。[/]");
-
-            var panel = new Panel(body)
-                .Header("[red]■ 安全联锁 ■[/]", Justify.Center)
-                .Border(BoxBorder.Double)
-                .BorderColor(Color.Red)
-                .Padding(2, 1);
-
-            Console.Clear();
-            AnsiConsole.Write(new Align(panel, HorizontalAlignment.Center, VerticalAlignment.Middle));
-        }
+            IsActive = IsActive,
+            Message = _message,
+            Detail = _detail,
+            SecondsUntilExit = SecondsUntilExit
+        };
 
         public static void ForceExitProcess()
         {
-            try { Console.Clear(); }
-            catch (Exception ex) { Log.Debug("退出前 Console.Clear 失败", ex); }
+            Log.Fatal("严重故障：执行进程退出。");
             Environment.Exit(1);
         }
+    }
 
-        private static string EscapeMarkup(string text) =>
-            Markup.Escape(text ?? string.Empty);
+    public sealed class FatalAlertEventArgs : EventArgs
+    {
+        public string Message { get; }
+        public string Detail { get; }
+        public TimeSpan ExitDelay { get; }
+
+        public FatalAlertEventArgs(string message, string detail, TimeSpan exitDelay)
+        {
+            Message = message;
+            Detail = detail;
+            ExitDelay = exitDelay;
+        }
+    }
+
+    public sealed class FatalAlertSnapshot
+    {
+        public bool IsActive { get; set; }
+        public string Message { get; set; } = "";
+        public string Detail { get; set; } = "";
+        public int SecondsUntilExit { get; set; }
     }
 }

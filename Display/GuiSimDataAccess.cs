@@ -3,8 +3,8 @@ using log4net;
 
 namespace EssSimulator.Display
 {
-    /// <summary>GUI 读取仿真对象路径的辅助方法。</summary>
-    internal static class GuiSimDataAccess
+    /// <summary>GUI/Web 读取仿真对象路径的辅助方法。</summary>
+    public static class GuiSimDataAccess
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(GuiSimDataAccess));
 

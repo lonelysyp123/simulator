@@ -5,8 +5,12 @@ using EssSimulator.Display;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi;
 using EssSimulator.LocalControl;
+using EssSimulator.Web;
 using log4net;
+using log4net.Appender;
 using log4net.Config;
+using log4net.Repository.Hierarchy;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,7 +20,7 @@ using System.Text.Json;
 
 namespace EssSimulator
 {
-    class Program
+    public class Program
     {
         private static Stream? LoadJsonWithCommentsAsStream(string path, bool optional)
         {
@@ -61,9 +65,7 @@ namespace EssSimulator
                 return false;
 
             if (SimServer.serverListenInfo.Count < expectedServerCount)
-            {
                 return false;
-            }
 
             try
             {
@@ -88,54 +90,34 @@ namespace EssSimulator
                 int emuPerGroup = Math.Max(1, cfg.Protocol.LocalControlEmuPerGroup);
                 expectedLcCount = (int)Math.Ceiling(expectedEmuCount / (double)emuPerGroup);
             }
-            int expectedServerCount = expectedBmsCount + expectedEmuCount + expectedLcCount + 1; // BMS + EMU + LC + EM
+            int expectedServerCount = expectedBmsCount + expectedEmuCount + expectedLcCount + 1;
             var timeout = TimeSpan.FromSeconds(60);
             var start = DateTime.UtcNow;
-            var spinner = new[] { '|', '/', '-', '\\' };
-            int spinnerIndex = 0;
 
             while ((DateTime.UtcNow - start) < timeout)
             {
                 if (IsSimulatorReady(expectedServerCount, cfg.Protocol.EnableLocalControl))
                 {
-                    Console.Clear();
+                    LogManager.GetLogger(typeof(Program)).Info("[Program] 仿真器已就绪");
                     return;
                 }
-
-                var elapsedSeconds = (int)(DateTime.UtcNow - start).TotalSeconds;
-                Console.Clear();
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("=== 储能单元模拟器加载中 ===");
-                Console.ResetColor();
-                Console.WriteLine();
-                Console.WriteLine("正在初始化内部模拟器与协议服务，请稍候...");
-                Console.WriteLine($"协议服务进度: {SimServer.serverListenInfo.Count}/{expectedServerCount}");
-                Console.WriteLine($"加载状态: {spinner[spinnerIndex]}  已等待 {elapsedSeconds}s");
-                Console.WriteLine();
-                Console.WriteLine("加载完成后将自动进入可视化界面。");
-
-                spinnerIndex = (spinnerIndex + 1) % spinner.Length;
-                await Task.Delay(200, cancellationToken);
+                try { await Task.Delay(500, cancellationToken); }
+                catch (TaskCanceledException) { return; }
             }
 
-            // 超时兜底：避免无限等待，给出提示后继续进入 GUI。
-            Console.Clear();
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine("初始化等待超时，仍将进入可视化界面。");
-            Console.WriteLine("若 dpc 初始读取异常，请稍后重试。");
-            Console.ResetColor();
-            await Task.Delay(1200, cancellationToken);
+            LogManager.GetLogger(typeof(Program)).Warn("初始化等待超时，仍将启动 Web 服务。若 dpc 初始读取异常，请稍后重试。");
         }
 
-        private static void PrintProtocolCreateInfo(SimulatorConfig cfg)
+        private static void LogProtocolCreateInfo(SimulatorConfig cfg)
         {
-            Console.WriteLine("==== 协议模拟器创建 ====");
-            Console.WriteLine($"电表   simEm  : Modbus TCP 端口 {cfg.Protocol.EmModbusPort}");
+            var log = LogManager.GetLogger(typeof(Program));
+            log.Info("==== 协议模拟器创建 ====");
+            log.Info($"电表   simEm  : Modbus TCP 端口 {cfg.Protocol.EmModbusPort}");
             int unitCount = Math.Max(1, cfg.Devices?.Count ?? 1);
             for (int i = 0; i < unitCount; i++)
             {
                 int emuPort = cfg.Protocol.BaseEmuModbusPort + i * cfg.Protocol.EmuPortStep;
-                Console.WriteLine($"EMU 单元{i + 1} simEmu{i + 1}: Modbus TCP 端口 {emuPort}（承载 emu{i + 1}.PcsList[0..1]）");
+                log.Info($"EMU 单元{i + 1} simEmu{i + 1}: Modbus TCP 端口 {emuPort}（承载 emu{i + 1}.PcsList[0..1]）");
             }
             if (cfg.Protocol.EnableLocalControl)
             {
@@ -144,16 +126,15 @@ namespace EssSimulator
                 for (int i = 0; i < lcCount; i++)
                 {
                     int lcPort = cfg.Protocol.BaseLocalControlModbusPort + i * cfg.Protocol.LocalControlPortStep;
-                    Console.WriteLine($"LC 聚合{i + 1} simLc{i + 1}: Modbus TCP 端口 {lcPort}（聚合 {emuPerGroup} 个 EMU / {emuPerGroup * 2} 台 PCS）");
+                    log.Info($"LC 聚合{i + 1} simLc{i + 1}: Modbus TCP 端口 {lcPort}（聚合 {emuPerGroup} 个 EMU / {emuPerGroup * 2} 台 PCS）");
                 }
             }
             for (int i = 0; i < Math.Max(1, cfg.UnitCount); i++)
             {
                 int port = cfg.Protocol.BaseBmsModbusPort + i * cfg.Protocol.BmsPortStep;
-                Console.WriteLine($"BMS 路{i + 1} simBms{i + 1}: Modbus TCP 端口 {port}");
+                log.Info($"BMS 路{i + 1} simBms{i + 1}: Modbus TCP 端口 {port}");
             }
-            Console.WriteLine("=======================");
-            Console.WriteLine();
+            log.Info("=======================");
         }
 
         static async Task Main(string[] args)
@@ -172,115 +153,189 @@ namespace EssSimulator
                 BasicConfigurator.Configure();
                 Console.WriteLine($"[log4net] 配置加载失败：{ex.Message}，已启用基础配置");
             }
-            LogManager.GetLogger(typeof(Program)).Info("[Program] 应用启动");
+            LogManager.GetLogger(typeof(Program)).Info("[Program] 应用启动（B/S 架构）");
 
-            var host = Host.CreateDefaultBuilder(args)
-                .ConfigureAppConfiguration((ctx, cfg) =>
-                {
-                    // 改为与 autotest.json 一致的读取方式：支持 JSON 注释与尾随逗号。
-                    // 仍使用 IConfiguration/IOptions 绑定，避免影响其余逻辑。
-                    cfg.Sources.Clear();
-
-                    string baseDir = Directory.GetCurrentDirectory();
-                    string envName = ctx.HostingEnvironment.EnvironmentName;
-
-                    var baseStream = LoadJsonWithCommentsAsStream(Path.Combine(baseDir, "appsettings.json"), optional: false);
-                    if (baseStream != null) cfg.AddJsonStream(baseStream);
-
-                    var envStream = LoadJsonWithCommentsAsStream(Path.Combine(baseDir, $"appsettings.{envName}.json"), optional: true);
-                    if (envStream != null) cfg.AddJsonStream(envStream);
-
-                    // 保留环境变量与命令行覆盖能力
-                    cfg.AddEnvironmentVariables();
-                    if (args is { Length: > 0 }) cfg.AddCommandLine(args);
-                })
-                .ConfigureServices((ctx, services) =>
-                {
-                    // 绑定配置节到强类型选项
-                    services.Configure<SimulatorConfig>(ctx.Configuration.GetSection(SimulatorConfig.Section));
-                    services.PostConfigure<SimulatorConfig>(opt =>
-                    {
-                        var units = ctx.Configuration.GetSection(EssUnitsConfig.Section)
-                            .Get<List<EssUnitConfig>>();
-                        if (units is { Count: > 0 })
-                            opt.Devices = units;
-                    });
-                    services.Configure<PcsPhysicalConfig>(ctx.Configuration.GetSection(PcsPhysicalConfig.Section));
-                    services.Configure<TransformerConfig>(ctx.Configuration.GetSection(TransformerConfig.Section));
-                    services.Configure<UnitTransformerConfig>(ctx.Configuration.GetSection(UnitTransformerConfig.Section));
-                    services.Configure<LoadConfig>(ctx.Configuration.GetSection(LoadConfig.Section));
-                    services.Configure<PccConfig>(ctx.Configuration.GetSection(PccConfig.Section));
-                    services.Configure<EssSimulator.EssDeviceSimModel.Model.MeterConfig>(
-                        ctx.Configuration.GetSection(EssSimulator.EssDeviceSimModel.Model.MeterConfig.Section));
-                    services.Configure<DataExchangeOptions>(ctx.Configuration.GetSection(DataExchangeOptions.Section));
-
-                    // 核心仿真模型（单例 + 托管服务，由 Host 管理生命周期和仿真主循环）
-                    services.AddSingleton<EnergyStorageSystem>(sp =>
-                    {
-                        var simCfg   = sp.GetRequiredService<IOptions<SimulatorConfig>>().Value;
-                        var pcsCfg   = sp.GetRequiredService<IOptions<PcsPhysicalConfig>>().Value;
-                        var transCfg = sp.GetRequiredService<IOptions<TransformerConfig>>().Value;
-                        var unitTransCfg = sp.GetRequiredService<IOptions<UnitTransformerConfig>>().Value;
-                        var loadCfg  = sp.GetRequiredService<IOptions<LoadConfig>>().Value;
-                        var pccCfg   = sp.GetRequiredService<IOptions<PccConfig>>().Value;
-                        var meterCfg = sp.GetRequiredService<IOptions<EssSimulator.EssDeviceSimModel.Model.MeterConfig>>().Value;
-                        var ess = new EnergyStorageSystem(
-                            simCfg, pcsCfg, transCfg, unitTransCfg, loadCfg, pccCfg, meterCfg);
-                        SimulatorHost.Instance.Register("ess", ess);
-                        return ess;
-                    });
-                    services.AddHostedService(sp => sp.GetRequiredService<EnergyStorageSystem>());
-
-                    // 数据服务（BackgroundService）
-                    services.AddSingleton<BmsDataService>(sp =>
-                    {
-                        var cfg = sp.GetRequiredService<IOptions<SimulatorConfig>>().Value;
-                        return new BmsDataService(cfg);
-                    });
-                    services.AddHostedService(sp => sp.GetRequiredService<BmsDataService>());
-
-                    services.AddHostedService<BmsLinkService>();
-
-                    services.AddSingleton<PcsDataServer>();
-                    services.AddHostedService(sp => sp.GetRequiredService<PcsDataServer>());
-
-                    services.AddSingleton<EmDataService>();
-                    services.AddHostedService(sp => sp.GetRequiredService<EmDataService>());
-
-                    bool enableLocalControl = ctx.Configuration.GetSection(SimulatorConfig.Section)
-                        .GetSection(nameof(SimulatorConfig.Protocol))
-                        .GetValue<bool>(nameof(ProtocolConfig.EnableLocalControl));
-                    if (enableLocalControl)
-                    {
-                        services.AddHostedService<LocalControlHostedService>();
-                    }
-
-                    // Modbus 协议服务（托管服务）
-                    services.AddHostedService<ModbusHostedService>();
-
-                    // GUI（可选，不影响服务启动）
-                    services.AddSingleton<GuiMain>();
-                })
-                .Build();
-
-            var simCfg = host.Services.GetRequiredService<IOptions<SimulatorConfig>>().Value;
-            BlackStartSafety.Register(host.Services.GetRequiredService<IHostApplicationLifetime>());
-
-            // 先启动 Host（后台服务会创建并启动 Modbus 从站等）
-            await host.StartAsync();
-
-            // 启动控制台 GUI（若未禁用）。GUI 内部会 Clear 覆盖上面的打印。
-            if (!simCfg.Runtime.NoGui)
+            // 编程式注册 LogHubAppender：把日志推送到 SignalR（无需修改 log4net.config）
+            try
             {
-                await WaitForSimulatorReadyAsync(simCfg, CancellationToken.None);
-                host.Services.GetRequiredService<GuiMain>();
+                var repo = LogManager.GetRepository() as Hierarchy;
+                if (repo != null)
+                {
+                    var hubAppender = new LogHubAppender { Name = "LogHubAppender", Threshold = log4net.Core.Level.Info };
+                    hubAppender.ActivateOptions();
+                    repo.Root.AddAppender(hubAppender);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                PrintProtocolCreateInfo(simCfg);
+                Console.WriteLine($"[log4net] 注册 LogHubAppender 失败：{ex.Message}");
             }
 
-            await host.WaitForShutdownAsync();
+            var builder = WebApplication.CreateBuilder(args);
+
+            // 替换默认配置加载为支持 JSON 注释/尾随逗号的版本
+            builder.Configuration.Sources.Clear();
+            string baseDir = Directory.GetCurrentDirectory();
+            string envName = builder.Environment.EnvironmentName;
+            var baseStream = LoadJsonWithCommentsAsStream(Path.Combine(baseDir, "appsettings.json"), optional: false);
+            if (baseStream != null) builder.Configuration.AddJsonStream(baseStream);
+            var envStream = LoadJsonWithCommentsAsStream(Path.Combine(baseDir, $"appsettings.{envName}.json"), optional: true);
+            if (envStream != null) builder.Configuration.AddJsonStream(envStream);
+            builder.Configuration.AddEnvironmentVariables();
+            if (args is { Length: > 0 }) builder.Configuration.AddCommandLine(args);
+
+            // 绑定配置节
+            builder.Services.Configure<SimulatorConfig>(builder.Configuration.GetSection(SimulatorConfig.Section));
+            builder.Services.PostConfigure<SimulatorConfig>(opt =>
+            {
+                var units = builder.Configuration.GetSection(EssUnitsConfig.Section).Get<List<EssUnitConfig>>();
+                if (units is { Count: > 0 }) opt.Devices = units;
+            });
+            builder.Services.Configure<PcsPhysicalConfig>(builder.Configuration.GetSection(PcsPhysicalConfig.Section));
+            builder.Services.Configure<TransformerConfig>(builder.Configuration.GetSection(TransformerConfig.Section));
+            builder.Services.Configure<UnitTransformerConfig>(builder.Configuration.GetSection(UnitTransformerConfig.Section));
+            builder.Services.Configure<LoadConfig>(builder.Configuration.GetSection(LoadConfig.Section));
+            builder.Services.Configure<PccConfig>(builder.Configuration.GetSection(PccConfig.Section));
+            builder.Services.Configure<EssSimulator.EssDeviceSimModel.Model.MeterConfig>(
+                builder.Configuration.GetSection(EssSimulator.EssDeviceSimModel.Model.MeterConfig.Section));
+            builder.Services.Configure<DataExchangeOptions>(builder.Configuration.GetSection(DataExchangeOptions.Section));
+            builder.Services.Configure<WebConfig>(builder.Configuration.GetSection(WebConfig.Section));
+
+            // 配置 Kestrel 监听端口
+            var webCfgEarly = builder.Configuration.GetSection(WebConfig.Section).Get<WebConfig>() ?? new WebConfig();
+            string url = $"{webCfgEarly.HttpBaseUrl.Replace("0.0.0.0", "*")}:{webCfgEarly.HttpPort}";
+            builder.WebHost.UseUrls(url);
+
+            // CORS：允许前端 dev 代理与配置的来源
+            var corsOrigins = webCfgEarly.CorsOrigins ?? new List<string>();
+            // dev 模式默认放行 Vite 默认端口
+            var devOrigins = new[] { "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5050", "http://localhost:5000" };
+            var allOrigins = corsOrigins.Concat(devOrigins).Distinct().ToArray();
+            builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+            {
+                p.WithOrigins(allOrigins)
+                 .AllowAnyHeader()
+                 .AllowAnyMethod()
+                 .AllowCredentials();
+            }));
+
+            // SignalR
+            builder.Services.AddSignalR(o => o.MaximumReceiveMessageSize = 64 * 1024);
+
+            // JSON 序列化：保留枚举名/数值，camelCase 由 System.Text.Json 默认处理
+            builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
+            {
+                o.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+                o.SerializerOptions.IncludeFields = true;
+            });
+
+            // 核心仿真模型（单例 + 托管服务）
+            builder.Services.AddSingleton<EnergyStorageSystem>(sp =>
+            {
+                var simCfg   = sp.GetRequiredService<IOptions<SimulatorConfig>>().Value;
+                var pcsCfg   = sp.GetRequiredService<IOptions<PcsPhysicalConfig>>().Value;
+                var transCfg = sp.GetRequiredService<IOptions<TransformerConfig>>().Value;
+                var unitTransCfg = sp.GetRequiredService<IOptions<UnitTransformerConfig>>().Value;
+                var loadCfg  = sp.GetRequiredService<IOptions<LoadConfig>>().Value;
+                var pccCfg   = sp.GetRequiredService<IOptions<PccConfig>>().Value;
+                var meterCfg = sp.GetRequiredService<IOptions<EssSimulator.EssDeviceSimModel.Model.MeterConfig>>().Value;
+                var ess = new EnergyStorageSystem(simCfg, pcsCfg, transCfg, unitTransCfg, loadCfg, pccCfg, meterCfg);
+                SimulatorHost.Instance.Register("ess", ess);
+                return ess;
+            });
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<EnergyStorageSystem>());
+
+            builder.Services.AddSingleton<BmsDataService>(sp =>
+            {
+                var cfg = sp.GetRequiredService<IOptions<SimulatorConfig>>().Value;
+                return new BmsDataService(cfg);
+            });
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<BmsDataService>());
+
+            builder.Services.AddHostedService<BmsLinkService>();
+
+            builder.Services.AddSingleton<PcsDataServer>();
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<PcsDataServer>());
+
+            builder.Services.AddSingleton<EmDataService>();
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<EmDataService>());
+
+            bool enableLocalControl = builder.Configuration.GetSection(SimulatorConfig.Section)
+                .GetSection(nameof(SimulatorConfig.Protocol))
+                .GetValue<bool>(nameof(ProtocolConfig.EnableLocalControl));
+            if (enableLocalControl)
+            {
+                builder.Services.AddHostedService<LocalControlHostedService>();
+            }
+
+            builder.Services.AddHostedService<ModbusHostedService>();
+
+            // Web 层服务
+            builder.Services.AddSingleton<WebCommandExecutor>();
+            builder.Services.AddHostedService<SnapshotService>();
+            builder.Services.AddHostedService<LogHubDispatcher>();
+
+            var app = builder.Build();
+
+            var simCfg = app.Services.GetRequiredService<IOptions<SimulatorConfig>>().Value;
+            BlackStartSafety.Register(app.Services.GetRequiredService<IHostApplicationLifetime>());
+
+            // 订阅 FatalSystemAlert 事件，通过 SignalR 推送前端
+            var hub = app.Services.GetRequiredService<IHubContext<RealtimeHub>>();
+            FatalSystemAlert.AlertTriggered += async (e) =>
+            {
+                try
+                {
+                    await hub.Clients.All.SendAsync(RealtimeMethods.ReceiveAlert, new
+                    {
+                        isActive = true,
+                        message = e.Message,
+                        detail = e.Detail,
+                        secondsUntilExit = (int)e.ExitDelay.TotalSeconds
+                    });
+                }
+                catch { /* 推送失败忽略 */ }
+            };
+
+            // 中间件
+            app.UseCors();
+            if (webCfgEarly.StaticFiles)
+            {
+                app.UseDefaultFiles();
+                app.UseStaticFiles();
+            }
+
+            // 端点
+            app.MapHub<RealtimeHub>("/hub/realtime");
+            app.MapSimulatorEndpoints();
+
+            // SPA 回退：非 /api 与 /hub 开头的请求回退到 index.html
+            app.MapFallback(context =>
+            {
+                if (context.Request.Path.StartsWithSegments("/api") ||
+                    context.Request.Path.StartsWithSegments("/hub"))
+                {
+                    context.Response.StatusCode = 404;
+                    return Task.CompletedTask;
+                }
+                var indexPath = Path.Combine(app.Environment.WebRootPath ?? "wwwroot", "index.html");
+                if (!File.Exists(indexPath))
+                {
+                    context.Response.StatusCode = 404;
+                    return Task.CompletedTask;
+                }
+                context.Response.ContentType = "text/html; charset=utf-8";
+                return context.Response.SendFileAsync(indexPath);
+            });
+
+            // 启动
+            await app.StartAsync();
+            LogManager.GetLogger(typeof(Program)).Info($"[Program] Web 服务已启动：{url}（前端访问根路径）");
+            LogProtocolCreateInfo(simCfg);
+
+            _ = WaitForSimulatorReadyAsync(simCfg, app.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
+
+            await app.WaitForShutdownAsync();
         }
     }
 }
