@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using EssSimulator.EssDeviceSimModel;
+using EssSimulator.EssDeviceSimModel.Diagnostics;
 using EssSimulator.EssDeviceSimModel.Interface;
 using EssSimulator.EssDeviceSimModel.Model;
 
@@ -16,6 +17,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         private readonly PcsDeviceConfig _deviceConfig;
         public PcsConfiguration _config { get; }
         public string DeviceId { get; }
+        /// <summary>日志/界面友好名，如 pcs1。</summary>
+        public string DisplayLabel { get; set; }
         public ElectricalDeviceKind Kind => ElectricalDeviceKind.Pcs;
         public ElectricalPort Ac { get; }
         public ElectricalPort Dc { get; }
@@ -79,6 +82,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         public PcsDevice(string deviceId, PcsDeviceConfig deviceConfig, double ambientTemp = 25.0)
         {
             DeviceId = deviceId;
+            DisplayLabel = deviceId;
             _deviceConfig = deviceConfig;
             _config = new PcsConfiguration
             {
@@ -162,7 +166,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 return;
             }
 
-            double gridSideP = GetGridSideActivePower();
+            double acP = _currentState.ActivePower;
             double q = _currentState.ReactivePower;
             double acV = _currentState.GMode == GridMode.GridConnected
                 ? _currentState.AcVoltage
@@ -170,7 +174,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
 
             var acOut = AcQuantityConverter.FromLineVoltageAndPower(
                 Math.Max(acV, 1.0),
-                gridSideP,
+                acP,
                 q,
                 _deviceConfig.AcConnection,
                 _currentState.Frequency > 1 ? _currentState.Frequency : _config.FrequencyNominal);
@@ -243,7 +247,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 ApplyIslandVoltageCommand(0);
                 ApplyBlackStartEnabled(false);
                 if (_currentState.Mode != OperationMode.Off)
-                    TransitionToMode(OperationMode.Off);
+                    TransitionToMode(OperationMode.Off, "EMS/Modbus 启停写 0");
             }
             else if (_externalRunRisingEdge)
             {
@@ -256,17 +260,22 @@ namespace EssSimulator.EssDeviceSimModel.Devices
 
         private void ClearLatchedFault()
         {
+            if (!_faultTripLatched && _currentState.FaultType == 0)
+                return;
             _faultTripLatched = false;
             _latchedFaultType = 0;
             _latchedFaultMessage = null;
             _currentState.FaultType = 0;
             _currentState.FaultMessage = null;
+            SimStateChangeLogger.PcsFaultChanged(DisplayLabel, 0, null, cleared: true);
         }
 
         private void LatchFault(ushort faultType, string message)
         {
             if (faultType == 0)
                 return;
+            bool wasLatched = _faultTripLatched;
+            ushort prevType = _latchedFaultType;
             _faultTripLatched = true;
             _latchedFaultType = faultType;
             if (string.IsNullOrEmpty(_latchedFaultMessage))
@@ -275,6 +284,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 _latchedFaultMessage += message;
             _currentState.FaultType = _latchedFaultType;
             _currentState.FaultMessage = _latchedFaultMessage;
+            if (!wasLatched || prevType != _latchedFaultType)
+                SimStateChangeLogger.PcsFaultChanged(DisplayLabel, _latchedFaultType, _latchedFaultMessage, cleared: false);
         }
 
         /// <summary>
@@ -282,6 +293,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         /// 约定：正值表示向电网送电，负值表示从电网取电。
         /// - 放电时（P>=0）按线损效率折减；
         /// - 充电时（P<0）按线损效率反推网侧取电。
+        /// 用于潮流/母线汇总与端口传播，不用于 PCS 交流过流保护。
         /// </summary>
         public double GetGridSideActivePower()
         {
@@ -316,9 +328,9 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             _gridState.IsAvailable = isUtilityGridAvailable;
 
             if (!isUtilityGridAvailable && _currentState.GMode == GridMode.GridConnected)
-                TransitionToGMode(GridMode.Islanded);
+                TransitionToGMode(GridMode.Islanded, "主网/母线失电");
             else if (isUtilityGridAvailable && _currentState.GMode == GridMode.Islanded && !_blackStartEnabled)
-                TransitionToGMode(GridMode.GridConnected);
+                TransitionToGMode(GridMode.GridConnected, "主网/母线恢复");
 
             if (!isUtilityGridAvailable && !_blackStartEnabled)
                 StopRampsAndZeroPower();
@@ -327,10 +339,12 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         }
 
         // 模式切换
-        public void TransitionToMode(OperationMode newMode)
+        public void TransitionToMode(OperationMode newMode, string? reason = null)
         {
             if (_currentState.Mode == newMode) return;
+            var from = _currentState.Mode;
             _currentState.Mode = newMode;
+            SimStateChangeLogger.PcsModeChanged(DisplayLabel, from, newMode, reason ?? "未指定");
 
             // 非 Normal 模式不应继续执行功率指令
             if (newMode != OperationMode.Normal)
@@ -339,7 +353,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             }
         }
 
-        public void TransitionToGMode(GridMode newMode)
+        public void TransitionToGMode(GridMode newMode, string? reason = null)
         {
             if (_currentState.GMode == newMode) return;
 
@@ -349,8 +363,9 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 throw new InvalidOperationException("Cannot connect to grid when grid is not available");
             }
 
-            //Console.WriteLine($"PCS mode transition: {_currentState.Mode} -> {newMode}");
+            var from = _currentState.GMode;
             _currentState.GMode = newMode;
+            SimStateChangeLogger.PcsGridModeChanged(DisplayLabel, from, newMode, reason ?? "未指定");
         }
 
         // 设置功率指令
@@ -483,7 +498,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                     (_currentState.FaultType == 1 && _currentState.ActivePower < 0) ||
                     (_currentState.FaultType == 2 && _currentState.ActivePower > 0))
                 {
-                    TransitionToMode(OperationMode.Off);
+                    var tripReason = _currentState.FaultMessage ?? $"FaultType={_currentState.FaultType}";
+                    TransitionToMode(OperationMode.Off, $"故障跳闸: {tripReason.Trim()}");
                     UpdateStandbyState();
                 }
             }
@@ -531,14 +547,29 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             _currentState.AcVoltage = _gridState.Voltage * (1 - _gridLossCoefficient);
             _currentState.Frequency = _gridState.Frequency;
 
-            // 计算交流电流（带符号，正=从网侧取电，负=向网侧送电）
-            var gridSideActivePower = GetGridSideActivePower();
-            double apparentPower = Math.Sqrt(
-                Math.Pow(gridSideActivePower, 2) +
-                Math.Pow(_currentState.ReactivePower, 2));
-            double denomUg = Math.Max(_currentState.AcVoltage, 10.0);
-            double acCurrentMag = apparentPower * 1000 / (denomUg * Math.Sqrt(3));
-            _currentState.AcCurrent = gridSideActivePower >= 0 ? -acCurrentMag : acCurrentMag;
+            // 过流/遥测：按 PCS 交流口 P/Q 与端电压算电流（线损不改变交流口电流）
+            ApplyGridConnectedAcCurrent();
+        }
+
+        /// <summary>
+        /// 并网模式下交流电流：由交流口 ActivePower/ReactivePower 与 AcVoltage 推算。
+        /// 线损仅体现在 <see cref="GetGridSideActivePower"/> 的电网侧功率计量，不参与过流判定。
+        /// </summary>
+        private void ApplyGridConnectedAcCurrent()
+        {
+            double acCurrentMag = ComputeAcCurrentMagnitude(
+                _currentState.ActivePower,
+                _currentState.ReactivePower,
+                _currentState.AcVoltage);
+            // 正=从网侧取电（充电），负=向网侧送电（放电）
+            _currentState.AcCurrent = _currentState.ActivePower >= 0 ? -acCurrentMag : acCurrentMag;
+        }
+
+        private static double ComputeAcCurrentMagnitude(double activeKw, double reactiveKvar, double lineVoltageV)
+        {
+            double apparentKva = Math.Sqrt(activeKw * activeKw + reactiveKvar * reactiveKvar);
+            double denomU = Math.Max(lineVoltageV, 10.0);
+            return apparentKva * 1000 / (denomU * Math.Sqrt(3));
         }
 
         private void UpdateIslandedState()
@@ -570,11 +601,10 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 : 0;
 
             // 计算交流电流（带符号，正=放电，负=充电）
-            double apparentPower = Math.Sqrt(
-                Math.Pow(_currentState.ActivePower, 2) +
-                Math.Pow(_currentState.ReactivePower, 2));
-            double denomU = Math.Max(_currentState.AcVoltage, 10.0);
-            double acCurrentMag = apparentPower * 1000 / (denomU * Math.Sqrt(3));
+            double acCurrentMag = ComputeAcCurrentMagnitude(
+                _currentState.ActivePower,
+                _currentState.ReactivePower,
+                _currentState.AcVoltage);
             _currentState.AcCurrent = _currentState.ActivePower >= 0 ? acCurrentMag : -acCurrentMag;
         }
 

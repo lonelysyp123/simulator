@@ -138,7 +138,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
                     pcsSim.ApplyIslandVoltageCommand(0);
                     pcsSim.ApplyBlackStartEnabled(false);
                     ClearBlackStartCommand(simIdx, pcsData);
-                    pcsSim.TransitionToMode(OperationMode.Off);
+                    pcsSim.TransitionToMode(OperationMode.Off, "主断/单元高压分闸且无黑启动");
                     ess.PushPcsChannelToNetwork(simIdx);
                     continue;
                 }
@@ -166,7 +166,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
         {
             if (pcsSim.HasLatchedFaultTrip)
             {
-                pcsSim.TransitionToMode(OperationMode.Off);
+                pcsSim.TransitionToMode(OperationMode.Off, "故障已锁存，等待启停 0→1 复归");
                 return;
             }
 
@@ -177,7 +177,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 pcsSim.ApplyBlackStartEnabled(false);
                 BlackStartSafety.ReportViolation("开启黑启动", simIdx + 1);
                 ClearBlackStartCommand(simIdx, pcsData);
-                pcsSim.TransitionToMode(OperationMode.Off);
+                pcsSim.TransitionToMode(OperationMode.Off, "黑启动安全联锁拒绝开启");
                 return;
             }
 
@@ -196,12 +196,12 @@ namespace EssSimulator.EssSimModelApi.Mappers
             if (!pcsSim.IsGridElectricallyAvailable)
             {
                 if (pcsData.BlackStartEnabled || pcsData.IslandVoltageSetting > 0)
-                    pcsSim.TransitionToMode(OperationMode.Normal);
+                    pcsSim.TransitionToMode(OperationMode.Normal, "网侧无电，黑启动/孤岛建压运行");
                 else
-                    pcsSim.TransitionToMode(OperationMode.Standby);
+                    pcsSim.TransitionToMode(OperationMode.Standby, "网侧无电且无黑启动/孤岛电压设定");
             }
             else
-                pcsSim.TransitionToMode(OperationMode.Normal);
+                pcsSim.TransitionToMode(OperationMode.Normal, "网侧有电，跟网运行");
         }
     }
 }

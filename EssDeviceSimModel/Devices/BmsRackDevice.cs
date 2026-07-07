@@ -1,3 +1,4 @@
+using EssSimulator.EssDeviceSimModel.Diagnostics;
 using EssSimulator.EssDeviceSimModel.Interface;
 using EssSimulator.EssDeviceSimModel.Model;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
@@ -17,6 +18,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         public BmsRackDevice(string deviceId, BatteryRackSimulator rack)
         {
             DeviceId = deviceId;
+            DisplayLabel = deviceId;
             _rack = rack;
             Port = CreatePort();
             SyncPortFromRack();
@@ -24,6 +26,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         }
 
         public string DeviceId { get; }
+        /// <summary>日志/界面友好名，如 bms1。</summary>
+        public string DisplayLabel { get; set; }
         public BatteryRackSimulator Rack => _rack;
         public ElectricalDeviceKind Kind => ElectricalDeviceKind.Bms;
         public DeviceFaultState Fault => _fault;
@@ -79,6 +83,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             BmsMapper.MapClusters(_rack, bmsData);
             BmsRackProtection.EvaluateAllClusters(_rack, bmsData);
             BmsRackProtection.ApplyRackFaultSummary(bmsData, rackState);
+            BmsStateTracker.ReportProtectionChanges(DisplayLabel, bmsData, rackState);
             RefreshFaultState();
         }
 

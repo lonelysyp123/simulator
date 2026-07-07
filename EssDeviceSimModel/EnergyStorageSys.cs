@@ -121,7 +121,9 @@ namespace EssSimulator.EssDeviceSimModel
                 racks.Add(rack);
                 int u = i / 2;
                 int ch = i % 2;
-                bmsRackDevices.Add(new BmsRackDevice($"bms_u{u}_ch{ch}", rack));
+                var bmsDev = new BmsRackDevice($"bms_u{u}_ch{ch}", rack);
+                bmsDev.DisplayLabel = $"bms{i + 1}";
+                bmsRackDevices.Add(bmsDev);
             }
 
             for (int i = 0; i < channelCount; i++)
@@ -131,7 +133,9 @@ namespace EssSimulator.EssDeviceSimModel
                 var cfg = PcsDeviceFactory.CreateConfig(pcsCfg, rampCfg);
                 int u = i / 2;
                 int ch = i % 2;
-                pcsList.Add(PcsDeviceFactory.Create($"pcs_u{u}_ch{ch}", cfg));
+                var pcs = PcsDeviceFactory.Create($"pcs_u{u}_ch{ch}", cfg);
+                pcs.DisplayLabel = $"pcs{i + 1}";
+                pcsList.Add(pcs);
             }
 
             _batteryRacks = racks;
@@ -435,7 +439,7 @@ namespace EssSimulator.EssDeviceSimModel
 
             pcs.UpdateGridState(0, 0, false);
             pcs.ApplyBlackStartEnabled(false);
-            pcs.TransitionToMode(OperationMode.Off);
+            pcs.TransitionToMode(OperationMode.Off, "单元/主网侧无电且非黑启动");
         }
 
 
