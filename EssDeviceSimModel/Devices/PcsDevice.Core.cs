@@ -232,8 +232,17 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         /// <summary>本周期是否检测到外部启停 0→1 边沿（每周期在 SyncExternalRunCommand 后读取一次）。</summary>
         public bool ExternalRunRisingEdge => _externalRunRisingEdge;
 
-        /// <summary>已发生故障跳闸并锁存，需外部启停先写 0 再写 1 方可清除后重新启动。</summary>
+        /// <summary>已发生故障跳闸并锁存，启停线圈已自动回 0；EMS 写 1 可清除故障并重启。</summary>
         public bool HasLatchedFaultTrip => _faultTripLatched;
+
+        /// <summary>故障跳闸后撤回启停令（不清除故障锁存，区别于 EMS 写 0 的 <see cref="SyncExternalRunCommand"/>）。</summary>
+        public void WithdrawExternalRunCommand()
+        {
+            if (!_externalRunCommand)
+                return;
+            _externalRunCommand = false;
+            _externalRunRisingEdge = false;
+        }
 
         /// <summary>
         /// 同步 EMS/Modbus 启停位。停机仅由外部写 0、联锁或故障触发；禁止网侧恢复后自动离开 Off。
@@ -501,6 +510,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                     var tripReason = _currentState.FaultMessage ?? $"FaultType={_currentState.FaultType}";
                     TransitionToMode(OperationMode.Off, $"故障跳闸: {tripReason.Trim()}");
                     UpdateStandbyState();
+                    WithdrawExternalRunCommand();
                 }
             }
 

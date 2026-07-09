@@ -326,6 +326,44 @@ public class ClusterAlarms
             }
         }
 
+        /// <summary>清除充放电方向的保护/告警/故障位（供 esscmd bmsN fault clear）。</summary>
+        public void ClearChargeDischargeAlarms()
+        {
+            UndervoltageProtection = false;
+            UndervoltageAlarm = false;
+            UndervoltageFault = false;
+            OvervoltageProtection = false;
+            OvervoltageAlarm = false;
+            OvervoltageFault = false;
+            ChargeOvercurrentProtection = false;
+            ChargeOvercurrentAlarm = false;
+            ChargeOvercurrentFault = false;
+            DischargeOvercurrentProtection = false;
+            DischargeOvercurrentAlarm = false;
+            DischargeOvercurrentFault = false;
+            CellUnderVoltageProtection = false;
+            CellUnderVoltageAlarm = false;
+            CellUnderVoltageFault = false;
+            CellOverVoltageProtection = false;
+            CellOverVoltageAlarm = false;
+            CellOverVoltageFault = false;
+            LowSOCProtection = false;
+            LowSOCAlarm = false;
+            LowSOCFault = false;
+            CellChargeLowTempProtection = false;
+            CellChargeLowTempAlarm = false;
+            CellChargeLowTempFault = false;
+            CellChargeHighTempProtection = false;
+            CellChargeHighTempAlarm = false;
+            CellChargeHighTempFault = false;
+            CellDischargeLowTempProtection = false;
+            CellDischargeLowTempAlarm = false;
+            CellDischargeLowTempFault = false;
+            CellDischargeHighTempProtection = false;
+            CellDischargeHighTempAlarm = false;
+            CellDischargeHighTempFault = false;
+        }
+
         // 汇总充电故障
         public bool IsChargeFault
         {

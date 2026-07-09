@@ -118,9 +118,7 @@ namespace EssSimulator.Display
         public static string FormatPcsDeviceStateLine(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
         {
             string phase = FormatPcsDeviceStateLabel(unitIndex0, pcsSlotInUnit0, essPcsListIndex);
-            bool extRun = GuiSimDataAccess.SafeGetBool($"ess._pcsList[{essPcsListIndex}].IsExternalRunCommand");
-            string suffix = extRun && phase == "停机" ? "(有令)" : "";
-            return $"设备状态:{phase}{suffix}";
+            return $"设备状态:{phase}";
         }
 
         public static string FormatPcsStartStopPointLine(int unitIndex0, int pcsSlotInUnit0)
@@ -148,9 +146,6 @@ namespace EssSimulator.Display
         public static string FormatPcsMainLineDeviceState(int unitIndex0, int pcsSlotInUnit0, int essPcsListIndex)
         {
             string phase = FormatPcsDeviceStateLabel(unitIndex0, pcsSlotInUnit0, essPcsListIndex);
-            bool extRun = GuiSimDataAccess.SafeGetBool($"ess._pcsList[{essPcsListIndex}].IsExternalRunCommand");
-            if (extRun && phase == "停机")
-                phase = "停(令)";
             return $"状态:{phase}";
         }
 

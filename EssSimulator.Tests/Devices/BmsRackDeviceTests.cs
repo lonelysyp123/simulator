@@ -1,4 +1,5 @@
 using EssSimulator.Configuration;
+using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssDeviceSimModel.Battery;
 using EssSimulator.EssDeviceSimModel.Devices;
 using EssSimulator.EssSimModelApi;
@@ -23,7 +24,7 @@ public class BmsRackDeviceTests
     }
 
     [Fact]
-    public void SyncTelemetryAndProtection_SetsChargeFaultWhenSocHigh()
+    public void SyncTelemetryAndProtection_SetsChargeFaultWhenSocHighWhileCharging()
     {
         var rack = BmsRackFactory.CreateRack(new BmsDeviceConfig { ClusterCount = 1 });
         var device = new BmsRackDevice("bms_test", rack);
@@ -33,11 +34,80 @@ public class BmsRackDeviceTests
         rackState.MinClusterSOC = 0.96;
         rackState.MaxClusterSOC = 0.96;
         rackState.StateOfHealth = 1.0;
+        SetRackCurrent(rackState, -50);
 
         device.SyncTelemetryAndProtection(bmsData);
 
         Assert.Equal((ushort)1, device.FaultCode);
         Assert.True(device.HasBlockingFault);
+    }
+
+    [Fact]
+    public void SyncTelemetryAndProtection_NoChargeFaultWhenSocHighAtIdle()
+    {
+        var rack = BmsRackFactory.CreateRack(new BmsDeviceConfig { ClusterCount = 1 });
+        var device = new BmsRackDevice("bms_test", rack);
+        var bmsData = BmsDataGenerator.GenerateSampleData(1, 1);
+
+        var rackState = rack.GetRackState()!;
+        rackState.MinClusterSOC = 0.96;
+        rackState.MaxClusterSOC = 0.96;
+        rackState.StateOfHealth = 1.0;
+        SetRackCurrent(rackState, 0);
+
+        device.SyncTelemetryAndProtection(bmsData);
+
+        Assert.Equal((ushort)0, device.FaultCode);
+        Assert.False(device.HasBlockingFault);
+    }
+
+    [Fact]
+    public void SyncTelemetryAndProtection_SetsDischargeFaultWhenSocLowWhileDischarging()
+    {
+        var rack = BmsRackFactory.CreateRack(new BmsDeviceConfig { ClusterCount = 1 });
+        var device = new BmsRackDevice("bms_test", rack);
+        var bmsData = BmsDataGenerator.GenerateSampleData(1, 1);
+
+        var rackState = rack.GetRackState()!;
+        rackState.MinClusterSOC = 0.05;
+        rackState.MaxClusterSOC = 0.05;
+        rackState.StateOfHealth = 1.0;
+        foreach (var cluster in rackState.ClusterStates!)
+            cluster.MinPackSOC = 0.05;
+        SetRackCurrent(rackState, 50);
+
+        device.SyncTelemetryAndProtection(bmsData);
+
+        Assert.Equal((ushort)2, device.FaultCode);
+        Assert.True(device.HasBlockingFault);
+    }
+
+    [Fact]
+    public void SyncTelemetryAndProtection_NoDischargeFaultWhenSocLowAtIdle()
+    {
+        var rack = BmsRackFactory.CreateRack(new BmsDeviceConfig { ClusterCount = 1 });
+        var device = new BmsRackDevice("bms_test", rack);
+        var bmsData = BmsDataGenerator.GenerateSampleData(1, 1);
+
+        var rackState = rack.GetRackState()!;
+        rackState.MinClusterSOC = 0.05;
+        rackState.MaxClusterSOC = 0.05;
+        rackState.StateOfHealth = 1.0;
+        foreach (var cluster in rackState.ClusterStates!)
+            cluster.MinPackSOC = 0.05;
+        SetRackCurrent(rackState, 0);
+
+        device.SyncTelemetryAndProtection(bmsData);
+
+        Assert.Equal((ushort)0, device.FaultCode);
+        Assert.False(device.HasBlockingFault);
+    }
+
+    private static void SetRackCurrent(RackState rack, double current)
+    {
+        rack.TotalCurrent = current;
+        foreach (var cluster in rack.ClusterStates!)
+            cluster.TotalCurrent = current;
     }
 
     [Fact]

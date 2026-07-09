@@ -41,7 +41,15 @@ namespace EssSimulator.EssSimModelApi.Mappers
 
             dst.IslandVoltageFeedback = (float)src.IslandVoltageEffectiveV;
             dst.DriveFault = src.FaultType == 3;
+            dst.OperationStatus = PcsDisplayLabels.ToOperationStatusCode(src, dst.pcsOnOffSwitch);
             // BlackStartEnabled 为 EMS 下发命令，勿用仿真状态回写覆盖（否则 Modbus 写 5305 后会被 MapPcsState 清回 0）
+        }
+
+        /// <summary>故障跳闸撤回启停后，将 DTO 启停位同步为 0，供 Modbus Hold 反馈写线圈。</summary>
+        public static void SyncRunCommandFeedback(PcsDevice pcsSim, PcsData pcsData)
+        {
+            if (!pcsSim.IsExternalRunCommand && pcsData.pcsOnOffSwitch)
+                pcsData.pcsOnOffSwitch = false;
         }
 
         /// <summary>更新 EMU 汇总数据（运行状态、SOC 等）。</summary>
@@ -121,7 +129,8 @@ namespace EssSimulator.EssSimModelApi.Mappers
 
                 if (!cmdOn)
                 {
-                    pcsSim.SyncExternalRunCommand(false);
+                    if (pcsSim.IsExternalRunCommand)
+                        pcsSim.SyncExternalRunCommand(false);
                     ess.PushPcsChannelToNetwork(simIdx);
                     continue;
                 }
@@ -166,7 +175,8 @@ namespace EssSimulator.EssSimModelApi.Mappers
         {
             if (pcsSim.HasLatchedFaultTrip)
             {
-                pcsSim.TransitionToMode(OperationMode.Off, "故障已锁存，等待启停 0→1 复归");
+                pcsSim.WithdrawExternalRunCommand();
+                pcsSim.TransitionToMode(OperationMode.Off, "故障已锁存，等待启停写 1 复归");
                 return;
             }
 
