@@ -1,6 +1,7 @@
 using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.Bms;
+using EssSimulator.Protocol;
 using System;
 using System.Collections.Generic;
 
@@ -29,6 +30,12 @@ namespace EssSimulator.Display
             if (verb.StartsWith("setbms", StringComparison.OrdinalIgnoreCase))
                 return ExecuteSetBmsPower(args);
 
+            if (verb.StartsWith("bms", StringComparison.OrdinalIgnoreCase) &&
+                args.Length == 3 &&
+                args[1].Equals("fault", StringComparison.OrdinalIgnoreCase) &&
+                args[2].Equals("clear", StringComparison.OrdinalIgnoreCase))
+                return ExecuteBmsFaultClear(args);
+
             if (verb.StartsWith("pcs", StringComparison.OrdinalIgnoreCase))
                 return ExecutePcsStartStop(args);
 
@@ -50,14 +57,50 @@ namespace EssSimulator.Display
                 "  setGrid voltage <V>            // 设定仿真电网额定线电压（如 220000）",
                 "  pcsN start|stop                // PCS 启停（内部走 dpc 写 EMU yx3/yx5 控制点）",
                 "  setbmsN power on|off           // BMS 物理并网/离网（PCS↔BMS 直流链路）",
+                "  bmsN fault clear               // 待机时清除充放电方向内部故障，恢复可并网",
                 "",
                 "说明:",
                 "  - link off：关闭 TCP 监听，模拟通信中断；与 setbms power 无关",
                 "  - setGrid：调整外部电网源；主断闭合后生效于 PCC/跟网 PCS",
                 "  - setbmsN power on：触发并网，GridConnectStatus→2，IsPcsLinked=true",
                 "  - setbmsN power off：断开 PCS↔BMS 链路，GridConnectStatus→0",
+                "  - bmsN fault clear：待机时清除因充放电触发的内部故障，之后可 setbmsN power on",
                 "  - 同一储能单元内 pcs(2n-1)/pcs(2n) 共用 simEmu{n}，关闭任一路会影响该单元两路 PCS"
             }.JoinLines();
+        }
+
+        private static CommandResult ExecuteBmsFaultClear(string[] args)
+        {
+            if (!TryParseBmsIndex(args[0], out int bms1Based, out var parseMessage))
+                return CommandResult.Fail(parseMessage);
+
+            if (!SimulatorHost.Instance.Contains($"bms{bms1Based}"))
+                return CommandResult.Fail($"找不到 bms{bms1Based}（超出当前配置范围）");
+
+            if (!BmsFaultClearEngine.TryClearFaults(bms1Based - 1, out var result))
+                return CommandResult.Fail($"操作失败: {result}");
+
+            SimulatorHost.Instance.Get<ModbusSimServer>($"simBms{bms1Based}")?.InvalidateDataShadow("yc0");
+            return CommandResult.Ok($"执行成功: bms{bms1Based} — {result}");
+        }
+
+        private static bool TryParseBmsIndex(string target, out int bms1Based, out string message)
+        {
+            bms1Based = 0;
+            message = string.Empty;
+            if (!target.StartsWith("bms", StringComparison.OrdinalIgnoreCase))
+            {
+                message = "子命令格式应为 bmsN，例如 bms1";
+                return false;
+            }
+
+            if (!int.TryParse(target.AsSpan(3), out bms1Based) || bms1Based < 1)
+            {
+                message = "子命令格式应为 bmsN，例如 bms1";
+                return false;
+            }
+
+            return true;
         }
 
         private static CommandResult ExecuteSetLoad(string[] args)

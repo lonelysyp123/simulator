@@ -1,4 +1,6 @@
+using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssDeviceSimModel.Devices;
+using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 
 namespace EssSimulator.Tests.Devices;
 
@@ -43,5 +45,84 @@ public class BmsRackProtectionTests
         Assert.True(l1);
         Assert.Null(l2);
         Assert.Null(l3);
+    }
+
+    [Fact]
+    public void EvaluateCluster_SkipsLowSocWhenIdle()
+    {
+        var alarms = new ClusterAlarms();
+        var thresholds = new ClusterThresholds();
+        var clusterState = CreateClusterState(minPackSoc: 0.05, current: 0);
+
+        BmsRackProtection.EvaluateCluster(
+            clusterState, packCount: 1, cellsPerPack: 1, thresholds, alarms, insulationValue: 1000f);
+
+        Assert.False(alarms.LowSOCProtection);
+        Assert.False(alarms.LowSOCAlarm);
+        Assert.False(alarms.LowSOCFault);
+    }
+
+    [Fact]
+    public void EvaluateCluster_EvaluatesLowSocWhenDischarging()
+    {
+        var alarms = new ClusterAlarms();
+        var thresholds = new ClusterThresholds();
+        var clusterState = CreateClusterState(minPackSoc: 0.05, current: 50);
+
+        BmsRackProtection.EvaluateCluster(
+            clusterState, packCount: 1, cellsPerPack: 1, thresholds, alarms, insulationValue: 1000f);
+
+        Assert.True(alarms.LowSOCProtection);
+    }
+
+    [Fact]
+    public void EvaluateCluster_SkipsOvervoltageWhenIdle()
+    {
+        var alarms = new ClusterAlarms();
+        var thresholds = new ClusterThresholds();
+        var clusterState = CreateClusterState(totalVoltage: thresholds.OvervoltageThreshold1!.Value + 10, current: 0);
+
+        BmsRackProtection.EvaluateCluster(
+            clusterState, packCount: 1, cellsPerPack: 1, thresholds, alarms, insulationValue: 1000f);
+
+        Assert.False(alarms.OvervoltageProtection);
+    }
+
+    [Fact]
+    public void EvaluateCluster_EvaluatesOvervoltageWhenCharging()
+    {
+        var alarms = new ClusterAlarms();
+        var thresholds = new ClusterThresholds();
+        var clusterState = CreateClusterState(totalVoltage: thresholds.OvervoltageThreshold1!.Value + 10, current: -50);
+
+        BmsRackProtection.EvaluateCluster(
+            clusterState, packCount: 1, cellsPerPack: 1, thresholds, alarms, insulationValue: 1000f);
+
+        Assert.True(alarms.OvervoltageProtection);
+    }
+
+    private static ClusterState CreateClusterState(
+        double minPackSoc = 0.5,
+        double totalVoltage = 1300,
+        double current = 0)
+    {
+        return new ClusterState
+        {
+            MinPackSOC = minPackSoc,
+            MaxPackSOC = minPackSoc,
+            TotalVoltage = totalVoltage,
+            TotalCurrent = current,
+            PackStates =
+            [
+                new PackState
+                {
+                    MinCellVoltage = 3.2,
+                    MaxCellVoltage = 3.2,
+                    MinCellTemp = 25,
+                    MaxCellTemp = 25,
+                    CellStates = [new CellState { Voltage = 3.2, Temperature = 25 }]
+                }
+            ]
+        };
     }
 }

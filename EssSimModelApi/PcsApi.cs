@@ -186,22 +186,8 @@ namespace EssSimulator.EssSimModelApi
 
                 public bool gridOnOffSwitch { get; set; }           //并离网控制及状态
 
-                // 状态
-                public int OperationStatus 
-                { 
-                    get
-                    {
-                        // 1停机 2待机 4充电运行 5放电运行 6未知状态（正放负充）
-                        bool hasAlarm = AlarmSummary1 != 0 || AlarmSummary2 != 0 || AlarmSummary3 != 0;
-                        return PcsDisplayLabels.ToOperationStatusCode(
-                            SimulatorMode,
-                            pcsOnOffSwitch,
-                            ActivePower,
-                            BlackStartEnabled,
-                            0,
-                            hasAlarm);
-                    } 
-                }   // 运行状态
+                // 状态（由 MapPcsState 按物理仿真态写入，与界面 GetRunPhaseLabel 一致）
+                public int OperationStatus { get; set; }   // 1停机 2待机 4充电 5放电 6未知/故障
                 public float PCSActivePowerSetting { get; set; }    //有功率设置
                 public float PCSReactivePowerSetting { get; set; }    //无功率设置  
                 public float PCSRatePower { get; set; }    //额定功率设置

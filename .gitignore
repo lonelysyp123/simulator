@@ -441,3 +441,13 @@ Temporary Items
 *.icloud
 
 # End of https://www.toptal.com/developers/gitignore/api/csharp,macos
+
+### EssSimulator B/S Web ###
+# 前端源码、Node 依赖、Vite 缓存与 wwwroot 构建产物（本分支不纳入版本管理）
+web/
+Web/
+wwwroot/
+
+# 根目录点表 CSV（本地/EMS 导出，不纳入版本管理；子目录 pointmaps/ 等不受影响）
+/*.csv
+/*.xlsx

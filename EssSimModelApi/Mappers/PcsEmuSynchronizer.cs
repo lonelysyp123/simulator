@@ -38,6 +38,9 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 ess._pcsList[pcsBaseIndex + 1].GetCurrentState(),
                 emu.PcsList[1],
                 ess._batteryRacks[pcsBaseIndex + 1]);
+
+            PcsMapper.SyncRunCommandFeedback(ess._pcsList[pcsBaseIndex], emu.PcsList[0]);
+            PcsMapper.SyncRunCommandFeedback(ess._pcsList[pcsBaseIndex + 1], emu.PcsList[1]);
         }
     }
 }
