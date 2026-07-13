@@ -3,7 +3,6 @@ export const RealtimeMethods = {
   ReceiveBattery: 'ReceiveBattery',
   ReceiveCells: 'ReceiveCells',
   ReceiveConnections: 'ReceiveConnections',
-  ReceiveLog: 'ReceiveLog',
   ReceiveAlert: 'ReceiveAlert',
   ReceiveCommandProgress: 'ReceiveCommandProgress'
 }
@@ -13,7 +12,6 @@ export const RealtimeChannels = {
   Battery: 'battery',
   Cells: 'cells',
   Connections: 'connections',
-  Logs: 'logs',
   Alert: 'alert',
   CommandProgress: 'cmdprogress'
 }

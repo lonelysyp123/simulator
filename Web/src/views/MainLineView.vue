@@ -9,15 +9,43 @@
         <div class="metric-item"><div class="label">求解模式</div><div class="value">{{ snap.propagationEnabled ? '径向传播' : 'Legacy' }}</div></div>
         <div class="metric-item"><div class="label">电表 P</div><div class="value">{{ fmtKw(snap.meterPrimary?.activePowerKw) }}</div></div>
         <div class="metric-item"><div class="label">电表 Q</div><div class="value">{{ fmtKvar(snap.meterPrimary?.reactivePowerKvar) }}</div></div>
-        <div class="metric-item"><div class="label">35kV 负载 P</div><div class="value">{{ fmtKw(snap.loadActivePowerKw) }}</div></div>
-        <div class="metric-item"><div class="label">35kV 负载 Q</div><div class="value">{{ fmtKvar(snap.loadReactivePowerKvar) }}</div></div>
+        <div class="metric-item metric-item-editable">
+          <div class="label">35kV 负载 P</div>
+          <div class="value">{{ fmtKw(snap.loadActivePowerKw) }}</div>
+          <div class="metric-set">
+            <input
+              v-model="loadPDraft"
+              type="text"
+              inputmode="decimal"
+              class="metric-input"
+              placeholder="kW"
+              @keydown.enter="onSetLoadActive"
+            />
+            <button type="button" class="metric-set-btn" @click="onSetLoadActive">设定</button>
+          </div>
+        </div>
+        <div class="metric-item metric-item-editable">
+          <div class="label">35kV 负载 Q</div>
+          <div class="value">{{ fmtKvar(snap.loadReactivePowerKvar) }}</div>
+          <div class="metric-set">
+            <input
+              v-model="loadQDraft"
+              type="text"
+              inputmode="decimal"
+              class="metric-input"
+              placeholder="kvar"
+              @keydown.enter="onSetLoadReactive"
+            />
+            <button type="button" class="metric-set-btn" @click="onSetLoadReactive">设定</button>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="card">
       <p class="card-title">
         电气主接线
-        <span class="card-hint">左键点击断路器 · 右键拖动平移 · 滚轮缩放 · PCS/BMS 卡片内按钮控制</span>
+        <span class="card-hint">左键点击断路器 · 右键拖动平移 · 滚轮缩放 · PCS 卡片可启停/设定有功无功</span>
       </p>
       <MainLineSvg
         :snap="snap"
@@ -25,8 +53,11 @@
         @toggle-unit-breaker="onToggleUnitBreaker"
         @pcs-start="onPcsStart"
         @pcs-stop="onPcsStop"
+        @pcs-set-power="onPcsSetPower"
+        @pcs-set-reactive="onPcsSetReactive"
         @bms-power-on="onBmsPowerOn"
         @bms-power-off="onBmsPowerOff"
+        @bms-fault-clear="onBmsFaultClear"
       />
     </div>
 
@@ -70,6 +101,23 @@ import { useRealtime, RealtimeMethods, RealtimeChannels } from '@/services/useRe
 import MainLineSvg from '@/components/MainLineSvg.vue'
 
 const snap = ref({ units: [] })
+const loadPDraft = ref('')
+const loadQDraft = ref('')
+let lastLoadSetP = null
+let lastLoadSetQ = null
+
+function syncLoadDrafts(force = false) {
+  const setP = snap.value.loadActivePowerSetKw
+  const setQ = snap.value.loadReactivePowerSetKvar
+  if (force || (setP != null && setP !== lastLoadSetP)) {
+    loadPDraft.value = Number(setP ?? 0).toFixed(1)
+    lastLoadSetP = setP
+  }
+  if (force || (setQ != null && setQ !== lastLoadSetQ)) {
+    loadQDraft.value = Number(setQ ?? 0).toFixed(1)
+    lastLoadSetQ = setQ
+  }
+}
 
 function fmtVolt(v) {
   if (v == null) return '—'
@@ -183,6 +231,48 @@ async function onPcsStop(pcsNumber) {
   await runChannelCommand(`esscmd pcs${pcsNumber} stop`)
 }
 
+/** PCS 有功设定：dpc simEmu{N}.yt0|yt4 set raw（Scale=10，kW×10） */
+async function onPcsSetPower({ emuUnit, ytPoint, powerKw }) {
+  const kw = Number(powerKw)
+  if (!Number.isFinite(kw)) {
+    ElMessage.warning('请输入有效的有功功率')
+    return
+  }
+  const raw = Math.round(kw * 10)
+  await runChannelCommand(`dpc simEmu${emuUnit}.${ytPoint} set ${raw}`)
+}
+
+/** PCS 无功设定：dpc simEmu{N}.yt1|yt5 set raw（Scale=10，kvar×10） */
+async function onPcsSetReactive({ emuUnit, ytPoint, reactiveKvar }) {
+  const kvar = Number(reactiveKvar)
+  if (!Number.isFinite(kvar)) {
+    ElMessage.warning('请输入有效的无功功率')
+    return
+  }
+  const raw = Math.round(kvar * 10)
+  await runChannelCommand(`dpc simEmu${emuUnit}.${ytPoint} set ${raw}`)
+}
+
+async function onSetLoadActive() {
+  const kw = Number(loadPDraft.value)
+  if (!Number.isFinite(kw)) {
+    ElMessage.warning('请输入有效的负载有功（kW）')
+    return
+  }
+  await runChannelCommand(`esscmd setLoad activePower ${kw}`)
+  lastLoadSetP = kw
+}
+
+async function onSetLoadReactive() {
+  const kvar = Number(loadQDraft.value)
+  if (!Number.isFinite(kvar)) {
+    ElMessage.warning('请输入有效的负载无功（kvar）')
+    return
+  }
+  await runChannelCommand(`esscmd setLoad reactivePower ${kvar}`)
+  lastLoadSetQ = kvar
+}
+
 async function onBmsPowerOn(bmsNumber) {
   await runChannelCommand(`esscmd setbms${bmsNumber} power on`)
 }
@@ -191,15 +281,65 @@ async function onBmsPowerOff(bmsNumber) {
   await runChannelCommand(`esscmd setbms${bmsNumber} power off`)
 }
 
+async function onBmsFaultClear(bmsNumber) {
+  await runChannelCommand(`esscmd bms${bmsNumber} fault clear`)
+}
+
 onMounted(async () => {
-  try { snap.value = await getMainLine() } catch (e) { console.warn(e) }
+  try {
+    snap.value = await getMainLine()
+    syncLoadDrafts(true)
+  } catch (e) { console.warn(e) }
 })
 
 useRealtime(RealtimeChannels.MainLine, {
-  [RealtimeMethods.ReceiveMainLine]: data => { snap.value = data }
+  [RealtimeMethods.ReceiveMainLine]: data => {
+    snap.value = data
+    syncLoadDrafts()
+  }
 })
 </script>
 
 <style scoped>
 .card-hint { font-size: 12px; color: #909399; font-weight: normal; margin-left: 12px; }
+
+.metric-item-editable {
+  position: relative;
+  min-height: 72px;
+  padding-bottom: 30px;
+}
+
+.metric-set {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metric-input {
+  width: 62px;
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid #dcdfe6;
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+
+.metric-set-btn {
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 2px 6px;
+  border: 1px solid #c0c4cc;
+  border-radius: 3px;
+  background: #fff;
+  color: #303133;
+  cursor: pointer;
+}
+
+.metric-set-btn:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
 </style>

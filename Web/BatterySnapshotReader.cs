@@ -48,6 +48,10 @@ namespace EssSimulator.Web
         public List<List<float>> Packs { get; set; } = new();
         public double MinCellVoltage { get; set; }
         public double MaxCellVoltage { get; set; }
+        public int MaxCellVoltagePackId { get; set; }
+        public int MaxCellVoltageCellId { get; set; }
+        public int MinCellVoltagePackId { get; set; }
+        public int MinCellVoltageCellId { get; set; }
     }
 
     public static class BatterySnapshotReader
@@ -58,8 +62,8 @@ namespace EssSimulator.Web
 
             double totVolt = GuiSimDataAccess.SafeGetDouble($"{basePath}.TotalVoltage");
             double totCurr = GuiSimDataAccess.SafeGetDouble($"{basePath}.Current");
-            double soc = GuiSimDataAccess.SafeGetDouble($"{basePath}.SOC");
-            double soh = GuiSimDataAccess.SafeGetDouble($"{basePath}.SOH");
+            double soc = GuiSimDataAccess.SafeGetDouble($"{basePath}.SOC") * 100;
+            double soh = GuiSimDataAccess.SafeGetDouble($"{basePath}.SOH") * 100;
             double maxCellV = GuiSimDataAccess.SafeGetDouble($"{basePath}.MaxCellVoltage");
             double minCellV = GuiSimDataAccess.SafeGetDouble($"{basePath}.MinCellVoltage");
             int maxClusterId = (int)GuiSimDataAccess.SafeGetDouble($"{basePath}.MaxCellVoltageClusterId");
@@ -94,7 +98,7 @@ namespace EssSimulator.Web
                 double cCurr = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.Current");
                 double cVolt = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.TotalVoltage");
                 double cSoc = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.SOC") * 100;
-                double cSoh = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.SOH");
+                double cSoh = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.SOH") * 100;
                 double cAvg = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.AvgCellVoltage");
                 double cMax = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.MaxCellVoltage");
                 double cMin = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.MinCellVoltage");
@@ -124,16 +128,24 @@ namespace EssSimulator.Web
 
             const int packCount = 4;
             const int cellsPerPack = 104;
+            string clusterPath = $"{basePath}.Cluseter[{clusterId}]";
 
             var dto = new CellVoltageDto
             {
                 UnitIndex = unitIndex0,
                 ClusterId = clusterId,
                 PackCount = packCount,
-                CellsPerPack = cellsPerPack
+                CellsPerPack = cellsPerPack,
+                MaxCellVoltage = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MaxCellVoltage"),
+                MinCellVoltage = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MinCellVoltage")
             };
 
-            double minV = double.MaxValue, maxV = double.MinValue;
+            int maxIdFlat = (int)GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MaxCellVoltageId");
+            int minIdFlat = (int)GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MinCellVoltageId");
+            dto.MaxCellVoltagePackId = maxIdFlat / cellsPerPack;
+            dto.MaxCellVoltageCellId = maxIdFlat % cellsPerPack;
+            dto.MinCellVoltagePackId = minIdFlat / cellsPerPack;
+            dto.MinCellVoltageCellId = minIdFlat % cellsPerPack;
 
             for (int pack = 0; pack < packCount; pack++)
             {
@@ -145,22 +157,15 @@ namespace EssSimulator.Web
                     try
                     {
                         v = (float)SimServer.GetExtIfVariableVal(
-                            $"{basePath}.Cluseter[{clusterId}].ClusterCellVoltages.CellVoltages[{cellIdx}]");
+                            $"{clusterPath}.ClusterCellVoltages.CellVoltages[{cellIdx}]");
                     }
                     catch { v = 0; }
 
                     packCells.Add(v);
-                    if (v > 0)
-                    {
-                        if (v < minV) minV = v;
-                        if (v > maxV) maxV = v;
-                    }
                 }
                 dto.Packs.Add(packCells);
             }
 
-            dto.MinCellVoltage = minV == double.MaxValue ? 0 : minV;
-            dto.MaxCellVoltage = maxV == double.MinValue ? 0 : maxV;
             return dto;
         }
     }

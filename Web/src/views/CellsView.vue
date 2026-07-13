@@ -8,7 +8,13 @@
         <el-option v-for="i in clusterCount" :key="i" :label="`簇 ${i}`" :value="i" />
       </el-select>
       <el-button style="margin-left:12px" @click="reload">刷新</el-button>
-      <el-tag style="margin-left:12px" size="small">单体最高 {{ data?.maxCellVoltage?.toFixed(3) }} V / 最低 {{ data?.minCellVoltage?.toFixed(3) }} V</el-tag>
+      <el-tag v-if="data" style="margin-left:12px" size="small">
+        单体最高 簇{{ clusterNumber }} 包{{ data.maxCellVoltagePackId }} 单体{{ data.maxCellVoltageCellId }}
+        {{ data.maxCellVoltage.toFixed(3) }} V
+        /
+        最低 簇{{ clusterNumber }} 包{{ data.minCellVoltagePackId }} 单体{{ data.minCellVoltageCellId }}
+        {{ data.minCellVoltage.toFixed(3) }} V
+      </el-tag>
     </div>
 
     <div class="card" v-if="data">
@@ -16,8 +22,14 @@
         <div class="cell-pack" v-for="(pack, pi) in data.packs" :key="pi">
           <div class="pack-title">包 {{ pi }}（{{ data.cellsPerPack }} 节）</div>
           <div class="cell-grid-inner">
-            <div v-for="(v, ci) in pack" :key="ci" class="cell-box" :style="{ background: colorFor(v) }" :title="`${ci}# ${v.toFixed(3)} V`">
-              {{ v > 0 ? v.toFixed(2) : '—' }}
+            <div
+              v-for="(v, ci) in pack"
+              :key="ci"
+              class="cell-box"
+              :class="cellClass(pi, ci)"
+              :title="`簇${clusterNumber} 包${pi} 单体${ci} ${formatVoltage(v)}`"
+            >
+              {{ formatVoltage(v) }}
             </div>
           </div>
         </div>
@@ -36,14 +48,18 @@ const unitCount = ref(1)
 const clusterCount = ref(12)
 const data = ref(null)
 
-function colorFor(v) {
-  if (!v || v <= 0) return '#c0c4cc'
-  // 单体电压范围 2.8 ~ 3.65 V，映射颜色
-  const min = 2.8, max = 3.65
-  const ratio = Math.min(1, Math.max(0, (v - min) / (max - min)))
-  // 低=红，高=绿
-  const hue = ratio * 120 // 0=红,120=绿
-  return `hsl(${hue}, 70%, 45%)`
+function formatVoltage(v) {
+  return v > 0 ? v.toFixed(3) : '—'
+}
+
+function cellClass(packIndex, cellIndex) {
+  const d = data.value
+  if (!d) return 'cell-empty'
+  const v = d.packs?.[packIndex]?.[cellIndex]
+  if (!v || v <= 0) return 'cell-empty'
+  if (packIndex === d.maxCellVoltagePackId && cellIndex === d.maxCellVoltageCellId) return 'cell-max'
+  if (packIndex === d.minCellVoltagePackId && cellIndex === d.minCellVoltageCellId) return 'cell-min'
+  return 'cell-normal'
 }
 
 async function reload() {
@@ -59,3 +75,25 @@ onMounted(async () => {
   await reload()
 })
 </script>
+
+<style scoped>
+.cell-box.cell-normal {
+  background: #8bc34a;
+  color: #fff;
+}
+
+.cell-box.cell-max {
+  background: #409eff;
+  color: #fff;
+}
+
+.cell-box.cell-min {
+  background: #f56c6c;
+  color: #fff;
+}
+
+.cell-box.cell-empty {
+  background: #c0c4cc;
+  color: #fff;
+}
+</style>

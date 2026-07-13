@@ -19,7 +19,6 @@
           <el-menu-item index="/cells"><el-icon><Grid /></el-icon><span>电池单体信息</span></el-menu-item>
           <el-menu-item index="/command"><el-icon><Promotion /></el-icon><span>命令输入</span></el-menu-item>
           <el-menu-item index="/connections"><el-icon><Link /></el-icon><span>连接信息</span></el-menu-item>
-          <el-menu-item index="/logs"><el-icon><Document /></el-icon><span>日志信息</span></el-menu-item>
         </el-menu>
       </aside>
       <main class="app-main">

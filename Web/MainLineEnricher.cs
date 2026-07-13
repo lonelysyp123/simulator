@@ -30,6 +30,8 @@ namespace EssSimulator.Web
                 MainTransformerSecondary = snap.MainTransformerSecondary,
                 LoadActivePowerKw = snap.LoadActivePowerKw,
                 LoadReactivePowerKvar = snap.LoadReactivePowerKvar,
+                LoadActivePowerSetKw = snap.LoadActivePowerSetKw,
+                LoadReactivePowerSetKvar = snap.LoadReactivePowerSetKvar,
                 BlackStartSummary = GuiStatusFormatters.BuildBlackStartSwitchSummary(0, channelCount),
                 MainBreakerLabel = FormatBreaker(snap.MainBreakerClosed, snap.MainBreakerTripped),
                 Units = snap.Units.Select(u => EnrichUnit(u, channelCount)).ToList()
@@ -88,7 +90,14 @@ namespace EssSimulator.Web
                     channelIndex0, pcs?.ReactivePowerKw ?? 0),
                 PcsBlackStart = GuiStatusFormatters.FormatPcsMainLineBlackStart(unitIndex0, slotInUnit0, channelIndex0),
                 PcsAcLine = pcs != null ? GuiStatusFormatters.FormatPcsAcLine(pcs.Value) : "—",
-                PcsGridMode = pcs != null ? GuiStatusFormatters.FormatGridModeLabel(pcs.Value.GridMode) : "—"
+                PcsGridMode = pcs != null ? GuiStatusFormatters.FormatGridModeLabel(pcs.Value.GridMode) : "—",
+                TargetActivePowerKw = GuiSimDataAccess.SafeGetDouble(
+                    $"emu{unitIndex0 + 1}.PcsList[{slotInUnit0}].PCSActivePowerSetting"),
+                TargetReactivePowerKvar = GuiSimDataAccess.SafeGetDouble(
+                    $"emu{unitIndex0 + 1}.PcsList[{slotInUnit0}].PCSReactivePowerSetting"),
+                EmuUnitNumber = unitIndex0 + 1,
+                ActivePowerYtPoint = slotInUnit0 == 0 ? "yt0" : "yt4",
+                ReactivePowerYtPoint = slotInUnit0 == 0 ? "yt1" : "yt5"
             };
         }
 
@@ -122,6 +131,8 @@ namespace EssSimulator.Web
         public AcPhasorSnapshot MainTransformerSecondary { get; set; }
         public double LoadActivePowerKw { get; set; }
         public double LoadReactivePowerKvar { get; set; }
+        public double LoadActivePowerSetKw { get; set; }
+        public double LoadReactivePowerSetKvar { get; set; }
         public string BlackStartSummary { get; set; } = "";
         public List<MainLineUnitViewModel> Units { get; set; } = new();
     }
@@ -166,5 +177,10 @@ namespace EssSimulator.Web
         public string PcsBlackStart { get; set; } = "";
         public string PcsAcLine { get; set; } = "";
         public string PcsGridMode { get; set; } = "";
+        public double TargetActivePowerKw { get; set; }
+        public double TargetReactivePowerKvar { get; set; }
+        public int EmuUnitNumber { get; set; }
+        public string ActivePowerYtPoint { get; set; } = "yt0";
+        public string ReactivePowerYtPoint { get; set; } = "yt1";
     }
 }

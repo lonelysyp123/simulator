@@ -108,8 +108,11 @@
           :bus-y="96"
           @pcs-start="n => $emit('pcs-start', n)"
           @pcs-stop="n => $emit('pcs-stop', n)"
+          @pcs-set-power="p => $emit('pcs-set-power', p)"
+          @pcs-set-reactive="p => $emit('pcs-set-reactive', p)"
           @bms-power-on="n => $emit('bms-power-on', n)"
           @bms-power-off="n => $emit('bms-power-off', n)"
+          @bms-fault-clear="n => $emit('bms-fault-clear', n)"
         />
         <!-- PCS-B / 舱-B -->
         <ChannelBranch
@@ -120,24 +123,37 @@
           :bus-y="96"
           @pcs-start="n => $emit('pcs-start', n)"
           @pcs-stop="n => $emit('pcs-stop', n)"
+          @pcs-set-power="p => $emit('pcs-set-power', p)"
+          @pcs-set-reactive="p => $emit('pcs-set-reactive', p)"
           @bms-power-on="n => $emit('bms-power-on', n)"
           @bms-power-off="n => $emit('bms-power-off', n)"
+          @bms-fault-clear="n => $emit('bms-fault-clear', n)"
         />
       </g>
-
-      <!-- 底部说明 -->
-      <text x="16" :y="svgHeight - 12" class="hint-text">
-        绿色实线=合闸 · 红色虚线=分闸 · 点击断路器切换 · 变压器为标准双圈符号 · 数据实时推送
-      </text>
-      <text v-if="snap.blackStartSummary" x="16" :y="svgHeight - 28" class="hint-text">黑启动: {{ snap.blackStartSummary }}</text>
     </svg>
       </div>
+    </div>
+
+    <div v-if="blackStartChips.length" class="mainline-blackstart">
+      <span class="footer-label">黑启动</span>
+      <span
+        v-for="chip in blackStartChips"
+        :key="chip.pcs"
+        class="bs-chip"
+        :class="chipStatusClass(chip.status)"
+      >PCS{{ chip.pcs }} {{ chip.status }}</span>
+    </div>
+    <div class="mainline-legend">
+      <span><i class="legend-line legend-closed" />合闸</span>
+      <span><i class="legend-line legend-open" />分闸/跳闸</span>
+      <span>点击断路器切换</span>
+      <span>数据实时推送</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onBeforeUnmount, ref } from 'vue'
+import { computed, defineComponent, h, onBeforeUnmount, reactive, ref } from 'vue'
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 10
@@ -151,8 +167,11 @@ defineEmits([
   'toggle-unit-breaker',
   'pcs-start',
   'pcs-stop',
+  'pcs-set-power',
+  'pcs-set-reactive',
   'bms-power-on',
-  'bms-power-off'
+  'bms-power-off',
+  'bms-fault-clear'
 ])
 
 const zoom = ref(MIN_ZOOM)
@@ -173,7 +192,7 @@ const svgWidth = computed(() =>
   Math.max(900, MARGIN_LEFT + unitCount.value * UNIT_WIDTH + MARGIN_RIGHT)
 )
 const renderWidth = computed(() => Math.round(svgWidth.value * zoom.value))
-const renderHeight = computed(() => Math.round(SVG_HEIGHT * zoom.value))
+const renderHeight = computed(() => Math.round(svgHeight.value * zoom.value))
 
 function clampZoom(v) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +v.toFixed(2)))
@@ -227,7 +246,7 @@ const MARGIN_LEFT = 100
 const MARGIN_RIGHT = 80
 const MAIN_X = 70
 const BUS_Y = 195
-const SVG_HEIGHT = 720
+const BOTTOM_PAD = 12
 
 /** PCS / BMS 支路布局 */
 const BRANCH = {
@@ -235,16 +254,32 @@ const BRANCH = {
   /** A/B 支路中心距单元中心的水平偏移；须满足 2*channelX > boxW + 间距 */
   channelX: 92,
   pcsTop: 24,
-  pcsH: 172,
+  pcsH: 228,
   gap: 28,
-  bmsH: 118,
+  bmsH: 138,
   get bmsTop() { return this.pcsTop + this.pcsH + this.gap },
-  get linkMid() { return this.pcsTop + this.pcsH + this.gap / 2 }
+  get linkMid() { return this.pcsTop + this.pcsH + this.gap / 2 },
+  get bottomY() { return 96 + this.bmsTop + this.bmsH }
 }
 
 const mainX = MAIN_X
 const busY = BUS_Y
-const svgHeight = SVG_HEIGHT
+const svgHeight = computed(() => busY + BRANCH.bottomY + BOTTOM_PAD)
+
+const blackStartChips = computed(() => {
+  const summary = props.snap.blackStartSummary
+  if (!summary) return []
+  return summary.split(/\s{2,}/).filter(Boolean).map(part => {
+    const m = part.match(/^PCS(\d+):(.+)$/)
+    return m ? { pcs: m[1], status: m[2] } : { pcs: part, status: '' }
+  })
+})
+
+function chipStatusClass(status) {
+  if (!status || status === '关') return 'bs-off'
+  if (status.includes('运行') || status === '开' || status === '运') return 'bs-on'
+  return 'bs-partial'
+}
 
 const busEndX = computed(() => MARGIN_LEFT + Math.max(0, unitCount.value - 1) * UNIT_WIDTH + UNIT_WIDTH / 2)
 
@@ -300,11 +335,54 @@ const BreakerSymbol = defineComponent({
 })
 
 /** PCS + BMS 支路 */
+const powerDrafts = reactive({})
+
 const ChannelBranch = defineComponent({
   props: { channel: Object, side: String, x: Number, busY: Number },
-  emits: ['pcs-start', 'pcs-stop', 'bms-power-on', 'bms-power-off'],
+  emits: ['pcs-start', 'pcs-stop', 'pcs-set-power', 'pcs-set-reactive', 'bms-power-on', 'bms-power-off', 'bms-fault-clear'],
   setup(p, { emit }) {
     const halfW = BRANCH.boxW / 2
+
+    function draftKey(ch, kind) {
+      return `${kind}-${ch?.pcsNumber ?? ''}`
+    }
+
+    function getDraft(ch, kind, fallback) {
+      const key = draftKey(ch, kind)
+      if (powerDrafts[key] === undefined) {
+        powerDrafts[key] = String(Number(fallback ?? 0).toFixed(1))
+      }
+      return powerDrafts[key]
+    }
+
+    function setDraft(ch, kind, value) {
+      powerDrafts[draftKey(ch, kind)] = value
+    }
+
+    function buildSetRow(ch, label, kind, fallback, onApply) {
+      return h('div', { class: 'power-row' }, [
+        h('label', { class: 'power-label' }, label),
+        h('input', {
+          type: 'text',
+          inputMode: 'decimal',
+          class: 'power-input',
+          value: getDraft(ch, kind, fallback),
+          onInput: (e) => setDraft(ch, kind, e.target.value),
+          onKeydown: (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              onApply()
+            }
+          }
+        }),
+        h('button', {
+          type: 'button',
+          class: 'act-btn act-set',
+          onClick: (e) => { e.stopPropagation(); onApply() }
+        }, '设定')
+      ])
+    }
+
     return () => {
       const ch = p.channel
       const label = p.side === 'A' ? 'PCS-A' : 'PCS-B'
@@ -350,9 +428,31 @@ const ChannelBranch = defineComponent({
           h('div', { xmlns: 'http://www.w3.org/1999/xhtml', class: 'svg-device-box pcs-box' }, [
             h('div', { class: 'box-title' }, `${label} (PCS${ch.pcsNumber})`),
             ...pcsLines.map(t => h('div', { class: 'box-line' }, t)),
-            btnRow('启动', '停机',
-              () => emit('pcs-start', ch.pcsNumber),
-              () => emit('pcs-stop', ch.pcsNumber))
+            h('div', { class: 'box-controls' }, [
+              buildSetRow(ch, 'P设(kW)', 'p', ch.targetActivePowerKw, () => {
+                const kw = Number(getDraft(ch, 'p', ch.targetActivePowerKw))
+                if (!Number.isFinite(kw)) return
+                emit('pcs-set-power', {
+                  pcsNumber: ch.pcsNumber,
+                  emuUnit: ch.emuUnitNumber,
+                  ytPoint: ch.activePowerYtPoint,
+                  powerKw: kw
+                })
+              }),
+              buildSetRow(ch, 'Q设(kvar)', 'q', ch.targetReactivePowerKvar, () => {
+                const kvar = Number(getDraft(ch, 'q', ch.targetReactivePowerKvar))
+                if (!Number.isFinite(kvar)) return
+                emit('pcs-set-reactive', {
+                  pcsNumber: ch.pcsNumber,
+                  emuUnit: ch.emuUnitNumber,
+                  ytPoint: ch.reactivePowerYtPoint,
+                  reactiveKvar: kvar
+                })
+              }),
+              btnRow('启动', '停机',
+                () => emit('pcs-start', ch.pcsNumber),
+                () => emit('pcs-stop', ch.pcsNumber))
+            ])
           ])
         ]),
         h('line', {
@@ -373,7 +473,14 @@ const ChannelBranch = defineComponent({
             ...bmsLines.map(t => h('div', { class: 'box-line' }, t)),
             btnRow('上电', '下电',
               () => emit('bms-power-on', ch.compartmentNumber),
-              () => emit('bms-power-off', ch.compartmentNumber))
+              () => emit('bms-power-off', ch.compartmentNumber)),
+            h('div', { class: 'box-actions' }, [
+              h('button', {
+                type: 'button',
+                class: 'act-btn act-clear',
+                onClick: (e) => { e.stopPropagation(); emit('bms-fault-clear', ch.compartmentNumber) }
+              }, '故障清除')
+            ])
           ])
         ])
       ])
@@ -435,7 +542,73 @@ const ChannelBranch = defineComponent({
 .breaker-hit:hover .breaker-label { fill: #1e6abc; font-weight: 600; }
 .breaker-label { font-size: 11px; }
 .unit-title { font-size: 13px; font-weight: 700; fill: #1e3a5f; }
-.hint-text { font-size: 10px; fill: #909399; }
+.mainline-blackstart {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fafbfc;
+}
+.footer-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #606266;
+  margin-right: 2px;
+}
+.bs-chip {
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #dcdfe6;
+  background: #fff;
+  color: #606266;
+  white-space: nowrap;
+}
+.bs-chip.bs-on {
+  border-color: #b3e19d;
+  background: #f0f9eb;
+  color: #529b2e;
+}
+.bs-chip.bs-partial {
+  border-color: #f3d19e;
+  background: #fdf6ec;
+  color: #b88230;
+}
+.bs-chip.bs-off {
+  border-color: #e4e7ed;
+  background: #f4f4f5;
+  color: #909399;
+}
+.mainline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #909399;
+}
+.mainline-legend .legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  margin-right: 4px;
+  vertical-align: middle;
+  border-top-width: 2px;
+  border-top-style: solid;
+}
+.mainline-legend .legend-closed {
+  border-top-color: #67c23a;
+}
+.mainline-legend .legend-open {
+  border-top-color: #f56c6c;
+  border-top-style: dashed;
+}
 </style>
 
 <style>
@@ -474,6 +647,9 @@ const ChannelBranch = defineComponent({
 .svg-device-box .box-actions {
   display: flex;
   gap: 4px;
+  margin-top: 4px;
+}
+.svg-device-box .box-controls {
   margin-top: auto;
   padding-top: 4px;
 }
@@ -499,5 +675,41 @@ const ChannelBranch = defineComponent({
 .svg-device-box .act-btn.act-off:hover {
   border-color: #e6a23c;
   color: #e6a23c;
+}
+.svg-device-box .act-btn.act-clear {
+  flex: 1;
+}
+.svg-device-box .act-btn.act-clear:hover {
+  border-color: #f56c6c;
+  color: #f56c6c;
+}
+.svg-device-box .power-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+}
+.svg-device-box .power-label {
+  font-size: 9px;
+  color: #606266;
+  white-space: nowrap;
+}
+.svg-device-box .power-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  padding: 1px 3px;
+  border: 1px solid #c0c4cc;
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+.svg-device-box .act-btn.act-set {
+  flex: 0 0 auto;
+  min-width: 32px;
+  padding: 2px 4px;
+}
+.svg-device-box .act-btn.act-set:hover {
+  border-color: #409eff;
+  color: #409eff;
 }
 </style>

@@ -18,13 +18,17 @@ public class LoadDeviceTests
     }
 
     [Fact]
-    public void SetLoadCharacteristic_OverridesSchedule()
+    public void SetLoadCharacteristic_OverridesScheduleAndKeepsFluctuation()
     {
         var load = new LoadDevice("load_35", 100, 0);
         load.SetLoadCharacteristic("activePower", 42);
         load.RefreshSchedule(DateTime.UtcNow);
 
-        Assert.Equal(42, load.ActivePower);
+        Assert.Equal(42, load.ActivePowerSetpointKw);
+        Assert.InRange(load.ActivePower, 41.9, 42.1);
+        load.RefreshSchedule(DateTime.UtcNow);
+        Assert.Equal(42, load.ActivePowerSetpointKw);
+        Assert.InRange(load.ActivePower, 41.9, 42.1);
     }
 
     [Fact]

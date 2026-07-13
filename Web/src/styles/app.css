@@ -35,11 +35,16 @@ html, body, #app {
   font-size: 12px; padding: 8px; border-radius: 4px; height: calc(100vh - 180px); overflow: auto;
 }
 .log-line { white-space: pre-wrap; word-break: break-all; }
-.log-line .level-INFO  { color: #6a9955; }
-.log-line .level-WARN  { color: #d7ba7d; }
-.log-line .level-ERROR { color: #f48771; }
-.log-line .level-FATAL { color: #ff4d4f; font-weight: 600; }
-.log-line .level-DEBUG { color: #608b4e; }
+.log-line .level-INFO,
+.log-line.level-INFO  { color: #6a9955; }
+.log-line .level-WARN,
+.log-line.level-WARN  { color: #d7ba7d; }
+.log-line .level-ERROR,
+.log-line.level-ERROR { color: #f48771; }
+.log-line .level-FATAL,
+.log-line.level-FATAL { color: #ff4d4f; font-weight: 600; }
+.log-line .level-DEBUG,
+.log-line.level-DEBUG { color: #608b4e; }
 
 .cell-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .cell-pack { border: 1px solid #ebeef5; border-radius: 4px; padding: 6px; }

@@ -41,6 +41,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                     ReactivePowerPlan = reactivePowerPlan
                 }
             }).OrderBy(w => w.Start).ToList();
+            ActivePowerSetpointKw = activePowerPlan;
+            ReactivePowerSetpointKvar = reactivePowerPlan;
             Port = CreatePort(_config.Connection);
         }
 
@@ -52,8 +54,14 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         /// <summary>方向约定：+ 向电网送电，- 从电网取电。</summary>
         public double ActivePower { get; private set; }
 
+        /// <summary>有功设定值（kW），不含随机波动。</summary>
+        public double ActivePowerSetpointKw { get; private set; }
+
         /// <summary>无功约定：正=升压支撑，负=降压作用。</summary>
         public double ReactivePower { get; private set; }
+
+        /// <summary>无功设定值（kvar）。</summary>
+        public double ReactivePowerSetpointKvar { get; private set; }
 
         public void SetPowered(bool powered)
         {
@@ -69,9 +77,12 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         {
             _scheduleStopped = true;
             if (characteristic == "activePower")
-                ActivePower = value;
+                ActivePowerSetpointKw = value;
             else if (characteristic == "reactivePower")
-                ReactivePower = value;
+                ReactivePowerSetpointKvar = value;
+
+            if (_config.Powered)
+                ApplyMeasuredPowerFromSetpoints();
         }
 
         public void RefreshSchedule(DateTime simTime)
@@ -84,7 +95,10 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             }
 
             if (_scheduleStopped)
+            {
+                ApplyMeasuredPowerFromSetpoints();
                 return;
+            }
 
             var tod = simTime.TimeOfDay;
             var active = _windows[0];
@@ -96,11 +110,17 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                     break;
             }
 
-            double planP = active.ActivePowerPlan;
-            ActivePower = planP == 0
+            ActivePowerSetpointKw = active.ActivePowerPlan;
+            ReactivePowerSetpointKvar = active.ReactivePowerPlan;
+            ApplyMeasuredPowerFromSetpoints();
+        }
+
+        private void ApplyMeasuredPowerFromSetpoints()
+        {
+            ActivePower = ActivePowerSetpointKw == 0
                 ? 0
-                : planP + (_random.NextDouble() * 2.0 - 1.0) * ActivePowerFluctuationKw;
-            ReactivePower = active.ReactivePowerPlan;
+                : ActivePowerSetpointKw + (_random.NextDouble() * 2.0 - 1.0) * ActivePowerFluctuationKw;
+            ReactivePower = ReactivePowerSetpointKvar;
         }
 
         /// <summary>由 35kV 母线电压换算负载电流（A），供监视/兼容路径使用。</summary>

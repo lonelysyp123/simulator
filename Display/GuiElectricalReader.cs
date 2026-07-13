@@ -65,6 +65,8 @@ namespace EssSimulator.Display
         public AcPhasorSnapshot MainTransformerSecondary { get; init; }
         public double LoadActivePowerKw { get; init; }
         public double LoadReactivePowerKvar { get; init; }
+        public double LoadActivePowerSetKw { get; init; }
+        public double LoadReactivePowerSetKvar { get; init; }
         public IReadOnlyList<UnitBranchSnapshot> Units { get; init; } = Array.Empty<UnitBranchSnapshot>();
     }
 
@@ -153,6 +155,8 @@ namespace EssSimulator.Display
                 MainTransformerSecondary = mainSec,
                 LoadActivePowerKw = GuiSimDataAccess.SafeGetDouble("ess._loadSimulator.ActivePower"),
                 LoadReactivePowerKvar = GuiSimDataAccess.SafeGetDouble("ess._loadSimulator.ReactivePower"),
+                LoadActivePowerSetKw = GuiSimDataAccess.SafeGetDouble("ess._loadSimulator.ActivePowerSetpointKw"),
+                LoadReactivePowerSetKvar = GuiSimDataAccess.SafeGetDouble("ess._loadSimulator.ReactivePowerSetpointKvar"),
                 Units = units
             };
         }
