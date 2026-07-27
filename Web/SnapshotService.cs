@@ -8,9 +8,14 @@ namespace EssSimulator.Web
     /// <summary>周期采样仿真状态并通过 SignalR 推送（主接线/BMS/连接）。</summary>
     public sealed class SnapshotService : BackgroundService
     {
+        private static SnapshotService? _current;
+
         private readonly IHubContext<RealtimeHub> _hub;
         private readonly SimulatorConfig _simCfg;
         private readonly WebConfig _webCfg;
+        private readonly object _kickLock = new();
+        private TaskCompletionSource _kick =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public SnapshotService(
             IHubContext<RealtimeHub> hub,
@@ -20,6 +25,18 @@ namespace EssSimulator.Web
             _hub = hub;
             _simCfg = simCfg.Value;
             _webCfg = webCfg.Value;
+            _current = this;
+        }
+
+        /// <summary>
+        /// 控制侧变更后请求立即推一帧（如 PCS 启停），无需等周期到期。
+        /// </summary>
+        public static void RequestImmediatePush() => _current?.Kick();
+
+        private void Kick()
+        {
+            lock (_kickLock)
+                _kick.TrySetResult();
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -27,26 +44,49 @@ namespace EssSimulator.Web
             // 等待仿真基本就绪
             while (!stoppingToken.IsCancellationRequested && !IsSimulatorReady())
             {
-                try { await Task.Delay(500, stoppingToken); }
+                try { await Task.Delay(200, stoppingToken); }
                 catch (TaskCanceledException) { return; }
             }
 
-            int intervalMs = Math.Max(200, _webCfg.SnapshotIntervalMs);
-            var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(intervalMs));
+            // 与主循环/控制轮询同量级；默认 200ms，下限 50ms
+            int intervalMs = Math.Clamp(_webCfg.SnapshotIntervalMs, 50, 5000);
 
             try
             {
-                while (await timer.WaitForNextTickAsync(stoppingToken))
+                while (!stoppingToken.IsCancellationRequested)
                 {
                     try { await PushAll(stoppingToken); }
                     catch (Exception ex)
                     {
-                        // 单次采样失败不影响后续
                         System.Diagnostics.Debug.WriteLine($"SnapshotService 采样失败: {ex.Message}");
                     }
+
+                    try { await WaitNextAsync(intervalMs, stoppingToken); }
+                    catch (OperationCanceledException) { break; }
                 }
             }
-            catch (OperationCanceledException) { }
+            finally
+            {
+                if (ReferenceEquals(_current, this))
+                    _current = null;
+            }
+        }
+
+        private async Task WaitNextAsync(int intervalMs, CancellationToken ct)
+        {
+            TaskCompletionSource kickTcs;
+            lock (_kickLock)
+                kickTcs = _kick;
+
+            var winner = await Task.WhenAny(Task.Delay(intervalMs, ct), kickTcs.Task);
+            if (winner == kickTcs.Task)
+            {
+                lock (_kickLock)
+                {
+                    if (ReferenceEquals(_kick, kickTcs))
+                        _kick = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+            }
         }
 
         private bool IsSimulatorReady()
@@ -57,17 +97,14 @@ namespace EssSimulator.Web
 
         private async Task PushAll(CancellationToken ct)
         {
-            // 主接线：推送 enriched 视图模型
             var mainLine = MainLineEnricher.Build();
             await _hub.Clients.Group(RealtimeChannels.MainLine)
                 .SendAsync(RealtimeMethods.ReceiveMainLine, mainLine, ct);
 
-            // 连接信息
             var conn = ConnectionSnapshotReader.Read();
             await _hub.Clients.Group(RealtimeChannels.Connections)
                 .SendAsync(RealtimeMethods.ReceiveConnections, conn, ct);
 
-            // 电池舱总览：每个通道推送一次
             int unitCount = Math.Max(1, GuiSimDataAccess.GetEssUnitCount());
             for (int i = 0; i < unitCount; i++)
             {
@@ -80,7 +117,6 @@ namespace EssSimulator.Web
                 catch { /* 单个舱失败不影响其他 */ }
             }
 
-            // 告警状态（仅当活跃时推送，减少流量）
             var alert = FatalSystemAlert.GetSnapshot();
             if (alert.IsActive)
             {

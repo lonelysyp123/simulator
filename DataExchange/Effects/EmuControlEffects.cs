@@ -3,6 +3,7 @@ using EssSimulator.DataExchange.Catalog;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
 using EssSimulator.EssSimModelApi.Mappers;
+using EssSimulator.Web;
 
 namespace EssSimulator.DataExchange.Effects
 {
@@ -30,6 +31,7 @@ namespace EssSimulator.DataExchange.Effects
             PcsMapper.ApplyEmuCommands(emu, ess, pcsBase);
             PcsEmuSynchronizer.SyncPcsStateFromModel(ess, emu, pcsBase);
             _refreshTelemetry?.Invoke();
+            SnapshotService.RequestImmediatePush();
         }
 
         internal static bool TryParseEmuUnit(string serverName, out int unit1Based)
@@ -59,6 +61,7 @@ namespace EssSimulator.DataExchange.Effects
                 return;
 
             ess.SetUnitBreakerClosed(unit1Based - 1, emu.Emu.PowerOnOff != 0);
+            SnapshotService.RequestImmediatePush();
         }
     }
 }

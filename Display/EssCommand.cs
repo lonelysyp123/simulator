@@ -2,6 +2,7 @@ using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.Bms;
 using EssSimulator.Protocol;
+using EssSimulator.Web;
 using System;
 using System.Collections.Generic;
 
@@ -64,7 +65,7 @@ namespace EssSimulator.Display
                 "  - setGrid：调整外部电网源；主断闭合后生效于 PCC/跟网 PCS",
                 "  - setbmsN power on：触发并网，GridConnectStatus→2，IsPcsLinked=true",
                 "  - setbmsN power off：断开 PCS↔BMS 链路，GridConnectStatus→0",
-                "  - bmsN fault clear：待机时清除因充放电触发的内部故障，之后可 setbmsN power on",
+                "  - bmsN fault clear：待机时清除充放电方向内部故障（一次性）；再次超限会重新触发，三级故障会自动下电",
                 "  - 同一储能单元内 pcs(2n-1)/pcs(2n) 共用 simEmu{n}，关闭任一路会影响该单元两路 PCS"
             }.JoinLines();
         }
@@ -139,6 +140,7 @@ namespace EssSimulator.Display
                 if (!ess.TrySetGridFrequency(hz, out var message))
                     return CommandResult.Fail($"操作失败: {message}");
 
+                SnapshotService.RequestImmediatePush();
                 return CommandResult.Ok($"执行成功: {message}");
             }
 
@@ -150,6 +152,7 @@ namespace EssSimulator.Display
                 if (!ess.TrySetGridVoltage(volts, out var message))
                     return CommandResult.Fail($"操作失败: {message}");
 
+                SnapshotService.RequestImmediatePush();
                 return CommandResult.Ok($"执行成功: {message}");
             }
 

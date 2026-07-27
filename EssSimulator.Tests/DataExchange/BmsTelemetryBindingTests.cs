@@ -81,10 +81,53 @@ public class BmsTelemetryBindingTests
         var bms = new BatteryManagementSystemData();
         bms.BatteryStacks.Add(new BatteryStack());
 
-        var rack = new RackState { MinClusterSOC = 0.62, StateOfHealth = 0.98 };
+        var rack = new RackState { MinClusterSOC = 0.62, StateOfHealth = 0.98, IsPcsLinked = true };
         BmsMapper.MapRackToStack(rack, bms);
 
         Assert.Equal(0.62f, bms.BatteryStacks[0].SOC);
+    }
+
+    [Fact]
+    public void BmsMapper_ZerosDcVoltageWhenUnlinked()
+    {
+        var bms = new BatteryManagementSystemData();
+        bms.BatteryStacks.Add(new BatteryStack());
+
+        var rack = new RackState
+        {
+            TotalVoltage = 1330,
+            TotalCurrent = 40,
+            MinClusterSOC = 0.5,
+            StateOfHealth = 1.0,
+            IsPcsLinked = false
+        };
+        BmsMapper.MapRackToStack(rack, bms);
+
+        Assert.Equal(0f, bms.BatteryStacks[0].TotalVoltage);
+        Assert.Equal(0f, bms.BatteryStacks[0].Current);
+        Assert.Equal(0f, bms.BatteryStacks[0].Power);
+        Assert.Equal(0.5f, bms.BatteryStacks[0].SOC);
+    }
+
+    [Fact]
+    public void BmsMapper_ReportsDcVoltageWhenLinked()
+    {
+        var bms = new BatteryManagementSystemData();
+        bms.BatteryStacks.Add(new BatteryStack());
+
+        var rack = new RackState
+        {
+            TotalVoltage = 1330,
+            TotalCurrent = 40,
+            MinClusterSOC = 0.5,
+            StateOfHealth = 1.0,
+            IsPcsLinked = true
+        };
+        BmsMapper.MapRackToStack(rack, bms);
+
+        Assert.Equal(1330f, bms.BatteryStacks[0].TotalVoltage);
+        Assert.Equal(40f, bms.BatteryStacks[0].Current);
+        Assert.Equal(1330f * 40f / 1000f, bms.BatteryStacks[0].Power);
     }
 
     [Fact]

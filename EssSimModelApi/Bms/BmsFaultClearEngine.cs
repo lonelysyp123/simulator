@@ -11,7 +11,7 @@ namespace EssSimulator.EssSimModelApi.Bms
     {
         /// <summary>
         /// 待机状态下清除充放电方向内部故障，恢复可并网条件。
-        /// 清除后若仍处于待机，方向相关阈值不会立即再次触发。
+        /// 清除仅为一次性复位；若工况恢复充/放电且仍超限，保护状态机会按当前值重新落入对应等级。
         /// </summary>
         public static bool TryClearFaults(int bmsIndex0, out string message)
         {

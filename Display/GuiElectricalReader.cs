@@ -67,8 +67,28 @@ namespace EssSimulator.Display
         public double LoadReactivePowerKvar { get; init; }
         public double LoadActivePowerSetKw { get; init; }
         public double LoadReactivePowerSetKvar { get; init; }
+        /// <summary>仿真电网额定线电压设定（V）。</summary>
+        public double GridNominalLineVoltageV { get; init; }
+        /// <summary>仿真电网额定频率设定（Hz）。</summary>
+        public double GridNominalFrequencyHz { get; init; }
+        /// <summary>当前系统频率（Hz，主断分闸时可为 0）。</summary>
+        public double SystemFrequencyHz { get; init; }
+        /// <summary>PCC 电表三相线电压/相电流（与 em DTO / 点表一致）。</summary>
+        public MeterThreePhaseSnapshot MeterThreePhase { get; init; }
         public IReadOnlyList<UnitBranchSnapshot> Units { get; init; } = Array.Empty<UnitBranchSnapshot>();
     }
+
+    /// <summary>电表三相量（平衡系统下三相等值，仍分字段上报便于界面与点表对齐）。</summary>
+    public readonly record struct MeterThreePhaseSnapshot(
+        double LineVoltageAB,
+        double LineVoltageBC,
+        double LineVoltageCA,
+        double PhaseACurrent,
+        double PhaseBCurrent,
+        double PhaseCCurrent,
+        double PhaseAVoltage,
+        double PhaseBVoltage,
+        double PhaseCVoltage);
 
     /// <summary>从 ess/em 路径读取主接线电气量（对齐传播求解 V-I-φ 架构）。</summary>
     public static class GuiElectricalReader
@@ -157,8 +177,40 @@ namespace EssSimulator.Display
                 LoadReactivePowerKvar = GuiSimDataAccess.SafeGetDouble("ess._loadSimulator.ReactivePower"),
                 LoadActivePowerSetKw = GuiSimDataAccess.SafeGetDouble("ess._loadSimulator.ActivePowerSetpointKw"),
                 LoadReactivePowerSetKvar = GuiSimDataAccess.SafeGetDouble("ess._loadSimulator.ReactivePowerSetpointKvar"),
+                GridNominalLineVoltageV = GuiSimDataAccess.SafeGetDouble(
+                    "ess.ElectricalNetwork.Grid.NominalLineVoltageV", 220000),
+                GridNominalFrequencyHz = GuiSimDataAccess.SafeGetDouble(
+                    "ess.ElectricalNetwork.Grid.NominalFrequencyHz", 50),
+                SystemFrequencyHz = systemF > 0.05
+                    ? systemF
+                    : GuiSimDataAccess.SafeGetDouble("ess.ElectricalNetwork.Grid.NominalFrequencyHz", 50),
+                MeterThreePhase = ReadMeterThreePhase(meter),
                 Units = units
             };
+        }
+
+        private static MeterThreePhaseSnapshot ReadMeterThreePhase(AcPhasorSnapshot meterFallback)
+        {
+            double uab = GuiSimDataAccess.SafeGetDouble("em.LineVoltageAB");
+            double ubc = GuiSimDataAccess.SafeGetDouble("em.LineVoltageBC");
+            double uca = GuiSimDataAccess.SafeGetDouble("em.LineVoltageCA");
+            double ia = GuiSimDataAccess.SafeGetDouble("em.PhaseACurrent");
+            double ib = GuiSimDataAccess.SafeGetDouble("em.PhaseBCurrent");
+            double ic = GuiSimDataAccess.SafeGetDouble("em.PhaseCCurrent");
+            double va = GuiSimDataAccess.SafeGetDouble("em.PhaseAVoltage");
+            double vb = GuiSimDataAccess.SafeGetDouble("em.PhaseBVoltage");
+            double vc = GuiSimDataAccess.SafeGetDouble("em.PhaseCVoltage");
+
+            // em 尚未写入时，用平衡相量回填，保证界面始终有线电压/相电流
+            if (uab <= 1 && ubc <= 1 && uca <= 1 && meterFallback.LineVoltageV > 1)
+                uab = ubc = uca = meterFallback.LineVoltageV;
+            if (Math.Abs(ia) < 1e-9 && Math.Abs(ib) < 1e-9 && Math.Abs(ic) < 1e-9
+                && Math.Abs(meterFallback.LineCurrentA) > 1e-9)
+                ia = ib = ic = meterFallback.LineCurrentA;
+            if (va <= 1 && vb <= 1 && vc <= 1 && meterFallback.LineVoltageV > 1)
+                va = vb = vc = meterFallback.LineVoltageV / Math.Sqrt(3.0);
+
+            return new MeterThreePhaseSnapshot(uab, ubc, uca, ia, ib, ic, va, vb, vc);
         }
 
         private static PcsChannelSnapshot? ReadPcsChannel(int pcsIndex, int unitIndex, int slot)

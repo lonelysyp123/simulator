@@ -20,7 +20,7 @@ public class BmsFaultClearTests
         rackState.MinClusterSOC = 0.05;
         rackState.MaxClusterSOC = 0.05;
         rackState.StateOfHealth = 1.0;
-        SetRackCurrent(rackState, 50);
+        SetRackCurrent(rackState, -50);
         foreach (var cluster in rackState.ClusterStates!)
             cluster.MinPackSOC = 0.05;
 
@@ -33,6 +33,12 @@ public class BmsFaultClearTests
         Assert.Equal((ushort)0, device.FaultCode);
         Assert.Equal((ushort)0, bmsData.BatteryStacks[0].BMSFaultSummary);
         Assert.NotEqual(true, bmsData.BatteryStacks[0].SystemAlarms.LowSOCFault);
+
+        // 再次放电且 SOC 仍低：应重新落入三级并置 Rack 放电故障
+        SetRackCurrent(rackState, -50);
+        device.SyncTelemetryAndProtection(bmsData);
+        Assert.Equal(true, bmsData.BatteryStacks[0].SystemAlarms.LowSOCFault);
+        Assert.Equal((ushort)2, device.FaultCode);
     }
 
     [Fact]
@@ -41,7 +47,7 @@ public class BmsFaultClearTests
         var rack = BmsRackFactory.CreateRack(new BmsDeviceConfig { ClusterCount = 1 });
         var device = new BmsRackDevice("bms_test", rack);
         var bmsData = BmsDataGenerator.GenerateSampleData(1, 1);
-        SetRackCurrent(rack.GetRackState()!, 50);
+        SetRackCurrent(rack.GetRackState()!, -50);
 
         Assert.False(BmsRackProtection.TryClearChargeDischargeFaults(bmsData, device, out var message));
         Assert.Contains("待机", message);

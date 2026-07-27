@@ -8,6 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- 前端构建产物由 wwwroot/ 静态托管；发布时一并复制 -->
+    <!-- 排除发布产物，避免二次 publish 把 dist/ 内文件当源文件复制（MSB3030） -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/dist/**;**/bin/**;**/obj/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

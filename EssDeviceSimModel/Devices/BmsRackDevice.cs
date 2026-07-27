@@ -83,6 +83,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             BmsMapper.MapClusters(_rack, bmsData);
             BmsRackProtection.EvaluateAllClusters(_rack, bmsData);
             BmsRackProtection.ApplyRackFaultSummary(bmsData, rackState);
+            // 告警/功率限值就绪后再刷新堆级运行状态（bank yc3）
+            BmsMapper.UpdateStackOperationStatus(bmsData);
             BmsStateTracker.ReportProtectionChanges(DisplayLabel, bmsData, rackState);
             RefreshFaultState();
         }

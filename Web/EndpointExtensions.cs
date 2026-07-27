@@ -1,6 +1,7 @@
 using EssSimulator.Configuration;
 using EssSimulator.Core;
 using EssSimulator.Display;
+using EssSimulator.Web.DroopSlices;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
@@ -164,6 +165,33 @@ namespace EssSimulator.Web
                 return Results.Ok(result);
             });
 
+            // 下垂白盒切片
+            app.MapGet("/api/droop-slices/status", (DroopSliceStore store) => Results.Ok(store.GetStatus()));
+
+            app.MapGet("/api/droop-slices", (DroopSliceStore store, int? limit, int? offset) =>
+                Results.Ok(store.List(limit ?? 100, offset ?? 0)));
+
+            app.MapGet("/api/droop-slices/{id:guid}", (Guid id, DroopSliceStore store) =>
+            {
+                var slice = store.Get(id);
+                return slice == null ? Results.NotFound(new { message = "切片不存在" }) : Results.Ok(slice);
+            });
+
+            app.MapPost("/api/droop-slices/clear", (DroopSliceStore store) =>
+            {
+                store.Clear();
+                return Results.Ok(store.GetStatus());
+            });
+
+            app.MapPost("/api/droop-slices/config", (DroopSliceConfigRequest req, DroopSliceStore store) =>
+            {
+                if (req.Enabled.HasValue)
+                    store.Enabled = req.Enabled.Value;
+                if (req.MaxCount.HasValue)
+                    store.MaxCount = req.MaxCount.Value;
+                return Results.Ok(store.GetStatus());
+            });
+
             return app;
         }
 
@@ -180,5 +208,11 @@ namespace EssSimulator.Web
     public sealed class CommandRequest
     {
         public string Input { get; set; } = "";
+    }
+
+    public sealed class DroopSliceConfigRequest
+    {
+        public bool? Enabled { get; set; }
+        public int? MaxCount { get; set; }
     }
 }

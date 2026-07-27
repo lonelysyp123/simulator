@@ -17,7 +17,13 @@ namespace EssSimulator.Configuration
         /// <summary>CORS 允许来源；空数组表示允许开发代理（dev 模式自动放行 Vite 默认端口）。</summary>
         public List<string> CorsOrigins { get; set; } = new();
 
-        /// <summary>实时快照推送间隔（ms，主接线/BMS/连接）。</summary>
-        public int SnapshotIntervalMs { get; set; } = 1000;
+        /// <summary>实时快照推送间隔（ms，主接线/BMS/连接）；控制变更可额外触发立即推送。</summary>
+        public int SnapshotIntervalMs { get; set; } = 200;
+
+        /// <summary>是否默认开启下垂白盒切片采集（运行中仍可通过 API 开关）。</summary>
+        public bool DroopSliceCaptureEnabled { get; set; }
+
+        /// <summary>下垂切片内存环缓冲容量。</summary>
+        public int DroopSliceMaxCount { get; set; } = 500;
     }
 }

@@ -59,3 +59,4 @@ html, body, #app {
 .mainline-svg text { font-size: 11px; fill: #303133; }
 .mainline-svg .label-text { fill: #606266; }
 .mainline-svg .value-text { fill: #1e6abc; font-weight: 600; }
+.mainline-svg .muted-text { fill: #909399; font-weight: 500; }

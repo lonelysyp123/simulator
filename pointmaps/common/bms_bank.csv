@@ -51,7 +51,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10000,u16,16,yc0,1,一键并网状态0未开始1进行中2成功3失败,model=4|arg1=bmsdeviceId.BatteryStacks[0].GridConnectStatus|arg2=|arg3=|arg4=1000
 4,10001,u16,16,yc1,1,Rack启用/停用状态,1
 4,10002,u16,16,yc2,1,RACK 在线状态,1
-4,10003,u16,16,yc3,1,系统运行状态,1
+4,10003,u16,16,yc3,1,系统运行状态0正常1禁充2禁放3待机4停机,model=4|arg1=bmsdeviceId.BatteryStacks[0].OperationStatus|arg2=|arg3=|arg4=1000
 4,10004,u16,16,yc4,1,系统充放电状态,model=4|arg1=bmsdeviceId.BatteryStacks[0].ChargeDischargeStatus|arg2=|arg3=|arg4=1000
 4,10005,u16,16,yc5,1,总控报警状态1,0
 4,10006,u16,16,yc6,1,系统三级报警汇总,model=4|arg1=bmsdeviceId.BatteryStacks[0].BMSFaultSummary|arg2=|arg3=|arg4=1000

@@ -68,7 +68,11 @@ public partial class BatteryStack
         public float? SOH { get; set; } // 堆SOH
         public float? InsulationPlus { get; set; } // 正极对地绝缘值
         public float? InsulationMinus { get; set; } // 负极对地绝缘值
-        public int? OperationStatus { get; set; } // 运行状态码
+        /// <summary>
+        /// 系统运行状态（bank yc3，由 <c>BmsMapper.UpdateStackOperationStatus</c> 周期刷新）：
+        /// 0 正常；1 禁充；2 禁放；3 待机（非充放电方向二级告警）；4 停机（三级告警或 BMS 下电）。
+        /// </summary>
+        public int? OperationStatus { get; set; }
         public float Cycles { get; set; } // 循环次数
         public float res2 { get; set; } // 预留
         public float res3 { get; set; } // 预留

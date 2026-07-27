@@ -34,7 +34,7 @@ public class BmsRackDeviceTests
         rackState.MinClusterSOC = 0.96;
         rackState.MaxClusterSOC = 0.96;
         rackState.StateOfHealth = 1.0;
-        SetRackCurrent(rackState, -50);
+        SetRackCurrent(rackState, 50);
 
         device.SyncTelemetryAndProtection(bmsData);
 
@@ -74,7 +74,7 @@ public class BmsRackDeviceTests
         rackState.StateOfHealth = 1.0;
         foreach (var cluster in rackState.ClusterStates!)
             cluster.MinPackSOC = 0.05;
-        SetRackCurrent(rackState, 50);
+        SetRackCurrent(rackState, -50);
 
         device.SyncTelemetryAndProtection(bmsData);
 
@@ -133,5 +133,22 @@ public class BmsRackDeviceTests
         device.UpdatePhysics(10, 25.0, DateTime.Now, TimeSpan.FromMilliseconds(200));
 
         Assert.Equal(0, device.Port.Output.Dc?.VoltageV ?? -1);
+    }
+
+    [Fact]
+    public void SyncTelemetryAndProtection_ZerosStackDcVoltageWhenUnlinked()
+    {
+        var rack = BmsRackFactory.CreateRack(new BmsDeviceConfig { ClusterCount = 1 });
+        var device = new BmsRackDevice("bms_test", rack);
+        device.SetPcsLinked(true);
+        device.UpdatePhysics(0, 25.0, DateTime.Now, TimeSpan.FromMilliseconds(200));
+        Assert.True((rack.GetRackState()?.TotalVoltage ?? 0) > 0);
+
+        var bmsData = BmsDataGenerator.GenerateSampleData(1, 1);
+        device.SetPcsLinked(false);
+        device.SyncTelemetryAndProtection(bmsData);
+
+        Assert.Equal(0f, bmsData.BatteryStacks[0].TotalVoltage);
+        Assert.True((rack.GetRackState()?.TotalVoltage ?? 0) > 0);
     }
 }

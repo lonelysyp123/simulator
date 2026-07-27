@@ -52,7 +52,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 pcsData.pcsOnOffSwitch = false;
         }
 
-        /// <summary>更新 EMU 汇总数据（运行状态、SOC 等）。</summary>
+        /// <summary>更新 EMU 汇总数据（运行状态、SOC、单元总有功/无功等）。</summary>
         public static void MapEmuState(EnergyManagementData emu, IReadOnlyList<BatteryRackSimulator> batteryRacks)
         {
             emu.Emu.MaxChargePower    = 1250.0f;
@@ -61,16 +61,22 @@ namespace EssSimulator.EssSimModelApi.Mappers
             if (batteryRacks.Count > 0 && batteryRacks[0].GetRackState() != null)
                 emu.Emu.AverageBatterySoc = (float)batteryRacks[0].GetRackState().MinClusterSOC * 100;
 
-            // 运行状态（1停机 2待机 4充电 5放电 6未知；正放负充）
+            // 单元总有功/无功 = PcsList 各路之和（通常为单元1+单元2）
+            float sumP = 0f, sumQ = 0f;
             bool anyRunning = false, anyDischarge = false, anyCharge = false;
             foreach (var pcs in emu.PcsList)
             {
+                sumP += pcs.ActivePower;
+                sumQ += pcs.ReactivePower;
                 if (pcs.SimulatorMode == OperationMode.Off)
                     continue;
                 anyRunning = true;
                 if (pcs.ActivePower > PcsDisplayLabels.ActivePowerThresholdKw)  anyDischarge = true;
                 if (pcs.ActivePower < -PcsDisplayLabels.ActivePowerThresholdKw) anyCharge   = true;
             }
+            emu.Emu.OutputActivePower = sumP;
+            emu.Emu.OutputReactivePower = sumQ;
+            // 运行状态（1停机 2待机 4充电 5放电 6未知；正放负充）
             emu.Emu.OperationStatus = anyDischarge ? 5 : (anyCharge ? 4 : (anyRunning ? 2 : 1));
         }
 

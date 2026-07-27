@@ -35,7 +35,7 @@ Modbus TCP（simEm / simBms{N} / simEmu{N}）  ← EMS/测试工具接入
 | `HttpBaseUrl` | `http://0.0.0.0` | 监听地址（`0.0.0.0` 全网卡） |
 | `StaticFiles` | true | 是否托管 `wwwroot/` 前端文件 |
 | `CorsOrigins` | `[]` | 额外允许的 CORS 来源（dev 自动放行 5173） |
-| `SnapshotIntervalMs` | 1000 | 实时快照推送间隔 |
+| `SnapshotIntervalMs` | 200 | 实时快照推送间隔；PCS 启停等控制变更会额外立即推一帧 |
 
 > `Runtime.NoGui` 已无实际意义（TUI 已移除），保留兼容旧配置。
 

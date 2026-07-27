@@ -143,10 +143,10 @@ public class ClusterThresholds
             DischargeLowTempRecovery2 = DischargeLowTempThreshold2.Value + 3f;
             DischargeLowTempRecovery3 = DischargeLowTempThreshold3.Value + 3f;
 
-            // SOC过低恢复阈值: 保护/告警/故障
-            LowSOCRecovery1 = LowSOCTreshold1.Value + 3f;
-            LowSOCRecovery2 = LowSOCTreshold2.Value + 3f;
-            LowSOCRecovery3 = LowSOCTreshold3.Value + 3f;
+            // SOC过低恢复阈值（SOC 为 0~1，回滞约 3%）
+            LowSOCRecovery1 = LowSOCTreshold1.Value + 0.03f;
+            LowSOCRecovery2 = LowSOCTreshold2.Value + 0.03f;
+            LowSOCRecovery3 = LowSOCTreshold3.Value + 0.03f;
 
             // 端子高温恢复阈值: 保护/告警/故障
             PoleHighTempRecovery1 = PoleHighTempThreshold1.Value - 3f;

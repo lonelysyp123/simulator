@@ -59,7 +59,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 (alm.UndervoltageProtection, alm.UndervoltageAlarm, alm.UndervoltageFault) = (l1, l2, l3);
 
                 (l1, l2, l3) = (alm.DischargeOvercurrentProtection, alm.DischargeOvercurrentAlarm, alm.DischargeOvercurrentFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.DischargeOvercurrentThreshold1!.Value, thr.DischargeOvercurrentThreshold2!.Value, thr.DischargeOvercurrentThreshold3!.Value, thr.DischargeOvercurrentRecovery1!.Value, thr.DischargeOvercurrentRecovery2!.Value, thr.DischargeOvercurrentRecovery3!.Value, (float)clusterState.TotalCurrent);
+                UpdateOver(ref l1, ref l2, ref l3, thr.DischargeOvercurrentThreshold1!.Value, thr.DischargeOvercurrentThreshold2!.Value, thr.DischargeOvercurrentThreshold3!.Value, thr.DischargeOvercurrentRecovery1!.Value, thr.DischargeOvercurrentRecovery2!.Value, thr.DischargeOvercurrentRecovery3!.Value, (float)(-clusterState.TotalCurrent));
                 (alm.DischargeOvercurrentProtection, alm.DischargeOvercurrentAlarm, alm.DischargeOvercurrentFault) = (l1, l2, l3);
 
                 (l1, l2, l3) = (alm.CellUnderVoltageProtection, alm.CellUnderVoltageAlarm, alm.CellUnderVoltageFault);
@@ -86,7 +86,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 (alm.OvervoltageProtection, alm.OvervoltageAlarm, alm.OvervoltageFault) = (l1, l2, l3);
 
                 (l1, l2, l3) = (alm.ChargeOvercurrentProtection, alm.ChargeOvercurrentAlarm, alm.ChargeOvercurrentFault);
-                UpdateOver(ref l1, ref l2, ref l3, thr.ChargeOvercurrentThreshold1!.Value, thr.ChargeOvercurrentThreshold2!.Value, thr.ChargeOvercurrentThreshold3!.Value, thr.ChargeOvercurrentRecovery1!.Value, thr.ChargeOvercurrentRecovery2!.Value, thr.ChargeOvercurrentRecovery3!.Value, (float)(-clusterState.TotalCurrent));
+                UpdateOver(ref l1, ref l2, ref l3, thr.ChargeOvercurrentThreshold1!.Value, thr.ChargeOvercurrentThreshold2!.Value, thr.ChargeOvercurrentThreshold3!.Value, thr.ChargeOvercurrentRecovery1!.Value, thr.ChargeOvercurrentRecovery2!.Value, thr.ChargeOvercurrentRecovery3!.Value, (float)clusterState.TotalCurrent);
                 (alm.ChargeOvercurrentProtection, alm.ChargeOvercurrentAlarm, alm.ChargeOvercurrentFault) = (l1, l2, l3);
 
                 (l1, l2, l3) = (alm.CellOverVoltageProtection, alm.CellOverVoltageAlarm, alm.CellOverVoltageFault);
@@ -128,7 +128,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             int stackIndex = 0)
         {
             var stack = bmsData.BatteryStacks[stackIndex];
-            float current = stack.Current ?? 0f;
+            double current = rack.TotalCurrent;
             bool isCharging = IsCharging(current);
             bool isDischarging = IsDischarging(current);
             bool chargeFault = stack.IsChargeFault && isCharging;
@@ -171,7 +171,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         }
 
         /// <summary>
-        /// 待机时清除充放电方向故障并刷新 Rack 故障态。
+        /// 待机时清除充放电方向故障并刷新 Rack 故障态（一次性复位，不抑制后续再触发）。
         /// </summary>
         public static bool TryClearChargeDischargeFaults(
             BatteryManagementSystemData bmsData,
@@ -200,19 +200,25 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             if (stack.GridConnectStatus == 3)
                 stack.GridConnectStatus = 0;
 
+            // 待机时充/放电方向阈值不评估，不会因 SOC 边界立即再置障；
+            // 再次进入充/放电且仍超限时，UpdateUnder/Over 会按当前值一次性落入对应等级。
             device.SyncTelemetryAndProtection(bmsData);
             message = stack.BMSFaultSummary == 0 && rackState.IsFault == 0
-                ? "当前无充放电方向故障，状态已刷新"
-                : "充放电方向故障已清除，可重新并网";
+                ? "充放电方向故障已清除（一次性）；再次充/放电若仍超限将重新触发"
+                : "充放电方向故障已清除；部分非方向故障仍在，可重新并网后观察";
             return true;
         }
 
-        /// <summary>电流 &lt; 0 为充电（与 BMS ChargeDischargeStatus 一致）。</summary>
-        internal static bool IsCharging(double current) => current < 0;
+        /// <summary>电流 &gt; 0 为充电（与物理模型 rack/电芯一致）。</summary>
+        internal static bool IsCharging(double current) => current > 0;
 
-        /// <summary>电流 &gt; 0 为放电。</summary>
-        internal static bool IsDischarging(double current) => current > 0;
+        /// <summary>电流 &lt; 0 为放电。</summary>
+        internal static bool IsDischarging(double current) => current < 0;
 
+        /// <summary>
+        /// 欠量阈值状态机（SOC/欠压等）。清除后再次评估时按当前值<strong>一次性落到对应等级</strong>，
+        /// 避免清故障后仍超限却只能从一级慢慢爬升、表现为「清完就不再触发」。
+        /// </summary>
         public static void UpdateUnder(ref bool? l1, ref bool? l2, ref bool? l3,
             float t1, float t2, float t3, float r1, float r2, float r3, double val)
         {
@@ -223,9 +229,12 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             else if (l1 == true)
             { if (val <= t2) { l2 = true; l1 = false; } else if (val > r1) { l1 = false; } }
             else
-            { if (val <= t1) { l1 = true; } }
+            { SnapUnder(ref l1, ref l2, ref l3, t1, t2, t3, val); }
         }
 
+        /// <summary>
+        /// 过量阈值状态机（过压/过流等）。清除后再次评估时同样按当前值一次性落到对应等级。
+        /// </summary>
         public static void UpdateOver(ref bool? l1, ref bool? l2, ref bool? l3,
             float t1, float t2, float t3, float r1, float r2, float r3, double val)
         {
@@ -236,7 +245,21 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             else if (l1 == true)
             { if (val >= t2) { l2 = true; l1 = false; } else if (val < r1) { l1 = false; } }
             else
-            { if (val >= t1) { l1 = true; } }
+            { SnapOver(ref l1, ref l2, ref l3, t1, t2, t3, val); }
+        }
+
+        private static void SnapUnder(ref bool? l1, ref bool? l2, ref bool? l3, float t1, float t2, float t3, double val)
+        {
+            if (val <= t3) { l3 = true; l2 = false; l1 = false; }
+            else if (val <= t2) { l2 = true; l1 = false; l3 = false; }
+            else if (val <= t1) { l1 = true; }
+        }
+
+        private static void SnapOver(ref bool? l1, ref bool? l2, ref bool? l3, float t1, float t2, float t3, double val)
+        {
+            if (val >= t3) { l3 = true; l2 = false; l1 = false; }
+            else if (val >= t2) { l2 = true; l1 = false; l3 = false; }
+            else if (val >= t1) { l1 = true; }
         }
     }
 }

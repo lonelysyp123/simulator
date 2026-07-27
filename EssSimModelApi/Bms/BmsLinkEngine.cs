@@ -86,9 +86,11 @@ namespace EssSimulator.EssSimModelApi.Bms
                     return true;
                 }
 
-                if (stack.BMSFaultSummary > 0)
+                if (stack.BMSFaultSummary > 0 || bms.HasBlockingFault)
                 {
-                    message = $"并网失败：三级报警汇总={stack.BMSFaultSummary}，请先清除故障";
+                    message = bms.HasBlockingFault
+                        ? $"并网失败：Rack 故障码={bms.FaultCode}，请先清除故障"
+                        : $"并网失败：三级报警汇总={stack.BMSFaultSummary}，请先清除故障";
                     return false;
                 }
 
@@ -146,12 +148,15 @@ namespace EssSimulator.EssSimModelApi.Bms
         {
             var label = BmsLabel(bmsIndex, bms);
 
-            if (stack.IsPcsLinked && stack.BMSFaultSummary > 0)
+            // 故障等级处置：三级故障（BMSFaultSummary）或 Rack IsFault → BMS 下电（断开 PCS 链路）
+            // 一级保护 / 二级告警仅置位遥测，不自动离网。
+            if (stack.IsPcsLinked && (stack.BMSFaultSummary > 0 || bms.HasBlockingFault))
             {
-                SetLinked(ess, bmsIndex, stack, linked: false, label,
-                    $"三级报警汇总=0x{stack.BMSFaultSummary:X}，自动断开 PCS↔BMS 链路");
-                AssignGridConnectStatus(label, stack, GridStatusFailed,
-                    $"三级报警汇总=0x{stack.BMSFaultSummary:X}，并网失败");
+                string reason = stack.BMSFaultSummary > 0
+                    ? $"三级故障汇总=0x{stack.BMSFaultSummary:X}，自动下电"
+                    : $"Rack 故障码={bms.FaultCode}，自动下电";
+                SetLinked(ess, bmsIndex, stack, linked: false, label, reason);
+                AssignGridConnectStatus(label, stack, GridStatusFailed, reason);
             }
 
             ushort cmd = stack.GridConnectCommand;
@@ -228,12 +233,13 @@ namespace EssSimulator.EssSimModelApi.Bms
             if (stack.IsPcsLinked || bms.IsLinked)
                 return true;
 
-            if (stack.BMSFaultSummary > 0)
+            if (stack.BMSFaultSummary > 0 || bms.HasBlockingFault)
             {
-                SetLinked(ess, bmsIndex, stack, linked: false, label,
-                    $"并网拒绝：三级报警汇总=0x{stack.BMSFaultSummary:X}");
-                AssignGridConnectStatus(label, stack, GridStatusFailed,
-                    $"三级报警汇总=0x{stack.BMSFaultSummary:X}");
+                string reason = stack.BMSFaultSummary > 0
+                    ? $"并网拒绝：三级故障汇总=0x{stack.BMSFaultSummary:X}"
+                    : $"并网拒绝：Rack 故障码={bms.FaultCode}";
+                SetLinked(ess, bmsIndex, stack, linked: false, label, reason);
+                AssignGridConnectStatus(label, stack, GridStatusFailed, reason);
                 return false;
             }
 

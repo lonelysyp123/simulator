@@ -39,27 +39,32 @@
         preserveAspectRatio="xMinYMin meet"
       >
       <!-- 220kV 进线 -->
-      <line class="bus-line" :x1="mainX" :y1="20" :x2="mainX" :y2="48" />
-      <text :x="mainX + 8" y="36" class="label-text">220kV 电网</text>
-      <text :x="mainX + 8" y="50" class="value-text">PCC {{ fmtVolt(snap.pccLineVoltageV) }}</text>
+      <line class="bus-line" :x1="mainX" :y1="20" :x2="mainX" :y2="62" />
+      <text :x="mainX + 8" y="28" class="label-text">220kV 电网</text>
+      <text :x="mainX + 8" y="42" class="value-text">
+        PCC {{ fmtVolt(snap.pccLineVoltageV) }} / {{ fmtHz(snap.systemFrequencyHz) }}
+      </text>
+      <text :x="mainX + 8" y="56" class="value-text muted-text">
+        设定 {{ fmtVolt(snap.gridNominalLineVoltageV) }} / {{ fmtHz(snap.gridNominalFrequencyHz) }}
+      </text>
 
       <!-- 主断路器（可点击） -->
       <line
         :class="lineClass(snap.mainBreakerClosed, snap.mainBreakerTripped)"
-        :x1="mainX" :y1="48" :x2="mainX" :y2="72"
+        :x1="mainX" :y1="62" :x2="mainX" :y2="86"
       />
       <g class="breaker-hit" @click="$emit('toggle-main-breaker')">
-        <rect :x="mainX - 18" y="54" width="36" height="22" rx="3" fill="transparent" />
-        <BreakerSymbol :x="mainX" :y="65" :closed="snap.mainBreakerClosed" :tripped="snap.mainBreakerTripped" />
-        <text :x="mainX + 22" y="68" class="label-text breaker-label">主断 {{ snap.mainBreakerLabel || fmtBreaker(snap.mainBreakerClosed, snap.mainBreakerTripped) }}</text>
+        <rect :x="mainX - 18" y="68" width="36" height="22" rx="3" fill="transparent" />
+        <BreakerSymbol :x="mainX" :y="79" :closed="snap.mainBreakerClosed" :tripped="snap.mainBreakerTripped" />
+        <text :x="mainX + 22" y="82" class="label-text breaker-label">主断 {{ snap.mainBreakerLabel || fmtBreaker(snap.mainBreakerClosed, snap.mainBreakerTripped) }}</text>
       </g>
 
       <!-- 主变 -->
-      <line class="bus-line" :x1="mainX" :y1="76" :x2="mainX" :y2="92" />
-      <TransformerSymbol :x="mainX" :y="108" />
-      <text :x="mainX + 22" y="104" class="label-text">主变 220/35kV</text>
-      <text :x="mainX + 22" y="118" class="value-text">{{ fmtVolt(snap.mainTransformerSecondary?.lineVoltageV) }}</text>
-      <line class="bus-line" :x1="mainX" :y1="122" :x2="mainX" :y2="busY" />
+      <line class="bus-line" :x1="mainX" :y1="90" :x2="mainX" :y2="106" />
+      <TransformerSymbol :x="mainX" :y="122" />
+      <text :x="mainX + 22" y="118" class="label-text">主变 220/35kV</text>
+      <text :x="mainX + 22" y="132" class="value-text">{{ fmtVolt(snap.mainTransformerSecondary?.lineVoltageV) }}</text>
+      <line class="bus-line" :x1="mainX" :y1="136" :x2="mainX" :y2="busY" />
 
       <!-- 35kV 母线（从主变接入，贯穿所有单元） -->
       <line class="bus-line bus-thick" :x1="mainX" :y1="busY" :x2="busEndX" :y2="busY" />
@@ -256,7 +261,7 @@ const BRANCH = {
   pcsTop: 24,
   pcsH: 228,
   gap: 28,
-  bmsH: 138,
+  bmsH: 172,
   get bmsTop() { return this.pcsTop + this.pcsH + this.gap },
   get linkMid() { return this.pcsTop + this.pcsH + this.gap / 2 },
   get bottomY() { return 96 + this.bmsTop + this.bmsH }
@@ -290,6 +295,10 @@ function unitCenterX(i) {
 function fmtVolt(v) {
   if (v == null) return '—'
   return v >= 1000 ? `${(v / 1000).toFixed(1)} kV` : `${(v || 0).toFixed(1)} V`
+}
+function fmtHz(v) {
+  if (v == null) return '—'
+  return `${Number(v).toFixed(2)} Hz`
 }
 function fmtBreaker(closed, tripped) { return tripped ? '跳闸' : closed ? '合' : '分' }
 function fmtPhasorVi(p) {
@@ -399,6 +408,8 @@ const ChannelBranch = defineComponent({
 
       const bmsLines = [
         ch.bmsCompact,
+        ch.bmsRunStatus || '运行:—',
+        ch.bmsEnergy || `累计充 ${(ch.cumulativeChargeEnergyKwh ?? 0).toFixed(1)} / 放 ${(ch.cumulativeDischargeEnergyKwh ?? 0).toFixed(1)} kWh`,
         `并网:${ch.gridConnect}`,
         ch.bmsBlackStart
       ].filter(Boolean)

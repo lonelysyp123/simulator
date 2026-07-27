@@ -32,6 +32,7 @@ namespace EssSimulator.EssSimModelApi.ElectricMeter
         public float PhaseCReactivePower { get; set; }
         public float TotalReactivePower { get; set; }
         public float TotalApparentPower { get; set; }
+        /// <summary>功率因数：幅值 |P|/S；符号与无功同号（Q&gt;0 容性为正，与充放电无关）。</summary>
         public float PowerFactor { get; set; }
         public float Frequency { get; set; }
 

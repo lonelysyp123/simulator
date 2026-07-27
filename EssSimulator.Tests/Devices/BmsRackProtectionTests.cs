@@ -48,6 +48,34 @@ public class BmsRackProtectionTests
     }
 
     [Fact]
+    public void UpdateUnder_SnapsToFaultWhenDeeplyBelowThreshold()
+    {
+        bool? l1 = false, l2 = false, l3 = false;
+        BmsRackProtection.UpdateUnder(ref l1, ref l2, ref l3,
+            t1: 0.15f, t2: 0.10f, t3: 0.05f,
+            r1: 0.18f, r2: 0.13f, r3: 0.08f,
+            val: 0.04);
+
+        Assert.False(l1);
+        Assert.False(l2);
+        Assert.True(l3);
+    }
+
+    [Fact]
+    public void UpdateOver_SnapsToFaultWhenDeeplyAboveThreshold()
+    {
+        bool? l1 = false, l2 = false, l3 = false;
+        BmsRackProtection.UpdateOver(ref l1, ref l2, ref l3,
+            t1: 50, t2: 55, t3: 60,
+            r1: 48, r2: 53, r3: 58,
+            val: 65);
+
+        Assert.False(l1);
+        Assert.False(l2);
+        Assert.True(l3);
+    }
+
+    [Fact]
     public void EvaluateCluster_SkipsLowSocWhenIdle()
     {
         var alarms = new ClusterAlarms();
@@ -63,16 +91,43 @@ public class BmsRackProtectionTests
     }
 
     [Fact]
-    public void EvaluateCluster_EvaluatesLowSocWhenDischarging()
+    public void EvaluateCluster_SnapsToLowSocFaultWhenDischargingDeeplyLow()
     {
         var alarms = new ClusterAlarms();
         var thresholds = new ClusterThresholds();
-        var clusterState = CreateClusterState(minPackSoc: 0.05, current: 50);
+        var clusterState = CreateClusterState(minPackSoc: 0.05, current: -50);
 
         BmsRackProtection.EvaluateCluster(
             clusterState, packCount: 1, cellsPerPack: 1, thresholds, alarms, insulationValue: 1000f);
 
-        Assert.True(alarms.LowSOCProtection);
+        Assert.True(alarms.LowSOCFault);
+        Assert.False(alarms.LowSOCProtection);
+        Assert.False(alarms.LowSOCAlarm);
+    }
+
+    [Fact]
+    public void EvaluateCluster_ClearedFaultRetriggersWhenDischargingAgain()
+    {
+        var alarms = new ClusterAlarms
+        {
+            LowSOCProtection = true,
+            LowSOCAlarm = true,
+            LowSOCFault = true
+        };
+        var thresholds = new ClusterThresholds();
+
+        // 待机清除：方向门控下 LowSOC 不评估，位保持清除结果
+        alarms.ClearChargeDischargeAlarms();
+        var idle = CreateClusterState(minPackSoc: 0.05, current: 0);
+        BmsRackProtection.EvaluateCluster(
+            idle, packCount: 1, cellsPerPack: 1, thresholds, alarms, insulationValue: 1000f);
+        Assert.False(alarms.LowSOCFault);
+
+        // 再次放电且仍超限：一次性落入三级
+        var discharging = CreateClusterState(minPackSoc: 0.05, current: -50);
+        BmsRackProtection.EvaluateCluster(
+            discharging, packCount: 1, cellsPerPack: 1, thresholds, alarms, insulationValue: 1000f);
+        Assert.True(alarms.LowSOCFault);
     }
 
     [Fact]
@@ -93,7 +148,7 @@ public class BmsRackProtectionTests
     {
         var alarms = new ClusterAlarms();
         var thresholds = new ClusterThresholds();
-        var clusterState = CreateClusterState(totalVoltage: thresholds.OvervoltageThreshold1!.Value + 10, current: -50);
+        var clusterState = CreateClusterState(totalVoltage: thresholds.OvervoltageThreshold1!.Value + 10, current: 50);
 
         BmsRackProtection.EvaluateCluster(
             clusterState, packCount: 1, cellsPerPack: 1, thresholds, alarms, insulationValue: 1000f);

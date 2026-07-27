@@ -27,6 +27,16 @@ export async function postMainBreaker(closed) { return (await api.post(`/breaker
 export async function postUnitBreaker(unit, closed) { return (await api.post(`/breaker/unit/${unit}/${closed}`)).data }
 export async function postDpcTest(name) { return (await api.post(`/dpctest/${name}`)).data }
 
+export async function getDroopSliceStatus() { return (await api.get('/droop-slices/status')).data }
+export async function getDroopSlices(limit = 100, offset = 0) {
+  return (await api.get('/droop-slices', { params: { limit, offset } })).data
+}
+export async function getDroopSlice(id) { return (await api.get(`/droop-slices/${id}`)).data }
+export async function clearDroopSlices() { return (await api.post('/droop-slices/clear')).data }
+export async function setDroopSliceConfig(body) {
+  return (await api.post('/droop-slices/config', body)).data
+}
+
 let hubPromise = null
 export function getHub() {
   if (!hubPromise) {

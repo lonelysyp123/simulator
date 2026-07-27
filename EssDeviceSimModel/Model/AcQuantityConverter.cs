@@ -153,5 +153,25 @@ namespace EssSimulator.EssDeviceSimModel.Model
 
             return ComputeActivePowerKw(lineVoltageV, lineCurrentA, phaseAngleDeg) / apparentKva;
         }
+
+        /// <summary>
+        /// 电表/联调用有符号功率因数：幅值 = |P|/S，符号与无功 Q 同号（与充放电方向无关）。
+        /// 约定与 <see cref="ElectricalConventions.ReactivePowerCapacitiveSign"/> 一致：
+        /// Q&gt;0（容性）→ PF&gt;0；Q&lt;0（感性）→ PF&lt;0；Q≈0 → PF≥0。
+        /// </summary>
+        public static double ComputeSignedPowerFactor(double activePowerKw, double reactivePowerKvar)
+        {
+            double apparentKva = Math.Sqrt(
+                activePowerKw * activePowerKw + reactivePowerKvar * reactivePowerKvar);
+            if (apparentKva <= 1e-9)
+                return 1.0;
+
+            double magnitude = Math.Abs(activePowerKw) / apparentKva;
+            if (Math.Abs(reactivePowerKvar) <= 1e-9)
+                return Math.Clamp(magnitude, 0.0, 1.0);
+
+            // 功率因数正负与无功同号：Q>0 → PF>0，Q<0 → PF<0
+            return Math.Clamp(Math.Sign(reactivePowerKvar) * magnitude, -1.0, 1.0);
+        }
     }
 }

@@ -57,6 +57,20 @@ public class PcsDisplayLabelsTests
     }
 
     [Fact]
+    public void MapEmuState_SumsPcsActiveAndReactivePower()
+    {
+        var emu = new EnergyManagementData();
+        emu.PcsList.Add(new PcsData { ActivePower = 100f, ReactivePower = 20f, SimulatorMode = OperationMode.Normal });
+        emu.PcsList.Add(new PcsData { ActivePower = 50f, ReactivePower = -10f, SimulatorMode = OperationMode.Normal });
+
+        PcsMapper.MapEmuState(emu, Array.Empty<BatteryRackSimulator>());
+
+        Assert.Equal(150f, emu.Emu.OutputActivePower);
+        Assert.Equal(10f, emu.Emu.OutputReactivePower);
+        Assert.Equal(5, emu.Emu.OperationStatus);
+    }
+
+    [Fact]
     public void WithdrawExternalRunCommand_ClearsCommandWithoutEmsStopSideEffects()
     {
         var pcs = CreateTestPcs();

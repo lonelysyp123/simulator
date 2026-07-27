@@ -81,6 +81,8 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10091,u16,16,yc73,1,单元2当前故障,0
 4,10092,u16,16,yc74,1,PCS1孤岛电压反馈V,model=4|arg1=emuDeviceId.PcsList[0].IslandVoltageFeedback|arg2=|arg3=|arg4=1000
 4,10093,u16,16,yc75,1,PCS2孤岛电压反馈V,model=4|arg1=emuDeviceId.PcsList[1].IslandVoltageFeedback|arg2=|arg3=|arg4=1000
+4,10094,int32,32,yc76,10,单元总有功功率,model=4|arg1=emuDeviceId.Emu.OutputActivePower|arg2=|arg3=|arg4=1000
+4,10096,int32,32,yc77,10,单元总无功功率,model=4|arg1=emuDeviceId.Emu.OutputReactivePower|arg2=|arg3=|arg4=1000
 6,40000,int16,16,yt0,10,单元1有功功率设置值,model=4|arg1=emuDeviceId.PcsList[0].PCSActivePowerSetting|arg2=|arg3=|arg4=1000
 6,40001,int16,16,yt1,10,单元1无功设置值,model=4|arg1=emuDeviceId.PcsList[0].PCSReactivePowerSetting|arg2=|arg3=|arg4=1000
 6,40002,int16,16,yt2,1000,单元1功率因数设置值,0

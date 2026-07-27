@@ -1,4 +1,5 @@
 using EssSimulator.Display;
+using EssSimulator.EssSimModelApi.Mappers;
 
 namespace EssSimulator.Web
 {
@@ -32,6 +33,10 @@ namespace EssSimulator.Web
                 LoadReactivePowerKvar = snap.LoadReactivePowerKvar,
                 LoadActivePowerSetKw = snap.LoadActivePowerSetKw,
                 LoadReactivePowerSetKvar = snap.LoadReactivePowerSetKvar,
+                GridNominalLineVoltageV = snap.GridNominalLineVoltageV,
+                GridNominalFrequencyHz = snap.GridNominalFrequencyHz,
+                SystemFrequencyHz = snap.SystemFrequencyHz,
+                MeterThreePhase = snap.MeterThreePhase,
                 BlackStartSummary = GuiStatusFormatters.BuildBlackStartSwitchSummary(0, channelCount),
                 MainBreakerLabel = FormatBreaker(snap.MainBreakerClosed, snap.MainBreakerTripped),
                 Units = snap.Units.Select(u => EnrichUnit(u, channelCount)).ToList()
@@ -63,6 +68,15 @@ namespace EssSimulator.Web
         private static MainLineChannelViewModel BuildChannel(
             int channelIndex0, int unitIndex0, int slotInUnit0, PcsChannelSnapshot? pcs)
         {
+            bool linked = IsBmsPcsLinked(channelIndex0);
+            double packVoltage = GuiSimDataAccess.SafeGetDouble(
+                $"ess._batteryRacks[{channelIndex0}]._currentState.TotalVoltage");
+            double packCurrent = GuiSimDataAccess.SafeGetDouble(
+                $"ess._batteryRacks[{channelIndex0}]._currentState.TotalCurrent");
+            // 与电气端口一致：下电/断链后 DC 侧对外电压、电流为 0
+            double dcVoltage = linked ? packVoltage : 0;
+            double dcCurrent = linked ? packCurrent : 0;
+
             return new MainLineChannelViewModel
             {
                 ChannelIndex = channelIndex0,
@@ -73,13 +87,17 @@ namespace EssSimulator.Web
                 SlotInUnit = slotInUnit0,
                 SocPercent = 100 * GuiSimDataAccess.SafeGetDouble(
                     $"ess._batteryRacks[{channelIndex0}]._currentState.MinClusterSOC"),
-                DcVoltage = GuiSimDataAccess.SafeGetDouble(
-                    $"ess._batteryRacks[{channelIndex0}]._currentState.TotalVoltage"),
-                DcCurrent = GuiSimDataAccess.SafeGetDouble(
-                    $"ess._batteryRacks[{channelIndex0}]._currentState.TotalCurrent"),
+                DcVoltage = dcVoltage,
+                DcCurrent = dcCurrent,
                 GridConnect = GuiStatusFormatters.FormatGridConnectStatus(channelIndex0),
                 BmsBlackStart = GuiStatusFormatters.FormatBmsMainLineBlackStart(channelIndex0),
-                BmsCompact = BuildBmsCompact(channelIndex0),
+                BmsCompact = BuildBmsCompact(channelIndex0, dcVoltage, dcCurrent),
+                CumulativeChargeEnergyKwh = GuiSimDataAccess.SafeGetDouble(
+                    $"ess._batteryRacks[{channelIndex0}]._currentState.TotalChargeEnergy"),
+                CumulativeDischargeEnergyKwh = GuiSimDataAccess.SafeGetDouble(
+                    $"ess._batteryRacks[{channelIndex0}]._currentState.TotalDischargeEnergy"),
+                BmsEnergy = BuildBmsEnergy(channelIndex0),
+                BmsRunStatus = BuildBmsRunStatus(channelIndex0),
                 PcsDeviceState = GuiStatusFormatters.FormatPcsMainLineDeviceState(unitIndex0, slotInUnit0, channelIndex0),
                 PcsStartStop = GuiStatusFormatters.FormatPcsMainLineStartStop(unitIndex0, slotInUnit0),
                 PcsTargetP = GuiStatusFormatters.FormatPcsMainLineTargetPower(unitIndex0, slotInUnit0),
@@ -101,15 +119,33 @@ namespace EssSimulator.Web
             };
         }
 
-        private static string BuildBmsCompact(int bmsIndex0)
+        private static bool IsBmsPcsLinked(int bmsIndex0) =>
+            GuiSimDataAccess.SafeGetBool($"bms{bmsIndex0 + 1}.BatteryStacks[0].IsPcsLinked")
+            || GuiSimDataAccess.SafeGetBool(
+                $"ess._batteryRacks[{bmsIndex0}]._currentState.IsPcsLinked");
+
+        private static string BuildBmsCompact(int bmsIndex0, double dcVoltage, double dcCurrent)
         {
             double s = 100 * GuiSimDataAccess.SafeGetDouble(
                 $"ess._batteryRacks[{bmsIndex0}]._currentState.MinClusterSOC");
-            double v = GuiSimDataAccess.SafeGetDouble(
-                $"ess._batteryRacks[{bmsIndex0}]._currentState.TotalVoltage");
-            double c = GuiSimDataAccess.SafeGetDouble(
-                $"ess._batteryRacks[{bmsIndex0}]._currentState.TotalCurrent");
-            return $"SOC {s:0.0}%  Vdc {v:0.0}  Idc {c:0.0}";
+            return $"SOC {s:0.0}%  Vdc {dcVoltage:0.0}  Idc {dcCurrent:0.0}";
+        }
+
+        private static string BuildBmsEnergy(int bmsIndex0)
+        {
+            double ch = GuiSimDataAccess.SafeGetDouble(
+                $"ess._batteryRacks[{bmsIndex0}]._currentState.TotalChargeEnergy");
+            double dis = GuiSimDataAccess.SafeGetDouble(
+                $"ess._batteryRacks[{bmsIndex0}]._currentState.TotalDischargeEnergy");
+            return $"累计充 {ch:0.0} / 放 {dis:0.0} kWh";
+        }
+
+        private static string BuildBmsRunStatus(int bmsIndex0)
+        {
+            int code = (int)GuiSimDataAccess.SafeGetDouble(
+                $"bms{bmsIndex0 + 1}.BatteryStacks[0].OperationStatus");
+            string label = BmsMapper.GetStackOperationStatusLabel(code);
+            return $"运行:{label}";
         }
 
         private static string FormatBreaker(bool closed, bool tripped) =>
@@ -133,6 +169,10 @@ namespace EssSimulator.Web
         public double LoadReactivePowerKvar { get; set; }
         public double LoadActivePowerSetKw { get; set; }
         public double LoadReactivePowerSetKvar { get; set; }
+        public double GridNominalLineVoltageV { get; set; }
+        public double GridNominalFrequencyHz { get; set; }
+        public double SystemFrequencyHz { get; set; }
+        public MeterThreePhaseSnapshot MeterThreePhase { get; set; }
         public string BlackStartSummary { get; set; } = "";
         public List<MainLineUnitViewModel> Units { get; set; } = new();
     }
@@ -168,6 +208,10 @@ namespace EssSimulator.Web
         public string GridConnect { get; set; } = "";
         public string BmsBlackStart { get; set; } = "";
         public string BmsCompact { get; set; } = "";
+        public double CumulativeChargeEnergyKwh { get; set; }
+        public double CumulativeDischargeEnergyKwh { get; set; }
+        public string BmsEnergy { get; set; } = "";
+        public string BmsRunStatus { get; set; } = "";
         public string PcsDeviceState { get; set; } = "";
         public string PcsStartStop { get; set; } = "";
         public string PcsTargetP { get; set; } = "";

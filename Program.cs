@@ -272,10 +272,14 @@ namespace EssSimulator
 
             // Web 层服务
             builder.Services.AddSingleton<WebCommandExecutor>();
+            builder.Services.AddSingleton<EssSimulator.Web.DroopSlices.DroopSliceStore>();
             builder.Services.AddHostedService<SnapshotService>();
             builder.Services.AddHostedService<LogHubDispatcher>();
 
             var app = builder.Build();
+
+            // 确保切片 Store 在控制管道写入前完成静态挂载
+            _ = app.Services.GetRequiredService<EssSimulator.Web.DroopSlices.DroopSliceStore>();
 
             var simCfg = app.Services.GetRequiredService<IOptions<SimulatorConfig>>().Value;
             BlackStartSafety.Register(app.Services.GetRequiredService<IHostApplicationLifetime>());

@@ -49,6 +49,10 @@ build_frontend() {
 
 build_frontend
 
+echo "==> Cleaning previous output: $OUT"
+rm -rf "$OUT"
+mkdir -p "$OUT"
+
 echo "==> Publishing EssSimulator for Windows x64 (self-contained, pointmap=$POINTMAP_VERSION)..."
 dotnet publish EssSimulator.csproj \
   -c Release \

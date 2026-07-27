@@ -1,4 +1,5 @@
 using EssSimulator.EssDeviceSimModel;
+using EssSimulator.EssDeviceSimModel.Model;
 using EssSimulator.EssSimModelApi.ElectricMeter;
 
 namespace EssSimulator.EssSimModelApi.Mappers
@@ -23,7 +24,8 @@ namespace EssSimulator.EssSimModelApi.Mappers
             double totalP = primary.ActivePowerKw;
             double totalQ = primary.ReactivePowerKvar;
             double totalS = Math.Sqrt(totalP * totalP + totalQ * totalQ);
-            double pf = totalS > 0 ? Math.Clamp(totalP / totalS, -1.0, 1.0) : 1.0;
+            // 幅值 |P|/S；符号与无功 Q 同号（与充放电方向无关）
+            double pf = AcQuantityConverter.ComputeSignedPowerFactor(totalP, totalQ);
             double I = primary.LineCurrentA;
 
             if (!ess.IsMainBreakerClosed)

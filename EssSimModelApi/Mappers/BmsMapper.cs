@@ -10,10 +10,79 @@ namespace EssSimulator.EssSimModelApi.Mappers
     /// </summary>
     public static class BmsMapper
     {
+        /// <summary>堆级系统运行状态（bank yc3）：0正常 1禁充 2禁放 3待机 4停机。</summary>
+        public const int StackOpNormal = 0;
+        public const int StackOpChargeForbidden = 1;
+        public const int StackOpDischargeForbidden = 2;
+        public const int StackOpStandby = 3;
+        public const int StackOpShutdown = 4;
+
+        /// <summary>
+        /// RackAlarmSummary1 中非充放电方向的二级告警位掩码：
+        /// bit10 绝缘 / bit11 端子高温 / bit12 高压箱高温 / bit13 压差 / bit14 温差。
+        /// </summary>
+        public const ushort NonChargeDischargeAlarmMask = 0x7C00;
+
         // ── 运行状态 ──────────────────────────────────────────────────
 
+        /// <summary>簇级充放电指示：0静置 1放电 2充电（与 ChargeDischargeStatus 一致）。</summary>
         public static int GetOperationStatus(float current) =>
             current > 0 ? 1 : current < 0 ? 2 : 0;
+
+        /// <summary>
+        /// 按优先级解析堆级系统运行状态：停机 &gt; 待机 &gt; 禁充/禁放 &gt; 正常。
+        /// 应在保护评估完成后调用，以便使用最新的告警汇总与功率限值。
+        /// </summary>
+        public static int ResolveStackOperationStatus(BatteryStack stack)
+        {
+            if (stack == null)
+                return StackOpNormal;
+
+            // 4 停机：任意三级告警，或 BMS 已下电（与 PCS 断链）
+            if (stack.BMSFaultSummary != 0 || !stack.IsPcsLinked)
+                return StackOpShutdown;
+
+            // 3 待机：存在不属于充放电方向的二级告警
+            if ((stack.BMSAlarmSummary & NonChargeDischargeAlarmMask) != 0)
+                return StackOpStandby;
+
+            float maxCharge = stack.MaxChargePower ?? 0f;
+            float maxDischarge = stack.MaxDischargePower ?? 0f;
+            bool canCharge = maxCharge > 1e-3f;
+            bool canDischarge = maxDischarge > 1e-3f;
+
+            // 1 禁充：最大可充电功率为 0，且仍可放电
+            if (!canCharge && canDischarge)
+                return StackOpChargeForbidden;
+
+            // 2 禁放：最大可放电功率为 0，且仍可充电
+            if (!canDischarge && canCharge)
+                return StackOpDischargeForbidden;
+
+            // 0 正常（初始化完成后默认可充可放，或两侧功率均为 0 时仍归正常）
+            return StackOpNormal;
+        }
+
+        /// <summary>堆级系统运行状态码 → 界面文案。</summary>
+        public static string GetStackOperationStatusLabel(int? code) => code switch
+        {
+            StackOpNormal => "正常",
+            StackOpChargeForbidden => "禁充",
+            StackOpDischargeForbidden => "禁放",
+            StackOpStandby => "待机",
+            StackOpShutdown => "停机",
+            _ => code.HasValue ? $"未知({code})" : "—"
+        };
+
+        /// <summary>将堆级系统运行状态写回 DTO（供 Modbus 遥测管道映射到 yc3）。</summary>
+        public static void UpdateStackOperationStatus(BatteryManagementSystemData bmsData, int stackIndex = 0)
+        {
+            if (bmsData?.BatteryStacks == null || stackIndex < 0 || stackIndex >= bmsData.BatteryStacks.Count)
+                return;
+
+            var stack = bmsData.BatteryStacks[stackIndex];
+            stack.OperationStatus = ResolveStackOperationStatus(stack);
+        }
 
         // ── Rack → Stack 数据映射 ─────────────────────────────────────
 
@@ -22,9 +91,12 @@ namespace EssSimulator.EssSimModelApi.Mappers
             if (rack == null || bmsData == null) return;
 
             var stack = bmsData.BatteryStacks[0];
-            stack.TotalVoltage = (float)rack.TotalVoltage;
-            stack.Current      = (float)rack.TotalCurrent;
-            stack.Power        = (float)rack.TotalVoltage * (float)rack.TotalCurrent / 1000.0f;
+            // DC 侧对外电压：故障/离网下电（断链）后为 0；电芯串电压仍由物理模型保留，仅影响端口/遥测
+            double dcVoltage = rack.IsPcsLinked ? rack.TotalVoltage : 0;
+            double dcCurrent = rack.IsPcsLinked ? rack.TotalCurrent : 0;
+            stack.TotalVoltage = (float)dcVoltage;
+            stack.Current      = (float)dcCurrent;
+            stack.Power        = (float)(dcVoltage * dcCurrent / 1000.0);
             stack.SOC          = (float)rack.MinClusterSOC;
             stack.SOH          = (float)rack.StateOfHealth;
             stack.Cycles       = 98;

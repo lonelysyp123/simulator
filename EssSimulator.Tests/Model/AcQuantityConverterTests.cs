@@ -126,4 +126,31 @@ public class AcQuantityConverterTests
         Assert.Equal(220_000, reported.LineVoltageV, 1.0);
         Assert.Equal(141.2, Math.Abs(reported.LineCurrentA), 0.5);
     }
+
+    [Theory]
+    [InlineData(3000, 1000, true)]    // 放电 + 容性(Q>0) → PF > 0
+    [InlineData(-3000, 1000, true)]   // 充电 + 容性(Q>0) → PF > 0（与充放电无关）
+    [InlineData(3000, -1000, false)]  // 放电 + 感性(Q<0) → PF < 0
+    [InlineData(-3000, -1000, false)] // 充电 + 感性(Q<0) → PF < 0
+    public void ComputeSignedPowerFactor_SignMatchesReactivePower(
+        double pKw, double qKvar, bool expectPositive)
+    {
+        double pf = AcQuantityConverter.ComputeSignedPowerFactor(pKw, qKvar);
+        double expectedMag = Math.Abs(pKw) / Math.Sqrt(pKw * pKw + qKvar * qKvar);
+
+        Assert.Equal(expectedMag, Math.Abs(pf), 1e-9);
+        Assert.Equal(Math.Sign(qKvar), Math.Sign(pf));
+        if (expectPositive)
+            Assert.True(pf > 0);
+        else
+            Assert.True(pf < 0);
+    }
+
+    [Fact]
+    public void ComputeSignedPowerFactor_ZeroReactive_IsNonNegative()
+    {
+        Assert.Equal(1.0, AcQuantityConverter.ComputeSignedPowerFactor(1000, 0), 1e-9);
+        Assert.Equal(1.0, AcQuantityConverter.ComputeSignedPowerFactor(-1000, 0), 1e-9);
+        Assert.Equal(1.0, AcQuantityConverter.ComputeSignedPowerFactor(0, 0), 1e-9);
+    }
 }
