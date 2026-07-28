@@ -16,7 +16,9 @@
       "CorsOrigins": [],
       "SnapshotIntervalMs": 200,
       "DroopSliceCaptureEnabled": false,
-      "DroopSliceMaxCount": 500
+      "DroopSliceMaxCount": 500,
+      "ApiKeyEnabled": false,
+      "ApiKey": ""
     },
     "Protocol": {
       "BaseBmsModbusPort": 1501,

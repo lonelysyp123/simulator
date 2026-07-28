@@ -55,9 +55,10 @@ c_units="$(json_get "$COMMUNITY" "EssUnits")"
 r_units="$(json_get "$RECHARGE" "EssUnits")"
 custom_units="$(json_get "$CUSTOM" "EssUnits")"
 root_units="$(json_get "$ROOT_CFG" "EssUnits")"
+r_api="$(json_get "$RECHARGE" "Simulator.Web.ApiKeyEnabled")"
 
 echo "    社区版 BindAddress=$c_bind HttpBind=$c_http NoGui=$c_gui Units=$c_units"
-echo "    充值版 BindAddress=$r_bind HttpBind=$r_http NoGui=$r_gui Units=$r_units"
+echo "    充值版 BindAddress=$r_bind HttpBind=$r_http NoGui=$r_gui Units=$r_units ApiKeyEnabled=$r_api"
 echo "    定制版 Units=$custom_units  |  根 appsettings Units=$root_units"
 
 if [[ "$c_bind" != "127.0.0.1" ]]; then
@@ -83,6 +84,11 @@ if [[ "$r_http" == "127.0.0.1" || -z "$r_http" ]]; then
 fi
 if [[ "$r_gui" != "true" ]]; then
   echo "ERROR: 充值版 Runtime.NoGui 应为 true（无头托管），当前=$r_gui" >&2
+  fail=1
+fi
+
+if [[ "$r_api" != "true" ]]; then
+  echo "ERROR: 充值版 Simulator.Web.ApiKeyEnabled 应为 true（密钥用环境变量注入），当前=$r_api" >&2
   fail=1
 fi
 

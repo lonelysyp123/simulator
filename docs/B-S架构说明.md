@@ -36,6 +36,8 @@ Modbus TCP（simEm / simBms{N} / simEmu{N}）  ← EMS/测试工具接入
 | `StaticFiles` | true | 是否托管 `wwwroot/` 前端文件 |
 | `CorsOrigins` | `[]` | 额外允许的 CORS 来源（dev 自动放行 5173） |
 | `SnapshotIntervalMs` | 200 | 实时快照推送间隔；PCS 启停等控制变更会额外立即推一帧 |
+| `ApiKeyEnabled` | false | 是否保护 `/api/*`（`/api/health` 豁免）；充值版建议 true |
+| `ApiKey` | `""` | 密钥明文；启用时必填，推荐环境变量 `Simulator__Web__ApiKey` |
 
 > `Runtime.NoGui` 已无实际意义（TUI 已移除），保留兼容旧配置。
 
@@ -43,7 +45,7 @@ Modbus TCP（simEm / simBms{N} / simEmu{N}）  ← EMS/测试工具接入
 
 ```bash
 dotnet run -- --Simulator:Web:HttpPort=5050
-Simulator__Web__HttpPort=5050 dotnet EssSimulator
+Simulator__Web__HttpPort=5050 Simulator__Web__ApiKey=secret dotnet EssSimulator
 ```
 
 ## 三、启动
@@ -86,7 +88,7 @@ cd web && npm install && npm run dev
 | GET | `/api/cells/{unit}/{cluster}` | 指定簇 4×104 单体电压 |
 | GET | `/api/connections` | 网络接口/监听/客户端/链路状态 |
 | GET | `/api/alert` | 严重告警状态 |
-| GET | `/api/config` | 仿真与 Web 配置概要 |
+| GET | `/api/config` | 仿真与 Web 配置概要（不回传 ApiKey 明文） |
 | GET | `/api/protocol` | Modbus 端口表 |
 | GET | `/api/autotest` | autotest.json 测试用例列表 |
 | GET | `/api/pointmaps` | 各 sim 设备点表（DataMaps/ControlMaps） |

@@ -303,6 +303,7 @@ namespace EssSimulator
 
             // 中间件
             app.UseCors();
+            app.UseMiddleware<EssSimulator.Web.ApiKeyAuthMiddleware>();
             if (webCfgEarly.StaticFiles)
             {
                 app.UseDefaultFiles();

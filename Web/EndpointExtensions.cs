@@ -42,7 +42,9 @@ namespace EssSimulator.Web
             app.MapGet("/api/alert", () => Results.Ok(FatalSystemAlert.GetSnapshot()));
 
             app.MapGet("/api/config", (IOptions<SimulatorConfig> simCfg, IOptions<WebConfig> webCfg) =>
-                Results.Ok(new
+            {
+                var w = webCfg.Value;
+                return Results.Ok(new
                 {
                     simulator = new
                     {
@@ -51,8 +53,20 @@ namespace EssSimulator.Web
                         unitCount = simCfg.Value.Devices?.Count ?? 0,
                         channelCount = simCfg.Value.UnitCount
                     },
-                    web = webCfg.Value
-                }));
+                    web = new
+                    {
+                        w.HttpPort,
+                        w.HttpBaseUrl,
+                        w.StaticFiles,
+                        w.CorsOrigins,
+                        w.SnapshotIntervalMs,
+                        w.DroopSliceCaptureEnabled,
+                        w.DroopSliceMaxCount,
+                        w.ApiKeyEnabled,
+                        apiKeyConfigured = !string.IsNullOrWhiteSpace(w.ApiKey)
+                    }
+                });
+            });
 
             app.MapGet("/api/protocol", (IOptions<SimulatorConfig> cfg) =>
             {

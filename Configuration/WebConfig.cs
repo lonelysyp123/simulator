@@ -25,5 +25,14 @@ namespace EssSimulator.Configuration
 
         /// <summary>白盒切片内存环缓冲容量。</summary>
         public int DroopSliceMaxCount { get; set; } = 500;
+
+        /// <summary>
+        /// 是否启用 HTTP API Key 鉴权（保护 /api/*，/api/health 豁免）。
+        /// 充值版托管场景建议开启；密钥用环境变量注入，勿写入公开配置仓库。
+        /// </summary>
+        public bool ApiKeyEnabled { get; set; }
+
+        /// <summary>API Key 明文；启用时必填。推荐环境变量 Simulator__Web__ApiKey。</summary>
+        public string ApiKey { get; set; } = "";
     }
 }

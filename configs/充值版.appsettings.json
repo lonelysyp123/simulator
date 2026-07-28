@@ -9,6 +9,17 @@
       "PropagationQuvMaxIterations": 3,
       "PropagationVoltageTolerancePu": 0.001
     },
+    "Web": {
+      "HttpPort": 5050,
+      "HttpBaseUrl": "http://0.0.0.0",
+      "StaticFiles": false,
+      "CorsOrigins": [],
+      "SnapshotIntervalMs": 200,
+      "DroopSliceCaptureEnabled": false,
+      "DroopSliceMaxCount": 500,
+      "ApiKeyEnabled": true,
+      "ApiKey": ""
+    },
     "Protocol": {
       "BindAddress": "0.0.0.0",
       "BaseBmsModbusPort": 1501,
