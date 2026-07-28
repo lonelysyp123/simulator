@@ -6,7 +6,7 @@ const routes = [
   { path: '/battery', name: 'battery', component: () => import('./views/BatteryView.vue'), meta: { title: '电池堆簇信息' } },
   { path: '/cells', name: 'cells', component: () => import('./views/CellsView.vue'), meta: { title: '电池单体信息' } },
   { path: '/command', name: 'command', component: () => import('./views/CommandView.vue'), meta: { title: '命令输入' } },
-  { path: '/droop-slices', name: 'droop-slices', component: () => import('./views/DroopSlicesView.vue'), meta: { title: '下垂白盒切片' } },
+  { path: '/droop-slices', name: 'droop-slices', component: () => import('./views/DroopSlicesView.vue'), meta: { title: '白盒切片' } },
   { path: '/connections', name: 'connections', component: () => import('./views/ConnectionsView.vue'), meta: { title: '连接信息' } }
 ]
 

@@ -77,7 +77,7 @@ namespace EssSimulator.DataExchange.Pipeline
 
                 _shadow.CommitControl(binding.ParamName, applied);
 
-                // 下垂白盒：EMS 写有功/无功设定瞬间切片
+                // 白盒切片：EMS 写有功/无功设定瞬间采集
                 DroopSliceStore.TryCapture(_serverName, binding, applied, previous);
 
                 if (_logControlChanges)

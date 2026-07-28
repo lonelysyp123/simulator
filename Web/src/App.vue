@@ -18,7 +18,7 @@
           <el-menu-item index="/battery"><el-icon><Battery /></el-icon><span>电池堆簇信息</span></el-menu-item>
           <el-menu-item index="/cells"><el-icon><Grid /></el-icon><span>电池单体信息</span></el-menu-item>
           <el-menu-item index="/command"><el-icon><Promotion /></el-icon><span>命令输入</span></el-menu-item>
-          <el-menu-item index="/droop-slices"><el-icon><DataAnalysis /></el-icon><span>下垂白盒切片</span></el-menu-item>
+          <el-menu-item index="/droop-slices"><el-icon><DataAnalysis /></el-icon><span>白盒切片</span></el-menu-item>
           <el-menu-item index="/connections"><el-icon><Link /></el-icon><span>连接信息</span></el-menu-item>
         </el-menu>
       </aside>
