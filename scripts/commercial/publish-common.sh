@@ -140,9 +140,15 @@ copy_platform_files() {
       # start.sh 已支持 macOS 的 open 打开浏览器
       cp -f "$ROOT/scripts/linux/start.sh" "$out/start.sh"
       cp -f "$ROOT/scripts/osx/README-macOS.txt" "$out/README-macOS.txt"
-      chmod +x "$out/start.sh"
+      cp -f "$ROOT/scripts/osx/解除隔离.sh" "$out/解除隔离.sh"
+      chmod +x "$out/start.sh" "$out/解除隔离.sh"
       if [[ -f "$out/EssSimulator" ]]; then
         chmod +x "$out/EssSimulator"
+        # 本地 ad-hoc 签名（不能替代 Apple 公证，但有助于部分环境识别）
+        if command -v codesign >/dev/null 2>&1; then
+          codesign --force --sign - --timestamp=none "$out/EssSimulator" 2>/dev/null \
+            || echo "    (codesign ad-hoc 跳过)"
+        fi
       fi
       ;;
     *)
