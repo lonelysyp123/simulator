@@ -136,6 +136,15 @@ copy_platform_files() {
         chmod +x "$out/EssSimulator"
       fi
       ;;
+    osx|macos|mac)
+      # start.sh 已支持 macOS 的 open 打开浏览器
+      cp -f "$ROOT/scripts/linux/start.sh" "$out/start.sh"
+      cp -f "$ROOT/scripts/osx/README-macOS.txt" "$out/README-macOS.txt"
+      chmod +x "$out/start.sh"
+      if [[ -f "$out/EssSimulator" ]]; then
+        chmod +x "$out/EssSimulator"
+      fi
+      ;;
     *)
       echo "未知平台: $platform" >&2
       return 1
