@@ -9,6 +9,15 @@
       "PropagationQuvMaxIterations": 3,
       "PropagationVoltageTolerancePu": 0.001
     },
+    "Web": {
+      "HttpPort": 5050,
+      "HttpBaseUrl": "http://0.0.0.0",
+      "StaticFiles": true,
+      "CorsOrigins": [],
+      "SnapshotIntervalMs": 200,
+      "DroopSliceCaptureEnabled": false,
+      "DroopSliceMaxCount": 500
+    },
     "Protocol": {
       "BaseBmsModbusPort": 1501,
       "BmsPortStep": 1,
@@ -106,8 +115,22 @@
     {
       "Name": "Unit-1",
       "Pcs": [
-        { "Name": "PCS-1A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-1B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-1A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-1B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
@@ -118,7 +141,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.55,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -132,7 +155,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.50,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -143,8 +166,22 @@
     {
       "Name": "Unit-2",
       "Pcs": [
-        { "Name": "PCS-2A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-2B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-2A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-2B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
@@ -155,7 +192,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.58,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -169,7 +206,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.53,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -180,8 +217,22 @@
     {
       "Name": "Unit-3",
       "Pcs": [
-        { "Name": "PCS-3A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-3B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-3A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-3B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
@@ -192,7 +243,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.60,
+          "CellInitialSoc": 0.6,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -206,7 +257,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.48,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -217,8 +268,22 @@
     {
       "Name": "Unit-4",
       "Pcs": [
-        { "Name": "PCS-4A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-4B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-4A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-4B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
@@ -229,7 +294,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.62,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -243,7 +308,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.45,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -254,8 +319,22 @@
     {
       "Name": "Unit-5",
       "Pcs": [
-        { "Name": "PCS-5A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-5B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-5A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-5B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
@@ -266,7 +345,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.57,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -280,7 +359,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.52,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -291,8 +370,22 @@
     {
       "Name": "Unit-6",
       "Pcs": [
-        { "Name": "PCS-6A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-6B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-6A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-6B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
@@ -328,8 +421,22 @@
     {
       "Name": "Unit-7",
       "Pcs": [
-        { "Name": "PCS-7A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-7B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-7A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-7B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
@@ -365,8 +472,22 @@
     {
       "Name": "Unit-8",
       "Pcs": [
-        { "Name": "PCS-8A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-8B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-8A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-8B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
