@@ -36,6 +36,10 @@
       "LockTopology": false,
       "MaxEssUnits": 0,
       "AllowDroopSlices": true
+    },
+    "License": {
+      "Required": true,
+      "FileName": "license.txt"
     }
   },
   "DataExchange": {

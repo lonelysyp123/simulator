@@ -442,6 +442,10 @@ Temporary Items
 
 # End of https://www.toptal.com/developers/gitignore/api/csharp,macos
 
+### EssSimulator license ###
+scripts/license/.license-secret
+**/license.txt
+
 ### EssSimulator B/S Web ###
 # 前端源码、Node 依赖、Vite 缓存与 wwwroot 构建产物（本分支不纳入版本管理）
 web/

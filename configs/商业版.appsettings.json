@@ -36,6 +36,10 @@
       "BaseLocalControlModbusPort": 1701,
       "LocalControlPortStep": 1,
       "LocalControlEmuPerGroup": 4
+    },
+    "License": {
+      "Required": true,
+      "FileName": "license.txt"
     }
   },
   "DataExchange": {
