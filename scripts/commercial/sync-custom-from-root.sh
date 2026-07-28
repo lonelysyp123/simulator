@@ -43,6 +43,12 @@ sim = data.setdefault("Simulator", {})
 runtime = sim.setdefault("Runtime", {})
 prev_gui = runtime.get("NoGui")
 runtime["NoGui"] = False
+sim["Edition"] = {
+    "Name": "Custom",
+    "LockTopology": False,
+    "MaxEssUnits": 0,
+    "AllowDroopSlices": True,
+}
 
 units = len(data.get("EssUnits") or [])
 has_web = "Web" in sim

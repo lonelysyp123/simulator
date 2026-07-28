@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=publish-common.sh
 source "$(dirname "$0")/publish-common.sh"
 
-EDITION="${EDITION:-$EDITION_COMMUNITY}"
+EDITION="$(normalize_edition "${EDITION:-$EDITION_COMMUNITY}")"
 RID="${RID:-linux-arm64}"
 CONFIG="${CONFIG:-Release}"
 OUT="$(dist_out_dir "$EDITION" "$RID")"

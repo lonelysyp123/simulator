@@ -30,6 +30,12 @@
       "BaseLocalControlModbusPort": 1701,
       "LocalControlPortStep": 1,
       "LocalControlEmuPerGroup": 4
+    },
+    "Edition": {
+      "Name": "Custom",
+      "LockTopology": false,
+      "MaxEssUnits": 0,
+      "AllowDroopSlices": true
     }
   },
   "DataExchange": {

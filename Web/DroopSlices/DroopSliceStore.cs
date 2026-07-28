@@ -21,6 +21,7 @@ namespace EssSimulator.Web.DroopSlices
         {
             var cfg = webCfg.Value;
             var edition = editionCfg.Value;
+            edition.ApplyPresets();
             _allowFeature = edition.AllowDroopSlices;
             _enabled = _allowFeature && cfg.DroopSliceCaptureEnabled;
             _maxCount = Math.Clamp(cfg.DroopSliceMaxCount, 10, 5000);

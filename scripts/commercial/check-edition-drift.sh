@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# 商业档位配置差异与定制版漂移检查（发布前建议执行）
+# 商业档位配置差异检查（发布前建议执行）
+# 主开关：Simulator.Edition.Name = Community | Commercial | Custom
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMMUNITY="$ROOT/configs/社区版.appsettings.json"
-RECHARGE="$ROOT/configs/充值版.appsettings.json"
+COMMERCIAL="$ROOT/configs/商业版.appsettings.json"
 CUSTOM="$ROOT/configs/定制版.appsettings.json"
 ROOT_CFG="$ROOT/appsettings.json"
 
@@ -39,67 +40,66 @@ else:
 PY
 }
 
-echo "==> 检查商业档位配置差异"
-if [[ ! -f "$COMMUNITY" || ! -f "$RECHARGE" || ! -f "$CUSTOM" ]]; then
-  echo "ERROR: configs/ 下缺少社区版/充值版/定制版模板" >&2
+echo "==> 检查商业档位配置差异（Edition 开关）"
+if [[ ! -f "$COMMUNITY" || ! -f "$COMMERCIAL" || ! -f "$CUSTOM" ]]; then
+  echo "ERROR: configs/ 下缺少社区版/商业版/定制版模板" >&2
   exit 1
 fi
 
-c_bind="$(json_get "$COMMUNITY" "Simulator.Protocol.BindAddress")"
-r_bind="$(json_get "$RECHARGE" "Simulator.Protocol.BindAddress")"
-c_http="$(json_get "$COMMUNITY" "Simulator.Observability.HttpBindAddress")"
-r_http="$(json_get "$RECHARGE" "Simulator.Observability.HttpBindAddress")"
-c_gui="$(json_get "$COMMUNITY" "Simulator.Runtime.NoGui")"
-r_gui="$(json_get "$RECHARGE" "Simulator.Runtime.NoGui")"
+c_name="$(json_get "$COMMUNITY" "Simulator.Edition.Name")"
+m_name="$(json_get "$COMMERCIAL" "Simulator.Edition.Name")"
+c_droop="$(json_get "$COMMUNITY" "Simulator.Edition.AllowDroopSlices")"
+m_droop="$(json_get "$COMMERCIAL" "Simulator.Edition.AllowDroopSlices")"
+c_lock="$(json_get "$COMMUNITY" "Simulator.Edition.LockTopology")"
+c_max="$(json_get "$COMMUNITY" "Simulator.Edition.MaxEssUnits")"
 c_units="$(json_get "$COMMUNITY" "EssUnits")"
-r_units="$(json_get "$RECHARGE" "EssUnits")"
+m_units="$(json_get "$COMMERCIAL" "EssUnits")"
 custom_units="$(json_get "$CUSTOM" "EssUnits")"
 root_units="$(json_get "$ROOT_CFG" "EssUnits")"
-r_api="$(json_get "$RECHARGE" "Simulator.Web.ApiKeyEnabled")"
+c_bind="$(json_get "$COMMUNITY" "Simulator.Protocol.BindAddress")"
 
-echo "    社区版 BindAddress=$c_bind HttpBind=$c_http NoGui=$c_gui Units=$c_units"
-echo "    充值版 BindAddress=$r_bind HttpBind=$r_http NoGui=$r_gui Units=$r_units ApiKeyEnabled=$r_api"
+echo "    社区版 Edition=$c_name AllowDroop=$c_droop Lock=$c_lock MaxUnits=$c_max Units=$c_units Bind=$c_bind"
+echo "    商业版 Edition=$m_name AllowDroop=$m_droop Units=$m_units"
 echo "    定制版 Units=$custom_units  |  根 appsettings Units=$root_units"
 
-if [[ "$c_bind" != "127.0.0.1" ]]; then
-  echo "ERROR: 社区版 Protocol.BindAddress 应为 127.0.0.1，当前=$c_bind" >&2
+if [[ "$c_name" != "Community" && "$c_name" != "社区版" ]]; then
+  echo "ERROR: 社区版 Simulator.Edition.Name 应为 Community，当前=$c_name" >&2
   fail=1
 fi
-if [[ "$c_http" != "127.0.0.1" ]]; then
-  echo "ERROR: 社区版 Observability.HttpBindAddress 应为 127.0.0.1，当前=$c_http" >&2
+if [[ "$c_droop" != "false" ]]; then
+  echo "ERROR: 社区版 AllowDroopSlices 应为 false（高级 API 关闭），当前=$c_droop" >&2
   fail=1
 fi
-if [[ "$c_gui" != "false" ]]; then
-  echo "ERROR: 社区版 Runtime.NoGui 应为 false，当前=$c_gui" >&2
+if [[ "$c_lock" != "true" ]]; then
+  echo "ERROR: 社区版 LockTopology 应为 true，当前=$c_lock" >&2
+  fail=1
+fi
+if [[ -n "$c_max" && "$c_max" != "0" && "$c_max" != "2" ]]; then
+  echo "WARN: 社区版 MaxEssUnits 建议为 2，当前=$c_max" >&2
+  warn=1
+fi
+if [[ "$c_bind" != "127.0.0.1" && -n "$c_bind" ]]; then
+  echo "WARN: 社区版 BindAddress 建议 127.0.0.1，当前=$c_bind" >&2
+  warn=1
+fi
+
+if [[ "$m_name" != "Commercial" && "$m_name" != "商业版" ]]; then
+  echo "ERROR: 商业版 Simulator.Edition.Name 应为 Commercial，当前=$m_name" >&2
+  fail=1
+fi
+if [[ "$m_droop" != "true" ]]; then
+  echo "ERROR: 商业版 AllowDroopSlices 应为 true，当前=$m_droop" >&2
   fail=1
 fi
 
-if [[ "$r_bind" == "127.0.0.1" || -z "$r_bind" ]]; then
-  echo "ERROR: 充值版 Protocol.BindAddress 不应为本机回环（期望 0.0.0.0 等可托管地址），当前=$r_bind" >&2
-  fail=1
-fi
-if [[ "$r_http" == "127.0.0.1" || -z "$r_http" ]]; then
-  echo "ERROR: 充值版 HttpBindAddress 不应为本机回环，当前=$r_http" >&2
-  fail=1
-fi
-if [[ "$r_gui" != "true" ]]; then
-  echo "ERROR: 充值版 Runtime.NoGui 应为 true（无头托管），当前=$r_gui" >&2
-  fail=1
-fi
-
-if [[ "$r_api" != "true" ]]; then
-  echo "ERROR: 充值版 Simulator.Web.ApiKeyEnabled 应为 true（密钥用环境变量注入），当前=$r_api" >&2
-  fail=1
-fi
-
-if [[ "$c_units" != "$r_units" ]]; then
-  echo "ERROR: 社区版与充值版 EssUnits 单元数应一致（$c_units vs $r_units）" >&2
-  fail=1
+# 商业版应对齐开发主配置规模（完整能力）
+if [[ "$m_units" != "$root_units" ]]; then
+  echo "WARN: 商业版与根 appsettings 的 EssUnits 不一致（$m_units vs $root_units），可用 sync-custom 思路同步商业版模板" >&2
+  warn=1
 fi
 
 if [[ "$custom_units" != "$root_units" ]]; then
   echo "WARN: 定制版与根 appsettings.json 的 EssUnits 单元数不一致（$custom_units vs $root_units）" >&2
-  echo "      若定制版是项目快照可忽略；若应对齐开发主配置，请同步后再发布。" >&2
   warn=1
 fi
 

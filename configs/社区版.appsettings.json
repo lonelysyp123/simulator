@@ -106,46 +106,102 @@
     {
       "Name": "Unit-1",
       "Pcs": [
-        { "Name": "PCS-1A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-1B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-1A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-1B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
           "Name": "BMS-1A",
-          "ClusterCount": 12, "PackCount": 4, "CellSeriesCount": 104, "CellParallelCount": 1,
-          "CellNominalVoltage": 3.2, "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.55, "CellInitialSocRandomRange": 0.03,
-          "PackInternalResistance": 0.05, "ClusterInternalResistance": 0.1, "RackInternalResistance": 0.02
+          "ClusterCount": 12,
+          "PackCount": 4,
+          "CellSeriesCount": 104,
+          "CellParallelCount": 1,
+          "CellNominalVoltage": 3.2,
+          "CellNominalCapacity": 314,
+          "CellInitialSoc": 0.55,
+          "CellInitialSocRandomRange": 0.03,
+          "PackInternalResistance": 0.05,
+          "ClusterInternalResistance": 0.1,
+          "RackInternalResistance": 0.02
         },
         {
           "Name": "BMS-1B",
-          "ClusterCount": 12, "PackCount": 4, "CellSeriesCount": 104, "CellParallelCount": 1,
-          "CellNominalVoltage": 3.2, "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.50, "CellInitialSocRandomRange": 0.03,
-          "PackInternalResistance": 0.05, "ClusterInternalResistance": 0.1, "RackInternalResistance": 0.02
+          "ClusterCount": 12,
+          "PackCount": 4,
+          "CellSeriesCount": 104,
+          "CellParallelCount": 1,
+          "CellNominalVoltage": 3.2,
+          "CellNominalCapacity": 314,
+          "CellInitialSoc": 0.5,
+          "CellInitialSocRandomRange": 0.03,
+          "PackInternalResistance": 0.05,
+          "ClusterInternalResistance": 0.1,
+          "RackInternalResistance": 0.02
         }
       ]
     },
     {
       "Name": "Unit-2",
       "Pcs": [
-        { "Name": "PCS-2A", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } },
-        { "Name": "PCS-2B", "PcsRamp": { "Slope": 0.5, "IntervalMs": 100, "DelayMs": 0 } }
+        {
+          "Name": "PCS-2A",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        },
+        {
+          "Name": "PCS-2B",
+          "PcsRamp": {
+            "Slope": 0.5,
+            "IntervalMs": 100,
+            "DelayMs": 0
+          }
+        }
       ],
       "Bms": [
         {
           "Name": "BMS-2A",
-          "ClusterCount": 12, "PackCount": 4, "CellSeriesCount": 104, "CellParallelCount": 1,
-          "CellNominalVoltage": 3.2, "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.58, "CellInitialSocRandomRange": 0.03,
-          "PackInternalResistance": 0.05, "ClusterInternalResistance": 0.1, "RackInternalResistance": 0.02
+          "ClusterCount": 12,
+          "PackCount": 4,
+          "CellSeriesCount": 104,
+          "CellParallelCount": 1,
+          "CellNominalVoltage": 3.2,
+          "CellNominalCapacity": 314,
+          "CellInitialSoc": 0.58,
+          "CellInitialSocRandomRange": 0.03,
+          "PackInternalResistance": 0.05,
+          "ClusterInternalResistance": 0.1,
+          "RackInternalResistance": 0.02
         },
         {
           "Name": "BMS-2B",
-          "ClusterCount": 12, "PackCount": 4, "CellSeriesCount": 104, "CellParallelCount": 1,
-          "CellNominalVoltage": 3.2, "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.53, "CellInitialSocRandomRange": 0.03,
-          "PackInternalResistance": 0.05, "ClusterInternalResistance": 0.1, "RackInternalResistance": 0.02
+          "ClusterCount": 12,
+          "PackCount": 4,
+          "CellSeriesCount": 104,
+          "CellParallelCount": 1,
+          "CellNominalVoltage": 3.2,
+          "CellNominalCapacity": 314,
+          "CellInitialSoc": 0.53,
+          "CellInitialSocRandomRange": 0.03,
+          "PackInternalResistance": 0.05,
+          "ClusterInternalResistance": 0.1,
+          "RackInternalResistance": 0.02
         }
       ]
     }

@@ -187,6 +187,7 @@ namespace EssSimulator
             // 绑定配置节
             builder.Services.Configure<SimulatorConfig>(builder.Configuration.GetSection(SimulatorConfig.Section));
             builder.Services.Configure<EditionConfig>(builder.Configuration.GetSection(EditionConfig.Section));
+            builder.Services.PostConfigure<EditionConfig>(edition => edition.ApplyPresets());
             builder.Services.PostConfigure<SimulatorConfig>(opt =>
             {
                 var units = builder.Configuration.GetSection(EssUnitsConfig.Section).Get<List<EssUnitConfig>>();
@@ -194,7 +195,9 @@ namespace EssSimulator
 
                 var edition = builder.Configuration.GetSection(EditionConfig.Section).Get<EditionConfig>()
                     ?? new EditionConfig();
-                if (edition.MaxEssUnits > 0 && opt.Devices is { Count: > 0 }
+                edition.ApplyPresets();
+                // 仅社区版（LockTopology）裁剪单元；商业版不改拓扑，只靠 API 功能开关区分高级能力
+                if (edition.LockTopology && edition.MaxEssUnits > 0 && opt.Devices is { Count: > 0 }
                     && opt.Devices.Count > edition.MaxEssUnits)
                 {
                     int before = opt.Devices.Count;
@@ -207,6 +210,7 @@ namespace EssSimulator
             {
                 var edition = builder.Configuration.GetSection(EditionConfig.Section).Get<EditionConfig>()
                     ?? new EditionConfig();
+                edition.ApplyPresets();
                 if (!edition.AllowDroopSlices)
                     web.DroopSliceCaptureEnabled = false;
             });

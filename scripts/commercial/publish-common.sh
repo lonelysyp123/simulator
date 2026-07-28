@@ -7,9 +7,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$ROOT/scripts/pointmap-common.sh"
 
 EDITION_COMMUNITY="社区版"
-EDITION_RECHARGE="充值版"
+EDITION_COMMERCIAL="商业版"
 EDITION_CUSTOM="定制版"
-ALL_EDITIONS=("$EDITION_COMMUNITY" "$EDITION_RECHARGE" "$EDITION_CUSTOM")
+# 兼容旧名「充值版」→ 商业版
+EDITION_RECHARGE_ALIAS="充值版"
+ALL_EDITIONS=("$EDITION_COMMUNITY" "$EDITION_COMMERCIAL" "$EDITION_CUSTOM")
 
 RUNTIME_FILES=(
   log4net.config
@@ -20,7 +22,7 @@ edition_config_file() {
   local edition="$1"
   case "$edition" in
     "$EDITION_COMMUNITY") echo "$ROOT/configs/社区版.appsettings.json" ;;
-    "$EDITION_RECHARGE") echo "$ROOT/configs/充值版.appsettings.json" ;;
+    "$EDITION_COMMERCIAL"|"$EDITION_RECHARGE_ALIAS") echo "$ROOT/configs/商业版.appsettings.json" ;;
     "$EDITION_CUSTOM") echo "$ROOT/configs/定制版.appsettings.json" ;;
     *)
       echo "未知版本: $edition（可选: ${ALL_EDITIONS[*]}）" >&2
@@ -31,6 +33,10 @@ edition_config_file() {
 
 edition_readme_file() {
   local edition="$1"
+  # 旧名充值版复用商业版说明
+  if [[ "$edition" == "$EDITION_RECHARGE_ALIAS" ]]; then
+    edition="$EDITION_COMMERCIAL"
+  fi
   local readme="$ROOT/scripts/commercial/editions/$edition/README.txt"
   if [[ -f "$readme" ]]; then
     echo "$readme"
@@ -60,6 +66,7 @@ ensure_dist_layout() {
 
 validate_edition() {
   local edition="$1"
+  edition="$(normalize_edition "$edition")"
   local e
   for e in "${ALL_EDITIONS[@]}"; do
     if [[ "$e" == "$edition" ]]; then
@@ -67,8 +74,16 @@ validate_edition() {
       return 0
     fi
   done
-  echo "未知版本: $edition（可选: ${ALL_EDITIONS[*]}）" >&2
+  echo "未知版本: $edition（可选: ${ALL_EDITIONS[*]}；兼容旧名 充值版→商业版）" >&2
   return 1
+}
+
+# 将旧名「充值版」规范为「商业版」
+normalize_edition() {
+  case "$1" in
+    "$EDITION_RECHARGE_ALIAS") echo "$EDITION_COMMERCIAL" ;;
+    *) echo "$1" ;;
+  esac
 }
 
 copy_runtime_files() {
