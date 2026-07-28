@@ -186,10 +186,29 @@ namespace EssSimulator
 
             // 绑定配置节
             builder.Services.Configure<SimulatorConfig>(builder.Configuration.GetSection(SimulatorConfig.Section));
+            builder.Services.Configure<EditionConfig>(builder.Configuration.GetSection(EditionConfig.Section));
             builder.Services.PostConfigure<SimulatorConfig>(opt =>
             {
                 var units = builder.Configuration.GetSection(EssUnitsConfig.Section).Get<List<EssUnitConfig>>();
                 if (units is { Count: > 0 }) opt.Devices = units;
+
+                var edition = builder.Configuration.GetSection(EditionConfig.Section).Get<EditionConfig>()
+                    ?? new EditionConfig();
+                if (edition.MaxEssUnits > 0 && opt.Devices is { Count: > 0 }
+                    && opt.Devices.Count > edition.MaxEssUnits)
+                {
+                    int before = opt.Devices.Count;
+                    opt.Devices = opt.Devices.Take(edition.MaxEssUnits).ToList();
+                    Console.WriteLine(
+                        $"[Edition] {edition.Name}: EssUnits 已从 {before} 裁剪为 {opt.Devices.Count}（MaxEssUnits={edition.MaxEssUnits}）");
+                }
+            });
+            builder.Services.PostConfigure<WebConfig>(web =>
+            {
+                var edition = builder.Configuration.GetSection(EditionConfig.Section).Get<EditionConfig>()
+                    ?? new EditionConfig();
+                if (!edition.AllowDroopSlices)
+                    web.DroopSliceCaptureEnabled = false;
             });
             builder.Services.Configure<PcsPhysicalConfig>(builder.Configuration.GetSection(PcsPhysicalConfig.Section));
             builder.Services.Configure<TransformerConfig>(builder.Configuration.GetSection(TransformerConfig.Section));

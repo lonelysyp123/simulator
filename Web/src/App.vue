@@ -18,7 +18,7 @@
           <el-menu-item index="/battery"><el-icon><Battery /></el-icon><span>电池堆簇信息</span></el-menu-item>
           <el-menu-item index="/cells"><el-icon><Grid /></el-icon><span>电池单体信息</span></el-menu-item>
           <el-menu-item index="/command"><el-icon><Promotion /></el-icon><span>命令输入</span></el-menu-item>
-          <el-menu-item index="/droop-slices"><el-icon><DataAnalysis /></el-icon><span>白盒切片</span></el-menu-item>
+          <el-menu-item v-if="allowDroopSlices" index="/droop-slices"><el-icon><DataAnalysis /></el-icon><span>白盒切片</span></el-menu-item>
           <el-menu-item index="/connections"><el-icon><Link /></el-icon><span>连接信息</span></el-menu-item>
         </el-menu>
       </aside>
@@ -31,10 +31,11 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { getHealth, getAlert, getHub } from '@/services/api.js'
+import { getHealth, getAlert, getHub, getConfig } from '@/services/api.js'
 import { RealtimeMethods } from '@/services/constants.js'
 
 const ready = ref(false)
+const allowDroopSlices = ref(true)
 const alert = reactive({ isActive: false, message: '', detail: '', secondsUntilExit: 0 })
 
 async function pollHealth() {
@@ -47,6 +48,11 @@ async function pollHealth() {
 onMounted(async () => {
   pollHealth()
   setInterval(pollHealth, 3000)
+
+  try {
+    const cfg = await getConfig()
+    allowDroopSlices.value = cfg?.edition?.allowDroopSlices !== false
+  } catch { /* ignore */ }
 
   try {
     const a = await getAlert()

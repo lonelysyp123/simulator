@@ -9,6 +9,23 @@
       "PropagationQuvMaxIterations": 3,
       "PropagationVoltageTolerancePu": 0.001
     },
+    "Edition": {
+      "Name": "Community",
+      "LockTopology": true,
+      "MaxEssUnits": 2,
+      "AllowDroopSlices": false
+    },
+    "Web": {
+      "HttpPort": 5050,
+      "HttpBaseUrl": "http://127.0.0.1",
+      "StaticFiles": true,
+      "CorsOrigins": [],
+      "SnapshotIntervalMs": 200,
+      "DroopSliceCaptureEnabled": false,
+      "DroopSliceMaxCount": 100,
+      "ApiKeyEnabled": false,
+      "ApiKey": ""
+    },
     "Protocol": {
       "BindAddress": "127.0.0.1",
       "BaseBmsModbusPort": 1501,
