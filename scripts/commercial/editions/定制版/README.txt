@@ -8,8 +8,8 @@
   - Linux：./start.sh
 
 Modbus 端口以 appsettings.json 中 Simulator.Protocol 为准；单元数由
-EssUnits 配置决定。替换点表时保持文件名不变（emu.csv / bms_bank.csv 等），
-重启进程生效。
+Devices / EssUnits 配置决定。替换点表时保持文件名不变（emu.csv /
+bms_bank.csv 等），重启进程生效。
 
-详细联调步骤、命令与故障排查见 docs/用户手册.md、docs/指令详细说明.md
-交付的技术文档。
+交付边界（含/不含项）见 docs/产品分档与交付边界.md。
+详细联调步骤、命令与故障排查见 docs/用户手册.md、docs/指令详细说明.md。

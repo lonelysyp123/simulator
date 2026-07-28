@@ -2,7 +2,7 @@
   "Simulator": {
     "Runtime": {
       "IntegrationStepMultiplier": 1.0,
-      "NoGui": false,
+      "NoGui": true,
       "AutoStartPcsOnStartup": true,
       "PropagationIntervalMs": 100,
       "UseElectricalPropagation": true,
@@ -10,7 +10,7 @@
       "PropagationVoltageTolerancePu": 0.001
     },
     "Protocol": {
-      "BindAddress": "127.0.0.1",
+      "BindAddress": "0.0.0.0",
       "BaseBmsModbusPort": 1501,
       "BmsPortStep": 1,
       "BaseEmuModbusPort": 1601,
@@ -24,7 +24,7 @@
     "Observability": {
       "EnableHttp": true,
       "HttpPort": 8080,
-      "HttpBindAddress": "127.0.0.1"
+      "HttpBindAddress": "0.0.0.0"
     }
   },
   "Pcc": {
