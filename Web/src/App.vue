@@ -13,13 +13,40 @@
     </header>
     <div class="app-body">
       <aside class="app-aside">
-        <el-menu :default-active="$route.path" router>
-          <el-menu-item index="/mainline"><el-icon><Connection /></el-icon><span>主电气接线</span></el-menu-item>
-          <el-menu-item index="/battery"><el-icon><Battery /></el-icon><span>电池堆簇信息</span></el-menu-item>
-          <el-menu-item index="/cells"><el-icon><Grid /></el-icon><span>电池单体信息</span></el-menu-item>
-          <el-menu-item index="/command"><el-icon><Promotion /></el-icon><span>命令输入</span></el-menu-item>
-          <el-menu-item v-if="allowDroopSlices" index="/droop-slices"><el-icon><DataAnalysis /></el-icon><span>白盒切片</span></el-menu-item>
-          <el-menu-item index="/connections"><el-icon><Link /></el-icon><span>连接信息</span></el-menu-item>
+        <el-menu :default-active="$route.path" router class="app-menu">
+          <div class="menu-group-label">电气接线</div>
+          <el-menu-item index="/mainline">
+            <el-icon><Connection /></el-icon>
+            <span>主电气接线</span>
+          </el-menu-item>
+          <el-menu-item index="/mainline-3d">
+            <el-icon><Monitor /></el-icon>
+            <span>主接线 3D（增强）</span>
+          </el-menu-item>
+
+          <div class="menu-group-label">电池系统</div>
+          <el-menu-item index="/battery">
+            <el-icon><BatteryStackIcon /></el-icon>
+            <span>电池堆簇信息</span>
+          </el-menu-item>
+          <el-menu-item index="/cells">
+            <el-icon><Grid /></el-icon>
+            <span>电池单体信息</span>
+          </el-menu-item>
+
+          <div class="menu-group-label">运维工具</div>
+          <el-menu-item index="/command">
+            <el-icon><Promotion /></el-icon>
+            <span>命令输入</span>
+          </el-menu-item>
+          <el-menu-item v-if="allowDroopSlices" index="/droop-slices">
+            <el-icon><DataAnalysis /></el-icon>
+            <span>白盒切片</span>
+          </el-menu-item>
+          <el-menu-item index="/connections">
+            <el-icon><Link /></el-icon>
+            <span>连接信息</span>
+          </el-menu-item>
         </el-menu>
       </aside>
       <main class="app-main">
@@ -33,6 +60,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { getHealth, getAlert, getHub, getConfig } from '@/services/api.js'
 import { RealtimeMethods } from '@/services/constants.js'
+import BatteryStackIcon from '@/components/icons/BatteryStackIcon.vue'
 
 const ready = ref(false)
 const allowDroopSlices = ref(true)

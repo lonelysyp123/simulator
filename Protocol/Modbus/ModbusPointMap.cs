@@ -30,8 +30,9 @@ namespace EssSimulator.Protocol.Modbus
 
         public ModbusPointMap(string mapFilePath, string serverName, int clusterCount = 0)
         {
-            var entries = CSVUtil.CSV2Class<MapEntry>(mapFilePath)?.ToArray()
-                ?? throw new Exception($"Modbus bank map 读取失败: {mapFilePath}");
+            var resolvedPath = PointMapPathResolver.Resolve(mapFilePath);
+            var entries = CSVUtil.CSV2Class<MapEntry>(resolvedPath)?.ToArray()
+                ?? throw new Exception($"Modbus bank map 读取失败: {resolvedPath}");
 
             ApplyDeviceIdSubstitution(
                 entries,
@@ -41,11 +42,11 @@ namespace EssSimulator.Protocol.Modbus
             IndexBankEntries(entries);
             RawMaps.Add(entries);
 
-            if (mapFilePath.Contains("bms_bank", StringComparison.OrdinalIgnoreCase))
+            if (resolvedPath.Contains("bms_bank", StringComparison.OrdinalIgnoreCase))
                 DefaultBuffer.TryAdd("param4", (ushort)2);
 
             if (serverName.Contains("bms", StringComparison.OrdinalIgnoreCase) && clusterCount > 0)
-                LoadRackMap("bms_rack.csv", serverName);
+                LoadRackMap(PointMapPathResolver.ResolveSibling(resolvedPath, "bms_rack.csv"), serverName);
         }
 
         private void IndexBankEntries(MapEntry[] entries)

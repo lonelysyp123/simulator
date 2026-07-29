@@ -64,7 +64,10 @@ namespace EssSimulator.EssSimModelApi
                 if (ess == null) continue;
 
                 for (int i = 0; i < _unitCount && i < ess._bmsRackDevices.Count; i++)
+                {
                     ess._bmsRackDevices[i].SyncTelemetryAndProtection(_bmsDataList[i]);
+                    BmsThermalProbeMapper.Apply(ess.Thermal, i, _bmsDataList[i]);
+                }
 
                 _bmsDataList[0].Timestamp = DateTime.Now;
             }

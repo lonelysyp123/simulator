@@ -11,8 +11,10 @@ namespace EssSimulator.EssDeviceSimModel
     using EssSimulator.EssDeviceSimModel.Battery;
     using EssSimulator.EssDeviceSimModel.Devices;
     using EssSimulator.EssDeviceSimModel.Model;
+    using EssSimulator.EssDeviceSimModel.Plant;
     using EssSimulator.EssDeviceSimModel.Propagation;
     using EssSimulator.EssDeviceSimModel.Solver;
+    using EssSimulator.EssDeviceSimModel.Thermal;
     using EssSimulator.EssSimModelApi;
     using EssSimulator.EssSimModelApi.BatteryManagementSystem;
     using System;
@@ -92,6 +94,24 @@ namespace EssSimulator.EssDeviceSimModel
 
         /// <summary>径向网络母线图。</summary>
         public RadialNetworkGraph? RadialGraph { get; }
+
+        /// <summary>
+        /// 电站物理步进门面。主循环只应调用 <see cref="PlantEngine.Step"/>；
+        /// 设备编排与热网络扩展落在此引擎内，而非 Host 定时器回调里。
+        /// </summary>
+        public PlantEngine PlantEngine { get; private set; } = null!;
+
+        /// <summary>电站热子系统（气候 + BMS 柜体）。</summary>
+        public PlantThermalSystem Thermal { get; private set; } = null!;
+
+        /// <summary>设备耦合图（PCS–BMS 直流边等）。</summary>
+        public PlantCouplingGraph CouplingGraph { get; private set; } = null!;
+
+        /// <summary>是否使用径向潮流主路径（供 <see cref="PlantEngine"/> 调度）。</summary>
+        internal bool UseElectricalPropagation => _useElectricalPropagation;
+
+        /// <summary>PCS 物理配置（供 <see cref="PlantEngine"/> 走 Solver 备用路径时使用）。</summary>
+        internal PcsPhysicalConfig PcsPhysicalConfig => _pcsCfg;
 
         private readonly ElectricalNetwork _electricalNetwork;
         private readonly bool _useElectricalPropagation;
@@ -213,6 +233,10 @@ namespace EssSimulator.EssDeviceSimModel
             {
                 _log.Info("[EnergyStorageSystem] 电气网络 Solver 主路径已启用");
             }
+
+            PlantEngine = new PlantEngine(this);
+            Thermal = new PlantThermalSystem(simCfg.Runtime.Thermal, channelCount, DateTime.UtcNow);
+            CouplingGraph = PlantCouplingGraph.BuildDefault(_pcsList, _bmsRackDevices);
         }
 
         /// <summary>阶段 4 起固定为 Solver 主路径 + 网络控制面。</summary>
@@ -377,10 +401,11 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>
         /// 仿真主循环（IHostedService / BackgroundService）。
         /// 由 .NET Host 在 StartAsync 时调用，stoppingToken 取消时自动退出。
+        /// 每 tick 只推进时钟并调用 <see cref="PlantEngine.Step"/>（导演逻辑已迁入引擎门面）。
         /// </summary>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Info("[EnergyStorageSystem] 仿真主循环启动");
+            _log.Info("[EnergyStorageSystem] 仿真主循环启动（经 PlantEngine.Step）");
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_propagationIntervalMs));
             try
             {
@@ -388,21 +413,7 @@ namespace EssSimulator.EssDeviceSimModel
                 {
                     var (elapsed, integrationElapsed) = AdvanceCycleClock();
                     DateTime simTime = DateTime.UtcNow;
-
-                    if (_useElectricalPropagation && PowerSweepEngine != null)
-                    {
-                        PowerSweepEngine.SolveCycle(simTime, elapsed, integrationElapsed);
-                    }
-                    else
-                    {
-                        NetworkStepOrchestrator.SolverPrimaryStep(
-                            _electricalNetwork, this, simTime, elapsed, integrationElapsed, _pcsCfg);
-                    }
-
-                    Update(simTime, elapsed, integrationElapsed);
-                    SyncUnitTransformerAfterPcsUpdate(simTime, elapsed);
-                    RefreshAllUnitBlackStartBusContexts();
-                    NetworkControlBridge.SyncBmsLinksFromRacks(_electricalNetwork, _bmsRackDevices);
+                    PlantEngine.Step(simTime, elapsed, integrationElapsed);
                 }
             }
             catch (OperationCanceledException)
@@ -469,15 +480,8 @@ namespace EssSimulator.EssDeviceSimModel
                 _pcsList[b].RefreshBlackStartBusContext(busV);
         }
 
-        private void RefreshAllUnitBlackStartBusContexts()
-        {
-            int unitCount = (_pcsList.Count + 1) / 2;
-            for (int u = 0; u < unitCount; u++)
-                RefreshUnitBlackStartBusContext(u);
-        }
-
         /// <summary>PCS.Update 之后同步单元变与站用电分摊（见 <see cref="UnitTransformerIslandSync"/>）。</summary>
-        private void SyncUnitTransformerAfterPcsUpdate(DateTime simTime, TimeSpan simStep) =>
+        internal void SyncUnitTransformerAfterPcsUpdate(DateTime simTime, TimeSpan simStep) =>
             UnitTransformerIslandSync.SyncAfterPcsUpdate(
                 IsMainBreakerClosed,
                 StationBus35LineVoltageV,
@@ -489,29 +493,19 @@ namespace EssSimulator.EssDeviceSimModel
                 simTime,
                 simStep);
 
-        // 更新系统状态
-        private void Update(DateTime simTime, TimeSpan elapsed, TimeSpan integrationElapsed)
+        /// <summary>刷新各单元黑启动母线上下文（供 <see cref="PlantEngine"/> 调用）。</summary>
+        internal void RefreshAllUnitBlackStartBusContexts()
         {
-            int n = Math.Min(_bmsRackDevices.Count, _pcsList.Count);
-            for (int i = 0; i < n; i++)
-            {
-                var bms = _bmsRackDevices[i];
-
-                if (bms.IsLinked)
-                {
-                    var rackState = bms.Rack.GetRackState();
-                    if (rackState == null) continue;
-
-                    _pcsList[i].Update(rackState.TotalVoltage, rackState.IsFault, simTime, elapsed, integrationElapsed);
-                    bms.UpdatePhysics(-_pcsList[i].GetCurrentState().DcCurrent, 25.0, simTime, integrationElapsed);
-                }
-                else
-                {
-                    _pcsList[i].Update(0, 0, simTime, elapsed, integrationElapsed);
-                    bms.UpdatePhysics(0, 25.0, simTime, integrationElapsed);
-                }
-            }
+            int unitCount = (_pcsList.Count + 1) / 2;
+            for (int u = 0; u < unitCount; u++)
+                RefreshUnitBlackStartBusContext(u);
         }
+
+        /// <summary>
+        /// PCS↔BMS 耦合（兼容入口）：委托 <see cref="PlantCouplingGraph.StepCouplings"/>。
+        /// </summary>
+        internal void RunPcsBmsCoupling(DateTime simTime, TimeSpan elapsed, TimeSpan integrationElapsed) =>
+            CouplingGraph.StepCouplings(Thermal, simTime, elapsed, integrationElapsed);
 
         // // 示例使用
         // public void EssMain(string[] args)

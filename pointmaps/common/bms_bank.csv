@@ -104,8 +104,8 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10055,u16,16,yc53,1,1#压缩机运行状态,0
 4,10056,u16,16,yc54,1,2#压缩机运行状态,0
 4,10057,u16,16,yc55,1,电加热运行状态,0
-4,10058,u16,16,yc56,1,出水温度,0
-4,10059,u16,16,yc57,1,回水温度,0
+4,10058,u16,16,yc56,1,出水温度,model=4|arg1=bmsdeviceId.LiquidCoolingSystems[0].SupplyLiquidTemp|arg2=|arg3=|arg4=1000
+4,10059,u16,16,yc57,1,回水温度,model=4|arg1=bmsdeviceId.LiquidCoolingSystems[0].ReturnLiquidTemp|arg2=|arg3=|arg4=1000
 4,10060,u16,16,yc58,1,出水压力,0
 4,10061,u16,16,yc59,1,回水压力,0
 4,10062,u16,16,yc60,1,TMS报警1,0
@@ -117,9 +117,9 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10068,u16,16,yc66,1,空调外风机状态,0
 4,10069,u16,16,yc67,1,空调压缩机状态,0
 4,10070,u16,16,yc68,1,空调电加热状态,0
-4,10071,u16,16,yc69,1,空调盘管温度,0
-4,10072,u16,16,yc70,1,空调冷凝温度,0
-4,10073,u16,16,yc71,1,空调柜内温度,0
+4,10071,u16,16,yc69,1,空调盘管温度,model=4|arg1=bmsdeviceId.AirConditioners[0].DefrostTemp|arg2=|arg3=|arg4=1000
+4,10072,u16,16,yc70,1,空调冷凝温度,model=4|arg1=bmsdeviceId.AirConditioners[0].CondensationTemp|arg2=|arg3=|arg4=1000
+4,10073,u16,16,yc71,1,空调柜内温度,model=4|arg1=bmsdeviceId.AirConditioners[0].CabinetTemp|arg2=|arg3=|arg4=1000
 4,10074,u16,16,yc72,1,空调柜内湿度,0
 4,10075,u16,16,yc73,1,空调告警信息1,0
 4,10076,u16,16,yc74,1,空调告警信息2,0
@@ -141,7 +141,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10092,u16,16,yc90,1,除湿器1控湿停止值,0
 4,10093,u16,16,yc91,1,除湿器1温度报警上限值,0
 4,10094,u16,16,yc92,1,除湿器1温度报警下限值,0
-4,10095,u16,16,yc93,1,除湿器1环境温度值,0
+4,10095,u16,16,yc93,1,除湿器1环境温度值,model=4|arg1=bmsdeviceId.TempHumiditySensors[0].Temperature|arg2=|arg3=|arg4=1000
 4,10096,u16,16,yc94,1,除湿器1环境湿度值,0
 4,10097,u16,16,yc95,1,除湿器1通信故障,0
 4,10098,u16,16,yc96,1,除湿器2控温开启值,0
@@ -150,7 +150,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10101,u16,16,yc99,1,除湿器2控湿停止值,0
 4,10102,u16,16,yc100,1,除湿器2温度报警上限值,0
 4,10103,u16,16,yc101,1,除湿器2温度报警下限值,0
-4,10104,u16,16,yc102,1,除湿器2环境温度值,0
+4,10104,u16,16,yc102,1,除湿器2环境温度值,model=4|arg1=bmsdeviceId.TempHumiditySensors[1].Temperature|arg2=|arg3=|arg4=1000
 4,10105,u16,16,yc103,1,除湿器2环境湿度值,0
 4,10106,u16,16,yc104,1,除湿器2通信故障,0
 4,10107,u16,16,yc105,1,除湿器3控温开启值,0
@@ -159,7 +159,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10110,u16,16,yc108,1,除湿器3控湿停止值,0
 4,10111,u16,16,yc109,1,除湿器3温度报警上限值,0
 4,10112,u16,16,yc110,1,除湿器3温度报警下限值,0
-4,10113,u16,16,yc111,1,除湿器3环境温度值,0
+4,10113,u16,16,yc111,1,除湿器3环境温度值,model=4|arg1=bmsdeviceId.TempHumiditySensors[2].Temperature|arg2=|arg3=|arg4=1000
 4,10114,u16,16,yc112,1,除湿器3环境湿度值,0
 4,10115,u16,16,yc113,1,除湿器3通信故障,0
 4,10116,int32,32,yc114,1,CO浓度,0

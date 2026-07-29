@@ -12,7 +12,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
     /// PCS 设备模型（阶段 5）：跟网/离网、功率爬坡、黑启动、保护、AC/DC 端口。
     /// PCS 设备模型：爬坡、黑启动、保护、跟网/离网；ESS 与电气网络共用同一实例。
     /// </summary>
-    public sealed partial class PcsDevice : IPcsDevice
+    public sealed partial class PcsDevice : IPcsDevice, IElectricalLossSource, ITemperatureAware
     {
         private readonly PcsDeviceConfig _deviceConfig;
         public PcsConfiguration _config { get; }
@@ -32,6 +32,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         public PcsState _currentState { get; set; }
         private GridState _gridState;
         private double _ambientTemperature;
+        private double _thermalPowerDeratingFactor = 1.0;
         private readonly Random _random = new Random();
         private readonly object _setpointLock = new object();
         private double _pendingActiveSetpoint;
@@ -472,6 +473,13 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 _currentState.ReactivePower = _loadReactivePowerKvar;
             }
 
+            // 高温降额：在电气量计算前限制指令功率
+            if (_thermalPowerDeratingFactor < 0.999 && !_blackStartEnabled)
+            {
+                _currentState.ActivePower *= _thermalPowerDeratingFactor;
+                _currentState.ReactivePower *= _thermalPowerDeratingFactor;
+            }
+
             // 2) 根据模式更新电气量（过流等保护基于本步 P/Q 与 AcCurrent）
             switch (_currentState.Mode)
             {
@@ -620,15 +628,31 @@ namespace EssSimulator.EssDeviceSimModel.Devices
 
         private void UpdateTemperatureModel(TimeSpan timeStep)
         {
-            // 计算功率损耗 (简化模型)
-            double powerLoss = Math.Abs(_currentState.ActivePower) * (1 - _config.Efficiency);
+            // 计算功率损耗 (简化模型)；ActivePower 为 kW
+            double powerLossKw = Math.Abs(_currentState.ActivePower) * (1 - _config.Efficiency);
 
-            // 温度变化计算
+            // 温度变化计算（沿用历史单位约定）
             double cooling = (_currentState.Temperature - _ambientTemperature) * 50; // 假设冷却系数50W/°C
-            double tempChange = (powerLoss - cooling) * timeStep.TotalHours / 10.0; // 假设热容10kWh/°C
+            double tempChange = (powerLossKw - cooling) * timeStep.TotalHours / 10.0; // 假设热容10kWh/°C
 
             _currentState.Temperature = Math.Max(_ambientTemperature, _currentState.Temperature + tempChange);
         }
+
+        /// <inheritdoc />
+        public void ApplyAmbientTemperature(double ambientCelsius) => _ambientTemperature = ambientCelsius;
+
+        /// <inheritdoc />
+        public double TemperatureCelsius => _currentState.Temperature;
+
+        /// <summary>高温功率降额因子（0–1），由热反馈写入。</summary>
+        public void ApplyThermalPowerDerating(double factor) =>
+            _thermalPowerDeratingFactor = Math.Clamp(factor, 0, 1);
+
+        public double ThermalPowerDeratingFactor => _thermalPowerDeratingFactor;
+
+        /// <inheritdoc />
+        public double GetElectricalLossWatts() =>
+            Math.Abs(_currentState.ActivePower) * (1.0 - _config.Efficiency) * 1000.0;
 
         private void CheckFaultConditions()
         {

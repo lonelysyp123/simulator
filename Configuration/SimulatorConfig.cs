@@ -30,6 +30,108 @@ namespace EssSimulator.Configuration
 
         /// <summary>Q-U/V 迭代相对电压收敛阈值（pu，相对 PCC 额定线电压）。</summary>
         public double PropagationVoltageTolerancePu { get; set; } = 0.001;
+
+        /// <summary>电站热网络 / 气候（阶段 2：外温 + BMS 柜体空气）。</summary>
+        public ThermalRuntimeConfig Thermal { get; set; } = new();
+    }
+
+    /// <summary>热仿真运行时配置（Simulator.Runtime.Thermal）。</summary>
+    public class ThermalRuntimeConfig
+    {
+        /// <summary>为 false 时 BMS 环境温回退到 <see cref="ClimateConfig.FixedCelsius"/>（默认 25）。</summary>
+        public bool Enabled { get; set; } = true;
+
+        public ClimateConfig Climate { get; set; } = new();
+        public BmsCabinetThermalConfig Cabinet { get; set; } = new();
+
+        /// <summary>多点温度探针偏置（°C）；挂点见 <see cref="ThermalProbeBiasesConfig"/>。</summary>
+        public ThermalProbeBiasesConfig ProbeBiases { get; set; } = new();
+
+        /// <summary>温度反馈：降额与寿命加速（阶段 5）。</summary>
+        public ThermalFeedbackConfig Feedback { get; set; } = new();
+    }
+
+    /// <summary>电–热反馈：高温降额、温度加速日历老化。</summary>
+    public class ThermalFeedbackConfig
+    {
+        public bool DeratingEnabled { get; set; } = true;
+
+        /// <summary>开始线性降额的温度（°C）。</summary>
+        public double DerateStartCelsius { get; set; } = 40;
+
+        /// <summary>降额至下限的温度（°C）。</summary>
+        public double DerateFullCelsius { get; set; } = 55;
+
+        /// <summary>满降额时仍保留的功率比例（0–1）。</summary>
+        public double MinPowerFactor { get; set; } = 0.2;
+
+        public bool TemperatureAgingEnabled { get; set; } = true;
+
+        public double AgingReferenceCelsius { get; set; } = 25;
+
+        /// <summary>Arrhenius 系数 B≈Ea/R（K）；约 5000 时 45°C 相对 25°C 加速约 2–3 倍。</summary>
+        public double AgingArrheniusB { get; set; } = 5000;
+
+        /// <summary>参考温度下日历老化速率（每年 Age 增量，0–1）。</summary>
+        public double CalendarAgingPerYearAtRef { get; set; } = 0.02;
+    }
+
+    /// <summary>各测点相对混合温度的固定偏置（模拟传感器安装位置误差）。</summary>
+    public class ThermalProbeBiasesConfig
+    {
+        public double CabinetAirCelsius { get; set; }
+        public double CoilCelsius { get; set; } = -1.5;
+        public double CondenserCelsius { get; set; } = 2.0;
+        public double LiquidSupplyCelsius { get; set; } = -2.0;
+        public double LiquidReturnCelsius { get; set; } = 1.0;
+        public double DehumidifierTopCelsius { get; set; } = 0.8;
+        public double DehumidifierMidCelsius { get; set; }
+        public double DehumidifierBottomCelsius { get; set; } = -0.8;
+    }
+
+    /// <summary>室外气温模型参数。</summary>
+    public class ClimateConfig
+    {
+        /// <summary>若有值则忽略日变化，始终返回该温度（°C）。</summary>
+        public double? FixedCelsius { get; set; }
+
+        public double MinCelsius { get; set; } = 15;
+        public double MaxCelsius { get; set; } = 35;
+
+        /// <summary>日最高温出现的小时（0–24，可小数）。</summary>
+        public double PeakHour { get; set; } = 14;
+    }
+
+    /// <summary>单个 BMS 柜体集总热网络参数。</summary>
+    public class BmsCabinetThermalConfig
+    {
+        public double AirThermalCapacityJPerK { get; set; } = 80_000;
+        public double ShellThermalCapacityJPerK { get; set; } = 200_000;
+        public double BatteryThermalCapacityJPerK { get; set; } = 800_000;
+
+        /// <summary>室外→外壳热阻（K/W）。</summary>
+        public double OutdoorToShellResistanceKPerW { get; set; } = 0.04;
+
+        /// <summary>外壳→柜内空气热阻（K/W）。</summary>
+        public double ShellToAirResistanceKPerW { get; set; } = 0.015;
+
+        /// <summary>电池等效热容节点→柜内空气热阻（K/W）。</summary>
+        public double BatteryToAirResistanceKPerW { get; set; } = 0.008;
+
+        /// <summary>空调制冷功率（W）；0 表示无空调。</summary>
+        public double HvacCoolingPowerW { get; set; } = 0;
+
+        /// <summary>空调目标柜温（°C）。</summary>
+        public double HvacSetpointCelsius { get; set; } = 25;
+
+        /// <summary>运行时是否允许空调工作（仍需 HvacCoolingPowerW&gt;0）。</summary>
+        public bool HvacEnabled { get; set; } = true;
+
+        /// <summary>制冷回差（°C）：高于设定+回差开启，低于设定关闭。</summary>
+        public double HvacHysteresisCelsius { get; set; } = 2;
+
+        /// <summary>比例制冷增益（W/°C），与额定功率取小。</summary>
+        public double HvacProportionalGainWPerK { get; set; } = 800;
     }
 
     public class PcsRampConfig

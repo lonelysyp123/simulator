@@ -114,6 +114,14 @@ start_backend() {
     echo "错误: 端口 $HTTP_PORT 已被占用，请先释放或设置 HTTP_PORT=..." >&2
     exit 1
   fi
+  # 根目录点表 CSV 被 gitignore；开发启动前同步，避免 Modbus 从站起不来
+  if [[ ! -f "$ROOT/emu.csv" ]]; then
+    echo "==> 同步点位表到仓库根目录 (./scripts/sync-pointmaps-to-root.sh)"
+    "$ROOT/scripts/sync-pointmaps-to-root.sh" || {
+      echo "错误: 点位表同步失败，dpc/PCS 设定将不可用" >&2
+      exit 1
+    }
+  fi
   echo "==> 启动后端: dotnet run (http://localhost:${HTTP_PORT})"
   (
     cd "$ROOT"

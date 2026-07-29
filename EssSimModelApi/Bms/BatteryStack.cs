@@ -132,13 +132,16 @@ public partial class BatteryStack
         // public float? AvailableDischargeEnergy { get; set; } // 堆可用放电容量
 
         // 限制参数
+        /// <summary>热降额因子（0–1），由热反馈写入；默认 1。</summary>
+        public float ThermalPowerDeratingFactor { get; set; } = 1f;
+
         public float? MaxChargePower // 最大允许充电功率
         { 
             get
             {
                 if (!SOC.HasValue) return null;
                 float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
-                return basePower * GetChargePowerFactor(SOC.Value);
+                return basePower * GetChargePowerFactor(SOC.Value) * Math.Clamp(ThermalPowerDeratingFactor, 0f, 1f);
             }
         } 
 
@@ -148,7 +151,7 @@ public partial class BatteryStack
             {
                 if (!SOC.HasValue) return null;
                 float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
-                return basePower * GetDischargePowerFactor(SOC.Value);
+                return basePower * GetDischargePowerFactor(SOC.Value) * Math.Clamp(ThermalPowerDeratingFactor, 0f, 1f);
             }
         } 
 

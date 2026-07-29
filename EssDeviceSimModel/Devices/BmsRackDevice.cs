@@ -1,6 +1,7 @@
 using EssSimulator.EssDeviceSimModel.Diagnostics;
 using EssSimulator.EssDeviceSimModel.Interface;
 using EssSimulator.EssDeviceSimModel.Model;
+using EssSimulator.EssDeviceSimModel.Thermal;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 using EssSimulator.EssSimModelApi.Mappers;
 
@@ -10,10 +11,13 @@ namespace EssSimulator.EssDeviceSimModel.Devices
     /// BMS 设备：四层电池堆物理、阈值保护、DC 端口与 PCS 并网链路。
     /// 与 <see cref="ElectricalNetwork.BmsDevices"/> 共用实例。
     /// </summary>
-    public sealed class BmsRackDevice : IBmsDevice
+    public sealed class BmsRackDevice : IBmsDevice, IElectricalLossSource, ITemperatureAware
     {
         private readonly BatteryRackSimulator _rack;
         private DeviceFaultState _fault = new();
+        private double _ambientCelsius = 25.0;
+        private double _lastLossWatts;
+        private double _thermalPowerDeratingFactor = 1.0;
 
         public BmsRackDevice(string deviceId, BatteryRackSimulator rack)
         {
@@ -33,6 +37,25 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         public DeviceFaultState Fault => _fault;
         public ElectricalPort Port { get; }
         public IReadOnlyList<ElectricalPort> Ports => new[] { Port };
+
+        public double TemperatureCelsius
+        {
+            get
+            {
+                var state = _rack.GetRackState();
+                return state?.AvgClusterTemp ?? _ambientCelsius;
+            }
+        }
+
+        public void ApplyAmbientTemperature(double ambientCelsius) => _ambientCelsius = ambientCelsius;
+
+        public double GetElectricalLossWatts() => _lastLossWatts;
+
+        /// <summary>高温功率降额因子（0–1），映射到堆 MaxCharge/DischargePower。</summary>
+        public void ApplyThermalPowerDerating(double factor) =>
+            _thermalPowerDeratingFactor = Math.Clamp(factor, 0, 1);
+
+        public double ThermalPowerDeratingFactor => _thermalPowerDeratingFactor;
 
         public bool IsLinked
         {
@@ -65,7 +88,9 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         /// <summary>ESS 主循环：推进电芯/SOC 物理并刷新 DC 端口。</summary>
         public void UpdatePhysics(double rackCurrent, double ambientTemp, DateTime timeStamp, TimeSpan step)
         {
+            _ambientCelsius = ambientTemp;
             _rack.Update(rackCurrent, ambientTemp, timeStamp, step);
+            _lastLossWatts = PlantThermalSystem.EstimateRackOhmicLossWatts(_rack, rackCurrent);
             SyncPortFromRack();
         }
 

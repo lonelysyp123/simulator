@@ -7,7 +7,10 @@
 | 协议层 | `Protocol/` | Modbus TCP 从站、`ModbusHostedService` 启动多路服务 |
 | 数据交换 | `DataExchange/` | 点目录编译、遥测/控制/反馈管道、`ControlEffect` |
 | 映射层 | `EssSimModelApi/Mappers/` | 物理状态 → BMS/EMU/EM DTO（`BmsMapper`、`PcsMapper`） |
-| 编排层 | `EssDeviceSimModel/EnergyStorageSys.cs` | 仿真主循环、BMS/PCS 耦合、黑启动站用电 |
+| 编排层 | `EssDeviceSimModel/EnergyStorageSys.cs` | Host 时钟；持有拓扑与设备实例 |
+| 电站引擎门面 | `EssDeviceSimModel/PlantEngine.cs` | **唯一物理步进入口** `Step(dt)`：电气 → 热网络 → **耦合图** |
+| 耦合图 | `EssDeviceSimModel/Plant/` | `PlantCouplingGraph` / `PcsBmsDcCouplingLink`（PCS↔BMS 直流边）；设备实现 `IElectricalLossSource` / `ITemperatureAware` |
+| 热网络 | `EssDeviceSimModel/Thermal/` | `ClimateModel`、`ThermalNetwork`、`BmsCabinetThermalZone`、`PlantThermalSystem` |
 | 求解层 | `EssDeviceSimModel/Solver/`、`Propagation/` | `ElectricalNetwork`、`NetworkSolver`、径向潮流 |
 | 设备层 | `EssDeviceSimModel/Devices/` | PCS、变压器、断路器、电网、负载、BMS Rack |
 | 电池细模型 | `EssDeviceSimModel/Battery/` | 电芯/簇/堆积分，经 `BmsRackDevice` 接入 |
@@ -18,16 +21,23 @@
 - **现方式**：
   - `.NET Host` 注册多个 `IHostedService` / `BackgroundService`
   - **单一仿真时钟**：`EnergyStorageSystem.ExecuteAsync` + `PeriodicTimer`（`PropagationIntervalMs`）
-  - 每 tick：电气网络 Step → PCS/BMS 物理更新 → Mapper 刷新 DTO
+  - 每 tick：`PlantEngine.Step` → 电气 → **热（外温+柜体）** → PCS/BMS（环境温=柜内空气）→ 同步；Mapper 另周期刷新 DTO
   - Modbus 侧独立周期读 DTO 写寄存器（`DataExchange` 的 `TelemetryIntervalMs` 等）
 
 ## 主循环一步（简化）
 
+Host 只做：`AdvanceCycleClock` → `PlantEngine.Step`。引擎内顺序：
+
 1. `RadialPowerSweepEngine.SolveCycle` 或 `NetworkStepOrchestrator.SolverPrimaryStep`
-2. `Update`：PCS DC、BMS 电流积分
-3. `SyncUnitTransformerAfterPcsUpdate`：离网/黑启动单元变与站用电
-4. `RefreshAllUnitBlackStartBusContexts`
-5. `NetworkControlBridge.SyncBmsLinksFromRacks`
+2. `PlantThermalSystem.Step`：日变化外温 + 各 BMS 柜体热网络（损耗来自上一步）
+3. `PlantCouplingGraph.StepCouplings`：每条 `PcsBmsDcCouplingLink` 施加环境温 → 交换 V/I → `IElectricalLossSource` 登记热注入
+4. `SyncUnitTransformerAfterPcsUpdate`：离网/黑启动单元变与站用电
+5. `RefreshAllUnitBlackStartBusContexts`
+6. `NetworkControlBridge.SyncBmsLinksFromRacks`
+
+热配置：`Simulator.Runtime.Thermal`（`Enabled`、`Climate`、`Cabinet`、`ProbeBiases`、`Feedback`）。
+多点探针经 `BmsThermalProbeMapper` 写入 `AirConditioners` / `LiquidCoolingSystems` / `TempHumiditySensors`，点表 yc56/57、yc69–71、yc93/102/111。
+阶段 5：空调回差闭环（`HvacEnabled`/`HvacCoolingPowerW`）；`TemperatureDerating` 降额 PCS 实发功率与堆 MaxCharge/Discharge；`ThermalAgingContext` Arrhenius 日历老化。
 
 ## 数据交换三管道
 

@@ -48,14 +48,16 @@ EMS/测试工具 ──Modbus TCP──► ModbusSimServer + DataExchangeSession
                          EssSimModelApi (BmsMapper / PcsMapper / EmMapper)
                                     │
                                     ▼
-              EnergyStorageSystem 主循环 (PeriodicTimer, ~PropagationIntervalMs)
-                                    │
-              ElectricalNetwork + NetworkSolver / 潮流传播
+              EnergyStorageSystem 时钟 (PeriodicTimer)
+                                    │ PlantEngine.Step
+                                    ▼
+              电气潮流 → PlantThermalSystem → PlantCouplingGraph（PCS↔BMS 边）
                                     │
               PcsDevice · TransformerDevice · Breaker · BmsRackDevice · …
 ```
 
-- **主循环**：Host 托管 + 固定步长；每步求解电气网络 → 更新 PCS/BMS → Mapper 写 DTO。
+- **主循环**：Host 托管 + 固定步长；每步 **`PlantEngine.Step`**（电气 → 热 → PCS/BMS；Mapper 在独立服务）。
+- **热**：`Simulator.Runtime.Thermal`；柜体空调闭环；高温降额（PCS/堆限功率）；温度加速日历老化；多点探针 → 点表。
 - **对外接口**：BMS `simBms{N}`、EMU `simEmu{N}`、电表 `simEm`；点位由 CSV + `Scale` 映射。
 - **控制语义**：DataExchange 管道（遥测 / 控制 / 反馈）；PCS 启停 Hold、BMS 并网 Pulse 等见 `PointCatalogLoader`。
 
@@ -69,7 +71,7 @@ EMS/测试工具 ──Modbus TCP──► ModbusSimServer + DataExchangeSession
 | PCS/EMU 点表 | `emu.csv` |
 | 电表点表 | `em.csv` |
 | 点位表目录 | `pointmaps/`（common / lc / battery） |
-| 主循环 | `EssDeviceSimModel/EnergyStorageSys.cs` |
+| 主循环 / 电站引擎 | `EssDeviceSimModel/EnergyStorageSys.cs`、`PlantEngine.cs` |
 | 数据交换 | `DataExchange/` |
 | Modbus 服务 | `Protocol/ModbusHostedService.cs` |
 | 文档索引 | `docs/README.md` |

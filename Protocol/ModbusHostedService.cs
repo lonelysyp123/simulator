@@ -35,43 +35,52 @@ namespace EssSimulator
             // 避免阻塞 Host 的 StartAsync 调用链。
             Task.Run(() =>
             {
-                var store = SimulatorHost.Instance;
-                var bmsCfg = _cfg.GetBmsDeviceConfigs();
-
-                // BMS Modbus 服务（每个储能单元一个，端口间隔 10）
-                for (int i = 0; i < _cfg.UnitCount; i++)
+                try
                 {
-                    int port    = _cfg.Protocol.BaseBmsModbusPort + i * _cfg.Protocol.BmsPortStep;
-                    string name = $"simBms{i + 1}";
-                    int clusterCount = i < bmsCfg.Count
-                        ? bmsCfg[i].ClusterCount
-                        : new BmsDeviceConfig().ClusterCount;
-                    var server  = new ModbusSimServer("bms_bank.csv", port, name, clusterCount, _dataExchange);
-                    store.Register(name, server);
-                    server.Start();
-                    SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
-                    _servers.Add(server);
-                }
+                    var store = SimulatorHost.Instance;
+                    var bmsCfg = _cfg.GetBmsDeviceConfigs();
 
-                // PCS (EMU) Modbus 服务
-                int unitCount = Math.Max(1, _cfg.Devices?.Count ?? 1);
-                for (int u = 0; u < unitCount; u++)
+                    // BMS Modbus 服务（每个储能单元一个，端口间隔 10）
+                    for (int i = 0; i < _cfg.UnitCount; i++)
+                    {
+                        int port    = _cfg.Protocol.BaseBmsModbusPort + i * _cfg.Protocol.BmsPortStep;
+                        string name = $"simBms{i + 1}";
+                        int clusterCount = i < bmsCfg.Count
+                            ? bmsCfg[i].ClusterCount
+                            : new BmsDeviceConfig().ClusterCount;
+                        var server  = new ModbusSimServer("bms_bank.csv", port, name, clusterCount, _dataExchange);
+                        store.Register(name, server);
+                        server.Start();
+                        SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
+                        _servers.Add(server);
+                    }
+
+                    // PCS (EMU) Modbus 服务
+                    int unitCount = Math.Max(1, _cfg.Devices?.Count ?? 1);
+                    for (int u = 0; u < unitCount; u++)
+                    {
+                        int port = _cfg.Protocol.BaseEmuModbusPort + u * _cfg.Protocol.EmuPortStep;
+                        string name = $"simEmu{u + 1}";
+                        var pcs = new ModbusSimServer("emu.csv", port, name, dataExchangeOptions: _dataExchange);
+                        store.Register(name, pcs);
+                        pcs.Start();
+                        SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
+                        _servers.Add(pcs);
+                    }
+
+                    // 电表 Modbus 服务
+                    var em = new ModbusSimServer("em.csv", _cfg.Protocol.EmModbusPort, "simEm");
+                    store.Register("simEm", em);
+                    em.Start();
+                    SimServer.serverListenInfo["simEm"] = $"Modbus TCP 端口 {_cfg.Protocol.EmModbusPort}";
+                    _servers.Add(em);
+
+                    Log.Info($"Modbus 从站注册完成，共 {_servers.Count} 个设备");
+                }
+                catch (Exception ex)
                 {
-                    int port = _cfg.Protocol.BaseEmuModbusPort + u * _cfg.Protocol.EmuPortStep;
-                    string name = $"simEmu{u + 1}";
-                    var pcs = new ModbusSimServer("emu.csv", port, name, dataExchangeOptions: _dataExchange);
-                    store.Register(name, pcs);
-                    pcs.Start();
-                    SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
-                    _servers.Add(pcs);
+                    Log.Error("Modbus 从站启动失败（dpc/esscmd 将提示找不到 Modbus 设备）。请确认点表 CSV 可用：./scripts/sync-pointmaps-to-root.sh", ex);
                 }
-
-                // 电表 Modbus 服务
-                var em = new ModbusSimServer("em.csv", _cfg.Protocol.EmModbusPort, "simEm");
-                store.Register("simEm", em);
-                em.Start();
-                SimServer.serverListenInfo["simEm"] = $"Modbus TCP 端口 {_cfg.Protocol.EmModbusPort}";
-                _servers.Add(em);
             }, cancellationToken);
 
             return Task.CompletedTask;

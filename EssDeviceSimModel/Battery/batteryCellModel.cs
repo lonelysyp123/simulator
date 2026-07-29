@@ -50,6 +50,7 @@ namespace EssSimulator.EssDeviceSimModel
         private double _totalAhThroughput;  // 累计安时吞吐量
         private double _chargeAhAccum;      // 累计充电安时，用于循环计数
         private double _dischargeAhAccum;   // 累计放电安时，用于循环计数
+        private double _calendarAgeAccum;   // 温度相关日历老化累积 (0-1)
 
         // 构造函数
         public LiFePO4CellSimulator(CellSpecifications specs)
@@ -128,8 +129,8 @@ namespace EssSimulator.EssDeviceSimModel
             double alpha    = Math.Exp(-deltaTimeSec / tau);            // 滤波系数
             double newTemp  = T_ss + (_currentState.Temperature - T_ss) * alpha;
 
-            // 老化模型 (简化)
-            double newAge = CalculateAging(_totalAhThroughput, _currentState.CycleCount);
+            // 老化模型 (循环/吞吐 + 温度加速日历老化)
+            double newAge = CalculateAging(_totalAhThroughput, _currentState.CycleCount, newTemp, deltaTimeHours);
 
             // 循环计数：充、放分开累计安时，满 1C 各计 0.5 个循环，再求和
             if (current > 0)
@@ -160,13 +161,22 @@ namespace EssSimulator.EssDeviceSimModel
         }
 
         // 老化模型计算
-        private double CalculateAging(double totalAhThroughput, double cycleCount)
+        private double CalculateAging(double totalAhThroughput, double cycleCount, double temperatureCelsius, double deltaTimeHours)
         {
             // 简化老化模型: 基于循环次数和总吞吐量
             double cycleAging = cycleCount / 2000.0;  // 假设2000次循环后老化100%
             double throughputAging = totalAhThroughput / (2 * _specs.NominalCapacity * 2000);
+            double baseAge = Math.Min(1.0, 0.7 * cycleAging + 0.3 * throughputAging);
 
-            return Math.Min(1.0, 0.7 * cycleAging + 0.3 * throughputAging);
+            if (Thermal.ThermalAgingContext.Enabled && deltaTimeHours > 0)
+            {
+                double years = deltaTimeHours / (365.25 * 24.0);
+                double arr = Thermal.ThermalAgingContext.ArrheniusFactor(temperatureCelsius);
+                _calendarAgeAccum += years * Thermal.ThermalAgingContext.CalendarAgingPerYearAtRef * arr;
+                _calendarAgeAccum = Math.Min(1.0, _calendarAgeAccum);
+            }
+
+            return Math.Min(1.0, baseAge + _calendarAgeAccum);
         }
 
         // 示例使用

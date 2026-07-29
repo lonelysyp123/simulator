@@ -267,6 +267,15 @@ const unitRows = computed(() => (snap.value.units || []).map(u => ({
   bmsB: fmtBmsChannel(u.channelB)
 })))
 
+async function runChannelCommand(input) {
+  try {
+    const r = await postCommand(input)
+    ElMessage[r.success ? 'success' : 'error'](r.message)
+  } catch (e) {
+    ElMessage.error(e.message)
+  }
+}
+
 async function onToggleMainBreaker() {
   if (snap.value.mainBreakerTripped) {
     ElMessage.warning('主断路器已跳闸，请先复位')
@@ -296,16 +305,17 @@ async function onToggleUnitBreaker(unitIndex) {
   }
 }
 
-async function runChannelCommand(input) {
-  try {
-    const r = await postCommand(input)
-    ElMessage[r.success ? 'success' : 'error'](r.message)
-  } catch (e) {
-    ElMessage.error(e.message)
-  }
+function resolvePcsModbus(pcsNumber, kind = 'p') {
+  const n = Number(pcsNumber)
+  if (!Number.isFinite(n) || n < 1) return null
+  const emuUnit = Math.ceil(n / 2)
+  const isA = n % 2 === 1
+  const ytPoint = kind === 'p'
+    ? (isA ? 'yt0' : 'yt4')
+    : (isA ? 'yt1' : 'yt5')
+  return { emuUnit, ytPoint }
 }
 
-/** PCS 启停：esscmd pcsN start|stop（内部复用 dpc 控制管道） */
 async function onPcsStart(pcsNumber) {
   await runChannelCommand(`esscmd pcs${pcsNumber} start`)
 }
@@ -314,26 +324,50 @@ async function onPcsStop(pcsNumber) {
   await runChannelCommand(`esscmd pcs${pcsNumber} stop`)
 }
 
-/** PCS 有功设定：dpc simEmu{N}.yt0|yt4 set raw（Scale=10，kW×10） */
-async function onPcsSetPower({ emuUnit, ytPoint, powerKw }) {
-  const kw = Number(powerKw)
+async function onPcsSetPower(payload = {}) {
+  const kw = Number(payload.powerKw)
   if (!Number.isFinite(kw)) {
     ElMessage.warning('请输入有效的有功功率')
+    return
+  }
+  const resolved = resolvePcsModbus(payload.pcsNumber, 'p')
+  const emuUnit = Number(payload.emuUnit) > 0 ? Number(payload.emuUnit) : resolved?.emuUnit
+  const ytPoint = payload.ytPoint || resolved?.ytPoint
+  if (!emuUnit || !ytPoint) {
+    ElMessage.error('无法解析 PCS 对应的 Modbus 设备')
     return
   }
   const raw = Math.round(kw * 10)
   await runChannelCommand(`dpc simEmu${emuUnit}.${ytPoint} set ${raw}`)
 }
 
-/** PCS 无功设定：dpc simEmu{N}.yt1|yt5 set raw（Scale=10，kvar×10） */
-async function onPcsSetReactive({ emuUnit, ytPoint, reactiveKvar }) {
-  const kvar = Number(reactiveKvar)
+async function onPcsSetReactive(payload = {}) {
+  const kvar = Number(payload.reactiveKvar)
   if (!Number.isFinite(kvar)) {
     ElMessage.warning('请输入有效的无功功率')
     return
   }
+  const resolved = resolvePcsModbus(payload.pcsNumber, 'q')
+  const emuUnit = Number(payload.emuUnit) > 0 ? Number(payload.emuUnit) : resolved?.emuUnit
+  const ytPoint = payload.ytPoint || resolved?.ytPoint
+  if (!emuUnit || !ytPoint) {
+    ElMessage.error('无法解析 PCS 对应的 Modbus 设备')
+    return
+  }
   const raw = Math.round(kvar * 10)
   await runChannelCommand(`dpc simEmu${emuUnit}.${ytPoint} set ${raw}`)
+}
+
+async function onBmsPowerOn(bmsNumber) {
+  await runChannelCommand(`esscmd setbms${bmsNumber} power on`)
+}
+
+async function onBmsPowerOff(bmsNumber) {
+  await runChannelCommand(`esscmd setbms${bmsNumber} power off`)
+}
+
+async function onBmsFaultClear(bmsNumber) {
+  await runChannelCommand(`esscmd bms${bmsNumber} fault clear`)
 }
 
 async function onSetLoadActive() {
@@ -374,18 +408,6 @@ async function onSetGridFrequency() {
   }
   await runChannelCommand(`esscmd setGrid frequency ${hz}`)
   lastGridSetF = hz
-}
-
-async function onBmsPowerOn(bmsNumber) {
-  await runChannelCommand(`esscmd setbms${bmsNumber} power on`)
-}
-
-async function onBmsPowerOff(bmsNumber) {
-  await runChannelCommand(`esscmd setbms${bmsNumber} power off`)
-}
-
-async function onBmsFaultClear(bmsNumber) {
-  await runChannelCommand(`esscmd bms${bmsNumber} fault clear`)
 }
 
 onMounted(async () => {
