@@ -26,6 +26,7 @@ namespace EssSimulator.DataExchange
         private readonly TelemetryPipeline _telemetryPipeline;
         private readonly RackTelemetryPipeline? _rackTelemetryPipeline;
         private readonly ControlPipeline _controlPipeline;
+        private readonly RackControlPipeline? _rackControlPipeline;
         private readonly ControlFeedbackPipeline _feedbackPipeline;
         private readonly IModbusRegisterAdapter _modbusAdapter;
         private readonly ControlEffectRegistry _effects;
@@ -84,6 +85,20 @@ namespace EssSimulator.DataExchange
 
             _controlPipeline = new ControlPipeline(
                 catalog, _simulation, _modbusAdapter, parser, _shadow, _effects, serverName, logChanges);
+            if (clusterCount > 0 && catalog.RackControlPoints.Count > 0)
+            {
+                _rackControlPipeline = new RackControlPipeline(
+                    catalog.RackControlPoints,
+                    _simulation,
+                    _modbusAdapter,
+                    parser,
+                    _shadow,
+                    clusterCount,
+                    deviceInfo.slaveId,
+                    serverName,
+                    logChanges);
+            }
+
             _feedbackPipeline = new ControlFeedbackPipeline(
                 catalog, _simulation, _modbusAdapter, _shadow, serverName, logChanges);
 
@@ -98,7 +113,19 @@ namespace EssSimulator.DataExchange
 
             ThreadPool.UnsafeQueueUserWorkItem(_ =>
             {
-                try { DrainControlPipeline(); }
+                try
+                {
+                    // bank slaveId == base；簇从站 = base + rackIndex + 1
+                    if (_rackControlPipeline != null && slaveId > _deviceInfo.slaveId)
+                    {
+                        int rackId = slaveId - _deviceInfo.slaveId - 1;
+                        DrainRackControlPipeline(rackId);
+                    }
+                    else
+                    {
+                        DrainControlPipeline();
+                    }
+                }
                 catch (Exception ex)
                 {
                     _log.Error($"Event-driven control drain error [{_deviceInfo.name}] slave={slaveId}", ex);
@@ -124,6 +151,53 @@ namespace EssSimulator.DataExchange
             return true;
         }
 
+        /// <summary>dpc / imperative 写簇级控制点（如门限 yc1322）。</summary>
+        public bool TryWriteRackControlRegister(int rackIndex, string name, object value, out string message)
+        {
+            message = string.Empty;
+            if (_rackControlPipeline == null)
+            {
+                message = "当前设备无簇级控制点表";
+                return false;
+            }
+
+            if (rackIndex < 0 || rackIndex >= _clusterCount)
+            {
+                message = $"簇索引越界: r{rackIndex}（有效 0..{_clusterCount - 1}）";
+                return false;
+            }
+
+            var binding = _catalog.FindRackControl(name);
+            if (binding == null)
+            {
+                message = $"找不到簇级控制点 {name}";
+                return false;
+            }
+
+            object modbusValue = value;
+            if (binding.Entry.FunctionCode == 5)
+            {
+                bool coil = value switch
+                {
+                    bool b => b,
+                    string s when bool.TryParse(s, out var bv) => bv,
+                    _ => Convert.ToDouble(value) != 0
+                };
+                modbusValue = coil ? 1 : 0;
+            }
+
+            byte slaveId = (byte)(_deviceInfo.slaveId + rackIndex + 1);
+            _modbusAdapter.WritePoints(
+                new Dictionary<string, object> { { binding.ParamName, modbusValue } },
+                slaveId,
+                applyScale: false);
+            DrainRackControlPipeline(rackIndex);
+            message =
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {_deviceInfo.name}.r{rackIndex}.{name} " +
+                $"控制点写入寄存器原始值 {modbusValue}（工程值=原始值/Scale，经簇控制管道解析）";
+            return true;
+        }
+
         private void DrainControlPipeline()
         {
             lock (_controlGate)
@@ -132,6 +206,23 @@ namespace EssSimulator.DataExchange
                     return;
 
                 _controlPipeline.RunOnce();
+            }
+        }
+
+        private void DrainRackControlPipeline(int? rackIndex = null)
+        {
+            if (_rackControlPipeline == null)
+                return;
+
+            lock (_controlGate)
+            {
+                if (!_running)
+                    return;
+
+                if (rackIndex.HasValue)
+                    _rackControlPipeline.RunForRack(rackIndex.Value);
+                else
+                    _rackControlPipeline.RunOnce();
             }
         }
 
@@ -225,6 +316,9 @@ namespace EssSimulator.DataExchange
                 _log.Warn($"Imperative control write failed: {_deviceInfo.name}.{name}");
         }
 
+        public bool TrySetRackControl(int rackIndex, string name, object value, out string message) =>
+            TryWriteRackControlRegister(rackIndex, name, value, out message);
+
         /// <summary>仿真 → Modbus 反馈（不回灌控制管道，避免重复触发副作用）。</summary>
         public void PublishControlToSlave(string name, object value)
         {
@@ -287,10 +381,43 @@ namespace EssSimulator.DataExchange
 
                 if (initCtl.Count > 0)
                     _modbusAdapter.WritePoints(initCtl);
+
+                InitializeRackControlRegistersFromSimulation();
             }
             catch (Exception ex)
             {
                 _log.Warn("Init control register defaults failed.", ex);
+            }
+        }
+
+        /// <summary>
+        /// 用簇模型当前门限回填各 rack 从站 Holding，并 seed 控制 shadow。
+        /// 避免启动时寄存器为 0 被 RackControlPipeline 误写回模型，冲掉 ClusterThresholds 默认值。
+        /// </summary>
+        private void InitializeRackControlRegistersFromSimulation()
+        {
+            if (_rackControlPipeline == null || _clusterCount <= 0 || _catalog.RackControlPoints.Count == 0)
+                return;
+
+            for (int rackId = 0; rackId < _clusterCount; rackId++)
+            {
+                var initCtl = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                foreach (var binding in _catalog.RackControlPoints)
+                {
+                    string path = binding.ResolvePath(rackId);
+                    var cur = _simulation.Read(path);
+                    if (cur == null)
+                        continue;
+
+                    initCtl[binding.ParamName] = cur;
+                    _shadow.SeedControl($"{rackId}:{binding.ParamName}", cur);
+                }
+
+                if (initCtl.Count == 0)
+                    continue;
+
+                byte slaveId = (byte)(_deviceInfo.slaveId + rackId + 1);
+                _modbusAdapter.WritePoints(initCtl, slaveId, applyScale: true);
             }
         }
 
@@ -338,6 +465,7 @@ namespace EssSimulator.DataExchange
                 try
                 {
                     DrainControlPipeline();
+                    DrainRackControlPipeline();
                 }
                 catch (Exception ex)
                 {

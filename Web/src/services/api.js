@@ -15,6 +15,13 @@ export async function getHealth() { return (await api.get('/health')).data }
 export async function getMainLine() { return (await api.get('/mainline')).data }
 export async function getBattery(unit) { return (await api.get(`/battery/${unit}`)).data }
 export async function getCells(unit, cluster) { return (await api.get(`/cells/${unit}/${cluster}`)).data }
+export async function getRackThresholds(unit, rack = 0) {
+  return (await api.get(`/bms/${unit}/rack-thresholds`, { params: { rack } })).data
+}
+export async function getAlarms() { return (await api.get('/alarms')).data }
+export async function getBmsAlarms(unit, rack) {
+  return (await api.get(`/alarms/bms/${unit}`, { params: rack == null ? {} : { rack } })).data
+}
 export async function getConnections() { return (await api.get('/connections')).data }
 export async function getAlert() { return (await api.get('/alert')).data }
 export async function getConfig() { return (await api.get('/config')).data }

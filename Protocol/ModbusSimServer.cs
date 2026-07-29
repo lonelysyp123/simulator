@@ -137,8 +137,14 @@ namespace EssSimulator
         /// <summary>控制点列表（FunctionCode 5/6），如 pcs1_startstop。</summary>
         public IReadOnlyList<MapEntry> ControlMaps => _pointMap.ControlMaps;
 
+        /// <summary>簇级控制点（bms_rack FC5/6，如门限 yc1322）。</summary>
+        public IReadOnlyList<MapEntry> RackControlMaps => _pointMap.RackControlMaps;
+
         public void SetDataObjectByMesurePointName(string name, object value)
             => _dataSync.SetDataObjectByMesurePointName(name, value);
+
+        public bool TrySetRackControl(int rackIndex, string name, object value, out string message)
+            => _dataSync.TrySetRackControl(rackIndex, name, value, out message);
 
         /// <summary>模型控制量回写 Modbus（如联锁停机后清启停线圈）。</summary>
         public void PublishControlToSlave(string name, object value)

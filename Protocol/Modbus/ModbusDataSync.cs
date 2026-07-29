@@ -306,6 +306,12 @@ namespace EssSimulator.Protocol.Modbus
             }
         }
 
+        public bool TrySetRackControl(int rackIndex, string name, object value, out string message)
+        {
+            message = "当前后端不支持簇级控制点写入（请使用 DataExchange / simBms）";
+            return false;
+        }
+
         private void ApplyControlToModel(string name, object modelValue, object modbusShadowValue)
         {
             if (string.IsNullOrWhiteSpace(name)) return;

@@ -18,14 +18,54 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             {
                 var cs = clusterStates[i];
                 var clu = stack.Cluseter[i];
+                float busbarTempC = ResolveBusbarTempC(clu.Measurements);
+                float poleTempC = ResolvePoleTempC(clu);
                 EvaluateCluster(
                     cs,
                     clusterConfig.PackCount,
                     packSerial,
                     clu.Thresholds,
                     clu.Alarms,
-                    clu.Measurements.Insulation ?? 0f);
+                    clu.Measurements.Insulation ?? 0f,
+                    busbarTempC,
+                    poleTempC);
             }
+        }
+
+        private static float ResolveBusbarTempC(ClusterBasicMeasurements m)
+        {
+            if (m == null)
+                return 26f;
+            float? t1 = m.HVB1Temp;
+            float? t2 = m.HVB2Temp;
+            if (t1.HasValue && t2.HasValue)
+                return Math.Max(t1.Value, t2.Value);
+            return t1 ?? t2 ?? 26f;
+        }
+
+        private static float ResolvePoleTempC(BatteryCluster clu)
+        {
+            var temps = clu?.ClusterCellTemperatures;
+            if (temps == null)
+                return 26f;
+
+            float max = float.NegativeInfinity;
+            bool any = false;
+            void consider(Dictionary<int, float?>? dict)
+            {
+                if (dict == null) return;
+                foreach (var kv in dict)
+                {
+                    if (!kv.Value.HasValue) continue;
+                    any = true;
+                    if (kv.Value.Value > max)
+                        max = kv.Value.Value;
+                }
+            }
+
+            consider(temps.PositivePoleTemperatures);
+            consider(temps.NegativePoleTemperatures);
+            return any ? max : 26f;
         }
 
         public static void EvaluateCluster(
@@ -35,7 +75,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             ClusterThresholds thresholds,
             ClusterAlarms alarms,
             float insulationValue,
-            float busbarTempC = 26.0f)
+            float busbarTempC = 26.0f,
+            float poleTempC = 26.0f)
         {
             var minVoltList = Enumerable.Range(0, packCount)
                 .Select(j => (float)clusterState.PackStates[j].MinCellVoltage).ToList();
@@ -114,9 +155,21 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             UpdateUnder(ref l1, ref l2, ref l3, thr.InsulationThreshold1!.Value, thr.InsulationThreshold2!.Value, thr.InsulationThreshold3!.Value, thr.InsulationRecovery1!.Value, thr.InsulationRecovery2!.Value, thr.InsulationRecovery3!.Value, insulationValue);
             (alm.InsulationProtection, alm.InsulationAlarm, alm.InsulationFault) = (l1, l2, l3);
 
-            (l1, l2, l3) = (alm.BatteryBoxBusbarHighTempProtection, alm.BatteryBoxBusbarHighTempAlarm, alm.BatteryBoxBusbarHighTempFault);
+            // 端子/极柱高温 → TerminalHighTemp*（汇总 bit11）；门限用 PoleHighTemp*
+            (l1, l2, l3) = (alm.TerminalHighTempProtection, alm.TerminalHighTempAlarm, alm.TerminalHighTempFault);
+            UpdateOver(ref l1, ref l2, ref l3, thr.PoleHighTempThreshold1!.Value, thr.PoleHighTempThreshold2!.Value, thr.PoleHighTempThreshold3!.Value, thr.PoleHighTempRecovery1!.Value, thr.PoleHighTempRecovery2!.Value, thr.PoleHighTempRecovery3!.Value, poleTempC);
+            (alm.TerminalHighTempProtection, alm.TerminalHighTempAlarm, alm.TerminalHighTempFault) = (l1, l2, l3);
+
+            // 高压箱连接器高温 → HVBHighTemp*（汇总 bit12）；同步铜排位便于 summary2
+            (l1, l2, l3) = (alm.HVBHighTempProtection, alm.HVBHighTempAlarm, alm.HVBHighTempFault);
             UpdateOver(ref l1, ref l2, ref l3, thr.HVBHighTempThreshold1!.Value, thr.HVBHighTempThreshold2!.Value, thr.HVBHighTempThreshold3!.Value, thr.HVBHighTempRecovery1!.Value, thr.HVBHighTempRecovery2!.Value, thr.HVBHighTempRecovery3!.Value, busbarTempC);
+            (alm.HVBHighTempProtection, alm.HVBHighTempAlarm, alm.HVBHighTempFault) = (l1, l2, l3);
             (alm.BatteryBoxBusbarHighTempProtection, alm.BatteryBoxBusbarHighTempAlarm, alm.BatteryBoxBusbarHighTempFault) = (l1, l2, l3);
+
+            // 簇内模组总压差 → TotalVoltageDifference* 门限；写入 summary2 的电压极差位
+            (l1, l2, l3) = (alm.BatteryBoxVoltageExtremaDifferenceProtection, alm.BatteryBoxVoltageExtremaDifferenceAlarm, alm.BatteryBoxVoltageExtremaDifferenceFault);
+            UpdateOver(ref l1, ref l2, ref l3, thr.TotalVoltageDifferenceThreshold1!.Value, thr.TotalVoltageDifferenceThreshold2!.Value, thr.TotalVoltageDifferenceThreshold3!.Value, thr.TotalVoltageDifferenceRecovery1!.Value, thr.TotalVoltageDifferenceRecovery2!.Value, thr.TotalVoltageDifferenceRecovery3!.Value, (float)clusterState.VoltageImbalance);
+            (alm.BatteryBoxVoltageExtremaDifferenceProtection, alm.BatteryBoxVoltageExtremaDifferenceAlarm, alm.BatteryBoxVoltageExtremaDifferenceFault) = (l1, l2, l3);
         }
 
         /// <summary>

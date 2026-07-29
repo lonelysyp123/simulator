@@ -127,11 +127,22 @@ public class BatteryStackThermalDeratingTests
     {
         var stack = new BatteryStack
         {
-            SOC = 0.5f,
-            NominalEnergyKWh = 1000,
-            MaxCRate = 0.5f,
             ThermalPowerDeratingFactor = 1f
         };
+        stack.Cluseter.Add(new BatteryCluster
+        {
+            Measurements =
+            {
+                SOC = 0.5f,
+                NominalEnergyKWh = 1000,
+                MaxCRate = 0.5f,
+                TotalVoltage = 1300f,
+                MaxCellTemp = 25f,
+                MinCellTemp = 25f,
+                MaxCellVoltage = 3.3f,
+                MinCellVoltage = 3.2f,
+            }
+        });
         float full = stack.MaxChargePower!.Value;
         stack.ThermalPowerDeratingFactor = 0.5f;
         Assert.Equal(full * 0.5f, stack.MaxChargePower!.Value, 2);

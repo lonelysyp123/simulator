@@ -35,6 +35,16 @@ namespace EssSimulator.Web
         public double AvgCellVoltage { get; set; }
         public double MaxCellVoltage { get; set; }
         public double MinCellVoltage { get; set; }
+        public double AvgCellTemp { get; set; }
+        public double MaxCellTemp { get; set; }
+        public double MinCellTemp { get; set; }
+        /// <summary>簇内扁平单体编号：pack * cellsPerPack + cell。</summary>
+        public int MaxCellTempId { get; set; }
+        public int MinCellTempId { get; set; }
+        public int MaxCellTempPackId { get; set; }
+        public int MaxCellTempCellId { get; set; }
+        public int MinCellTempPackId { get; set; }
+        public int MinCellTempCellId { get; set; }
     }
 
     /// <summary>电池单体电压快照：4 包 × 104 节。</summary>
@@ -93,15 +103,23 @@ namespace EssSimulator.Web
             };
 
             int clusterCount = GuiSimDataAccess.GetClusterCount();
+            // 与点表/ReadCells 一致：默认 4 包 × 104；若可读到 PackCount 则优先
+            int cellsPerPack = 104;
             for (int i = 0; i < clusterCount; i++)
             {
-                double cCurr = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.Current");
-                double cVolt = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.TotalVoltage");
-                double cSoc = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.SOC") * 100;
-                double cSoh = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.SOH") * 100;
-                double cAvg = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.AvgCellVoltage");
-                double cMax = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.MaxCellVoltage");
-                double cMin = GuiSimDataAccess.SafeGetDouble($"{basePath}.Cluseter[{i}].Measurements.MinCellVoltage");
+                string clusterPath = $"{basePath}.Cluseter[{i}]";
+                double cCurr = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.Current");
+                double cVolt = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.TotalVoltage");
+                double cSoc = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.SOC") * 100;
+                double cSoh = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.SOH") * 100;
+                double cAvg = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.AvgCellVoltage");
+                double cMax = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MaxCellVoltage");
+                double cMin = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MinCellVoltage");
+                double avgTemp = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.AvgCellTemp");
+                double maxTemp = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MaxCellTemp");
+                double minTemp = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MinCellTemp");
+                int maxTempId = (int)GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MaxCellTempId");
+                int minTempId = (int)GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MinCellTempId");
 
                 dto.Clusters.Add(new ClusterDto
                 {
@@ -113,7 +131,16 @@ namespace EssSimulator.Web
                     SOH = cSoh,
                     AvgCellVoltage = cAvg,
                     MaxCellVoltage = cMax,
-                    MinCellVoltage = cMin
+                    MinCellVoltage = cMin,
+                    AvgCellTemp = avgTemp,
+                    MaxCellTemp = maxTemp,
+                    MinCellTemp = minTemp,
+                    MaxCellTempId = maxTempId,
+                    MinCellTempId = minTempId,
+                    MaxCellTempPackId = cellsPerPack > 0 ? maxTempId / cellsPerPack : 0,
+                    MaxCellTempCellId = cellsPerPack > 0 ? maxTempId % cellsPerPack : maxTempId,
+                    MinCellTempPackId = cellsPerPack > 0 ? minTempId / cellsPerPack : 0,
+                    MinCellTempCellId = cellsPerPack > 0 ? minTempId % cellsPerPack : minTempId
                 });
             }
 

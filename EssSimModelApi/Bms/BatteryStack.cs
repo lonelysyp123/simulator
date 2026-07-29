@@ -135,56 +135,51 @@ public partial class BatteryStack
         /// <summary>热降额因子（0–1），由热反馈写入；默认 1。</summary>
         public float ThermalPowerDeratingFactor { get; set; } = 1f;
 
-        public float? MaxChargePower // 最大允许充电功率
-        { 
-            get
-            {
-                if (!SOC.HasValue) return null;
-                float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
-                return basePower * GetChargePowerFactor(SOC.Value) * Math.Clamp(ThermalPowerDeratingFactor, 0f, 1f);
-            }
-        } 
+        /// <summary>
+        /// 最大允许充电功率：各簇 <see cref="ClusterBasicMeasurements.MaxChargePower"/> 之和，
+        /// 再乘柜体热降额（堆级不再独立用 SOC/电压/温度判据）。
+        /// </summary>
+        public float? MaxChargePower =>
+            SumClusterLimits(c => c.Measurements?.MaxChargePower);
 
-        public float? MaxDischargePower // 最大允许放电功率
-        { 
-            get
-            {
-                if (!SOC.HasValue) return null;
-                float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
-                return basePower * GetDischargePowerFactor(SOC.Value) * Math.Clamp(ThermalPowerDeratingFactor, 0f, 1f);
-            }
-        } 
+        /// <summary>
+        /// 最大允许放电功率：各簇最大允许放电功率之和 × 柜体热降额。
+        /// </summary>
+        public float? MaxDischargePower =>
+            SumClusterLimits(c => c.Measurements?.MaxDischargePower);
 
-        public float? MaxChargeCurrent  // 最大允许充电电流
+        /// <summary>
+        /// 最大允许充电电流：各簇最大允许充电电流之和 × 柜体热降额（并联簇电流累加）。
+        /// </summary>
+        public float? MaxChargeCurrent =>
+            SumClusterLimits(c => c.Measurements?.MaxChargeCurrent);
+
+        /// <summary>
+        /// 最大允许放电电流：各簇最大允许放电电流之和 × 柜体热降额。
+        /// </summary>
+        public float? MaxDischargeCurrent =>
+            SumClusterLimits(c => c.Measurements?.MaxDischargeCurrent);
+
+        private float? SumClusterLimits(Func<BatteryCluster, float?> selector)
         {
-            get
-            {
-                // 根据当前的最大充电功率和当前电压计算最大充电电流
-                if (MaxChargePower.HasValue && TotalVoltage.HasValue && TotalVoltage.Value > 0)
-                {
-                    return MaxChargePower.Value * 1000f / TotalVoltage.Value; // 转换为安培
-                }
-                else
-                {
-                    return null;
-                }
-            }
-        }
+            if (Cluseter == null || Cluseter.Count == 0)
+                return null;
 
-        public float? MaxDischargeCurrent   // 最大允许放电电流
-        {
-            get
+            float sum = 0f;
+            bool any = false;
+            foreach (var cluster in Cluseter)
             {
-                // 根据当前的最大放电功率和当前电压计算最大放电电流
-                if (MaxDischargePower.HasValue && TotalVoltage.HasValue && TotalVoltage.Value > 0)
-                {
-                    return MaxDischargePower.Value * 1000f / TotalVoltage.Value; // 转换为安培
-                }
-                else
-                {
-                    return null;
-                }
+                float? v = selector(cluster);
+                if (!v.HasValue)
+                    continue;
+                sum += v.Value;
+                any = true;
             }
+
+            if (!any)
+                return null;
+
+            return sum * Math.Clamp(ThermalPowerDeratingFactor, 0f, 1f);
         } 
 
         public float? AvailableChargeCapacity 
@@ -203,22 +198,6 @@ public partial class BatteryStack
                 return NominalEnergyKWh * SOC.Value;
             }
         } // 可用放电容量
-
-        private static float GetChargePowerFactor(float soc)
-        {
-            if (soc < 0.8f) return 1.0f;
-            if (soc < 0.85f) return 1.0f - (soc - 0.8f) / 0.05f * 0.5f;
-            if (soc < 0.9f) return 0.5f - (soc - 0.85f) / 0.05f * 0.25f;
-            return 0.0f;
-        }
-
-        private static float GetDischargePowerFactor(float soc)
-        {
-            if (soc > 0.2f) return 1.0f;
-            if (soc > 0.15f) return 0.5f + (soc - 0.15f) / 0.05f * 0.5f;
-            if (soc > 0.1f) return 0.25f + (soc - 0.1f) / 0.05f * 0.25f;
-            return 0.0f;
-        }
 
         // 告警信息
         public bool? BMSSystemChannelStatus { get; set; } // BMS系统通道状态

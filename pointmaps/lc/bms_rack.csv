@@ -52,7 +52,7 @@
 6,12302,int16,16,yc1335,100,Rack充电温度过高三级恢复门限Rack Charge Over Temp Warning Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeHighTempRecovery1|arg2=|arg3=|arg4=1000
 6,12303,int16,16,yc1336,100,Rack充电温度过低三级报警门限Rack Charge Under Temp Warning,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeLowTempThreshold1|arg2=|arg3=|arg4=1000
 6,12304,int16,16,yc1337,100,Rack充电温度过低三级恢复门限Rack Charge Under Temp Warning Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeLowTempRecovery1|arg2=|arg3=|arg4=1000
-6,12305,u16,16,yc1338,1000,RackSOC过低三级报警门限Rack SOC Lower Warning,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.LowSOCThreshold|arg2=|arg3=|arg4=1000
+6,12305,u16,16,yc1338,1000,RackSOC过低三级报警门限Rack SOC Lower Warning,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.LowSOCThreshold1|arg2=|arg3=|arg4=1000
 6,12306,u16,16,yc1339,1000,RackSOC过低三级恢复门限Rack SOC Lower Warning Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.LowSOCRecovery1|arg2=|arg3=|arg4=1000
 6,12307,u16,16,yc1340,100,Rack极柱温度过高三级报警门限Rack Pole Over Temp Warning,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.PoleHighTempThreshold1|arg2=|arg3=|arg4=1000
 6,12308,u16,16,yc1341,100,Rack极柱温度过高三级恢复门限Rack Pole Over Temp Warning Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.PoleHighTempRecovery1|arg2=|arg3=|arg4=1000
@@ -86,7 +86,7 @@
 6,12336,int16,16,yc1369,100,Rack充电温度过高二级恢复门限Rack Charge Over Temp Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeHighTempRecovery2|arg2=|arg3=|arg4=1000
 6,12337,int16,16,yc1370,100,Rack充电温度过低二级报警门限Rack Charge Under Temp Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeLowTempThreshold2|arg2=|arg3=|arg4=1000
 6,12338,int16,16,yc1371,100,Rack充电温度过低二级恢复门限Rack Charge Under Temp Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeLowTempRecovery2|arg2=|arg3=|arg4=1000
-6,12339,u16,16,yc1372,1000,RackSOC过低二级报警门限Rack SOC Lower Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.LowSOCThreshold|arg2=|arg3=|arg4=1000
+6,12339,u16,16,yc1372,1000,RackSOC过低二级报警门限Rack SOC Lower Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.LowSOCThreshold2|arg2=|arg3=|arg4=1000
 6,12340,u16,16,yc1373,1000,RackSOC过低二级恢复门限Rack SOC Lower Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.LowSOCRecovery2|arg2=|arg3=|arg4=1000
 6,12341,u16,16,yc1374,100,Rack极柱温度过高二级报警门限Rack Pole Over Temp Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.PoleHighTempThreshold2|arg2=|arg3=|arg4=1000
 6,12342,u16,16,yc1375,100,Rack极柱温度过高二级恢复门限Rack Pole Over Temp Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.PoleHighTempRecovery2|arg2=|arg3=|arg4=1000
@@ -105,36 +105,36 @@
 6,12355,u16,16,yc1388,100,Rack 高压箱连接器温度过高二级报警门限Rack HVB Temp High Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.HVBHighTempThreshold2|arg2=|arg3=|arg4=1000
 6,12356,u16,16,yc1389,100,Rack 高压箱连接器温度过高二级恢复门限Rack HVB Temp High Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.HVBHighTempRecovery2|arg2=|arg3=|arg4=1000
 6,12357,u16,16,yc1390,1000,Rack单体过压一级报警门限Rack Cell Over Voltage Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12358,u16,16,yc1391,1000,Rack单体过压一级恢复门限Rack Cell Over Voltage Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12359,u16,16,yc1392,1000,Rack单体欠压一级报警门限Rack Cell Under Voltage Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12360,u16,16,yc1393,1000,Rack单体欠压一级恢复门限Rack Cell Under Voltage Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12361,u16,16,yc1394,10,Rack总电压过压一级报警门限Rack System Over Voltage Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12362,u16,16,yc1395,10,Rack总电压过压一级恢复门限Rack System Over Voltage Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12363,u16,16,yc1396,10,Rack总电压欠压一级报警门限Rack System Under Voltage Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12364,u16,16,yc1397,10,Rack总电压欠压一级恢复门限Rack System Under Voltage Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12365,u16,16,yc1398,10,Rack充电过流一级报警门限Rack Charge Over Current Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12366,u16,16,yc1399,10,Rack充电过流一级恢复门限Rack Charge Over Current Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12367,u16,16,yc1400,10,Rack放电过流一级报警门限Rack Discharge Over Current Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12368,u16,16,yc1401,10,Rack放电过流一级恢复门限Rack Discharge Over Current Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12369,int16,16,yc1402,100,Rack充电温度过高一级报警门限Rack Charge Over Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12370,int16,16,yc1403,100,Rack充电温度过高一级恢复门限Rack Charge Over Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12371,int16,16,yc1404,100,Rack充电温度过低一级报警门限Rack Charge Under Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12372,int16,16,yc1405,100,Rack充电温度过低一级恢复门限Rack Charge Under Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12373,u16,16,yc1406,1000,RackSOC过低一级报警门限Rack SOC Lower Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12374,u16,16,yc1407,1000,RackSOC过低一级恢复门限Rack SOC Lower Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12375,u16,16,yc1408,100,Rack极柱温度过高一级报警门限Rack Pole Over Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12376,u16,16,yc1409,100,Rack极柱温度过高一级恢复门限Rack Pole Over Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12377,u16,16,yc1410,1,Rack绝缘失效一级报警门限Rack Insulation Failure Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12378,u16,16,yc1411,1,Rack绝缘失效一级恢复门限Rack Insulation Failure Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12379,u16,16,yc1412,1000,Rack单体压差过高一级报警门限Rack Cell Vol Diff Over Big Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12380,u16,16,yc1413,1000,Rack单体压差过高一级恢复门限Rack Cell Vol Diff Over Big Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12381,u16,16,yc1414,1,Rack总电压压差过高一级报警门限Rack Total Vol Diff Over Big Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12382,u16,16,yc1415,1,Rack总电压压差过高一级恢复门限Rack Total Vol Diff Over Big Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12383,int16,16,yc1416,100,Rack放电过温一级报警门限Rack Discharge Over Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12384,int16,16,yc1417,100,Rack放电过温一级恢复门限Rack Discharge Over Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12385,int16,16,yc1418,100,Rack放电欠温一级报警门限Rack Discharge Under Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12386,int16,16,yc1419,100,Rack放电欠温一级恢复门限Rack Discharge Under Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12387,u16,16,yc1420,100,Rack温差过高一级报警门限Rack Bat Temp Diff Over Big Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12388,u16,16,yc1421,100,Rack温差过高一级恢复门限Rack Bat Temp Diff Over Big Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12389,u16,16,yc1422,100,Rack 高压箱连接器温度过高一级报警门限Rack HVB Temp High Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
-6,12390,u16,16,yc1423,100,Rack 高压箱连接器温度过高一级恢复门限Rack HVB Temp High Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageThreshold3|arg2=|arg3=|arg4=1000
+6,12358,u16,16,yc1391,1000,Rack单体过压一级恢复门限Rack Cell Over Voltage Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellOvervoltageRecovery3|arg2=|arg3=|arg4=1000
+6,12359,u16,16,yc1392,1000,Rack单体欠压一级报警门限Rack Cell Under Voltage Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellUndervoltageThreshold3|arg2=|arg3=|arg4=1000
+6,12360,u16,16,yc1393,1000,Rack单体欠压一级恢复门限Rack Cell Under Voltage Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellUndervoltageRecovery3|arg2=|arg3=|arg4=1000
+6,12361,u16,16,yc1394,10,Rack总电压过压一级报警门限Rack System Over Voltage Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.OvervoltageThreshold3|arg2=|arg3=|arg4=1000
+6,12362,u16,16,yc1395,10,Rack总电压过压一级恢复门限Rack System Over Voltage Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.OvervoltageRecovery3|arg2=|arg3=|arg4=1000
+6,12363,u16,16,yc1396,10,Rack总电压欠压一级报警门限Rack System Under Voltage Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.UndervoltageThreshold3|arg2=|arg3=|arg4=1000
+6,12364,u16,16,yc1397,10,Rack总电压欠压一级恢复门限Rack System Under Voltage Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.UndervoltageRecovery3|arg2=|arg3=|arg4=1000
+6,12365,u16,16,yc1398,10,Rack充电过流一级报警门限Rack Charge Over Current Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeOvercurrentThreshold3|arg2=|arg3=|arg4=1000
+6,12366,u16,16,yc1399,10,Rack充电过流一级恢复门限Rack Charge Over Current Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeOvercurrentRecovery3|arg2=|arg3=|arg4=1000
+6,12367,u16,16,yc1400,10,Rack放电过流一级报警门限Rack Discharge Over Current Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.DischargeOvercurrentThreshold3|arg2=|arg3=|arg4=1000
+6,12368,u16,16,yc1401,10,Rack放电过流一级恢复门限Rack Discharge Over Current Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.DischargeOvercurrentRecovery3|arg2=|arg3=|arg4=1000
+6,12369,int16,16,yc1402,100,Rack充电温度过高一级报警门限Rack Charge Over Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeHighTempThreshold3|arg2=|arg3=|arg4=1000
+6,12370,int16,16,yc1403,100,Rack充电温度过高一级恢复门限Rack Charge Over Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeHighTempRecovery3|arg2=|arg3=|arg4=1000
+6,12371,int16,16,yc1404,100,Rack充电温度过低一级报警门限Rack Charge Under Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeLowTempThreshold3|arg2=|arg3=|arg4=1000
+6,12372,int16,16,yc1405,100,Rack充电温度过低一级恢复门限Rack Charge Under Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.ChargeLowTempRecovery3|arg2=|arg3=|arg4=1000
+6,12373,u16,16,yc1406,1000,RackSOC过低一级报警门限Rack SOC Lower Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.LowSOCThreshold3|arg2=|arg3=|arg4=1000
+6,12374,u16,16,yc1407,1000,RackSOC过低一级恢复门限Rack SOC Lower Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.LowSOCRecovery3|arg2=|arg3=|arg4=1000
+6,12375,u16,16,yc1408,100,Rack极柱温度过高一级报警门限Rack Pole Over Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.PoleHighTempThreshold3|arg2=|arg3=|arg4=1000
+6,12376,u16,16,yc1409,100,Rack极柱温度过高一级恢复门限Rack Pole Over Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.PoleHighTempRecovery3|arg2=|arg3=|arg4=1000
+6,12377,u16,16,yc1410,1,Rack绝缘失效一级报警门限Rack Insulation Failure Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.InsulationThreshold3|arg2=|arg3=|arg4=1000
+6,12378,u16,16,yc1411,1,Rack绝缘失效一级恢复门限Rack Insulation Failure Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.InsulationRecovery3|arg2=|arg3=|arg4=1000
+6,12379,u16,16,yc1412,1000,Rack单体压差过高一级报警门限Rack Cell Vol Diff Over Big Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellVoltageDifferenceThreshold3|arg2=|arg3=|arg4=1000
+6,12380,u16,16,yc1413,1000,Rack单体压差过高一级恢复门限Rack Cell Vol Diff Over Big Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellVoltageDifferenceRecovery3|arg2=|arg3=|arg4=1000
+6,12381,u16,16,yc1414,1,Rack总电压压差过高一级报警门限Rack Total Vol Diff Over Big Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.TotalVoltageDifferenceThreshold3|arg2=|arg3=|arg4=1000
+6,12382,u16,16,yc1415,1,Rack总电压压差过高一级恢复门限Rack Total Vol Diff Over Big Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.TotalVoltageDifferenceRecovery3|arg2=|arg3=|arg4=1000
+6,12383,int16,16,yc1416,100,Rack放电过温一级报警门限Rack Discharge Over Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.DischargeHighTempThreshold3|arg2=|arg3=|arg4=1000
+6,12384,int16,16,yc1417,100,Rack放电过温一级恢复门限Rack Discharge Over Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.DischargeHighTempRecovery3|arg2=|arg3=|arg4=1000
+6,12385,int16,16,yc1418,100,Rack放电欠温一级报警门限Rack Discharge Under Temp Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.DischargeLowTempThreshold3|arg2=|arg3=|arg4=1000
+6,12386,int16,16,yc1419,100,Rack放电欠温一级恢复门限Rack Discharge Under Temp Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.DischargeLowTempRecovery3|arg2=|arg3=|arg4=1000
+6,12387,u16,16,yc1420,100,Rack温差过高一级报警门限Rack Bat Temp Diff Over Big Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellTempDifferenceThreshold3|arg2=|arg3=|arg4=1000
+6,12388,u16,16,yc1421,100,Rack温差过高一级恢复门限Rack Bat Temp Diff Over Big Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.CellTempDifferenceRecovery3|arg2=|arg3=|arg4=1000
+6,12389,u16,16,yc1422,100,Rack 高压箱连接器温度过高一级报警门限Rack HVB Temp High Critical Alarm,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.HVBHighTempThreshold3|arg2=|arg3=|arg4=1000
+6,12390,u16,16,yc1423,100,Rack 高压箱连接器温度过高一级恢复门限Rack HVB Temp High Critical Alarm Recover,model=4|arg1=bmsdeviceId.BatteryStacks[0].Cluseter[rackId].Thresholds.HVBHighTempRecovery3|arg2=|arg3=|arg4=1000

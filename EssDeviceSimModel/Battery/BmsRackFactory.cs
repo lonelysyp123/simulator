@@ -27,7 +27,23 @@ namespace EssSimulator.EssDeviceSimModel.Battery
                     },
                     ClusterInternalResistance = bmsCfg.ClusterInternalResistance
                 },
-                RackInternalResistance = bmsCfg.RackInternalResistance
+                RackInternalResistance = bmsCfg.RackInternalResistance,
+                PassiveBalance = MapPassiveBalance(bmsCfg.PassiveBalance)
             };
+
+        private static RackPassiveBalanceConfig MapPassiveBalance(BmsPassiveBalanceConfig? src)
+        {
+            src ??= new BmsPassiveBalanceConfig();
+            return new RackPassiveBalanceConfig
+            {
+                Enabled = src.Enabled,
+                StartSocDelta = src.StartSocDelta,
+                StopSocDelta = src.StopSocDelta,
+                BalanceCRate = src.BalanceCRate,
+                IdleOnly = src.IdleOnly,
+                IdleCurrentThresholdA = src.IdleCurrentThresholdA,
+                BleedAboveMinMargin = src.BleedAboveMinMargin
+            };
+        }
     }
 }

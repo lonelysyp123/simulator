@@ -24,4 +24,19 @@ public class BmsPointCatalogLoaderTests
         Assert.Contains("rackId", catalog.RackTelemetryPoints[0].BindingPathTemplate, StringComparison.Ordinal);
         Assert.StartsWith("bms1.", catalog.RackTelemetryPoints[0].BindingPathTemplate, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void FromPointMap_IncludesRackControlThresholds()
+    {
+        var pointMap = new ModbusPointMap("bms_bank.csv", "simBms1", clusterCount: 12);
+        var catalog = PointCatalogLoader.FromPointMap(pointMap, "simBms1");
+
+        Assert.NotEmpty(catalog.RackControlPoints);
+        var yc1322 = catalog.FindRackControl("yc1322");
+        Assert.NotNull(yc1322);
+        Assert.Contains("Thresholds.CellOvervoltageThreshold1", yc1322!.BindingPathTemplate);
+        Assert.Equal(
+            "bms1.BatteryStacks[0].Cluseter[0].Thresholds.CellOvervoltageThreshold1",
+            yc1322.ResolvePath(0));
+    }
 }

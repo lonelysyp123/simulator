@@ -81,12 +81,8 @@ namespace EssSimulator.EssSimModelApi
                     HVB1Temp = 25 + random.Next(-3, 3),
                     HVB2Temp = 25 + random.Next(-3, 3),
                 },
-                Alarms = new ClusterAlarms
-                {
-                    MildAlarm = random.NextDouble() > 0.8,
-                    ModerateAlarm = random.NextDouble() > 0.9,
-                    SevereAlarm = random.NextDouble() > 0.95
-                }
+                Alarms = new ClusterAlarms()
+                // Mild/Moderate/Severe 保持默认 false；由真实保护评估或外部写入置位，避免启动随机假告警。
             };
 
             // 生成单体电压数据

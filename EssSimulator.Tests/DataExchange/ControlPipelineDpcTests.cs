@@ -37,7 +37,7 @@ public class ControlPipelineDpcTests
         public void WritePoints(IReadOnlyDictionary<string, object> values, byte slaveId = 1, bool applyScale = true) =>
             WritePoints(values);
 
-        public Dictionary<string, object> ReadAllControlRaw(IReadOnlyList<string> paramNames)
+        public Dictionary<string, object> ReadAllControlRaw(IReadOnlyList<string> paramNames, byte slaveId = 1)
         {
             var result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             foreach (var name in paramNames)

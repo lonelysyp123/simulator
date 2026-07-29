@@ -1,11 +1,16 @@
 using EssSimulator.Core;
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace EssSimulator.Display
 {
     public class DataPointChangeCommand : ICommand
     {
+        private static readonly Regex RackPointPattern = new(
+            @"^(?<dev>[^.]+)\.r(?<rack>\d+|\*)\.(?<point>.+)$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         public string Name => "dpc";
         public string Description => "数据点变位 (set/get)";
 
@@ -36,10 +41,21 @@ namespace EssSimulator.Display
             var op = args[1].ToLowerInvariant();
             var opdata = args.Length > 2 ? string.Join(' ', args.Skip(2)) : string.Empty;
 
+            // 簇级：simBms1.r0.yc1322 或 simBms1.r*.yc1322
+            var rackMatch = RackPointPattern.Match(dpcname);
+            if (rackMatch.Success)
+                return TryExecuteRackDpc(
+                    rackMatch.Groups["dev"].Value,
+                    rackMatch.Groups["rack"].Value,
+                    rackMatch.Groups["point"].Value,
+                    op,
+                    opdata,
+                    out message);
+
             var dpcnameParts = dpcname.Split('.');
             if (dpcnameParts.Length != 2)
             {
-                message = "dpcname 格式错误，应为 <device>.<datapoint>";
+                message = "dpcname 格式错误，应为 <device>.<datapoint> 或 <device>.r<N>.<datapoint>";
                 return false;
             }
 
@@ -63,7 +79,11 @@ namespace EssSimulator.Display
             bool isDataPoint    = simServer.DataMaps.Any(m => m.ParamName == dpcDeviceDataPoint);
             if (!isControlPoint && !isDataPoint)
             {
-                message = "指定设备找不到对应数据点";
+                bool isRackCtl = simServer.RackControlMaps.Any(m =>
+                    string.Equals(m.ParamName, dpcDeviceDataPoint, StringComparison.OrdinalIgnoreCase));
+                message = isRackCtl
+                    ? $"点 `{dpcDeviceDataPoint}` 为簇级控制点，请使用: dpc {dpcDeviceName}.r0.{dpcDeviceDataPoint} set <原始值>"
+                    : "指定设备找不到对应数据点";
                 return false;
             }
 
@@ -110,21 +130,114 @@ namespace EssSimulator.Display
             return false;
         }
 
+        private static bool TryExecuteRackDpc(
+            string deviceName,
+            string rackToken,
+            string pointName,
+            string op,
+            string opdata,
+            out string message)
+        {
+            message = string.Empty;
+            var obj = SimulatorHost.Instance.Get<object>(deviceName);
+            if (obj is not IModbusRegisterServer simServer)
+            {
+                message = $"找不到 Modbus 设备 `{deviceName}`";
+                return false;
+            }
+
+            if (!simServer.RackControlMaps.Any(m =>
+                    string.Equals(m.ParamName, pointName, StringComparison.OrdinalIgnoreCase)))
+            {
+                message = $"设备 `{deviceName}` 找不到簇级控制点 `{pointName}`";
+                return false;
+            }
+
+            if (op != "set")
+            {
+                message = "簇级门限点目前仅支持 set（写原始寄存器值）；读请用 mbpoll 对对应 rack 从站读 Holding";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(opdata))
+            {
+                message = "set 操作缺少参数值（原始寄存器值，工程值×Scale）";
+                return false;
+            }
+
+            object val = opdata;
+            if (bool.TryParse(opdata, out var bv)) val = bv;
+            else if (int.TryParse(opdata, out var iv)) val = iv;
+            else if (double.TryParse(opdata, out var dv)) val = dv;
+
+            var targets = new List<int>();
+            if (rackToken == "*")
+            {
+                // 从点表簇数量未知时，按常见上限尝试；后端会拒绝越界
+                int maxGuess = 64;
+                for (int i = 0; i < maxGuess; i++)
+                    targets.Add(i);
+            }
+            else if (int.TryParse(rackToken, out var rackId))
+            {
+                targets.Add(rackId);
+            }
+            else
+            {
+                message = "簇索引格式错误，应为 r0 / r1 / r*";
+                return false;
+            }
+
+            var okMessages = new List<string>();
+            var errors = new List<string>();
+            foreach (var rackId in targets)
+            {
+                if (!simServer.TrySetRackControl(rackId, pointName, val, out var oneMsg))
+                {
+                    if (rackToken == "*" && oneMsg.Contains("越界", StringComparison.Ordinal))
+                        break;
+                    errors.Add(oneMsg);
+                    if (rackToken != "*")
+                    {
+                        message = oneMsg;
+                        return false;
+                    }
+                    continue;
+                }
+
+                okMessages.Add(oneMsg);
+                if (rackToken == "*" && okMessages.Count >= 1)
+                {
+                    // 继续直到越界
+                }
+            }
+
+            if (okMessages.Count == 0)
+            {
+                message = errors.Count > 0 ? string.Join("; ", errors) : "簇级写入失败";
+                return false;
+            }
+
+            message = rackToken == "*"
+                ? $"已写入 {okMessages.Count} 个簇的 {pointName}\n" + string.Join("\n", okMessages.Take(3)) +
+                  (okMessages.Count > 3 ? $"\n... 共 {okMessages.Count} 簇" : "")
+                : okMessages[0];
+            return true;
+        }
+
         private static string PrintHelp()
         {
             return new[]
             {
                 "用法: dpc <dpcname> <operation> <data>",
-                "  dpcname: <device>.<datapoint> 例如 pcs1.ActivePower",
-                "  operation: set / get",
-                "  data: set 时填写值，get 时可省略",
-                "  控制点 set：写入 Modbus 原始寄存器值（与 mbpoll 一致）；工程值 = 原始值 / CSV 的 Scale",
-                "  遥测点 set：若 ModelSim 不为 0，将在下一个轮询周期被覆盖",
-                "示例:",
-                "  dpc simEmu1.yt0 set 1000   # yt0 Scale=10 → 100 kW 有功设定",
-                "  dpc simEmu1.yx3 set 0      # PCS1 停机",
-                "  dpc simBms1.yc11 get"
-            }.JoinLines();
+                "  堆级: dpc <device>.<datapoint> set|get [value]",
+                "  簇级门限: dpc <device>.r<N>.<datapoint> set <原始值>",
+                "         或 dpc <device>.r*.<datapoint> set <原始值>  （写全部簇）",
+                "  示例:",
+                "    dpc simBms1.yt0 set 1",
+                "    dpc simBms1.r0.yc1322 set 3450   # 簇0 单体过压三级门限 3.45V (Scale1000)",
+                "    dpc simBms1.r*.yc1322 set 3450   # 全部簇同门限",
+            }.Aggregate((a, b) => a + Environment.NewLine + b);
         }
     }
 }

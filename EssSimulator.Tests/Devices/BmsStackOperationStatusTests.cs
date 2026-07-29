@@ -110,7 +110,21 @@ public class BmsStackOperationStatusTests
             SOC = soc,
             IsPcsLinked = linked
         };
-        stack.Cluseter.Add(new BatteryCluster());
+        // 堆级限额由簇汇总；运行状态禁充/禁放依赖簇 Max*Power
+        stack.Cluseter.Add(new BatteryCluster
+        {
+            Measurements =
+            {
+                SOC = soc,
+                NominalEnergyKWh = 100f,
+                MaxCRate = 0.5f,
+                TotalVoltage = 1300f,
+                MaxCellTemp = 25f,
+                MinCellTemp = 25f,
+                MaxCellVoltage = 3.3f,
+                MinCellVoltage = 3.2f,
+            }
+        });
         return stack;
     }
 }

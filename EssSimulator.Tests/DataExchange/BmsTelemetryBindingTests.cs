@@ -45,7 +45,7 @@ public class BmsTelemetryBindingTests
                 Registers[pair.Key] = pair.Value;
         }
 
-        public Dictionary<string, object> ReadAllControlRaw(IReadOnlyList<string> paramNames) => new();
+        public Dictionary<string, object> ReadAllControlRaw(IReadOnlyList<string> paramNames, byte slaveId = 1) => new();
 
         public object? ReadParsedPoint(string paramName, byte slaveId = 1) =>
             Registers.TryGetValue(paramName, out var val) ? val : null;

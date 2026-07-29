@@ -44,10 +44,10 @@ namespace EssSimulator.DataExchange.Adapters
             _slave.Write(values, slaveId, applyScale);
         }
 
-        public Dictionary<string, object> ReadAllControlRaw(IReadOnlyList<string> paramNames)
+        public Dictionary<string, object> ReadAllControlRaw(IReadOnlyList<string> paramNames, byte slaveId = 1)
         {
             var result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-            var allRaw = _slave.Read();
+            var allRaw = _slave.Read(slaveId);
             if (allRaw == null || allRaw.Count == 0)
                 return result;
 

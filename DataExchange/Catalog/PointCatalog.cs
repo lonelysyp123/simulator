@@ -6,6 +6,7 @@ namespace EssSimulator.DataExchange.Catalog
         public required IReadOnlyList<PointBinding> TelemetryPoints { get; init; }
         public required IReadOnlyList<PointBinding> ControlPoints { get; init; }
         public IReadOnlyList<RackPointBinding> RackTelemetryPoints { get; init; } = Array.Empty<RackPointBinding>();
+        public IReadOnlyList<RackPointBinding> RackControlPoints { get; init; } = Array.Empty<RackPointBinding>();
         public required IReadOnlyDictionary<string, object> DefaultValues { get; init; }
 
         public PointBinding? FindControl(string paramName) =>
@@ -14,6 +15,10 @@ namespace EssSimulator.DataExchange.Catalog
 
         public PointBinding? FindTelemetry(string paramName) =>
             TelemetryPoints.FirstOrDefault(p =>
+                string.Equals(p.ParamName, paramName, StringComparison.OrdinalIgnoreCase));
+
+        public RackPointBinding? FindRackControl(string paramName) =>
+            RackControlPoints.FirstOrDefault(p =>
                 string.Equals(p.ParamName, paramName, StringComparison.OrdinalIgnoreCase));
     }
 }

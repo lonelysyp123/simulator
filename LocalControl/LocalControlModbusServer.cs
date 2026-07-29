@@ -42,6 +42,14 @@ namespace EssSimulator.LocalControl
 
         public IReadOnlyList<MapEntry> ControlMaps => _pointMap.ControlMaps;
 
+        public IReadOnlyList<MapEntry> RackControlMaps => _pointMap.RackControlMaps;
+
+        public void SetDataObjectByMesurePointName(string name, object value) =>
+            _backend.SetDataObjectByMesurePointName(name, value);
+
+        public bool TrySetRackControl(int rackIndex, string name, object value, out string message) =>
+            _backend.TrySetRackControl(rackIndex, name, value, out message);
+
         public bool Start(int maxRetries = 30)
         {
             for (int attempt = 1; attempt <= maxRetries; attempt++)
@@ -69,9 +77,6 @@ namespace EssSimulator.LocalControl
             catch (Exception ex) { _log.Error("Stop error", ex); }
             _slave.DeviceDisconnect();
         }
-
-        public void SetDataObjectByMesurePointName(string name, object value) =>
-            _backend.SetDataObjectByMesurePointName(name, value);
 
         public void PublishControlToSlave(string name, object value) =>
             _backend.PublishControlToSlave(name, value);

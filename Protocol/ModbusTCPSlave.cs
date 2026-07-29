@@ -32,9 +32,10 @@ namespace EssSimulator
             if (rackCount > 0 && rackPointMap != null)
             {
                 var rackIndex = new ModbusControlAddressIndex(rackPointMap);
-                for (byte i = deviceInfoDto.slaveId; i < rackCount; i++)
+                for (int r = 0; r < rackCount; r++)
                 {
-                    var rackSlave = CreateSlaveWithHooks(modbusFactory, (byte)(i + 1), rackIndex);
+                    byte sid = (byte)(deviceInfoDto.slaveId + r + 1);
+                    var rackSlave = CreateSlaveWithHooks(modbusFactory, sid, rackIndex);
                     modbusSlaveNetwork.AddSlave(rackSlave);
                 }
             }
@@ -82,8 +83,8 @@ namespace EssSimulator
                 modbusSlaveNetwork.RemoveSlave(deviceInfoDto.slaveId);
                 if (rackCount > 0)
                 {
-                    for (byte i = deviceInfoDto.slaveId; i < rackCount; i++)
-                        modbusSlaveNetwork.RemoveSlave(i);
+                    for (int r = 0; r < rackCount; r++)
+                        modbusSlaveNetwork.RemoveSlave((byte)(deviceInfoDto.slaveId + r + 1));
                 }
 
                 modbusSlaveNetwork.Dispose();

@@ -199,6 +199,27 @@ namespace EssSimulator.Configuration
         public double PackInternalResistance { get; set; } = 0.05;
         public double ClusterInternalResistance { get; set; } = 0.1;
         public double RackInternalResistance { get; set; } = 0.02;
+
+        /// <summary>堆内簇间被动均衡；缺省启用并采用内置建议值。</summary>
+        public BmsPassiveBalanceConfig PassiveBalance { get; set; } = new();
+    }
+
+    /// <summary>BMS 堆内簇间被动均衡（appsettings / BmsDeviceConfig）。</summary>
+    public class BmsPassiveBalanceConfig
+    {
+        public bool Enabled { get; set; } = true;
+        /// <summary>启动阈值：簇间 SOC 差（0~1），建议 0.02。</summary>
+        public double StartSocDelta { get; set; } = 0.02;
+        /// <summary>停止阈值（回滞），建议 0.01。</summary>
+        public double StopSocDelta { get; set; } = 0.01;
+        /// <summary>泄放倍率，建议 0.02C。</summary>
+        public double BalanceCRate { get; set; } = 0.02;
+        /// <summary>仅小电流/静置时均衡。</summary>
+        public bool IdleOnly { get; set; } = true;
+        /// <summary>IdleOnly 堆电流门槛 (A)，建议 10。</summary>
+        public double IdleCurrentThresholdA { get; set; } = 10.0;
+        /// <summary>高于最低簇 SOC 多少才泄放，建议 0.01。</summary>
+        public double BleedAboveMinMargin { get; set; } = 0.01;
     }
 
     public class EssUnitConfig

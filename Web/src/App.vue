@@ -33,6 +33,14 @@
             <el-icon><Grid /></el-icon>
             <span>电池单体信息</span>
           </el-menu-item>
+          <el-menu-item index="/thresholds">
+            <el-icon><SetUp /></el-icon>
+            <span>BMS 告警门限</span>
+          </el-menu-item>
+          <el-menu-item index="/alarms">
+            <el-icon><Warning /></el-icon>
+            <span>设备告警</span>
+          </el-menu-item>
 
           <div class="menu-group-label">运维工具</div>
           <el-menu-item index="/command">

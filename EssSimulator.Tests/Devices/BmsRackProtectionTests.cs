@@ -156,6 +156,39 @@ public class BmsRackProtectionTests
         Assert.True(alarms.OvervoltageProtection);
     }
 
+    [Fact]
+    public void EvaluateCluster_SetsTerminalAndHvbFromPoleAndBusbarTemps()
+    {
+        var alarms = new ClusterAlarms();
+        var thresholds = new ClusterThresholds();
+        var clusterState = CreateClusterState(current: 0);
+
+        BmsRackProtection.EvaluateCluster(
+            clusterState, packCount: 1, cellsPerPack: 1, thresholds, alarms,
+            insulationValue: 1000f,
+            busbarTempC: thresholds.HVBHighTempThreshold3!.Value + 1,
+            poleTempC: thresholds.PoleHighTempThreshold3!.Value + 1);
+
+        Assert.True(alarms.TerminalHighTempFault);
+        Assert.True(alarms.HVBHighTempFault);
+        Assert.True((alarms.RackFaultSummary1 & (1 << 11)) != 0);
+        Assert.True((alarms.RackFaultSummary1 & (1 << 12)) != 0);
+    }
+
+    [Fact]
+    public void EvaluateCluster_PackVoltageImbalanceUsesTotalVoltageDifferenceThreshold()
+    {
+        var alarms = new ClusterAlarms();
+        var thresholds = new ClusterThresholds();
+        var clusterState = CreateClusterState(current: 0);
+        clusterState.VoltageImbalance = thresholds.TotalVoltageDifferenceThreshold3!.Value + 1;
+
+        BmsRackProtection.EvaluateCluster(
+            clusterState, packCount: 1, cellsPerPack: 1, thresholds, alarms, insulationValue: 1000f);
+
+        Assert.True(alarms.BatteryBoxVoltageExtremaDifferenceFault);
+    }
+
     private static ClusterState CreateClusterState(
         double minPackSoc = 0.5,
         double totalVoltage = 1300,

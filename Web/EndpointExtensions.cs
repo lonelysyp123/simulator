@@ -37,6 +37,28 @@ namespace EssSimulator.Web
                 return Results.Ok(BatterySnapshotReader.ReadCells(idx, cluster - 1));
             });
 
+            // BMS 簇告警门限：点表元数据 + 当前工程值（下发仍走 POST /api/command → dpc）
+            app.MapGet("/api/bms/{unit:int}/rack-thresholds", (int unit, int? rack) =>
+            {
+                int unitCount = Math.Max(1, GuiSimDataAccess.GetEssUnitCount());
+                int unitNum = Math.Clamp(unit, 1, unitCount);
+                int rackIndex = Math.Max(0, rack ?? 0);
+                var snap = RackThresholdSnapshotReader.Read(unitNum, rackIndex);
+                return snap == null
+                    ? Results.NotFound(new { message = $"未找到设备 simBms{unitNum} 或点表未加载" })
+                    : Results.Ok(snap);
+            });
+
+            // 设备告警/故障位：绿=未触发，红=已触发
+            app.MapGet("/api/alarms", () => Results.Ok(AlarmSnapshotReader.ReadAll()));
+
+            app.MapGet("/api/alarms/bms/{unit:int}", (int unit, int? rack) =>
+            {
+                int unitCount = Math.Max(1, GuiSimDataAccess.GetEssUnitCount());
+                int unitNum = Math.Clamp(unit, 1, unitCount);
+                return Results.Ok(AlarmSnapshotReader.ReadBmsUnit(unitNum, rack));
+            });
+
             app.MapGet("/api/connections", () => Results.Ok(ConnectionSnapshotReader.Read()));
 
             app.MapGet("/api/alert", () => Results.Ok(FatalSystemAlert.GetSnapshot()));
@@ -45,14 +67,40 @@ namespace EssSimulator.Web
             {
                 var w = webCfg.Value;
                 var e = editionCfg.Value;
+                var devices = simCfg.Value.Devices ?? new List<EssUnitConfig>();
+                // 按舱号（channel / compartment，1-based）展开各 BMS 拓扑，供 3D 详情等使用
+                var bmsTopology = new List<object>();
+                for (int ui = 0; ui < devices.Count; ui++)
+                {
+                    var bmsList = devices[ui].Bms ?? new List<BmsDeviceConfig>();
+                    for (int bi = 0; bi < bmsList.Count; bi++)
+                    {
+                        var b = bmsList[bi];
+                        int channelIndex0 = ui * 2 + bi;
+                        bmsTopology.Add(new
+                        {
+                            unitIndex = ui,
+                            slotInUnit = bi,
+                            channelIndex = channelIndex0,
+                            compartmentNumber = channelIndex0 + 1,
+                            name = b.Name,
+                            clusterCount = Math.Max(1, b.ClusterCount),
+                            packCount = Math.Max(1, b.PackCount),
+                            cellSeriesCount = Math.Max(1, b.CellSeriesCount),
+                            cellParallelCount = Math.Max(1, b.CellParallelCount)
+                        });
+                    }
+                }
+
                 return Results.Ok(new
                 {
                     simulator = new
                     {
                         simCfg.Value.Runtime,
                         simCfg.Value.Protocol,
-                        unitCount = simCfg.Value.Devices?.Count ?? 0,
-                        channelCount = simCfg.Value.UnitCount
+                        unitCount = devices.Count,
+                        channelCount = simCfg.Value.UnitCount,
+                        bmsTopology
                     },
                     edition = new
                     {
@@ -112,7 +160,8 @@ namespace EssSimulator.Web
                     {
                         device = $"simBms{bms}",
                         dataMaps = srv?.DataMaps,
-                        controlMaps = srv?.ControlMaps
+                        controlMaps = srv?.ControlMaps,
+                        rackControlMaps = srv?.RackControlMaps
                     });
                     bms++;
                 }

@@ -30,6 +30,12 @@ namespace EssSimulator.LocalControl
             _slave.Write(new Dictionary<string, object> { { name, value } });
         }
 
+        public bool TrySetRackControl(int rackIndex, string name, object value, out string message)
+        {
+            message = "LocalControl 寄存器后端不支持簇级控制点";
+            return false;
+        }
+
         public void PublishControlToSlave(string name, object value) =>
             SetDataObjectByMesurePointName(name, value);
 

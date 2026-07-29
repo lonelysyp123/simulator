@@ -30,6 +30,11 @@ namespace EssSimulator.EssDeviceSimModel
         public double TotalChargeEnergy { get; set; }        // 累计充电能量(kWh)
         public double TotalDischargeEnergy { get; set; }     // 累计放电能量(kWh)
 
+        /// <summary>堆内被动均衡是否正在动作。</summary>
+        public bool IsPassiveBalancing { get; set; }
+        /// <summary>本步被动均衡泄放电流合计 (A，放电为正)。</summary>
+        public double PassiveBalanceDischargeCurrentA { get; set; }
+
         public bool IsAlarm { get; set; }                        // 是否报警
         public ushort IsFault { get; set; }                      // 是否故障 0-无故障 1-充电故障 2-放电故障 3-其他故障
         public bool IsProtection { get; set; }                    // 是否保护动作
@@ -47,6 +52,38 @@ namespace EssSimulator.EssDeviceSimModel
         public double RackInternalResistance { get; set; }        // 堆总内阻(Ohm)
         public double MaxCurrentImbalance { get; set; } = 0.1;    // 允许的最大电流不平衡比例(0-1)
         public double MaxSOCDifference { get; set; } = 0.2;       // 允许的最大SOC差异(0-1)
+
+        /// <summary>堆内簇间被动均衡（高 SOC 簇泄放）。</summary>
+        public RackPassiveBalanceConfig PassiveBalance { get; set; } = new();
+    }
+
+    /// <summary>
+    /// 堆内簇间被动均衡参数（电阻泄放型：只对高 SOC 簇施加小放电电流，能量以热耗散）。
+    /// 建议默认面向大储 LFP 联调，可按项目调整。
+    /// </summary>
+    public class RackPassiveBalanceConfig
+    {
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>簇间 SOC 差 ≥ 此值时启动均衡（建议 2%）。</summary>
+        public double StartSocDelta { get; set; } = 0.02;
+
+        /// <summary>簇间 SOC 差 ≤ 此值时停止均衡（建议 1%，回滞）。</summary>
+        public double StopSocDelta { get; set; } = 0.01;
+
+        /// <summary>被动均衡放电倍率（建议 0.02C，约 314Ah×0.02≈6.3A）。</summary>
+        public double BalanceCRate { get; set; } = 0.02;
+
+        /// <summary>仅在堆电流绝对值低于此阈值时均衡（建议 10A，近似静置/小电流）。</summary>
+        public bool IdleOnly { get; set; } = true;
+
+        /// <summary>IdleOnly 时的堆电流门槛 (A)。</summary>
+        public double IdleCurrentThresholdA { get; set; } = 10.0;
+
+        /// <summary>
+        /// 仅当簇 SOC 高于「最低簇 SOC + 此裕度」才泄放（建议等于 StopSocDelta）。
+        /// </summary>
+        public double BleedAboveMinMargin { get; set; } = 0.01;
     }
 
     public class BatteryRackSimulator
@@ -57,6 +94,7 @@ namespace EssSimulator.EssDeviceSimModel
         public RackState _currentState { get; set; }
         private double _totalChargeEnergy;        // 累计充电能量(kWh)
         private double _totalDischargeEnergy;     // 累计放电能量(kWh)
+        private bool _passiveBalanceActive;
 
         // 构造函数
         public BatteryRackSimulator(RackConfiguration config)
@@ -95,6 +133,9 @@ namespace EssSimulator.EssDeviceSimModel
             // 计算各簇电流分配 (考虑内阻差异)
             var clusterCurrents = CalculateCurrentDistribution(rackCurrent);
 
+            // 堆内被动均衡：对高 SOC 簇叠加小放电电流（能量耗散，不转移给低 SOC 簇）
+            double balanceDischargeSum = ApplyPassiveBalanceCurrents(clusterCurrents, rackCurrent);
+
             // 更新所有簇 (并联电压相同，电流不同)
             for (int i = 0; i < _clusters.Count; i++)
             {
@@ -106,7 +147,62 @@ namespace EssSimulator.EssDeviceSimModel
 
             // 更新堆状态
             UpdateRackState(rackCurrent, ambientTemp, timeStamp, timeStep);
+            _currentState.IsPassiveBalancing = _passiveBalanceActive && balanceDischargeSum > 0;
+            _currentState.PassiveBalanceDischargeCurrentA = balanceDischargeSum;
+        }
 
+        /// <summary>
+        /// 按簇 SOC 差启动/停止被动均衡，并对高 SOC 簇叠加放电电流（约定：电流&lt;0 为放电）。
+        /// </summary>
+        /// <returns>本步泄放电流合计（放电为正，A）。</returns>
+        internal double ApplyPassiveBalanceCurrents(double[] clusterCurrents, double rackCurrent)
+        {
+            var cfg = _config.PassiveBalance ?? new RackPassiveBalanceConfig();
+            if (!cfg.Enabled || _clusters.Count < 2 || clusterCurrents.Length != _clusters.Count)
+            {
+                _passiveBalanceActive = false;
+                return 0;
+            }
+
+            if (cfg.IdleOnly && Math.Abs(rackCurrent) > Math.Max(0, cfg.IdleCurrentThresholdA))
+            {
+                _passiveBalanceActive = false;
+                return 0;
+            }
+
+            var socs = _clusters.Select(c => c.GetClusterSOC()).ToArray();
+            double maxSoc = socs.Max();
+            double minSoc = socs.Min();
+            double delta = maxSoc - minSoc;
+
+            double start = Math.Max(0, cfg.StartSocDelta);
+            double stop = Math.Clamp(cfg.StopSocDelta, 0, start);
+            if (!_passiveBalanceActive && delta >= start)
+                _passiveBalanceActive = true;
+            else if (_passiveBalanceActive && delta <= stop)
+                _passiveBalanceActive = false;
+
+            if (!_passiveBalanceActive)
+                return 0;
+
+            double packAh = Math.Max(1e-6,
+                _config.ClusterConfig!.PackConfig.NominalCapacity * _config.ClusterConfig.PackConfig.ParallelCount);
+            double balanceDischargeA = Math.Max(0, cfg.BalanceCRate) * packAh; // 放电幅度（正值）
+            if (balanceDischargeA <= 0)
+                return 0;
+
+            double bleedFloor = minSoc + Math.Max(0, cfg.BleedAboveMinMargin);
+            double sum = 0;
+            for (int i = 0; i < _clusters.Count; i++)
+            {
+                if (socs[i] <= bleedFloor)
+                    continue;
+                // 物理约定：电流 &lt; 0 为放电
+                clusterCurrents[i] -= balanceDischargeA;
+                sum += balanceDischargeA;
+            }
+
+            return sum;
         }
 
         // 计算电流分配 (考虑并联簇的内阻差异)
@@ -189,31 +285,7 @@ namespace EssSimulator.EssDeviceSimModel
             _currentState.ClusterStates = clusterStates;
         }
 
-        // 堆级均衡控制
-        // public void ApplyRackBalancing(TimeSpan duration)
-        // {
-        //     // 找出SOC最高的簇
-        //     int maxSOCIndex = 0;
-        //     double maxSOC = 0;
-        //     for (int i = 0; i < _clusters.Count; i++)
-        //     {
-        //         var soc = _clusters[i].GetClusterSOC();
-        //         if (soc > maxSOC)
-        //         {
-        //             maxSOC = soc;
-        //             maxSOCIndex = i;
-        //         }
-        //     }
-
-        //     // 对SOC最高的簇进行放电平衡
-        //     Console.WriteLine($"执行堆级均衡: 对簇{maxSOCIndex}(SOC={maxSOC * 100:F1}%)进行放电");
-        //     double balancingCurrent = _config.ClusterConfig!.PackConfig.NominalCapacity *
-        //                             _config.ClusterConfig!.PackConfig.ParallelCount * 0.1; // 0.1C平衡电流
-
-        //     _clusters[maxSOCIndex].Update(-balancingCurrent, _currentState!.MaxClusterTemp, duration);
-
-        //     UpdateRackState(_currentState.TotalCurrent, _currentState.MaxClusterTemp, duration);
-        // }
+        // 堆级被动均衡已在 Update() 中按 RackPassiveBalanceConfig 自动执行。
 
         // 获取堆SOC (基于最小簇SOC)
         public double GetRackSOC()

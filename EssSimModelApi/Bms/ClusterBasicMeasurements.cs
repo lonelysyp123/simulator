@@ -48,7 +48,9 @@ public class ClusterBasicMeasurements
             {
                 if (!SOC.HasValue) return null;
                 float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
-                return basePower * GetChargePowerFactor(SOC.Value);
+                float factor = BmsCurrentLimitDerating.ChargeLimitFactor(
+                    SOC.Value, MinCellTemp, MaxCellTemp, MaxCellVoltage);
+                return basePower * factor;
             }
         } 
 
@@ -58,7 +60,9 @@ public class ClusterBasicMeasurements
             {
                 if (!SOC.HasValue) return null;
                 float basePower = Math.Max(0f, NominalEnergyKWh) * Math.Max(0f, MaxCRate);
-                return basePower * GetDischargePowerFactor(SOC.Value);
+                float factor = BmsCurrentLimitDerating.DischargeLimitFactor(
+                    SOC.Value, MinCellTemp, MaxCellTemp, MinCellVoltage);
+                return basePower * factor;
             }
         } 
 
@@ -94,20 +98,5 @@ public class ClusterBasicMeasurements
             }
         } 
 
-        private static float GetChargePowerFactor(float soc)
-        {
-            if (soc < 0.8f) return 1.0f;
-            if (soc < 0.85f) return 1.0f - (soc - 0.8f) / 0.05f * 0.5f;
-            if (soc < 0.9f) return 0.5f - (soc - 0.85f) / 0.05f * 0.25f;
-            return 0.0f;
-        }
-
-        private static float GetDischargePowerFactor(float soc)
-        {
-            if (soc > 0.2f) return 1.0f;
-            if (soc > 0.15f) return 0.5f + (soc - 0.15f) / 0.05f * 0.5f;
-            if (soc > 0.1f) return 0.25f + (soc - 0.1f) / 0.05f * 0.25f;
-            return 0.0f;
-        }
     }
 }

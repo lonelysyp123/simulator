@@ -109,6 +109,7 @@ namespace EssSimulator.DataExchange.Catalog
             }
 
             var rackTelemetry = new List<RackPointBinding>();
+            var rackControl = new List<RackPointBinding>();
             if (isBms)
             {
                 foreach (var entry in pointMap.RackDataMaps)
@@ -127,6 +128,23 @@ namespace EssSimulator.DataExchange.Catalog
                         BindingPathTemplate = model.Arg1
                     });
                 }
+
+                foreach (var entry in pointMap.RackControlMaps)
+                {
+                    if (string.IsNullOrWhiteSpace(entry.ParamName))
+                        continue;
+                    if (!pointMap.RackParamModelLookup.TryGetValue(entry.ParamName, out var model))
+                        continue;
+                    if (string.IsNullOrWhiteSpace(model.Arg1))
+                        continue;
+
+                    rackControl.Add(new RackPointBinding
+                    {
+                        Entry = entry,
+                        ParamName = entry.ParamName,
+                        BindingPathTemplate = model.Arg1
+                    });
+                }
             }
 
             return new PointCatalog
@@ -135,6 +153,7 @@ namespace EssSimulator.DataExchange.Catalog
                 TelemetryPoints = telemetry,
                 ControlPoints = control,
                 RackTelemetryPoints = rackTelemetry,
+                RackControlPoints = rackControl,
                 DefaultValues = new Dictionary<string, object>(pointMap.DefaultBuffer)
             };
         }
