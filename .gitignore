@@ -447,9 +447,12 @@ scripts/license/.license-secret
 **/license.txt
 
 ### EssSimulator B/S Web ###
-# 前端源码、Node 依赖、Vite 缓存与 wwwroot 构建产物（本分支不纳入版本管理）
-web/
-Web/
+# Node 依赖、Vite 缓存与 wwwroot 构建产物；Web 源码纳入版本管理
+Web/node_modules/
+web/node_modules/
+Web/**/node_modules/
+Web/.vite/
+web/.vite/
 wwwroot/
 
 # 根目录点表 CSV（本地/EMS 导出，不纳入版本管理；子目录 pointmaps/ 等不受影响）

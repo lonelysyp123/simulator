@@ -1,0 +1,276 @@
+<template>
+  <div
+    class="dt-device-box"
+    :class="type === 'pcs' ? 'pcs-box' : 'bms-box'"
+    @pointerdown.stop
+    @wheel.stop
+    @dblclick.stop
+  >
+    <div class="box-head">
+      <div class="box-title">
+        <template v-if="type === 'pcs' && channel">{{ sideLabel }} · PCS{{ channel.pcsNumber }}</template>
+        <template v-else-if="type === 'bms' && channel">舱{{ channel.compartmentNumber }}</template>
+      </div>
+      <button type="button" class="box-close" title="关闭" @click.stop="emit('close')">×</button>
+    </div>
+    <template v-if="type === 'pcs' && channel">
+      <div v-for="(t, i) in pcsLinesCompact" :key="'p' + i" class="box-line">{{ t }}</div>
+      <div class="box-controls">
+        <div class="power-row">
+          <label class="power-label">P</label>
+          <input v-model="pDraft" type="text" inputmode="decimal" class="power-input" @keydown.enter.prevent="applyP" />
+          <button type="button" class="act-btn act-set" @click="applyP">设</button>
+        </div>
+        <div class="power-row">
+          <label class="power-label">Q</label>
+          <input v-model="qDraft" type="text" inputmode="decimal" class="power-input" @keydown.enter.prevent="applyQ" />
+          <button type="button" class="act-btn act-set" @click="applyQ">设</button>
+        </div>
+        <div class="box-actions">
+          <button type="button" class="act-btn act-on" @click="emit('pcs-start', channel.pcsNumber)">启</button>
+          <button type="button" class="act-btn act-off" @click="emit('pcs-stop', channel.pcsNumber)">停</button>
+        </div>
+      </div>
+    </template>
+    <template v-else-if="type === 'bms' && channel">
+      <div v-for="(t, i) in bmsLinesCompact" :key="'b' + i" class="box-line">{{ t }}</div>
+      <div class="box-actions">
+        <button type="button" class="act-btn act-on" @click="emit('bms-power-on', channel.compartmentNumber)">上电</button>
+        <button type="button" class="act-btn act-off" @click="emit('bms-power-off', channel.compartmentNumber)">下电</button>
+      </div>
+      <div class="box-actions">
+        <button type="button" class="act-btn act-clear" @click="emit('bms-fault-clear', channel.compartmentNumber)">清故障</button>
+      </div>
+    </template>
+  </div>
+</template>
+
+<script setup>
+import { computed, ref, watch } from 'vue'
+
+const props = defineProps({
+  type: { type: String, required: true },
+  side: { type: String, default: 'A' },
+  channel: { type: Object, default: null }
+})
+
+const emit = defineEmits([
+  'close',
+  'pcs-start',
+  'pcs-stop',
+  'pcs-set-power',
+  'pcs-set-reactive',
+  'bms-power-on',
+  'bms-power-off',
+  'bms-fault-clear'
+])
+
+const pDraft = ref('0.0')
+const qDraft = ref('0.0')
+let lastP = null
+let lastQ = null
+
+const sideLabel = computed(() => (props.side === 'A' ? 'PCS-A' : 'PCS-B'))
+
+const pcsLinesCompact = computed(() => {
+  const ch = props.channel
+  if (!ch) return []
+  return [
+    ch.pcsDeviceState,
+    ch.pcsActualP || ch.pcsTargetP,
+    ch.pcsActualQ || ch.pcsTargetQ
+  ].filter(Boolean)
+})
+
+const bmsLinesCompact = computed(() => {
+  const ch = props.channel
+  if (!ch) return []
+  return [
+    ch.bmsCompact,
+    ch.bmsRunStatus || null,
+    `并网:${ch.gridConnect}`
+  ].filter(Boolean)
+})
+
+watch(
+  () => props.channel,
+  (ch) => {
+    if (!ch || props.type !== 'pcs') return
+    const tp = ch.targetActivePowerKw
+    const tq = ch.targetReactivePowerKvar
+    if (tp != null && tp !== lastP) {
+      pDraft.value = String(Number(tp).toFixed(1))
+      lastP = tp
+    }
+    if (tq != null && tq !== lastQ) {
+      qDraft.value = String(Number(tq).toFixed(1))
+      lastQ = tq
+    }
+  },
+  { immediate: true, deep: true }
+)
+
+function applyP() {
+  const ch = props.channel
+  if (!ch) return
+  const kw = Number(pDraft.value)
+  if (!Number.isFinite(kw)) return
+  const pcsNumber = Number(ch.pcsNumber)
+  const emuUnit = Number(ch.emuUnitNumber) > 0
+    ? Number(ch.emuUnitNumber)
+    : Math.ceil(pcsNumber / 2)
+  const ytPoint = ch.activePowerYtPoint
+    || (pcsNumber % 2 === 1 ? 'yt0' : 'yt4')
+  emit('pcs-set-power', {
+    pcsNumber,
+    emuUnit,
+    ytPoint,
+    powerKw: kw
+  })
+}
+
+function applyQ() {
+  const ch = props.channel
+  if (!ch) return
+  const kvar = Number(qDraft.value)
+  if (!Number.isFinite(kvar)) return
+  const pcsNumber = Number(ch.pcsNumber)
+  const emuUnit = Number(ch.emuUnitNumber) > 0
+    ? Number(ch.emuUnitNumber)
+    : Math.ceil(pcsNumber / 2)
+  const ytPoint = ch.reactivePowerYtPoint
+    || (pcsNumber % 2 === 1 ? 'yt1' : 'yt5')
+  emit('pcs-set-reactive', {
+    pcsNumber,
+    emuUnit,
+    ytPoint,
+    reactiveKvar: kvar
+  })
+}
+</script>
+
+<style scoped>
+.dt-device-box {
+  font-size: 9px;
+  line-height: 1.25;
+  padding: 4px 5px 5px;
+  border-radius: 3px;
+  box-sizing: border-box;
+  width: 112px;
+  pointer-events: auto;
+  user-select: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+.dt-device-box:hover {
+  opacity: 0.92;
+}
+.dt-device-box.pcs-box {
+  background: rgba(238, 245, 255, 0.55);
+  border: 1px solid rgba(30, 106, 188, 0.65);
+  color: #303133;
+}
+.dt-device-box.bms-box {
+  background: rgba(255, 247, 230, 0.55);
+  border: 1px solid rgba(230, 162, 60, 0.65);
+  color: #303133;
+}
+.box-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.box-title {
+  flex: 1;
+  font-weight: 700;
+  font-size: 9px;
+  color: #1e3a5f;
+  line-height: 1.2;
+}
+.box-close {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #909399;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.box-close:hover {
+  color: #f56c6c;
+  background: rgba(245, 108, 108, 0.12);
+}
+.box-line {
+  margin-bottom: 1px;
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.box-actions {
+  display: flex;
+  gap: 3px;
+  margin-top: 3px;
+}
+.box-controls {
+  margin-top: 2px;
+}
+.act-btn {
+  flex: 1;
+  font-size: 9px;
+  line-height: 1.15;
+  padding: 1px 0;
+  border-radius: 2px;
+  border: 1px solid #c0c4cc;
+  background: #fff;
+  cursor: pointer;
+  color: #303133;
+}
+.act-btn:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+.act-btn.act-on:hover {
+  border-color: #67c23a;
+  color: #67c23a;
+}
+.act-btn.act-off:hover {
+  border-color: #e6a23c;
+  color: #e6a23c;
+}
+.act-btn.act-clear:hover {
+  border-color: #f56c6c;
+  color: #f56c6c;
+}
+.act-btn.act-set {
+  flex: 0 0 auto;
+  min-width: 22px;
+  padding: 1px 3px;
+}
+.power-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+}
+.power-label {
+  font-size: 8px;
+  color: #606266;
+  width: 10px;
+}
+.power-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 9px;
+  padding: 1px 2px;
+  border: 1px solid #c0c4cc;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+</style>

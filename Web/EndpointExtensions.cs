@@ -2,6 +2,7 @@ using EssSimulator.Configuration;
 using EssSimulator.Core;
 using EssSimulator.Display;
 using EssSimulator.Web.DroopSlices;
+using EssSimulator.Web.Topology;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
@@ -274,6 +275,9 @@ namespace EssSimulator.Web
                     store.MaxCount = req.MaxCount.Value;
                 return Results.Ok(store.GetStatus());
             });
+
+            // 组态编辑：模板 / 工程 / 连线校验 / 设备库
+            app.MapTopologyEndpoints();
 
             return app;
         }

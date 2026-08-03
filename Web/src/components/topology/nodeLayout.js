@@ -1,0 +1,61 @@
+/** 组态节点几何与端口坐标（画布本地坐标，单位 px） */
+
+const SIZE = {
+  grid: { w: 120, h: 72 },
+  ac_bus: { w: 220, h: 36 },
+  transformer: { w: 100, h: 120 },
+  ac_meter: { w: 110, h: 100 },
+  emu: { w: 140, h: 96 },
+  bms: { w: 110, h: 72 },
+  dc_bus: { w: 160, h: 48 }
+}
+
+export function nodeSize(templateId) {
+  return SIZE[templateId] || { w: 120, h: 80 }
+}
+
+export function portPosition(node, portDef) {
+  const { w, h } = nodeSize(node.templateId)
+  const t = Math.min(0.95, Math.max(0.05, portDef.offset ?? 0.5))
+  let lx = w / 2
+  let ly = h / 2
+  switch (portDef.side) {
+    case 'top':
+      lx = w * t
+      ly = 0
+      break
+    case 'bottom':
+      lx = w * t
+      ly = h
+      break
+    case 'left':
+      lx = 0
+      ly = h * t
+      break
+    case 'right':
+      lx = w
+      ly = h * t
+      break
+  }
+  return { x: node.x + lx, y: node.y + ly, localX: lx, localY: ly }
+}
+
+export function formatVoltage(v) {
+  const n = Number(v)
+  if (!Number.isFinite(n) || n <= 0) return '—'
+  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}kV`
+  return `${n.toFixed(0)}V`
+}
+
+export function templateColor(templateId) {
+  switch (templateId) {
+    case 'grid': return '#c0392b'
+    case 'ac_bus': return '#1a1a1a'
+    case 'transformer': return '#2980b9'
+    case 'ac_meter': return '#8e44ad'
+    case 'emu': return '#16a085'
+    case 'bms': return '#27ae60'
+    case 'dc_bus': return '#d35400'
+    default: return '#606266'
+  }
+}

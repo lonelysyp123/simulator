@@ -23,6 +23,10 @@
             <el-icon><Monitor /></el-icon>
             <span>主接线 3D（增强）</span>
           </el-menu-item>
+          <el-menu-item index="/topology">
+            <el-icon><EditPen /></el-icon>
+            <span>组态编辑</span>
+          </el-menu-item>
 
           <div class="menu-group-label">电池系统</div>
           <el-menu-item index="/battery">

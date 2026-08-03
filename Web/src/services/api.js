@@ -44,6 +44,17 @@ export async function setDroopSliceConfig(body) {
   return (await api.post('/droop-slices/config', body)).data
 }
 
+// 组态编辑
+export async function getTopologyTemplates() { return (await api.get('/topology/templates')).data }
+export async function getTopologyProject() { return (await api.get('/topology/project')).data }
+export async function putTopologyProject(project) { return (await api.put('/topology/project', project)).data }
+export async function postTopologyConnect(body) { return (await api.post('/topology/connect', body)).data }
+export async function postTopologyDisconnect(body) { return (await api.post('/topology/disconnect', body)).data }
+export async function getTopologyLibrary() { return (await api.get('/topology/library')).data }
+export async function putTopologyLibrary(item) { return (await api.put('/topology/library', item)).data }
+export async function deleteTopologyLibrary(id) { return (await api.delete(`/topology/library/${id}`)).data }
+export async function getTopologyPaths() { return (await api.get('/topology/paths')).data }
+
 let hubPromise = null
 export function getHub() {
   if (!hubPromise) {

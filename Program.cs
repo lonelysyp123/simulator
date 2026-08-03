@@ -360,6 +360,7 @@ namespace EssSimulator
             // Web 层服务
             builder.Services.AddSingleton<WebCommandExecutor>();
             builder.Services.AddSingleton<EssSimulator.Web.DroopSlices.DroopSliceStore>();
+            builder.Services.AddSingleton<EssSimulator.Web.Topology.TopologyStore>();
             builder.Services.AddHostedService<SnapshotService>();
             builder.Services.AddHostedService<LogHubDispatcher>();
 
