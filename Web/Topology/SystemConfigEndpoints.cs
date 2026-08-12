@@ -1,0 +1,168 @@
+using EssSimulator.Configuration;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+
+namespace EssSimulator.Web.Topology
+{
+    public static class SystemConfigEndpoints
+    {
+        public static IEndpointRouteBuilder MapSystemConfigEndpoints(this IEndpointRouteBuilder app)
+        {
+            var g = app.MapGroup("/api/system");
+
+            g.MapGet("/config", (
+                TopologyStore store,
+                IOptions<SimulatorConfig> simCfg) =>
+            {
+                var mode = store.LoadRuntimeMode();
+                var overlay = store.LoadOverlay();
+                var projects = store.ListProjects();
+                bool eng = mode.EngineeringMode && overlay != null;
+                return Results.Ok(new SystemConfigState
+                {
+                    EngineeringMode = mode.EngineeringMode,
+                    ActiveProjectId = mode.ActiveProjectId,
+                    ActiveProjectName = mode.ActiveProjectName,
+                    OverlayPresent = overlay != null,
+                    Source = eng ? "topology" : "appsettings",
+                    RuntimeUnitCount = Math.Max(1, simCfg.Value.Devices?.Count ?? 1),
+                    Projects = projects.ToList(),
+                    OverlaySummary = overlay == null ? null : new TopologyRuntimeOverlay
+                    {
+                        SourceProjectId = overlay.SourceProjectId,
+                        SourceProjectName = overlay.SourceProjectName,
+                        GeneratedAtUtc = overlay.GeneratedAtUtc,
+                        EssUnits = overlay.EssUnits,
+                        Notes = overlay.Notes
+                    }
+                });
+            });
+
+            g.MapGet("/projects", (TopologyStore store) => Results.Ok(store.ListProjects()));
+
+            g.MapPost("/apply", (
+                SystemApplyRequest req,
+                TopologyStore store,
+                IHostApplicationLifetime lifetime,
+                IOptions<EditionConfig> editionOpts) =>
+            {
+                if (req == null)
+                    return Results.BadRequest(new SystemApplyResponse { Ok = false, Message = "请求体为空" });
+
+                var edition = editionOpts.Value;
+                edition.ApplyPresets();
+
+                if (!req.EngineeringMode)
+                {
+                    // 关闭工程模式：清 overlay，下次启动用 appsettings
+                    store.ClearOverlay();
+                    store.SaveRuntimeMode(new TopologyRuntimeMode
+                    {
+                        EngineeringMode = false,
+                        ActiveProjectId = null,
+                        ActiveProjectName = null
+                    });
+
+                    if (req.ConfirmRestart)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(400);
+                            lifetime.StopApplication();
+                        });
+                    }
+
+                    return Results.Ok(new SystemApplyResponse
+                    {
+                        Ok = true,
+                        Restarting = req.ConfirmRestart,
+                        Message = req.ConfirmRestart
+                            ? "已关闭工程模式，模拟器即将重启并恢复 appsettings.json 配置"
+                            : "已关闭工程模式（需重启后生效）",
+                        Details = { "来源: appsettings.json" }
+                    });
+                }
+
+                if (string.IsNullOrWhiteSpace(req.ProjectId))
+                    return Results.BadRequest(new SystemApplyResponse
+                    {
+                        Ok = false,
+                        Message = "工程模式下必须选择一个组态工程"
+                    });
+
+                var project = store.LoadNamedProject(req.ProjectId!);
+                if (project == null)
+                {
+                    var cur = store.LoadProject();
+                    if (cur.Id == req.ProjectId || string.Equals(cur.Name, req.ProjectId, StringComparison.OrdinalIgnoreCase))
+                        project = cur;
+                }
+
+                if (project == null || project.Nodes.Count == 0)
+                    return Results.BadRequest(new SystemApplyResponse
+                    {
+                        Ok = false,
+                        Message = $"未找到工程或工程为空: {req.ProjectId}"
+                    });
+
+                // 确保工程已入库
+                if (string.IsNullOrWhiteSpace(project.Id))
+                    project.Id = req.ProjectId!;
+                store.SaveNamedProject(project);
+                store.SaveProject(project);
+
+                var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+                if (!validation.Ok || overlay == null)
+                    return Results.BadRequest(new SystemApplyResponse
+                    {
+                        Ok = false,
+                        Message = validation.Message,
+                        Details = validation.Details
+                    });
+
+                if (edition.LockTopology && edition.MaxEssUnits > 0 && overlay.EssUnits.Count > edition.MaxEssUnits)
+                {
+                    return Results.BadRequest(new SystemApplyResponse
+                    {
+                        Ok = false,
+                        Message = $"当前产品档位最多 {edition.MaxEssUnits} 个储能单元，工程含 {overlay.EssUnits.Count} 个 EMU",
+                        Details = validation.Details
+                    });
+                }
+
+                store.SaveOverlay(overlay);
+                store.SaveRuntimeMode(new TopologyRuntimeMode
+                {
+                    EngineeringMode = true,
+                    ActiveProjectId = project.Id,
+                    ActiveProjectName = project.Name
+                });
+
+                if (req.ConfirmRestart)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(500);
+                        lifetime.StopApplication();
+                    });
+                }
+
+                return Results.Ok(new SystemApplyResponse
+                {
+                    Ok = true,
+                    Restarting = req.ConfirmRestart,
+                    Overlay = overlay,
+                    Message = req.ConfirmRestart
+                        ? $"已应用工程「{project.Name}」（{overlay.EssUnits.Count} 单元），模拟器即将重启"
+                        : $"已写入工程配置（需重启后生效）",
+                    Details = overlay.Notes
+                });
+            });
+
+            return app;
+        }
+    }
+}

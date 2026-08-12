@@ -55,7 +55,7 @@
   - 共 **8** 个 Unit（Unit-1 ~ Unit-8），每单元 2 路 PCS + 2 路 BMS
   - BMS 拓扑一致：`ClusterCount=12`、`PackCount=4`、`CellSeriesCount=104`、`CellParallelCount=1`
   - 单体：`CellNominalVoltage=3.2`、`CellNominalCapacity=314`
-  - 各 BMS 的 `CellInitialSoc` / `CellInitialSocRandomRange=0.03` 按单元单独配置（见 JSON）
+  - 各 BMS 的 `CellInitialSoc` 按单元单独配置（见 JSON）；初始 SOC 精确取值，不再施加随机扰动
 - **`DataExchange`**
   - `TelemetryIntervalMs = 500`，`EmuTelemetryIntervalMs = 100`
   - `ControlEventDriven = true`，`ControlPollIntervalMs = 100`
@@ -163,7 +163,7 @@
 - `Name`：BMS 名称（占位）
 - `ClusterCount` / `PackCount` / `CellSeriesCount` / `CellParallelCount`：电池拓扑
 - `CellNominalVoltage`（V）/ `CellNominalCapacity`（Ah）：单体标称参数
-- `CellInitialSoc`（0~1）/ `CellInitialSocRandomRange`（0~1）：初始 SOC 及随机扰动
+- `CellInitialSoc`（0~1）：初始 SOC（精确取值）；`CellInitialSocRandomRange` 已废弃、忽略
 - `PackInternalResistance` / `ClusterInternalResistance` / `RackInternalResistance`：等效内阻（简化模型）
 
 ---

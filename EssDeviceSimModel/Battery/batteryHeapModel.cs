@@ -127,6 +127,28 @@ namespace EssSimulator.EssDeviceSimModel
         public RackState GetRackState() => _currentState;
         public RackConfiguration GetRackConfig() => _config;
 
+        /// <summary>热设整堆 SOC（0~1）：写透全部电芯并刷新堆/簇汇总，不累计充放电电能。</summary>
+        public bool TrySetSoc(double soc, out string message)
+        {
+            if (double.IsNaN(soc) || double.IsInfinity(soc) || soc < 0.0 || soc > 1.0)
+            {
+                message = "SOC 须在 0~1（或界面按 % 换算后传入）";
+                return false;
+            }
+
+            foreach (var cluster in _clusters)
+                cluster.SetSoc(soc);
+
+            UpdateRackState(
+                _currentState.TotalCurrent,
+                _currentState.AvgClusterTemp != 0 ? _currentState.AvgClusterTemp : 25.0,
+                DateTime.UtcNow,
+                TimeSpan.Zero);
+
+            message = $"堆 SOC 已设为 {soc:F4}（MinClusterSOC={_currentState.MinClusterSOC:F4}）";
+            return true;
+        }
+
         // 更新堆状态
         public void Update(double rackCurrent, double ambientTemp, DateTime timeStamp, TimeSpan timeStep)
         {

@@ -16,14 +16,14 @@
         :format-tooltip="v => `${Math.round(v * 100)}%`"
       />
       <el-button size="small" link type="primary" @click="resetZoom">重置 100%</el-button>
-      <span class="toolbar-hint">滚轮缩放 · 按住右键拖动平移</span>
+      <span class="toolbar-hint">右键平移 · Ctrl/⌘ + 滚轮缩放</span>
     </div>
 
     <div
       ref="viewportRef"
       class="mainline-viewport"
       :class="{ 'is-panning': isPanning }"
-      @wheel.prevent="onWheel"
+      @wheel="onWheel"
       @contextmenu.prevent
       @mousedown="onPanMouseDown"
     >
@@ -118,6 +118,7 @@
           @bms-power-on="n => $emit('bms-power-on', n)"
           @bms-power-off="n => $emit('bms-power-off', n)"
           @bms-fault-clear="n => $emit('bms-fault-clear', n)"
+          @bms-set-soc="p => $emit('bms-set-soc', p)"
         />
         <!-- PCS-B / 舱-B -->
         <ChannelBranch
@@ -133,6 +134,7 @@
           @bms-power-on="n => $emit('bms-power-on', n)"
           @bms-power-off="n => $emit('bms-power-off', n)"
           @bms-fault-clear="n => $emit('bms-fault-clear', n)"
+          @bms-set-soc="p => $emit('bms-set-soc', p)"
         />
       </g>
     </svg>
@@ -176,7 +178,8 @@ defineEmits([
   'pcs-set-reactive',
   'bms-power-on',
   'bms-power-off',
-  'bms-fault-clear'
+  'bms-fault-clear',
+  'bms-set-soc'
 ])
 
 const zoom = ref(MIN_ZOOM)
@@ -210,7 +213,10 @@ function resetZoom() {
   panY.value = 0
 }
 
+/** 普通滚轮交给页面滚动；按住 Ctrl/⌘ 才缩放接线图 */
 function onWheel(e) {
+  if (!e.ctrlKey && !e.metaKey) return
+  e.preventDefault()
   const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
   zoom.value = clampZoom(zoom.value + delta)
 }
@@ -261,7 +267,7 @@ const BRANCH = {
   pcsTop: 24,
   pcsH: 228,
   gap: 28,
-  bmsH: 172,
+  bmsH: 198,
   get bmsTop() { return this.pcsTop + this.pcsH + this.gap },
   get linkMid() { return this.pcsTop + this.pcsH + this.gap / 2 },
   get bottomY() { return 96 + this.bmsTop + this.bmsH }
@@ -348,12 +354,12 @@ const powerDrafts = reactive({})
 
 const ChannelBranch = defineComponent({
   props: { channel: Object, side: String, x: Number, busY: Number },
-  emits: ['pcs-start', 'pcs-stop', 'pcs-set-power', 'pcs-set-reactive', 'bms-power-on', 'bms-power-off', 'bms-fault-clear'],
+  emits: ['pcs-start', 'pcs-stop', 'pcs-set-power', 'pcs-set-reactive', 'bms-power-on', 'bms-power-off', 'bms-fault-clear', 'bms-set-soc'],
   setup(p, { emit }) {
     const halfW = BRANCH.boxW / 2
 
     function draftKey(ch, kind) {
-      return `${kind}-${ch?.pcsNumber ?? ''}`
+      return `${kind}-${ch?.pcsNumber ?? ch?.compartmentNumber ?? ''}`
     }
 
     function getDraft(ch, kind, fallback) {
@@ -482,15 +488,22 @@ const ChannelBranch = defineComponent({
           h('div', { xmlns: 'http://www.w3.org/1999/xhtml', class: 'svg-device-box bms-box' }, [
             h('div', { class: 'box-title' }, `BMS 舱${ch.compartmentNumber}`),
             ...bmsLines.map(t => h('div', { class: 'box-line' }, t)),
-            btnRow('上电', '下电',
-              () => emit('bms-power-on', ch.compartmentNumber),
-              () => emit('bms-power-off', ch.compartmentNumber)),
-            h('div', { class: 'box-actions' }, [
-              h('button', {
-                type: 'button',
-                class: 'act-btn act-clear',
-                onClick: (e) => { e.stopPropagation(); emit('bms-fault-clear', ch.compartmentNumber) }
-              }, '故障清除')
+            h('div', { class: 'box-controls' }, [
+              buildSetRow(ch, 'SOC(%)', 'soc', ch.socPercent, () => {
+                const pct = Number(getDraft(ch, 'soc', ch.socPercent))
+                if (!Number.isFinite(pct)) return
+                emit('bms-set-soc', { bmsNumber: ch.compartmentNumber, socPercent: pct })
+              }),
+              btnRow('上电', '下电',
+                () => emit('bms-power-on', ch.compartmentNumber),
+                () => emit('bms-power-off', ch.compartmentNumber)),
+              h('div', { class: 'box-actions' }, [
+                h('button', {
+                  type: 'button',
+                  class: 'act-btn act-clear',
+                  onClick: (e) => { e.stopPropagation(); emit('bms-fault-clear', ch.compartmentNumber) }
+                }, '故障清除')
+              ])
             ])
           ])
         ])

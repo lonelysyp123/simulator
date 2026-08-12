@@ -22,7 +22,7 @@ namespace EssSimulator.EssDeviceSimModel.Battery
                         NominalVoltage = bmsCfg.CellNominalVoltage,
                         NominalCapacity = bmsCfg.CellNominalCapacity,
                         InitialSoc = bmsCfg.CellInitialSoc,
-                        InitialSocRandomRange = bmsCfg.CellInitialSocRandomRange,
+                        InitialSocRandomRange = 0,
                         PackInternalResistance = bmsCfg.PackInternalResistance
                     },
                     ClusterInternalResistance = bmsCfg.ClusterInternalResistance

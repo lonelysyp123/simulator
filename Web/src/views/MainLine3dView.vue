@@ -12,7 +12,7 @@
     <div class="card">
       <p class="card-title">
         电气主接线 3D
-        <span class="card-hint">左键旋转 · 滚轮缩放 · 右键平移 · 单击断路器 · 双击 PCS/BMS 进入设备详情</span>
+        <span class="card-hint">左键旋转 · 滚轮缩放 · 右键平移 · 单击断路器 · 双击 BMS 进入设备详情</span>
       </p>
       <MainLineScene
         :snap="snap"

@@ -151,4 +151,48 @@ public class BmsRackDeviceTests
         Assert.Equal(0f, bmsData.BatteryStacks[0].TotalVoltage);
         Assert.True((rack.GetRackState()?.TotalVoltage ?? 0) > 0);
     }
+
+    [Fact]
+    public void TrySetSoc_UpdatesDeviceSocAndPreservesLink()
+    {
+        var rack = BmsRackFactory.CreateRack(new BmsDeviceConfig
+        {
+            ClusterCount = 1,
+            PackCount = 1,
+            CellSeriesCount = 2,
+            CellParallelCount = 1,
+            CellInitialSoc = 0.4,
+            CellInitialSocRandomRange = 0
+        });
+        var device = new BmsRackDevice("bms_test", rack);
+        device.SetPcsLinked(true);
+
+        Assert.True(device.TrySetSoc(0.66, out var message));
+        Assert.Contains("0.66", message);
+        Assert.Equal(0.66, device.Soc, 2);
+        Assert.True(device.IsLinked);
+    }
+
+    [Fact]
+    public void TrySetSoc_RejectsWhileCharging()
+    {
+        var rack = BmsRackFactory.CreateRack(new BmsDeviceConfig { ClusterCount = 1 });
+        var device = new BmsRackDevice("bms_test", rack);
+        rack.GetRackState()!.TotalCurrent = 40;
+
+        Assert.False(device.TrySetSoc(0.7, out var message));
+        Assert.Contains("待机", message);
+        Assert.NotEqual(0.7, device.Soc, 2);
+    }
+
+    [Fact]
+    public void TrySetSoc_RejectsWhileDischarging()
+    {
+        var rack = BmsRackFactory.CreateRack(new BmsDeviceConfig { ClusterCount = 1 });
+        var device = new BmsRackDevice("bms_test", rack);
+        rack.GetRackState()!.TotalCurrent = -40;
+
+        Assert.False(device.TrySetSoc(0.3, out var message));
+        Assert.Contains("待机", message);
+    }
 }

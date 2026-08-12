@@ -32,7 +32,10 @@
           v-for="node in nodes"
           :key="node.id"
           class="node"
-          :class="{ selected: node.id === selectedNodeId }"
+          :class="{
+            selected: node.id === selectedNodeId,
+            problem: problemSet.has(node.id)
+          }"
           :transform="`translate(${node.x},${node.y})`"
           @mousedown.stop="onNodeDown($event, node)"
           @click.stop="emit('select-node', node.id)"
@@ -61,6 +64,34 @@
             <circle :cx="sizeOf(node).w / 2" cy="42" r="14" />
             <circle :cx="sizeOf(node).w / 2" cy="78" r="14" />
           </g>
+          <g v-if="node.templateId === 'ac_breaker'" fill="none" stroke="#fff" stroke-width="2">
+            <!-- 三相竖线 + 中间联动开关 -->
+            <line :x1="sizeOf(node).w * 0.2" y1="18" :x2="sizeOf(node).w * 0.2" y2="42" />
+            <line :x1="sizeOf(node).w * 0.5" y1="18" :x2="sizeOf(node).w * 0.5" y2="42" />
+            <line :x1="sizeOf(node).w * 0.8" y1="18" :x2="sizeOf(node).w * 0.8" y2="42" />
+            <line
+              :x1="sizeOf(node).w * 0.2"
+              :y1="breakerClosed(node) ? 55 : 48"
+              :x2="sizeOf(node).w * 0.8"
+              :y2="breakerClosed(node) ? 55 : 48"
+              stroke-width="2.5"
+            />
+            <line :x1="sizeOf(node).w * 0.2" :y1="breakerClosed(node) ? 55 : 48" :x2="sizeOf(node).w * 0.2" y2="68" />
+            <line :x1="sizeOf(node).w * 0.5" :y1="breakerClosed(node) ? 55 : 48" :x2="sizeOf(node).w * 0.5" y2="68" />
+            <line :x1="sizeOf(node).w * 0.8" :y1="breakerClosed(node) ? 55 : 48" :x2="sizeOf(node).w * 0.8" y2="68" />
+            <line
+              v-if="!breakerClosed(node)"
+              :x1="sizeOf(node).w * 0.35"
+              y1="42"
+              :x2="sizeOf(node).w * 0.65"
+              y2="68"
+              stroke="#ffdddd"
+              stroke-width="2"
+            />
+            <line :x1="sizeOf(node).w * 0.2" y1="68" :x2="sizeOf(node).w * 0.2" :y2="sizeOf(node).h - 18" />
+            <line :x1="sizeOf(node).w * 0.5" y1="68" :x2="sizeOf(node).w * 0.5" :y2="sizeOf(node).h - 18" />
+            <line :x1="sizeOf(node).w * 0.8" y1="68" :x2="sizeOf(node).w * 0.8" :y2="sizeOf(node).h - 18" />
+          </g>
 
           <text
             :x="sizeOf(node).w / 2"
@@ -83,13 +114,21 @@
             :key="port.id"
             class="port"
             :class="{ active: linking && linking.nodeId === node.id && linking.portId === port.id }"
-            @mousedown.stop
+            @mousedown.stop.prevent
             @click.stop="emit('port-click', { nodeId: node.id, portId: port.id })"
           >
+            <!-- 透明扩大命中区 -->
             <circle
               :cx="port.localX"
               :cy="port.localY"
-              r="5"
+              r="14"
+              fill="transparent"
+              stroke="none"
+            />
+            <circle
+              :cx="port.localX"
+              :cy="port.localY"
+              r="7"
               :fill="portFill(port)"
               stroke="#fff"
               stroke-width="1.5"
@@ -99,13 +138,13 @@
         </g>
       </g>
     </svg>
-    <div class="hint">滚轮缩放 · 右键拖动画布 · 点击拐角连线 · Delete 删除选中</div>
+    <div class="hint">滚轮缩放 · 右键拖动画布 · 点拐角连线（三相/直流自动成组）· 网格吸附 · Ctrl+Z 撤销 · Delete 删除</div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { formatVoltage, nodeSize, portPosition, templateColor } from './nodeLayout.js'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { formatVoltage, nodeSize, portPosition, snapToGrid, templateColor } from './nodeLayout.js'
 
 const props = defineProps({
   nodes: { type: Array, default: () => [] },
@@ -114,14 +153,16 @@ const props = defineProps({
   selectedNodeId: { type: String, default: null },
   selectedEdgeId: { type: String, default: null },
   linking: { type: Object, default: null },
-  pointerWorld: { type: Object, default: null }
+  pointerWorld: { type: Object, default: null },
+  problemNodeIds: { type: Array, default: () => [] },
+  snap: { type: Boolean, default: true }
 })
 
 const emit = defineEmits(['select-node', 'select-edge', 'port-click', 'move-node', 'pointer-world'])
 
 const root = ref(null)
-const width = ref(800)
-const height = ref(560)
+const width = ref(0)
+const height = ref(0)
 const panX = ref(40)
 const panY = ref(40)
 const scale = ref(1)
@@ -131,6 +172,8 @@ const tplMap = computed(() => {
   for (const t of props.templates) m[t.id] = t
   return m
 })
+
+const problemSet = computed(() => new Set(props.problemNodeIds || []))
 
 function sizeOf(node) {
   return nodeSize(node.templateId)
@@ -175,8 +218,27 @@ function voltageHint(node) {
     const v = series * Number(p.cellNominalVoltage || 0)
     return v > 0 ? `≈${formatVoltage(v)}` : ''
   }
-  if (node.templateId === 'ac_meter') return `PT ${formatVoltage(p.ptPrimaryVoltage)}`
+  if (node.templateId === 'ac_breaker') {
+    const closed = breakerClosed(node)
+    const role = p.isMainBreaker === true || p.isMainBreaker === 'true' ? '主断 · ' : ''
+    return `${role}${closed ? '合' : '分'} · ${formatVoltage(p.ratedVoltage)}`
+  }
+  if (node.templateId === 'ac_meter') {
+    const role = p.isPccMeter === true || p.isPccMeter === 'true' ? '并网点 · ' : ''
+    return `${role}PT/CT ${formatVoltage(p.ptPrimaryVoltage)} / ${Number(p.ctPrimaryCurrent || 0).toFixed(0)}A`
+  }
+  if (node.templateId === 'load') {
+    const pKw = Number(p.activePowerKw || 0)
+    const qKvar = Number(p.reactivePowerKvar || 0)
+    return `P ${pKw.toFixed(1)}kW · Q ${qKvar.toFixed(1)}kvar`
+  }
   return ''
+}
+
+function breakerClosed(node) {
+  const v = node?.parameters?.closed
+  if (v === false || v === 'false' || v === 0) return false
+  return true
 }
 
 const edgePaths = computed(() => {
@@ -207,6 +269,7 @@ const draftLine = computed(() => {
 })
 
 function clientToWorld(clientX, clientY) {
+  if (!root.value) return { x: 0, y: 0 }
   const rect = root.value.getBoundingClientRect()
   return {
     x: (clientX - rect.left - panX.value) / scale.value,
@@ -215,6 +278,7 @@ function clientToWorld(clientX, clientY) {
 }
 
 function onWheel(ev) {
+  if (!root.value) return
   const factor = ev.deltaY > 0 ? 0.9 : 1.1
   const next = Math.min(2.5, Math.max(0.35, scale.value * factor))
   const rect = root.value.getBoundingClientRect()
@@ -231,11 +295,30 @@ let panning = false
 let panStart = null
 let draggingNode = null
 let dragOffset = null
+let tracking = false
+let alive = true
+
+function bindWindowTracking() {
+  if (!alive || tracking) return
+  tracking = true
+  window.addEventListener('mousemove', onMoveTrack, true)
+  window.addEventListener('mouseup', onUpTrack, true)
+  window.addEventListener('blur', onUpTrack)
+}
+
+function unbindWindowTracking() {
+  if (!tracking) return
+  tracking = false
+  window.removeEventListener('mousemove', onMoveTrack, true)
+  window.removeEventListener('mouseup', onUpTrack, true)
+  window.removeEventListener('blur', onUpTrack)
+}
 
 function onBackgroundDown(ev) {
   if (ev.button === 2 || ev.button === 1 || (ev.button === 0 && ev.altKey)) {
     panning = true
     panStart = { x: ev.clientX, y: ev.clientY, panX: panX.value, panY: panY.value }
+    bindWindowTracking()
   }
 }
 
@@ -244,23 +327,38 @@ function onNodeDown(ev, node) {
   draggingNode = node
   const w = clientToWorld(ev.clientX, ev.clientY)
   dragOffset = { x: w.x - node.x, y: w.y - node.y }
+  bindWindowTracking()
 }
 
 function onMoveTrack(ev) {
+  if (!alive || !root.value) return
   if (panning && panStart) {
     panX.value = panStart.panX + (ev.clientX - panStart.x)
     panY.value = panStart.panY + (ev.clientY - panStart.y)
   } else if (draggingNode && dragOffset) {
     const w = clientToWorld(ev.clientX, ev.clientY)
-    draggingNode.x = Math.round(w.x - dragOffset.x)
-    draggingNode.y = Math.round(w.y - dragOffset.y)
+    let x = w.x - dragOffset.x
+    let y = w.y - dragOffset.y
+    if (props.snap) {
+      x = snapToGrid(x)
+      y = snapToGrid(y)
+    } else {
+      x = Math.round(x)
+      y = Math.round(y)
+    }
+    draggingNode.x = x
+    draggingNode.y = y
   }
-  if (props.linking && root.value) {
+  if (props.linking) {
     emit('pointer-world', clientToWorld(ev.clientX, ev.clientY))
   }
 }
 
 function onUpTrack() {
+  if (!alive) {
+    unbindWindowTracking()
+    return
+  }
   if (draggingNode) {
     emit('move-node', { id: draggingNode.id, x: draggingNode.x, y: draggingNode.y })
   }
@@ -268,25 +366,47 @@ function onUpTrack() {
   panStart = null
   draggingNode = null
   dragOffset = null
+  // 连线预览仍需要跟踪时保持监听；否则释放
+  if (!props.linking) unbindWindowTracking()
 }
 
 function resize() {
   if (!root.value) return
-  width.value = root.value.clientWidth
-  height.value = root.value.clientHeight
+  const w = root.value.clientWidth
+  const h = root.value.clientHeight
+  if (w > 0) width.value = w
+  if (h > 0) height.value = h
 }
+
+let ro = null
 
 onMounted(() => {
   resize()
   window.addEventListener('resize', resize)
-  window.addEventListener('mousemove', onMoveTrack)
-  window.addEventListener('mouseup', onUpTrack)
+  if (typeof ResizeObserver !== 'undefined' && root.value) {
+    ro = new ResizeObserver(() => resize())
+    ro.observe(root.value)
+  }
 })
 
 onUnmounted(() => {
+  alive = false
   window.removeEventListener('resize', resize)
-  window.removeEventListener('mousemove', onMoveTrack)
-  window.removeEventListener('mouseup', onUpTrack)
+  unbindWindowTracking()
+  if (ro) {
+    ro.disconnect()
+    ro = null
+  }
+  panning = false
+  panStart = null
+  draggingNode = null
+  dragOffset = null
+})
+
+// 进入连线态时开始跟踪鼠标画预览线
+watch(() => props.linking, (v) => {
+  if (v) bindWindowTracking()
+  else if (!panning && !draggingNode) unbindWindowTracking()
 })
 
 defineExpose({ clientToWorld })
@@ -297,7 +417,8 @@ defineExpose({ clientToWorld })
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 480px;
+  min-width: 0;
+  min-height: 0;
   background:
     linear-gradient(90deg, rgba(0,0,0,.03) 1px, transparent 1px) 0 0 / 20px 20px,
     linear-gradient(rgba(0,0,0,.03) 1px, transparent 1px) 0 0 / 20px 20px,
@@ -308,7 +429,7 @@ defineExpose({ clientToWorld })
   cursor: default;
   user-select: none;
 }
-.topo-svg { display: block; width: 100%; height: 100%; }
+.topo-svg { display: block; width: 100%; height: 100%; max-width: 100%; }
 .edge {
   fill: none;
   stroke: #606266;
@@ -319,10 +440,12 @@ defineExpose({ clientToWorld })
 .edge.draft { stroke: #409eff; stroke-dasharray: 6 4; }
 .node { cursor: grab; }
 .node.selected rect { stroke: #e6a23c; stroke-width: 2.5; }
+.node.problem rect,
+.node.problem > rect { stroke: #f56c6c; stroke-width: 2.5; }
 .node-label { font-size: 12px; font-weight: 600; pointer-events: none; }
 .node-sub { font-size: 10px; pointer-events: none; }
 .port { cursor: crosshair; }
-.port.active circle { stroke: #e6a23c; stroke-width: 2.5; }
+.port.active circle:last-of-type { stroke: #e6a23c; stroke-width: 2.5; }
 .hint {
   position: absolute;
   left: 10px;

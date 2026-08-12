@@ -75,7 +75,8 @@ export class SceneController {
 
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color(0x8a9aab)
-    this.scene.fog = new THREE.Fog(0x8a9aab, 70, 280)
+    // 近景清晰、远景更快虚化
+    this.scene.fog = new THREE.Fog(0x8a9aab, 48, 165)
 
     this.camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 2000)
     this.camera.position.set(28, 22, 38)
@@ -107,7 +108,10 @@ export class SceneController {
         if (pickId === 'main') this.onEvent('toggle-main-breaker')
         else if (typeof unitIndex === 'number') this.onEvent('toggle-unit-breaker', unitIndex)
       },
-      onDeviceDblClick: (panelKey) => this.enterDeviceDetail(panelKey),
+      onDeviceDblClick: (panelKey) => {
+        // 仅 BMS 支持双击进入 3D 详情；PCS 不再切入剖切视图
+        if (String(panelKey || '').startsWith('bms-')) this.enterDeviceDetail(panelKey)
+      },
       onPointerMove: (e) => this._onDetailPointerMove(e),
       onClick: (e) => this._onDetailClick(e)
     })
@@ -187,14 +191,11 @@ export class SceneController {
     this.groundMat = new THREE.MeshStandardMaterial({ color: 0x4d6a46, metalness: 0.02, roughness: 0.95 })
     this.ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.groundMat)
     this.ground.rotation.x = -Math.PI / 2
+    this.ground.position.y = -0.02
     this.ground.receiveShadow = true
     this.scene.add(this.ground)
-    // 弱网格，偏草地色
-    this.grid = new THREE.GridHelper(1, 20, 0x5a7852, 0x456342)
-    this.grid.position.y = 0.015
-    this.grid.material.transparent = true
-    this.grid.material.opacity = 0.35
-    this.scene.add(this.grid)
+    // 不再叠加 GridHelper：与水泥垫/路面几乎共面时缩放会闪烁
+    this.grid = null
     this._resizeGround(280)
   }
 
@@ -213,19 +214,12 @@ export class SceneController {
       this.grid.geometry?.dispose?.()
       if (Array.isArray(this.grid.material)) this.grid.material.forEach(m => m.dispose?.())
       else this.grid.material?.dispose?.()
-      const divisions = Math.min(80, Math.max(20, Math.round(size / 6)))
-      this.grid = new THREE.GridHelper(size, divisions, 0x5a7852, 0x456342)
-      this.grid.position.y = 0.015
-      if (this.grid.material) {
-        this.grid.material.transparent = true
-        this.grid.material.opacity = 0.28
-      }
-      this.scene.add(this.grid)
+      this.grid = null
     }
     if (this.scene.fog) {
       // 近景清晰、远景快速虚化，营造电站外围模糊感
-      this.scene.fog.near = Math.max(45, size * 0.22)
-      this.scene.fog.far = Math.max(160, size * 0.85)
+      this.scene.fog.near = Math.max(36, size * 0.14)
+      this.scene.fog.far = Math.max(120, size * 0.55)
     }
   }
 
@@ -576,6 +570,7 @@ export class SceneController {
     if (this.stationRoot) this.stationRoot.visible = !!visible
     if (this.envRoot) this.envRoot.visible = !!visible
     if (this.grid) this.grid.visible = !!visible
+    if (this.ground) this.ground.visible = !!visible
   }
 
   _notifyViewMode() {
@@ -586,13 +581,14 @@ export class SceneController {
   }
 
   /**
-   * 双击设备：切入 PCS/BMS 详情 3D
+   * 双击设备：切入 BMS 详情 3D（PCS 已禁用）
    * @param {string} panelKey
    * @param {{ skipSaveCamera?: boolean }} [opts]
    */
   enterDeviceDetail(panelKey, opts = {}) {
     const resolved = this._resolvePanelKey(panelKey)
     if (!resolved) return
+    if (resolved.type !== 'bms') return
 
     if (this.viewMode === 'station' && !opts.skipSaveCamera) {
       this._savedCamera = {
@@ -828,7 +824,7 @@ export class SceneController {
       let tripped = false
       let powerKw = 0
 
-      if (role === 'grid-main' || role === 'main-xf' || role === 'xf-bus35' || role === 'bus35') {
+      if (role === 'grid-main' || role === 'main-xf' || role === 'xf-bus35') {
         // 35kV / 进线级：看整个储能区对外输出
         energized = mainLive
         tripped = !!snap.mainBreakerTripped
@@ -839,7 +835,7 @@ export class SceneController {
         tripped = !!(unit?.unitBreakerTripped || snap.mainBreakerTripped)
         const unitPower = channelPowerKw(unit?.channelA) + channelPowerKw(unit?.channelB)
 
-        if (role === 'unit-drop' || role === 'unit-xf' || role === 'unit-690' || role === 'unit-690-bus') {
+        if (role === 'unit-drop' || role === 'unit-xf' || role === 'unit-690') {
           // 储能单元级：两台 PCS 功率合计
           energized = unitLive
           powerKw = unitPower
@@ -851,6 +847,21 @@ export class SceneController {
         }
       }
       updateCableState(cable, { energized, tripped, powerKw })
+    }
+
+    // 母线汇流点通电态（随主断/单元断变化）
+    for (const node of this.refs.busNodes || []) {
+      const role = node.userData.busRole
+      let live = mainLive
+      if (role === 'unit-690-bus') {
+        const unit = (snap.units || []).find(x => x.unitIndex === node.userData.unitIndex)
+        live = !!(unit?.unitBreakerClosed && !unit?.unitBreakerTripped && mainLive)
+      }
+      const core = node.children?.[0]
+      if (core?.material) {
+        core.material.color?.setHex?.(live ? 0xe07a3a : 0x8a9099)
+        if (core.material.emissive) core.material.emissiveIntensity = live ? 0.55 : 0.12
+      }
     }
 
     // 面板数据

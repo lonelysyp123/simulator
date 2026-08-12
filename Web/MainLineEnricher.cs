@@ -1,23 +1,27 @@
 using EssSimulator.Display;
 using EssSimulator.EssSimModelApi.Mappers;
+using EssSimulator.Web.Topology;
 
 namespace EssSimulator.Web
 {
     /// <summary>为主接线 Web 视图补充 PCS/BMS 展示字段（对齐原 TUI 主接线图信息量）。</summary>
     public static class MainLineEnricher
     {
-        public static MainLineViewModel Build()
+        public static MainLineViewModel Build(TopologyStore? topologyStore = null)
         {
             int channelCount = Math.Max(1, GuiSimDataAccess.GetEssUnitCount());
             int unitCount = Math.Max(1, (int)Math.Ceiling(channelCount / 2.0));
             var snap = GuiElectricalReader.ReadMainLine(0, unitCount);
-            return Build(snap, channelCount);
+            return Build(snap, channelCount, topologyStore);
         }
 
-        public static MainLineViewModel Build(MainLineSnapshot snap, int? channelCountOverride = null)
+        public static MainLineViewModel Build(
+            MainLineSnapshot snap,
+            int? channelCountOverride = null,
+            TopologyStore? topologyStore = null)
         {
             int channelCount = channelCountOverride ?? Math.Max(1, GuiSimDataAccess.GetEssUnitCount());
-            return new MainLineViewModel
+            var vm = new MainLineViewModel
             {
                 PropagationEnabled = snap.PropagationEnabled,
                 MainBreakerClosed = snap.MainBreakerClosed,
@@ -41,6 +45,44 @@ namespace EssSimulator.Web
                 MainBreakerLabel = FormatBreaker(snap.MainBreakerClosed, snap.MainBreakerTripped),
                 Units = snap.Units.Select(u => EnrichUnit(u, channelCount)).ToList()
             };
+
+            AttachTopology(vm, topologyStore);
+            return vm;
+        }
+
+        private static void AttachTopology(MainLineViewModel vm, TopologyStore? store)
+        {
+            if (store == null) return;
+            try
+            {
+                var mode = store.LoadRuntimeMode();
+                if (!mode.EngineeringMode) return;
+
+                TopologyProject? project = null;
+                if (!string.IsNullOrWhiteSpace(mode.ActiveProjectId))
+                    project = store.LoadNamedProject(mode.ActiveProjectId!);
+                project ??= store.LoadProject();
+                if (project == null || project.Nodes.Count == 0) return;
+
+                vm.EngineeringMode = true;
+                vm.Topology = project;
+                vm.TopologyTemplates = TopologyTemplates.All.ToList();
+                vm.ActiveProjectName = mode.ActiveProjectName ?? project.Name;
+                vm.HasTopologyLoad = project.Nodes.Any(n => n.TemplateId == "load");
+
+                // 工程模式且无负载节点：概览负载冻结为 0，前端置灰不可改
+                if (!vm.HasTopologyLoad)
+                {
+                    vm.LoadActivePowerKw = 0;
+                    vm.LoadReactivePowerKvar = 0;
+                    vm.LoadActivePowerSetKw = 0;
+                    vm.LoadReactivePowerSetKvar = 0;
+                }
+            }
+            catch
+            {
+                /* 组态附加失败不影响主接线遥测 */
+            }
         }
 
         private static MainLineUnitViewModel EnrichUnit(UnitBranchSnapshot u, int channelCount)
@@ -181,6 +223,14 @@ namespace EssSimulator.Web
         public MeterThreePhaseSnapshot MeterThreePhase { get; set; }
         public string BlackStartSummary { get; set; } = "";
         public List<MainLineUnitViewModel> Units { get; set; } = new();
+
+        /// <summary>工程模式开启且存在激活组态时为 true，前端按组态拓扑绘制主接线。</summary>
+        public bool EngineeringMode { get; set; }
+        /// <summary>工程模式组态中是否存在「负载」节点；无则概览负载置灰冻结。</summary>
+        public bool HasTopologyLoad { get; set; }
+        public string? ActiveProjectName { get; set; }
+        public TopologyProject? Topology { get; set; }
+        public List<TopologyTemplate>? TopologyTemplates { get; set; }
     }
 
     public sealed class MainLineUnitViewModel

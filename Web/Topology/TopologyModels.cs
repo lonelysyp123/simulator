@@ -92,12 +92,24 @@ namespace EssSimulator.Web.Topology
         /// <summary>校验失败时应解绑的边（通常是刚建立的那条）。</summary>
         public string? RejectEdgeId { get; set; }
         public List<string> Details { get; set; } = new();
+        /// <summary>与错误相关的节点 Id，供前端高亮定位。</summary>
+        public List<string> ProblemNodeIds { get; set; } = new();
     }
 
     public sealed class ConnectRequest
     {
         public TopologyProject Project { get; set; } = new();
-        public TopologyEdge Edge { get; set; } = new();
+        public TopologyEdge? Edge { get; set; }
+        /// <summary>为 true（默认）时，交流同侧三相 / 直流正负极自动成组连接。</summary>
+        public bool ExpandBundle { get; set; } = true;
+    }
+
+    public sealed class ScaffoldRequest
+    {
+        /// <summary>EMU 单元数，1–20。</summary>
+        public int EmuCount { get; set; } = 1;
+        public string? Name { get; set; }
+        public bool IncludeLoad { get; set; } = true;
     }
 
     public sealed class ConnectResponse
@@ -140,6 +152,22 @@ namespace EssSimulator.Web.Topology
             if (raw is System.Text.Json.JsonElement je)
                 return je.ValueKind == System.Text.Json.JsonValueKind.String ? (je.GetString() ?? fallback) : je.ToString();
             return raw.ToString() ?? fallback;
+        }
+
+        public static bool GetBool(IReadOnlyDictionary<string, object?> parameters, string key, bool fallback = false)
+        {
+            if (parameters == null || !parameters.TryGetValue(key, out var raw) || raw == null)
+                return fallback;
+            if (raw is bool b) return b;
+            if (raw is System.Text.Json.JsonElement je)
+            {
+                if (je.ValueKind == System.Text.Json.JsonValueKind.True) return true;
+                if (je.ValueKind == System.Text.Json.JsonValueKind.False) return false;
+                if (je.ValueKind == System.Text.Json.JsonValueKind.String &&
+                    bool.TryParse(je.GetString(), out var pb)) return pb;
+            }
+            if (bool.TryParse(raw.ToString(), out var parsed)) return parsed;
+            return fallback;
         }
     }
 }

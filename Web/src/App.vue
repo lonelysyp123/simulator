@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout" :class="{ 'is-system-locked': systemLock.locked }">
     <header class="app-header">
       <span class="title">储能仿真模拟器</span>
       <span class="status">
@@ -27,6 +27,10 @@
             <el-icon><EditPen /></el-icon>
             <span>组态编辑</span>
           </el-menu-item>
+          <el-menu-item index="/projects">
+            <el-icon><FolderOpened /></el-icon>
+            <span>工程管理</span>
+          </el-menu-item>
 
           <div class="menu-group-label">电池系统</div>
           <el-menu-item index="/battery">
@@ -47,6 +51,10 @@
           </el-menu-item>
 
           <div class="menu-group-label">运维工具</div>
+          <el-menu-item index="/system">
+            <el-icon><Setting /></el-icon>
+            <span>系统配置</span>
+          </el-menu-item>
           <el-menu-item index="/command">
             <el-icon><Promotion /></el-icon>
             <span>命令输入</span>
@@ -65,13 +73,41 @@
         <router-view />
       </main>
     </div>
+
+    <!-- 系统重新初始化：全屏遮罩，禁止切换与其它操作 -->
+    <div
+      v-if="systemLock.locked"
+      class="system-lock-mask"
+      role="alertdialog"
+      aria-modal="true"
+      aria-busy="true"
+    >
+      <div class="system-lock-panel">
+        <el-icon class="system-lock-spin" :size="36"><Loading /></el-icon>
+        <div class="system-lock-title">正在重新初始化</div>
+        <div class="system-lock-stage">{{ systemLock.stage || '处理中' }}</div>
+        <el-progress
+          class="system-lock-progress"
+          :percentage="systemLock.progress"
+          :stroke-width="12"
+          striped
+          striped-flow
+          :duration="12"
+          :status="systemLock.progress >= 100 ? 'success' : undefined"
+        />
+        <div class="system-lock-msg">{{ systemLock.message }}</div>
+        <div class="system-lock-sub">请勿切换页面或关闭窗口</div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { Loading } from '@element-plus/icons-vue'
 import { getHealth, getAlert, getHub, getConfig } from '@/services/api.js'
 import { RealtimeMethods } from '@/services/constants.js'
+import { systemLock } from '@/services/systemLock.js'
 import BatteryStackIcon from '@/components/icons/BatteryStackIcon.vue'
 
 const ready = ref(false)

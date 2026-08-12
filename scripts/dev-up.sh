@@ -192,15 +192,22 @@ case "$MODE" in
     echo "  前端(HMR): http://localhost:${VITE_PORT}/"
     echo "  后端 API:  ${BACKEND_URL}/api/health"
     echo "  后端同源:  ${BACKEND_URL}/  (需已有 wwwroot 构建产物)"
-    # 任一子进程退出则结束
+    echo "  提示: 系统配置「应用到仿真」会重启后端；本脚本会自动拉起。"
+    # 前端退出则结束；后端退出则自动重启（支持组态工程模式热应用）
     while true; do
-      if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-        echo "后端已退出" >&2
-        exit 1
-      fi
       if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
         echo "前端已退出" >&2
         exit 1
+      fi
+      if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+        echo "==> 后端已退出，正在按当前配置重启..." >&2
+        sleep 1
+        if port_in_use "$HTTP_PORT"; then
+          echo "    等待端口 $HTTP_PORT 释放..." >&2
+          sleep 2
+        fi
+        start_backend
+        wait_http "${BACKEND_URL}/api/health" "后端" 90 || true
       fi
       sleep 1
     done

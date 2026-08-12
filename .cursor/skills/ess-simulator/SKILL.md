@@ -108,6 +108,24 @@ dotnet test EssSimulator.Tests/EssSimulator.Tests.csproj
 - 点表绑定/SOC 等：`EssSimulator.Tests/DataExchange/BmsTelemetryBindingTests.cs`
 - 改模型/ Solver / 管道后应跑相关测试
 
+## 组态编辑要点
+
+- 连线：点任一相口即可成组连接（AC 同侧 A/B/C，DC 同侧正/负）；`POST /api/topology/connect` 默认 `expandBundle: true`。
+- 标准径向骨架：`POST /api/topology/scaffold`（EMU 1–20）；编辑页「标准拓扑向导」。
+- 画布：20px 网格吸附；Ctrl+Z / Ctrl+Shift+Z 撤销重做；保存校验失败返回 `problemNodeIds` 供高亮。
+
+## 电气主接线绘制规则
+
+组态驱动的单线图（`topologyMainLineLayout.js` + `TopologyMainLineSvg.vue`）：
+
+1. **禁止贴连**：设备与母线、设备与设备之间必须有可见黑线引线段（`LINK_STUB`，默认 18px），不得直接邻接。
+2. **单挂省略母线**：母线下方只挂 1 台设备时省略该母线，上下设备用黑线直连（如仅 1 个 EMU 时省略 LV 母线；HV 仅挂主变时省略 HV；有负载/电表时 HV 保留；仅 1 路 PCS 时省略 690 母线）。
+3. **同行避让**：同行相邻设备中心距 ≥ `ROW_PEER_GAP`（默认 168px），避免符号/标签/框体重叠（如主变、并网点电表、HV 侧负载）；有电表时主变标签靠左。
+4. **站侧骨架**：电网 —引线—（主断）—引线— [HV 母线?] —引线— 主变/负载/电表 —引线— [LV 母线?] —单元。
+5. **负载**：按组态连通挂到对应 AC 母线（直连或经断路器；HV/LV 均可），显示概览绑定的 P/Q；无负载/未接入母线则不画，工程模式无负载时概览置灰。
+6. **单元支路**：…单元断 —引线— 单元变 —引线— [690 母线?] — PCS；DC 并联母线同理（下方仅 1 路可省）。
+7. **EMU 虚线框**仅为遮罩（无说明文字），不参与电气坐标与连通。
+
 ## 详细资料
 
 - 架构与数据流：[architecture.md](architecture.md)

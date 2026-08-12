@@ -77,9 +77,14 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         {
             _scheduleStopped = true;
             if (characteristic == "activePower")
-                ActivePowerSetpointKw = value;
+            {
+                // 规则：负载只能消耗有功（≤0），禁止向电网释放（正值钳位为 0）
+                ActivePowerSetpointKw = value > 0 ? 0 : value;
+            }
             else if (characteristic == "reactivePower")
+            {
                 ReactivePowerSetpointKvar = value;
+            }
 
             if (_config.Powered)
                 ApplyMeasuredPowerFromSetpoints();

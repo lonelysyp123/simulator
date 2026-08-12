@@ -312,6 +312,83 @@ public class TopologyValidatorTests
     }
 
     [Fact]
+    public void Save_validation_requires_grid_main_breaker_and_pcc_meter()
+    {
+        var incomplete = new TopologyProject
+        {
+            Nodes = { Node("grid1", "grid", "电网") }
+        };
+        var r0 = TopologyValidator.ValidateProjectForSave(incomplete);
+        Assert.False(r0.Ok);
+        Assert.Equal("NEED_MAIN_BREAKER", r0.Code);
+
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brk1", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true })
+            }
+        };
+        var ok = TopologyValidator.ValidateProjectForSave(p);
+        Assert.True(ok.Ok);
+
+        p.Nodes.Add(Node("brk2", "ac_breaker", "另一断", new Dictionary<string, object?> { ["isMainBreaker"] = true }));
+        var multi = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(multi.Ok);
+        Assert.Equal("MULTI_MAIN_BREAKER", multi.Code);
+    }
+
+    [Fact]
+    public void Bus_top_accepts_ac_breaker_and_energizes_through_when_closed()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brk1", "ac_breaker", "进线断路器"),
+                Node("bus1", "ac_bus", "220kV母线")
+            }
+        };
+
+        Assert.True(Connect(p, Edge("grid1", "a", "brk1", "a")).Ok);
+        Assert.True(Connect(p, Edge("grid1", "b", "brk1", "b")).Ok);
+        Assert.True(Connect(p, Edge("grid1", "c", "brk1", "c")).Ok);
+
+        Assert.True(Connect(p, Edge("brk1", "a2", "bus1", "a")).Ok);
+        Assert.True(Connect(p, Edge("brk1", "b2", "bus1", "b")).Ok);
+        Assert.True(Connect(p, Edge("brk1", "c2", "bus1", "c")).Ok);
+
+        TopologyValidator.RefreshAcBusEnergization(p);
+        var bus = p.Nodes.First(n => n.Id == "bus1");
+        Assert.True(bus.Parameters.TryGetValue("energized", out var en) && en is true);
+        Assert.Equal(220000d, TopologyParamHelper.GetDouble(bus.Parameters, "nominalVoltage", 0), 1);
+    }
+
+    [Fact]
+    public void Bus_top_breaker_open_does_not_energize()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brk1", "ac_breaker", "进线断路器", new Dictionary<string, object?> { ["closed"] = false }),
+                Node("bus1", "ac_bus", "220kV母线")
+            }
+        };
+
+        Assert.True(Connect(p, Edge("grid1", "a", "brk1", "a")).Ok);
+        Assert.True(Connect(p, Edge("brk1", "a2", "bus1", "a")).Ok);
+
+        TopologyValidator.RefreshAcBusEnergization(p);
+        var bus = p.Nodes.First(n => n.Id == "bus1");
+        Assert.False(bus.Parameters.TryGetValue("energized", out var en) && en is true);
+    }
+
+    [Fact]
     public void Happy_path_grid_bus_transformer_energizes_secondary_bus()
     {
         var p = new TopologyProject

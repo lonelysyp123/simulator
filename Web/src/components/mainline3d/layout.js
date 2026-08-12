@@ -18,6 +18,11 @@ export const Z = {
 
 export const Y = {
   ground: 0,
+  /**
+   * 设备间电缆贴地走线高度（管心）
+   * 须高于水泥垫/基座顶面 + 最大管径半径，避免刚体段陷入地面
+   */
+  cable: 0.55,
   bus35: 4.2,
   bus690: 2.4,
   equipment: 1.2,

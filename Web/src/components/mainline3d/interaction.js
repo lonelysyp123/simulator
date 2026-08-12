@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 const CLICK_SLOP_PX = 6
 
 /**
- * OrbitControls + Raycaster：单击断路器、双击 PCS/BMS 进入设备详情
+ * OrbitControls + Raycaster：单击断路器、双击 BMS 进入设备详情
  */
 export function createInteraction(camera, domElement, scene, { onBreakerClick, onDeviceDblClick, onPointerMove, onClick }) {
   const controls = new OrbitControls(camera, domElement)

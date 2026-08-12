@@ -7,6 +7,7 @@ using EssSimulator.EssSimModelApi;
 using EssSimulator.Licensing;
 using EssSimulator.LocalControl;
 using EssSimulator.Web;
+using EssSimulator.Web.Topology;
 using log4net;
 using log4net.Appender;
 using log4net.Config;
@@ -236,6 +237,14 @@ namespace EssSimulator
             if (!EnforceLicenseOrExit(builder.Configuration))
                 return;
 
+            // 组态工程模式：若已应用 overlay，则覆盖 EssUnits / Pcc / 变压器等
+            var topologyOverlay = TryLoadTopologyOverlay(builder.Environment.ContentRootPath);
+            if (topologyOverlay != null)
+            {
+                Console.WriteLine(
+                    $"[Topology] 工程模式已启用：{topologyOverlay.SourceProjectName}（{topologyOverlay.EssUnits.Count} 单元）");
+            }
+
             // 绑定配置节
             builder.Services.Configure<SimulatorConfig>(builder.Configuration.GetSection(SimulatorConfig.Section));
             builder.Services.Configure<EditionConfig>(builder.Configuration.GetSection(EditionConfig.Section));
@@ -256,6 +265,9 @@ namespace EssSimulator
             {
                 var units = builder.Configuration.GetSection(EssUnitsConfig.Section).Get<List<EssUnitConfig>>();
                 if (units is { Count: > 0 }) opt.Devices = units;
+
+                if (topologyOverlay?.EssUnits is { Count: > 0 })
+                    opt.Devices = topologyOverlay.EssUnits;
 
                 var edition = builder.Configuration.GetSection(EditionConfig.Section).Get<EditionConfig>()
                     ?? new EditionConfig();
@@ -287,6 +299,32 @@ namespace EssSimulator
                 builder.Configuration.GetSection(EssSimulator.EssDeviceSimModel.Model.MeterConfig.Section));
             builder.Services.Configure<DataExchangeOptions>(builder.Configuration.GetSection(DataExchangeOptions.Section));
             builder.Services.Configure<WebConfig>(builder.Configuration.GetSection(WebConfig.Section));
+
+            if (topologyOverlay != null)
+            {
+                if (topologyOverlay.Pcs != null)
+                    builder.Services.PostConfigure<PcsPhysicalConfig>(pcs => CopyPcs(topologyOverlay.Pcs, pcs));
+                if (topologyOverlay.Transformer != null)
+                    builder.Services.PostConfigure<TransformerConfig>(t => CopyTransformer(topologyOverlay.Transformer, t));
+                if (topologyOverlay.UnitTransformer != null)
+                    builder.Services.PostConfigure<UnitTransformerConfig>(t => CopyUnitTransformer(topologyOverlay.UnitTransformer, t));
+                if (topologyOverlay.Pcc != null)
+                    builder.Services.PostConfigure<PccConfig>(p => CopyPcc(topologyOverlay.Pcc, p));
+                if (topologyOverlay.Meter != null)
+                    builder.Services.PostConfigure<EssSimulator.EssDeviceSimModel.Model.MeterConfig>(m =>
+                    {
+                        m.PccMeter = topologyOverlay.Meter.PccMeter;
+                    });
+                if (topologyOverlay.Load != null)
+                {
+                    builder.Services.PostConfigure<LoadConfig>(load =>
+                    {
+                        // 组态负载：有功仅消耗（≤0）
+                        load.ActivePowerPlan = Math.Min(0, topologyOverlay.Load.ActivePowerPlan);
+                        load.ReactivePowerPlan = topologyOverlay.Load.ReactivePowerPlan;
+                    });
+                }
+            }
 
             // 配置 Kestrel 监听端口
             var webCfgEarly = builder.Configuration.GetSection(WebConfig.Section).Get<WebConfig>() ?? new WebConfig();
@@ -429,6 +467,67 @@ namespace EssSimulator
             _ = WaitForSimulatorReadyAsync(simCfg, app.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
 
             await app.WaitForShutdownAsync();
+        }
+
+        private static TopologyRuntimeOverlay? TryLoadTopologyOverlay(string contentRoot)
+        {
+            try
+            {
+                var modePath = Path.Combine(contentRoot, "configs", "topology", "runtime-mode.json");
+                var overlayPath = Path.Combine(contentRoot, "configs", "topology", "generated", "runtime-overlay.json");
+                if (!File.Exists(modePath) || !File.Exists(overlayPath))
+                    return null;
+
+                var jsonOpts = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+                var mode = JsonSerializer.Deserialize<TopologyRuntimeMode>(File.ReadAllText(modePath), jsonOpts);
+                if (mode?.EngineeringMode != true)
+                    return null;
+
+                return JsonSerializer.Deserialize<TopologyRuntimeOverlay>(File.ReadAllText(overlayPath), jsonOpts);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Topology] 加载工程 overlay 失败：{ex.Message}");
+                return null;
+            }
+        }
+
+        private static void CopyPcs(PcsPhysicalConfig src, PcsPhysicalConfig dst)
+        {
+            dst.RatedPower = src.RatedPower;
+            dst.MaxPower = src.MaxPower;
+            dst.Efficiency = src.Efficiency;
+            dst.DcVoltageRangeMin = src.DcVoltageRangeMin;
+            dst.DcVoltageRangeMax = src.DcVoltageRangeMax;
+            dst.AcVoltageNominal = src.AcVoltageNominal;
+        }
+
+        private static void CopyTransformer(TransformerConfig src, TransformerConfig dst)
+        {
+            dst.RatedPower = src.RatedPower;
+            dst.PrimaryVoltage = src.PrimaryVoltage;
+            dst.SecondaryVoltage = src.SecondaryVoltage;
+            dst.NoLoadLoss = src.NoLoadLoss;
+            dst.LoadLoss = src.LoadLoss;
+            dst.ImpedancePercent = src.ImpedancePercent;
+        }
+
+        private static void CopyUnitTransformer(UnitTransformerConfig src, UnitTransformerConfig dst)
+        {
+            dst.RatedPower = src.RatedPower;
+            dst.PrimaryVoltage = src.PrimaryVoltage;
+            dst.SecondaryVoltage = src.SecondaryVoltage;
+        }
+
+        private static void CopyPcc(PccConfig src, PccConfig dst)
+        {
+            dst.NominalLineVoltage = src.NominalLineVoltage;
+            dst.ShortCircuitMva = src.ShortCircuitMva;
+            dst.StationBusNominalLineVoltage = src.StationBusNominalLineVoltage;
         }
     }
 }

@@ -77,6 +77,16 @@ namespace EssSimulator.EssDeviceSimModel
             _currentState.Temperature = temperature;
         }
 
+        /// <summary>热设电芯 SOC（0~1），同步剩余容量与 OCV 端电压。</summary>
+        public void SetSoc(double soc)
+        {
+            soc = Math.Clamp(soc, 0.0, 1.0);
+            _currentState.SOC = soc;
+            _currentState.RemainingCapacity = _specs.NominalCapacity * soc;
+            _currentState.Voltage = LiFePO4BatteryOCVModel.GetVoltageFromSOC(soc, 0, false);
+            _currentState.Timestamp = DateTime.UtcNow;
+        }
+
         // 应用充放电条件更新电芯状态
         public void Update(double current, double ambientTemp, DateTime timeStamp, TimeSpan timeStep)
         {

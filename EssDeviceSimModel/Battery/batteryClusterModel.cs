@@ -78,6 +78,15 @@ namespace EssSimulator.EssDeviceSimModel
         public ClusterState GetClusterState() => _currentState;
         public ClusterConfiguration GetConfiguration() => _config;
 
+        /// <summary>热设簇内全部 Pack SOC，并刷新簇汇总。</summary>
+        public void SetSoc(double soc)
+        {
+            foreach (var pack in _packs)
+                pack.SetSoc(soc);
+
+            UpdateClusterState(_currentState?.TotalCurrent ?? 0, _currentState?.AvgPackTemp ?? 25.0, DateTime.UtcNow);
+        }
+
         // 更新簇状态
         public void Update(double clusterCurrent, double ambientTemp, DateTime timeStamp, TimeSpan timeStep)
         {

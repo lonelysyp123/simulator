@@ -1,10 +1,18 @@
 /** 组态节点几何与端口坐标（画布本地坐标，单位 px） */
 
+export const GRID_SIZE = 20
+
+export function snapToGrid(v, grid = GRID_SIZE) {
+  return Math.round(Number(v) / grid) * grid
+}
+
 const SIZE = {
   grid: { w: 120, h: 72 },
   ac_bus: { w: 220, h: 36 },
+  ac_breaker: { w: 100, h: 110 },
   transformer: { w: 100, h: 120 },
-  ac_meter: { w: 110, h: 100 },
+  ac_meter: { w: 110, h: 72 },
+  load: { w: 110, h: 72 },
   emu: { w: 140, h: 96 },
   bms: { w: 110, h: 72 },
   dc_bus: { w: 160, h: 48 }
@@ -51,8 +59,10 @@ export function templateColor(templateId) {
   switch (templateId) {
     case 'grid': return '#c0392b'
     case 'ac_bus': return '#1a1a1a'
+    case 'ac_breaker': return '#e67e22'
     case 'transformer': return '#2980b9'
     case 'ac_meter': return '#8e44ad'
+    case 'load': return '#c0392b'
     case 'emu': return '#16a085'
     case 'bms': return '#27ae60'
     case 'dc_bus': return '#d35400'

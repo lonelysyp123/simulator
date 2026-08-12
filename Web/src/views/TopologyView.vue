@@ -2,13 +2,19 @@
   <div class="topo-page">
     <div class="card toolbar">
       <div class="left">
-        <el-input v-model="project.name" size="small" style="width:200px" placeholder="工程名称" />
+        <el-input v-model="project.name" size="small" style="width:200px" placeholder="工程名称" @change="markDirty" />
         <el-button type="primary" size="small" :loading="saving" @click="saveProject">保存工程</el-button>
         <el-button size="small" @click="reload">重新加载</el-button>
+        <el-button size="small" :disabled="!canUndo" @click="undo" title="Ctrl+Z">撤销</el-button>
+        <el-button size="small" :disabled="!canRedo" @click="redo" title="Ctrl+Shift+Z">重做</el-button>
         <el-button size="small" type="danger" plain :disabled="!canDelete" @click="deleteSelected">删除选中</el-button>
         <el-button size="small" :disabled="!selectedNode" @click="openSaveLibrary">存入设备库</el-button>
+        <el-button size="small" type="success" plain @click="wizardOpen = true">标准拓扑向导</el-button>
+        <el-button size="small" link type="primary" @click="goProjectManage">工程管理</el-button>
       </div>
       <div class="right">
+        <el-tag v-if="dirty" size="small" type="warning" style="margin-right:6px">未保存</el-tag>
+        <el-tag v-if="editHint" size="small" type="success" style="margin-right:6px">{{ editHint }}</el-tag>
         <el-tag size="small" type="info">节点 {{ project.nodes.length }}</el-tag>
         <el-tag size="small" type="info" style="margin-left:6px">连线 {{ project.edges.length }}</el-tag>
         <el-tag v-if="linking" size="small" type="warning" style="margin-left:6px">连线中…再点目标拐角（Esc 取消）</el-tag>
@@ -66,6 +72,8 @@
           :selected-edge-id="selectedEdgeId"
           :linking="linking"
           :pointer-world="pointerWorld"
+          :problem-node-ids="problemNodeIds"
+          :snap="true"
           @select-node="onSelectNode"
           @select-edge="onSelectEdge"
           @port-click="onPortClick"
@@ -75,11 +83,34 @@
       </div>
 
       <aside class="props card">
+        <div v-if="validationIssues.length" class="validation-box">
+          <div class="card-title">校验问题</div>
+          <el-alert
+            :title="validationMessage || '工程配置不合理'"
+            type="error"
+            :closable="true"
+            show-icon
+            @close="clearValidation"
+          >
+            <ul class="issue-list">
+              <li
+                v-for="(issue, i) in validationIssues"
+                :key="i"
+                class="issue-item"
+                :class="{ clickable: !!issue.nodeId }"
+                @click="focusProblem(issue.nodeId)"
+              >
+                {{ issue.text }}
+              </li>
+            </ul>
+          </el-alert>
+        </div>
+
         <div class="card-title">属性</div>
         <template v-if="selectedNode && selectedTemplate">
           <el-form label-position="top" size="small">
             <el-form-item label="显示名称">
-              <el-input v-model="selectedNode.label" />
+              <el-input v-model="selectedNode.label" @change="onParamEdited" />
             </el-form-item>
             <el-form-item label="模板">
               <el-tag size="small">{{ selectedTemplate.name }}</el-tag>
@@ -93,13 +124,22 @@
               <el-input-number
                 v-if="def.type === 'number'"
                 v-model="selectedNode.parameters[def.key]"
-                :min="def.min"
-                :max="def.max"
+                v-bind="numberInputBounds(def)"
                 :step="numberStep(def)"
                 controls-position="right"
                 style="width:100%"
+                @change="onParamEdited"
               />
-              <el-input v-else v-model="selectedNode.parameters[def.key]" />
+              <el-switch
+                v-else-if="def.type === 'boolean'"
+                :model-value="!!selectedNode.parameters[def.key]"
+                @change="v => onBoolParamChange(def.key, v)"
+              />
+              <el-input
+                v-else
+                v-model="selectedNode.parameters[def.key]"
+                @change="onParamEdited"
+              />
               <div v-if="def.description" class="param-hint">{{ def.description }}</div>
             </el-form-item>
           </el-form>
@@ -116,7 +156,7 @@
           <p class="empty">已选中连线，按 Delete 可断开。</p>
           <el-button size="small" type="danger" @click="deleteSelected">断开连线</el-button>
         </template>
-        <p v-else class="empty">从左侧拖入设备，或选中画布中的设备编辑参数。</p>
+        <p v-else class="empty">从左侧拖入设备，或用「标准拓扑向导」一键生成径向骨架。</p>
       </aside>
     </div>
 
@@ -131,14 +171,34 @@
         <el-button size="small" type="primary" :loading="savingLib" @click="saveLibrary">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="wizardOpen" title="标准拓扑向导" width="460px">
+      <p class="wizard-desc">生成电网→主断→220kV 母线→主变→35kV 母线→N×EMU（含 DC 母线与双 BMS）的径向骨架，并自动三相/直流成组连线。</p>
+      <el-form label-width="100px" size="small">
+        <el-form-item label="工程名称">
+          <el-input v-model="wizardName" placeholder="标准径向-N单元" />
+        </el-form-item>
+        <el-form-item label="EMU 单元数">
+          <el-input-number v-model="wizardEmuCount" :min="1" :max="20" controls-position="right" />
+        </el-form-item>
+        <el-form-item label="站用负载">
+          <el-switch v-model="wizardIncludeLoad" active-text="包含" inactive-text="不含" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button size="small" @click="wizardOpen = false">取消</el-button>
+        <el-button size="small" type="primary" :loading="wizardLoading" @click="applyWizard">生成到画布</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import TopologyCanvas from '@/components/topology/TopologyCanvas.vue'
-import { nodeSize, templateColor } from '@/components/topology/nodeLayout.js'
+import { nodeSize, snapToGrid, templateColor } from '@/components/topology/nodeLayout.js'
 import {
   getTopologyTemplates,
   getTopologyProject,
@@ -147,8 +207,15 @@ import {
   postTopologyDisconnect,
   getTopologyLibrary,
   putTopologyLibrary,
-  deleteTopologyLibrary
+  deleteTopologyLibrary,
+  checkTopologyProjectName,
+  postTopologyValidate,
+  postTopologyScaffold
 } from '@/services/api.js'
+
+const route = useRoute()
+const router = useRouter()
+const editHint = ref('')
 
 const templates = ref([])
 const library = ref([])
@@ -172,10 +239,24 @@ const canvasRef = ref(null)
 const connecting = ref(false)
 let connectSeq = 0
 
+const dirty = ref(false)
+const problemNodeIds = ref([])
+const validationMessage = ref('')
+const validationIssues = ref([])
+const historyPast = ref([])
+const historyFuture = ref([])
+const HISTORY_MAX = 40
+let applyingHistory = false
+
+const wizardOpen = ref(false)
+const wizardEmuCount = ref(2)
+const wizardIncludeLoad = ref(true)
+const wizardName = ref('')
+const wizardLoading = ref(false)
+
 /** 清空队列后只展示当前一条，避免连线过快时提示堆积/延后爆发 */
 function showConnectFeedback(type, title, detail = '') {
   ElMessage.closeAll()
-  // 成功只靠画布出线反馈，避免三相连线刷屏
   if (type === 'success') return
   const text = detail ? `${title}：${detail}` : title
   ElMessage({
@@ -194,13 +275,13 @@ function dropWorldPosition(ev, templateId) {
   const world = canvasRef.value?.clientToWorld?.(ev.clientX, ev.clientY)
   if (!world) {
     return {
-      x: 80 + project.nodes.length * 24,
-      y: 80 + (project.nodes.length % 5) * 40
+      x: snapToGrid(80 + project.nodes.length * 24),
+      y: snapToGrid(80 + (project.nodes.length % 5) * 40)
     }
   }
   return {
-    x: Math.round(world.x - size.w / 2),
-    y: Math.round(world.y - size.h / 2)
+    x: snapToGrid(world.x - size.w / 2),
+    y: snapToGrid(world.y - size.h / 2)
   }
 }
 
@@ -249,13 +330,23 @@ function quickReject(edge) {
 const selectedNode = computed(() => project.nodes.find(n => n.id === selectedNodeId.value) || null)
 const selectedTemplate = computed(() => templates.value.find(t => t.id === selectedNode.value?.templateId) || null)
 const canDelete = computed(() => !!(selectedNodeId.value || selectedEdgeId.value))
+const canUndo = computed(() => historyPast.value.length > 0)
+const canRedo = computed(() => historyFuture.value.length > 0)
 
 function colorOf(id) { return templateColor(id) }
 function templateName(id) { return templates.value.find(t => t.id === id)?.name || id }
 function numberStep(def) {
   if (def.key?.toLowerCase().includes('efficiency') || def.key?.toLowerCase().includes('soc')) return 0.01
-  if ((def.max ?? 0) <= 2) return 0.01
+  if (Number.isFinite(def.max) && def.max <= 2) return 0.01
   return 1
+}
+
+/** null/undefined 的 max 会被 Element Plus 当成 0，触发 min>max 异常并拖垮整页交互 */
+function numberInputBounds(def) {
+  const bounds = {}
+  if (Number.isFinite(def.min)) bounds.min = def.min
+  if (Number.isFinite(def.max)) bounds.max = def.max
+  return bounds
 }
 
 function uid() {
@@ -266,7 +357,21 @@ function cloneParams(obj) {
   return JSON.parse(JSON.stringify(obj || {}))
 }
 
-function applyProject(p) {
+function projectPayload() {
+  return {
+    schemaVersion: project.schemaVersion,
+    id: project.id,
+    name: project.name,
+    nodes: project.nodes,
+    edges: project.edges
+  }
+}
+
+function snapshotJson() {
+  return JSON.stringify(projectPayload())
+}
+
+function applyProject(p, { resetHistory = false, clearDirty = false } = {}) {
   project.schemaVersion = p.schemaVersion || '1.0'
   project.id = p.id || 'current'
   project.name = p.name || '未命名组态'
@@ -275,9 +380,102 @@ function applyProject(p) {
     parameters: n.parameters || {}
   }))
   project.edges = p.edges || []
+  if (resetHistory) {
+    historyPast.value = []
+    historyFuture.value = []
+  }
+  if (clearDirty) dirty.value = false
+}
+
+function pushHistory() {
+  if (applyingHistory) return
+  historyPast.value.push(snapshotJson())
+  if (historyPast.value.length > HISTORY_MAX) historyPast.value.shift()
+  historyFuture.value = []
+  dirty.value = true
+}
+
+function markDirty() {
+  dirty.value = true
+}
+
+function onParamEdited() {
+  pushHistory()
+  clearValidation()
+}
+
+function undo() {
+  if (!historyPast.value.length) return
+  historyFuture.value.push(snapshotJson())
+  const prev = historyPast.value.pop()
+  applyingHistory = true
+  try {
+    applyProject(JSON.parse(prev))
+    dirty.value = true
+    clearValidation()
+  } finally {
+    applyingHistory = false
+  }
+}
+
+function redo() {
+  if (!historyFuture.value.length) return
+  historyPast.value.push(snapshotJson())
+  const next = historyFuture.value.pop()
+  applyingHistory = true
+  try {
+    applyProject(JSON.parse(next))
+    dirty.value = true
+    clearValidation()
+  } finally {
+    applyingHistory = false
+  }
+}
+
+function clearValidation() {
+  problemNodeIds.value = []
+  validationMessage.value = ''
+  validationIssues.value = []
+}
+
+function applyValidationResult(validation) {
+  const ok = validation?.ok ?? validation?.Ok
+  if (ok) {
+    clearValidation()
+    return true
+  }
+  validationMessage.value = validation?.message || validation?.Message || '工程配置不合理'
+  const details = validation?.details || validation?.Details || []
+  const nodes = validation?.problemNodeIds || validation?.ProblemNodeIds || []
+  problemNodeIds.value = [...nodes]
+  validationIssues.value = details.length
+    ? details.map((text, i) => ({ text, nodeId: nodes[i] || nodes[0] || null }))
+    : [{ text: validationMessage.value, nodeId: nodes[0] || null }]
+  return false
+}
+
+function focusProblem(nodeId) {
+  if (!nodeId) return
+  selectedNodeId.value = nodeId
+  selectedEdgeId.value = null
+}
+
+async function confirmDiscardIfDirty(actionLabel = '继续') {
+  if (!dirty.value) return true
+  try {
+    await ElMessageBox.confirm(
+      `当前组态有未保存修改，${actionLabel}将丢失这些改动。`,
+      '未保存修改',
+      { type: 'warning', confirmButtonText: actionLabel, cancelButtonText: '取消' }
+    )
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function reload() {
+  if (!(await confirmDiscardIfDirty('重新加载'))) return
   const [tpl, proj, lib] = await Promise.all([
     getTopologyTemplates(),
     getTopologyProject(),
@@ -285,24 +483,87 @@ async function reload() {
   ])
   templates.value = tpl
   library.value = lib
-  applyProject(proj)
+  applyProject(proj, { resetHistory: true, clearDirty: true })
   selectedNodeId.value = null
   selectedEdgeId.value = null
   linking.value = null
+  clearValidation()
+  syncEditHintFromRoute()
+}
+
+function syncEditHintFromRoute() {
+  const mode = route.query.mode
+  if (mode === 'new') editHint.value = '新建工程'
+  else if (mode === 'edit') editHint.value = '编辑工程'
+  else editHint.value = ''
+}
+
+function goProjectManage() {
+  router.push('/projects')
+}
+
+function onBoolParamChange(key, value) {
+  if (!selectedNode.value) return
+  pushHistory()
+  selectedNode.value.parameters[key] = !!value
+  if (key === 'isMainBreaker' && value) {
+    for (const n of project.nodes) {
+      if (n.templateId === 'ac_breaker' && n.id !== selectedNode.value.id)
+        n.parameters.isMainBreaker = false
+    }
+  }
+  if (key === 'isPccMeter' && value) {
+    for (const n of project.nodes) {
+      if (n.templateId === 'ac_meter' && n.id !== selectedNode.value.id)
+        n.parameters.isPccMeter = false
+    }
+  }
+  clearValidation()
 }
 
 async function saveProject() {
+  const name = (project.name || '').trim()
+  if (!name) {
+    ElMessage.warning('请填写工程名称')
+    return
+  }
+  project.name = name
+
+  if (!project.id || project.id === 'current')
+    project.id = uid()
+
   saving.value = true
   try {
-    const saved = await putTopologyProject({
-      schemaVersion: project.schemaVersion,
-      id: project.id,
-      name: project.name,
-      nodes: project.nodes,
-      edges: project.edges
-    })
-    applyProject(saved)
-    ElMessage.success(`工程已保存到 configs/topology/project.json`)
+    const validation = await postTopologyValidate(projectPayload())
+    if (!applyValidationResult(validation)) {
+      await ElMessageBox.alert(
+        validationIssues.value.map(i => i.text).join('\n') || validationMessage.value,
+        '无法保存',
+        { type: 'error', confirmButtonText: '知道了' }
+      )
+      return
+    }
+
+    const check = await checkTopologyProjectName(name, project.id)
+    if (check?.exists && check.project?.id) {
+      try {
+        await ElMessageBox.confirm(
+          `已存在同名工程「${check.project.name}」。\n确定后将覆盖该工程的组态内容（保留其工程 ID）。`,
+          '同名工程',
+          { type: 'warning', confirmButtonText: '替换并保存', cancelButtonText: '取消' }
+        )
+      } catch {
+        return
+      }
+      project.id = check.project.id
+    }
+
+    const saved = await putTopologyProject(projectPayload())
+    applyProject(saved, { clearDirty: true })
+    historyPast.value = []
+    historyFuture.value = []
+    editHint.value = '已保存'
+    ElMessage.success(`工程「${saved.name}」已保存，可在工程管理 / 系统配置中选用`)
   } catch (e) {
     ElMessage.error(e.message || '保存失败')
   } finally {
@@ -339,34 +600,38 @@ function onDrop(ev) {
 }
 
 function addFromTemplate(t, x = 120, y = 100) {
+  pushHistory()
   const node = {
     id: uid(),
     templateId: t.id,
     libraryItemId: null,
     label: t.name,
-    x,
-    y,
+    x: snapToGrid(x),
+    y: snapToGrid(y),
     parameters: cloneParams(t.defaultParameters)
   }
   project.nodes.push(node)
   selectedNodeId.value = node.id
   selectedEdgeId.value = null
+  clearValidation()
 }
 
 function addFromLibrary(item, x = 140, y = 120) {
+  pushHistory()
   const t = templates.value.find(i => i.id === item.templateId)
   const node = {
     id: uid(),
     templateId: item.templateId,
     libraryItemId: item.id,
     label: item.name,
-    x,
-    y,
+    x: snapToGrid(x),
+    y: snapToGrid(y),
     parameters: cloneParams({ ...(t?.defaultParameters || {}), ...(item.parameters || {}) })
   }
   project.nodes.push(node)
   selectedNodeId.value = node.id
   selectedEdgeId.value = null
+  clearValidation()
 }
 
 function onSelectNode(id) {
@@ -381,7 +646,13 @@ function onSelectEdge(id) {
 
 function onMoveNode({ id, x, y }) {
   const n = project.nodes.find(i => i.id === id)
-  if (n) { n.x = x; n.y = y }
+  if (!n) return
+  const nx = snapToGrid(x)
+  const ny = snapToGrid(y)
+  if (n.x === nx && n.y === ny) return
+  pushHistory()
+  n.x = nx
+  n.y = ny
 }
 
 async function onPortClick({ nodeId, portId }) {
@@ -411,6 +682,7 @@ async function onPortClick({ nodeId, portId }) {
     showConnectFeedback('error', '连接被拒绝', `[${localReject.code}] ${localReject.message}`)
     linking.value = source
     pointerWorld.value = null
+    problemNodeIds.value = [edge.fromNodeId, edge.toNodeId]
     return
   }
 
@@ -418,16 +690,10 @@ async function onPortClick({ nodeId, portId }) {
   connecting.value = true
   try {
     const res = await postTopologyConnect({
-      project: {
-        schemaVersion: project.schemaVersion,
-        id: project.id,
-        name: project.name,
-        nodes: project.nodes,
-        edges: project.edges
-      },
-      edge
+      project: projectPayload(),
+      edge,
+      expandBundle: true
     })
-    // 被更新的连线请求覆盖时，丢弃过期响应，避免延后刷一堆旧提示
     if (seq !== connectSeq) return
 
     const validation = res?.validation || res?.Validation || {}
@@ -443,12 +709,15 @@ async function onPortClick({ nodeId, portId }) {
       )
       linking.value = source
       pointerWorld.value = null
+      const nodes = validation.problemNodeIds || validation.ProblemNodeIds || [edge.fromNodeId, edge.toNodeId]
+      problemNodeIds.value = [...nodes]
       return
     }
+    pushHistory()
     applyProject(res.project)
-    // 成功不弹 toast，画布出现连线即反馈
     linking.value = null
     pointerWorld.value = null
+    clearValidation()
   } catch (e) {
     if (seq !== connectSeq) return
     showConnectFeedback('error', '连线失败', e.message || '请求异常')
@@ -463,27 +732,25 @@ async function deleteSelected() {
   if (selectedEdgeId.value) {
     try {
       const updated = await postTopologyDisconnect({
-        project: {
-          schemaVersion: project.schemaVersion,
-          id: project.id,
-          name: project.name,
-          nodes: project.nodes,
-          edges: project.edges
-        },
+        project: projectPayload(),
         edgeId: selectedEdgeId.value
       })
+      pushHistory()
       applyProject(updated)
       selectedEdgeId.value = null
+      clearValidation()
     } catch (e) {
       ElMessage.error(e.message || '断开失败')
     }
     return
   }
   if (selectedNodeId.value) {
+    pushHistory()
     const id = selectedNodeId.value
     project.edges = project.edges.filter(e => e.fromNodeId !== id && e.toNodeId !== id)
     project.nodes = project.nodes.filter(n => n.id !== id)
     selectedNodeId.value = null
+    clearValidation()
   }
 }
 
@@ -521,17 +788,73 @@ async function removeLibrary(id) {
   } catch { /* cancel */ }
 }
 
+async function applyWizard() {
+  if (!(await confirmDiscardIfDirty('生成骨架'))) return
+  wizardLoading.value = true
+  try {
+    const scaffolded = await postTopologyScaffold({
+      emuCount: wizardEmuCount.value,
+      name: wizardName.value || undefined,
+      includeLoad: wizardIncludeLoad.value
+    })
+    applyProject(scaffolded, { resetHistory: true })
+    dirty.value = true
+    selectedNodeId.value = null
+    selectedEdgeId.value = null
+    linking.value = null
+    clearValidation()
+    wizardOpen.value = false
+    editHint.value = '向导已生成'
+    ElMessage.success(`已生成标准径向拓扑（EMU×${wizardEmuCount.value}），请检查后保存`)
+  } catch (e) {
+    ElMessage.error(e.message || '生成失败')
+  } finally {
+    wizardLoading.value = false
+  }
+}
+
 function onKey(ev) {
+  const mod = ev.metaKey || ev.ctrlKey
+  if (mod && ev.key.toLowerCase() === 'z') {
+    const tag = (ev.target?.tagName || '').toLowerCase()
+    if (tag === 'input' || tag === 'textarea') return
+    ev.preventDefault()
+    if (ev.shiftKey) redo()
+    else undo()
+    return
+  }
+  if (mod && ev.key.toLowerCase() === 'y') {
+    const tag = (ev.target?.tagName || '').toLowerCase()
+    if (tag === 'input' || tag === 'textarea') return
+    ev.preventDefault()
+    redo()
+    return
+  }
   if (ev.key === 'Escape') {
     linking.value = null
     pointerWorld.value = null
+    return
   }
   if (ev.key === 'Delete' || ev.key === 'Backspace') {
     const tag = (ev.target?.tagName || '').toLowerCase()
     if (tag === 'input' || tag === 'textarea') return
-    if (canDelete.value) deleteSelected()
+    if (canDelete.value) {
+      ev.preventDefault()
+      deleteSelected()
+    }
   }
 }
+
+function onBeforeUnload(ev) {
+  if (!dirty.value) return
+  ev.preventDefault()
+  ev.returnValue = ''
+}
+
+watch(
+  () => `${route.query.mode || ''}:${route.query.id || ''}`,
+  () => { syncEditHintFromRoute() }
+)
 
 onMounted(async () => {
   try {
@@ -540,19 +863,44 @@ onMounted(async () => {
     ElMessage.error(e.message || '加载组态失败')
   }
   window.addEventListener('keydown', onKey)
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
 
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  window.removeEventListener('beforeunload', onBeforeUnload)
+  linking.value = null
+  pointerWorld.value = null
+  connecting.value = false
+  ElMessage.closeAll()
+})
 </script>
 
 <style scoped>
-.topo-page { height: calc(100vh - 80px); display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; margin-bottom: 0; }
+.topo-page {
+  height: 100%;
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; margin-bottom: 0; flex-shrink: 0; }
 .toolbar .left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .toolbar .right { display: flex; align-items: center; }
-.workspace { flex: 1; display: grid; grid-template-columns: 220px 1fr 280px; gap: 8px; min-height: 0; }
-.palette, .props, .canvas-wrap { margin-bottom: 0; min-height: 0; overflow: auto; }
-.canvas-wrap { padding: 0; overflow: hidden; display: flex; }
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 280px;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.palette, .props { margin-bottom: 0; min-width: 0; min-height: 0; overflow: auto; }
+.canvas-wrap { margin-bottom: 0; padding: 0; overflow: hidden; display: flex; min-width: 0; min-height: 0; }
 .palette-item {
   display: flex; align-items: center; gap: 8px;
   padding: 8px; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 6px;
@@ -565,8 +913,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 .palette-item .desc { font-size: 11px; color: #909399; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .empty { font-size: 12px; color: #909399; line-height: 1.5; }
 .param-hint { font-size: 11px; color: #909399; margin-top: 2px; line-height: 1.3; }
+.validation-box { margin-bottom: 12px; }
+.issue-list { margin: 6px 0 0; padding-left: 18px; }
+.issue-item { font-size: 12px; line-height: 1.5; margin-bottom: 4px; }
+.issue-item.clickable { cursor: pointer; color: #c45656; text-decoration: underline; }
+.wizard-desc { font-size: 13px; color: #606266; line-height: 1.5; margin: 0 0 12px; }
 @media (max-width: 1100px) {
-  .workspace { grid-template-columns: 180px 1fr; }
+  .workspace { grid-template-columns: 180px minmax(0, 1fr); }
   .props { display: none; }
 }
 </style>

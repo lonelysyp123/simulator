@@ -97,6 +97,24 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         /// <summary>并网链路写入（Rack 状态 SSOT）。</summary>
         public void SetPcsLinked(bool linked) => IsLinked = linked;
 
+        /// <summary>热设整堆 SOC（0~1），须待机（堆电流为 0）；写透电芯并刷新 DC 端口电压。</summary>
+        public bool TrySetSoc(double soc, out string message)
+        {
+            var rackState = _rack.GetRackState();
+            if (rackState != null &&
+                (BmsRackProtection.IsCharging(rackState.TotalCurrent) ||
+                 BmsRackProtection.IsDischarging(rackState.TotalCurrent)))
+            {
+                message = "当前仍在充/放电，请先待机后再修改 SOC";
+                return false;
+            }
+
+            if (!_rack.TrySetSoc(soc, out message))
+                return false;
+            SyncPortFromRack();
+            return true;
+        }
+
         /// <summary>将物理量映射到 BMS DTO，评估簇级/Rack 级保护并回写 Rack 故障态。</summary>
         public void SyncTelemetryAndProtection(BatteryManagementSystemData bmsData)
         {

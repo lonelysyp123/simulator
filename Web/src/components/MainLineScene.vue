@@ -90,7 +90,7 @@ const toolbarHint = computed(() => {
     const kind = key.startsWith('bms-') ? 'BMS 舱' : 'PCS 柜'
     return `设备详情（${kind}）· 左键旋转 · 滚轮缩放 · Esc / 返回全站`
   }
-  return '左键旋转 · 滚轮缩放 · 右键平移 · 单击断路器 · 双击 PCS/BMS 进入设备详情'
+  return '左键旋转 · 滚轮缩放 · 右键平移 · 单击断路器 · 双击 BMS 进入设备详情'
 })
 
 const blackStartChips = computed(() => {

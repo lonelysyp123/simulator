@@ -1,5 +1,6 @@
 using EssSimulator.Configuration;
 using EssSimulator.Display;
+using EssSimulator.Web.Topology;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 
@@ -13,6 +14,7 @@ namespace EssSimulator.Web
         private readonly IHubContext<RealtimeHub> _hub;
         private readonly SimulatorConfig _simCfg;
         private readonly WebConfig _webCfg;
+        private readonly TopologyStore _topologyStore;
         private readonly object _kickLock = new();
         private TaskCompletionSource _kick =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -20,11 +22,13 @@ namespace EssSimulator.Web
         public SnapshotService(
             IHubContext<RealtimeHub> hub,
             IOptions<SimulatorConfig> simCfg,
-            IOptions<WebConfig> webCfg)
+            IOptions<WebConfig> webCfg,
+            TopologyStore topologyStore)
         {
             _hub = hub;
             _simCfg = simCfg.Value;
             _webCfg = webCfg.Value;
+            _topologyStore = topologyStore;
             _current = this;
         }
 
@@ -97,7 +101,7 @@ namespace EssSimulator.Web
 
         private async Task PushAll(CancellationToken ct)
         {
-            var mainLine = MainLineEnricher.Build();
+            var mainLine = MainLineEnricher.Build(_topologyStore);
             await _hub.Clients.Group(RealtimeChannels.MainLine)
                 .SendAsync(RealtimeMethods.ReceiveMainLine, mainLine, ct);
 

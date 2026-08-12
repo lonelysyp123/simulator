@@ -19,7 +19,7 @@
               type="text"
               inputmode="decimal"
               class="metric-input"
-              placeholder="V"
+              placeholder="kV"
               @keydown.enter="onSetGridVoltage"
             />
             <button type="button" class="metric-set-btn" @click="onSetGridVoltage">设定</button>
@@ -40,24 +40,33 @@
             <button type="button" class="metric-set-btn" @click="onSetGridFrequency">设定</button>
           </div>
         </div>
-        <div class="metric-item metric-item-editable">
-          <div class="label">35kV 负载 P</div>
-          <div class="value">{{ fmtKw(snap.loadActivePowerKw) }}</div>
+        <div
+          class="metric-item metric-item-editable"
+          :class="{ 'metric-item-disabled': loadControlsDisabled }"
+          :title="loadControlsDisabled ? '工程模式未配置负载，概览负载已禁用' : ''"
+        >
+          <div class="label">35kV 负载 P（≤0 消耗）</div>
+          <div class="value">{{ loadControlsDisabled ? '—' : fmtKw(snap.loadActivePowerKw) }}</div>
           <div class="metric-set">
             <input
               v-model="loadPDraft"
               type="text"
               inputmode="decimal"
               class="metric-input"
-              placeholder="kW"
+              placeholder="kW≤0"
+              :disabled="loadControlsDisabled"
               @keydown.enter="onSetLoadActive"
             />
-            <button type="button" class="metric-set-btn" @click="onSetLoadActive">设定</button>
+            <button type="button" class="metric-set-btn" :disabled="loadControlsDisabled" @click="onSetLoadActive">设定</button>
           </div>
         </div>
-        <div class="metric-item metric-item-editable">
+        <div
+          class="metric-item metric-item-editable"
+          :class="{ 'metric-item-disabled': loadControlsDisabled }"
+          :title="loadControlsDisabled ? '工程模式未配置负载，概览负载已禁用' : ''"
+        >
           <div class="label">35kV 负载 Q</div>
-          <div class="value">{{ fmtKvar(snap.loadReactivePowerKvar) }}</div>
+          <div class="value">{{ loadControlsDisabled ? '—' : fmtKvar(snap.loadReactivePowerKvar) }}</div>
           <div class="metric-set">
             <input
               v-model="loadQDraft"
@@ -65,9 +74,10 @@
               inputmode="decimal"
               class="metric-input"
               placeholder="kvar"
+              :disabled="loadControlsDisabled"
               @keydown.enter="onSetLoadReactive"
             />
-            <button type="button" class="metric-set-btn" @click="onSetLoadReactive">设定</button>
+            <button type="button" class="metric-set-btn" :disabled="loadControlsDisabled" @click="onSetLoadReactive">设定</button>
           </div>
         </div>
       </div>
@@ -76,9 +86,14 @@
     <div class="card">
       <p class="card-title">
         电气主接线
-        <span class="card-hint">左键点击断路器 · 右键拖动平移 · 滚轮缩放 · PCS 卡片可启停/设定有功无功</span>
+        <span class="card-hint">
+          {{ useTopologyMainLine
+            ? '工程模式：经典单线图 · 右键平移 · Ctrl/⌘+滚轮缩放'
+            : '左键点击断路器 · 右键平移 · Ctrl/⌘+滚轮缩放 · PCS 可启停/设定功率' }}
+        </span>
       </p>
-      <MainLineSvg
+      <TopologyMainLineSvg
+        v-if="useTopologyMainLine"
         :snap="snap"
         @toggle-main-breaker="onToggleMainBreaker"
         @toggle-unit-breaker="onToggleUnitBreaker"
@@ -89,6 +104,21 @@
         @bms-power-on="onBmsPowerOn"
         @bms-power-off="onBmsPowerOff"
         @bms-fault-clear="onBmsFaultClear"
+        @bms-set-soc="onBmsSetSoc"
+      />
+      <MainLineSvg
+        v-else
+        :snap="snap"
+        @toggle-main-breaker="onToggleMainBreaker"
+        @toggle-unit-breaker="onToggleUnitBreaker"
+        @pcs-start="onPcsStart"
+        @pcs-stop="onPcsStop"
+        @pcs-set-power="onPcsSetPower"
+        @pcs-set-reactive="onPcsSetReactive"
+        @bms-power-on="onBmsPowerOn"
+        @bms-power-off="onBmsPowerOff"
+        @bms-fault-clear="onBmsFaultClear"
+        @bms-set-soc="onBmsSetSoc"
       />
     </div>
 
@@ -132,8 +162,16 @@ import { ElMessage } from 'element-plus'
 import { getMainLine, postMainBreaker, postUnitBreaker, postCommand } from '@/services/api.js'
 import { useRealtime, RealtimeMethods, RealtimeChannels } from '@/services/useRealtime.js'
 import MainLineSvg from '@/components/MainLineSvg.vue'
+import TopologyMainLineSvg from '@/components/TopologyMainLineSvg.vue'
 
 const snap = ref({ units: [] })
+const useTopologyMainLine = computed(() =>
+  !!(snap.value.engineeringMode && snap.value.topology?.nodes?.length)
+)
+/** 工程模式且组态无负载节点：负载显示/设定置灰冻结 */
+const loadControlsDisabled = computed(() =>
+  !!(snap.value.engineeringMode && !snap.value.hasTopologyLoad)
+)
 const loadPDraft = ref('')
 const loadQDraft = ref('')
 const gridVDraft = ref('')
@@ -144,21 +182,28 @@ let lastGridSetV = null
 let lastGridSetF = null
 
 function syncLoadDrafts(force = false) {
-  const setP = snap.value.loadActivePowerSetKw
-  const setQ = snap.value.loadReactivePowerSetKvar
-  if (force || (setP != null && setP !== lastLoadSetP)) {
-    loadPDraft.value = Number(setP ?? 0).toFixed(1)
-    lastLoadSetP = setP
-  }
-  if (force || (setQ != null && setQ !== lastLoadSetQ)) {
-    loadQDraft.value = Number(setQ ?? 0).toFixed(1)
-    lastLoadSetQ = setQ
+  if (loadControlsDisabled.value) {
+    loadPDraft.value = ''
+    loadQDraft.value = ''
+    lastLoadSetP = 0
+    lastLoadSetQ = 0
+  } else {
+    const setP = snap.value.loadActivePowerSetKw
+    const setQ = snap.value.loadReactivePowerSetKvar
+    if (force || (setP != null && setP !== lastLoadSetP)) {
+      loadPDraft.value = Number(setP ?? 0).toFixed(1)
+      lastLoadSetP = setP
+    }
+    if (force || (setQ != null && setQ !== lastLoadSetQ)) {
+      loadQDraft.value = Number(setQ ?? 0).toFixed(1)
+      lastLoadSetQ = setQ
+    }
   }
 
   const setV = snap.value.gridNominalLineVoltageV
   const setF = snap.value.gridNominalFrequencyHz
   if (force || (setV != null && setV !== lastGridSetV)) {
-    gridVDraft.value = Number(setV ?? 220000).toFixed(0)
+    gridVDraft.value = (Number(setV ?? 220000) / 1000).toFixed(1)
     lastGridSetV = setV
   }
   if (force || (setF != null && setF !== lastGridSetF)) {
@@ -370,10 +415,32 @@ async function onBmsFaultClear(bmsNumber) {
   await runChannelCommand(`esscmd bms${bmsNumber} fault clear`)
 }
 
+async function onBmsSetSoc(payload = {}) {
+  const bmsNumber = Number(payload.bmsNumber)
+  const pct = Number(payload.socPercent)
+  if (!Number.isFinite(bmsNumber) || bmsNumber < 1) {
+    ElMessage.warning('无效的 BMS 舱号')
+    return
+  }
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+    ElMessage.warning('请输入 0~100 的 SOC(%)')
+    return
+  }
+  await runChannelCommand(`esscmd setbms${bmsNumber} soc ${pct}`)
+}
+
 async function onSetLoadActive() {
+  if (loadControlsDisabled.value) {
+    ElMessage.warning('当前工程未配置负载，无法设定')
+    return
+  }
   const kw = Number(loadPDraft.value)
   if (!Number.isFinite(kw)) {
     ElMessage.warning('请输入有效的负载有功（kW）')
+    return
+  }
+  if (kw > 0) {
+    ElMessage.warning('负载有功只能消耗不能释放：请输入 ≤0（负值=从电网取电）')
     return
   }
   await runChannelCommand(`esscmd setLoad activePower ${kw}`)
@@ -381,6 +448,10 @@ async function onSetLoadActive() {
 }
 
 async function onSetLoadReactive() {
+  if (loadControlsDisabled.value) {
+    ElMessage.warning('当前工程未配置负载，无法设定')
+    return
+  }
   const kvar = Number(loadQDraft.value)
   if (!Number.isFinite(kvar)) {
     ElMessage.warning('请输入有效的负载无功（kvar）')
@@ -391,11 +462,12 @@ async function onSetLoadReactive() {
 }
 
 async function onSetGridVoltage() {
-  const volts = Number(gridVDraft.value)
-  if (!Number.isFinite(volts) || volts <= 0) {
-    ElMessage.warning('请输入有效的电网线电压（V，如 220000）')
+  const kv = Number(gridVDraft.value)
+  if (!Number.isFinite(kv) || kv <= 0) {
+    ElMessage.warning('请输入有效的电网线电压（kV，如 220）')
     return
   }
+  const volts = kv * 1000
   await runChannelCommand(`esscmd setGrid voltage ${volts}`)
   lastGridSetV = volts
 }
@@ -466,5 +538,23 @@ useRealtime(RealtimeChannels.MainLine, {
 .metric-set-btn:hover {
   border-color: #409eff;
   color: #409eff;
+}
+
+.metric-item-disabled {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+  background: #f4f4f5;
+  pointer-events: none;
+}
+.metric-item-disabled .value,
+.metric-item-disabled .label {
+  color: #909399 !important;
+}
+.metric-item-disabled .metric-input,
+.metric-item-disabled .metric-set-btn {
+  cursor: not-allowed;
+  background: #f0f2f5;
+  color: #c0c4cc;
+  border-color: #e4e7ed;
 }
 </style>

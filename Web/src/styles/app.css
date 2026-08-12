@@ -6,7 +6,64 @@ html, body, #app {
   background: #f5f7fa;
 }
 
-.app-layout { height: 100vh; display: flex; flex-direction: column; }
+.app-layout { height: 100vh; display: flex; flex-direction: column; position: relative; }
+.app-layout.is-system-locked { overflow: hidden; }
+
+.system-lock-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+  cursor: wait;
+  backdrop-filter: blur(2px);
+}
+.system-lock-panel {
+  min-width: 280px;
+  max-width: 420px;
+  padding: 28px 32px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+  text-align: center;
+}
+.system-lock-spin {
+  color: #1e6abc;
+  animation: system-lock-rotate 1s linear infinite;
+}
+@keyframes system-lock-rotate {
+  to { transform: rotate(360deg); }
+}
+.system-lock-title {
+  margin-top: 14px;
+  font-size: 17px;
+  font-weight: 650;
+  color: #1e3a5f;
+}
+.system-lock-stage {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e6abc;
+}
+.system-lock-progress {
+  margin: 16px 0 4px;
+  width: 100%;
+}
+.system-lock-msg {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.5;
+}
+.system-lock-sub {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #e6a23c;
+}
 .app-header {
   background: linear-gradient(90deg, #1e3a5f, #2d5a8c);
   color: #fff; height: 56px; display: flex; align-items: center; padding: 0 20px;
@@ -14,13 +71,15 @@ html, body, #app {
 }
 .app-header .title { font-size: 18px; font-weight: 600; flex: 1; }
 .app-header .status { font-size: 13px; opacity: .9; }
-.app-body { flex: 1; display: flex; min-height: 0; }
+.app-body { flex: 1; display: flex; min-width: 0; min-height: 0; overflow: hidden; }
 .app-aside {
   width: 200px;
   flex-shrink: 0;
   background: #fff;
   border-right: 1px solid #e6e8eb;
   overflow-y: auto;
+  position: relative;
+  z-index: 2;
 }
 .app-aside .el-menu { border-right: none; padding: 8px 0 12px; }
 .app-aside .el-menu-item {
@@ -54,7 +113,8 @@ html, body, #app {
   user-select: none;
 }
 .menu-group-label:first-child { padding-top: 6px; }
-.app-main { flex: 1; padding: 12px; overflow: auto; }
+/* min-width:0 避免子页面（如组态画布）把主区撑出视口，导致侧栏被挤走点不到 */
+.app-main { flex: 1; min-width: 0; padding: 12px; overflow: auto; }
 
 .card { background: #fff; border-radius: 6px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 12px; }
 .card-title { font-size: 14px; font-weight: 600; margin: 0 0 8px; color: #303133; }

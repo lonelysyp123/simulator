@@ -195,7 +195,8 @@ namespace EssSimulator.Configuration
         public double CellNominalVoltage { get; set; } = 3.2;
         public double CellNominalCapacity { get; set; } = 314;
         public double CellInitialSoc { get; set; } = 0.5;
-        public double CellInitialSocRandomRange { get; set; } = 0.05;
+        /// <summary>已废弃：初始 SOC 不再施加随机扰动，保留仅兼容旧配置 JSON。</summary>
+        public double CellInitialSocRandomRange { get; set; } = 0;
         public double PackInternalResistance { get; set; } = 0.05;
         public double ClusterInternalResistance { get; set; } = 0.1;
         public double RackInternalResistance { get; set; } = 0.02;
@@ -390,10 +391,10 @@ namespace EssSimulator.Configuration
     {
         public const string Section = "Load";
 
-        /// <summary>有功计划负载（kW，+放电/-用电）</summary>
-        public double ActivePowerPlan { get; set; } = -500;
+        /// <summary>有功计划负载（kW，仅允许 ≤0：负=用电消耗，正值禁止）</summary>
+        public double ActivePowerPlan { get; set; } = 0;
 
-        /// <summary>无功计划负载（kvar）</summary>
+        /// <summary>无功计划负载（kvar，可正可负）</summary>
         public double ReactivePowerPlan { get; set; } = 0;
     }
 

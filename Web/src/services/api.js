@@ -48,12 +48,25 @@ export async function setDroopSliceConfig(body) {
 export async function getTopologyTemplates() { return (await api.get('/topology/templates')).data }
 export async function getTopologyProject() { return (await api.get('/topology/project')).data }
 export async function putTopologyProject(project) { return (await api.put('/topology/project', project)).data }
+export async function postTopologyValidate(project) { return (await api.post('/topology/validate', project)).data }
 export async function postTopologyConnect(body) { return (await api.post('/topology/connect', body)).data }
 export async function postTopologyDisconnect(body) { return (await api.post('/topology/disconnect', body)).data }
+export async function postTopologyScaffold(body) { return (await api.post('/topology/scaffold', body)).data }
 export async function getTopologyLibrary() { return (await api.get('/topology/library')).data }
 export async function putTopologyLibrary(item) { return (await api.put('/topology/library', item)).data }
 export async function deleteTopologyLibrary(id) { return (await api.delete(`/topology/library/${id}`)).data }
 export async function getTopologyPaths() { return (await api.get('/topology/paths')).data }
+export async function getTopologyProjects() { return (await api.get('/topology/projects')).data }
+export async function getTopologyProjectById(id) { return (await api.get(`/topology/projects/${id}`)).data }
+export async function postTopologyProjectNew(body = {}) { return (await api.post('/topology/projects/new', body)).data }
+export async function postTopologyProjectOpen(id) { return (await api.post(`/topology/projects/${id}/open`)).data }
+export async function deleteTopologyProject(id) { return (await api.delete(`/topology/projects/${id}`)).data }
+export async function checkTopologyProjectName(name, excludeId) {
+  return (await api.get('/topology/projects/check-name', { params: { name, excludeId: excludeId || undefined } })).data
+}
+
+export async function getSystemConfig() { return (await api.get('/system/config')).data }
+export async function postSystemApply(body) { return (await api.post('/system/apply', body)).data }
 
 let hubPromise = null
 export function getHub() {

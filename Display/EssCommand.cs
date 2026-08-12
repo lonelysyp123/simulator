@@ -29,7 +29,7 @@ namespace EssSimulator.Display
                 return ExecuteSetGrid(args);
 
             if (verb.StartsWith("setbms", StringComparison.OrdinalIgnoreCase))
-                return ExecuteSetBmsPower(args);
+                return ExecuteSetBms(args);
 
             if (verb.StartsWith("bms", StringComparison.OrdinalIgnoreCase) &&
                 args.Length == 3 &&
@@ -48,8 +48,8 @@ namespace EssSimulator.Display
             return new[]
             {
                 "esscmd 子命令:",
-                "  setLoad activePower <kW>       // 手动设定负载有功（-用电, +向电网送电）",
-                "  setLoad reactivePower <kvar>   // 手动设定负载无功",
+                "  setLoad activePower <kW>       // 手动设定负载有功（仅允许 ≤0：负=消耗，正值拒绝）",
+                "  setLoad reactivePower <kvar>   // 手动设定负载无功（可正可负）",
                 "  link pcsN on|off               // 开启/关闭第 N 路 PCS 所属 EMU 单元的 Modbus 对外服务",
                 "  link bmsN on|off               // 开启/关闭第 N 路 BMS 的 Modbus 对外服务",
                 "  link em on|off                 // 开启/关闭并网点电表 simEm 的 Modbus 对外服务",
@@ -58,6 +58,7 @@ namespace EssSimulator.Display
                 "  setGrid voltage <V>            // 设定仿真电网额定线电压（如 220000）",
                 "  pcsN start|stop                // PCS 启停（内部走 dpc 写 EMU yx3/yx5 控制点）",
                 "  setbmsN power on|off           // BMS 物理并网/离网（PCS↔BMS 直流链路）",
+                "  setbmsN soc <0~1|%>            // 热设 BMS 整堆 SOC（须待机；写透电芯，立即生效）",
                 "  bmsN fault clear               // 待机时清除充放电方向内部故障，恢复可并网",
                 "",
                 "说明:",
@@ -65,6 +66,7 @@ namespace EssSimulator.Display
                 "  - setGrid：调整外部电网源；主断闭合后生效于 PCC/跟网 PCS",
                 "  - setbmsN power on：触发并网，GridConnectStatus→2，IsPcsLinked=true",
                 "  - setbmsN power off：断开 PCS↔BMS 链路，GridConnectStatus→0",
+                "  - setbmsN soc：须堆电流为 0（待机）；0~1 为标幺，>1 且≤100 按百分比",
                 "  - bmsN fault clear：待机时清除充放电方向内部故障（一次性）；再次超限会重新触发，三级故障会自动下电",
                 "  - 同一储能单元内 pcs(2n-1)/pcs(2n) 共用 simEmu{n}，关闭任一路会影响该单元两路 PCS"
             }.JoinLines();
@@ -115,6 +117,9 @@ namespace EssSimulator.Display
             if (!double.TryParse(args[2], out var num))
                 return CommandResult.Fail("请输入有效的数字");
 
+            if (args[1] == "activePower" && num > 0)
+                return CommandResult.Fail("负载有功只能消耗不能释放：请输入 ≤0 的值（负值=从电网取电）");
+
             var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
             if (ess == null)
                 return CommandResult.Fail("找不到 ess 模型，请确认仿真已启动");
@@ -157,6 +162,74 @@ namespace EssSimulator.Display
             }
 
             return CommandResult.Fail("setGrid 仅支持 frequency 或 voltage");
+        }
+
+        private static CommandResult ExecuteSetBms(string[] args)
+        {
+            if (args.Length < 2)
+                return CommandResult.Fail("用法: esscmd setbmsN power on|off\n      esscmd setbmsN soc <0~1|%>");
+
+            if (args[1].Equals("power", StringComparison.OrdinalIgnoreCase))
+                return ExecuteSetBmsPower(args);
+
+            if (args[1].Equals("soc", StringComparison.OrdinalIgnoreCase))
+                return ExecuteSetBmsSoc(args);
+
+            return CommandResult.Fail("用法: esscmd setbmsN power on|off\n      esscmd setbmsN soc <0~1|%>");
+        }
+
+        private static CommandResult ExecuteSetBmsSoc(string[] args)
+        {
+            if (args.Length != 3)
+                return CommandResult.Fail("用法: esscmd setbmsN soc <0~1|%>\n示例: esscmd setbms1 soc 0.55\n      esscmd setbms1 soc 55");
+
+            if (!TryParseSetBmsIndex(args[0], out int bms1Based, out var parseMessage))
+                return CommandResult.Fail(parseMessage);
+
+            if (!TryParseSocValue(args[2], out double soc, out var socMessage))
+                return CommandResult.Fail(socMessage);
+
+            if (!SimulatorHost.Instance.Contains($"bms{bms1Based}"))
+                return CommandResult.Fail($"找不到 bms{bms1Based}（超出当前配置范围）");
+
+            var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
+            if (ess == null)
+                return CommandResult.Fail("找不到 ess 仿真对象");
+
+            int idx = bms1Based - 1;
+            if (idx < 0 || idx >= ess._bmsRackDevices.Count)
+                return CommandResult.Fail($"bms{bms1Based} 设备索引越界");
+
+            if (!ess._bmsRackDevices[idx].TrySetSoc(soc, out var result))
+                return CommandResult.Fail($"操作失败: {result}");
+
+            SimulatorHost.Instance.Get<ModbusSimServer>($"simBms{bms1Based}")?.InvalidateDataShadow("yc11");
+            SnapshotService.RequestImmediatePush();
+            return CommandResult.Ok($"执行成功: bms{bms1Based} — {result}");
+        }
+
+        /// <summary>解析 SOC：0~1 为标幺；>1 且 ≤100 按百分比。</summary>
+        private static bool TryParseSocValue(string raw, out double soc, out string message)
+        {
+            soc = 0;
+            message = string.Empty;
+            if (!double.TryParse(raw, out var value) || double.IsNaN(value) || double.IsInfinity(value))
+            {
+                message = "请输入有效的 SOC 数值";
+                return false;
+            }
+
+            if (value > 1.0 && value <= 100.0)
+                value /= 100.0;
+
+            if (value < 0.0 || value > 1.0)
+            {
+                message = "SOC 须在 0~1，或 0~100（百分比）";
+                return false;
+            }
+
+            soc = value;
+            return true;
         }
 
         private static CommandResult ExecuteSetBmsPower(string[] args)

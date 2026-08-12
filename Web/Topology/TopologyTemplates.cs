@@ -1,6 +1,6 @@
 namespace EssSimulator.Web.Topology
 {
-    /// <summary>内置组态基础模板（电网 / 母线 / 变压器 / 电表 / EMU / BMS / 直流母线）。</summary>
+    /// <summary>内置组态基础模板（电网 / 母线 / 断路器 / 变压器 / 电表 / 负载 / EMU / BMS / 直流母线）。</summary>
     public static class TopologyTemplates
     {
         public static IReadOnlyList<TopologyTemplate> All { get; } = BuildAll();
@@ -12,8 +12,10 @@ namespace EssSimulator.Web.Topology
         {
             BuildGrid(),
             BuildAcBus(),
+            BuildAcBreaker(),
             BuildTransformer(),
             BuildAcMeter(),
+            BuildLoad(),
             BuildEmu(),
             BuildBms(),
             BuildDcBus()
@@ -74,6 +76,42 @@ namespace EssSimulator.Web.Topology
             }
         };
 
+        /// <summary>
+        /// 三相断路器：上/下各 A/B/C 拐角，中间为三相联动开关。
+        /// 串联接入交流回路；对母线带电判定为透明穿越（合闸时电压源可经断路器给母线供电）。
+        /// </summary>
+        private static TopologyTemplate BuildAcBreaker() => new()
+        {
+            Id = "ac_breaker",
+            Name = "三相断路器",
+            Category = "开关",
+            Description = "三相开关模型：上方 A/B/C 三个拐角，下方 A/B/C 三个拐角，中间为联动开关。可串联在电网与母线、母线与设备之间。",
+            IsVoltageSource = false,
+            Ports =
+            {
+                new() { Id = "a", Label = "A", Kind = "ac_phase", Phase = "A", Side = "top", Offset = 0.2, VoltageParam = "ratedVoltage" },
+                new() { Id = "b", Label = "B", Kind = "ac_phase", Phase = "B", Side = "top", Offset = 0.5, VoltageParam = "ratedVoltage" },
+                new() { Id = "c", Label = "C", Kind = "ac_phase", Phase = "C", Side = "top", Offset = 0.8, VoltageParam = "ratedVoltage" },
+                new() { Id = "a2", Label = "A'", Kind = "ac_phase", Phase = "A", Side = "bottom", Offset = 0.2, VoltageParam = "ratedVoltage" },
+                new() { Id = "b2", Label = "B'", Kind = "ac_phase", Phase = "B", Side = "bottom", Offset = 0.5, VoltageParam = "ratedVoltage" },
+                new() { Id = "c2", Label = "C'", Kind = "ac_phase", Phase = "C", Side = "bottom", Offset = 0.8, VoltageParam = "ratedVoltage" }
+            },
+            Parameters =
+            {
+                new() { Key = "ratedVoltage", Label = "额定线电压", Type = "number", Unit = "V", Min = 100 },
+                new() { Key = "closed", Label = "合闸", Type = "boolean", Description = "三相联动；分闸时下游母线视为未带电（非主断时仅组态显示）" },
+                new() { Key = "isMainBreaker", Label = "作为主断路器", Type = "boolean", Description = "勾选后与电站概览主断路器状态绑定；全工程有且仅能指定一个" },
+                new() { Key = "name", Label = "名称", Type = "string" }
+            },
+            DefaultParameters = new Dictionary<string, object?>
+            {
+                ["ratedVoltage"] = 220000d,
+                ["closed"] = true,
+                ["isMainBreaker"] = false,
+                ["name"] = "断路器"
+            }
+        };
+
         private static TopologyTemplate BuildTransformer() => new()
         {
             Id = "transformer",
@@ -113,40 +151,84 @@ namespace EssSimulator.Web.Topology
         };
 
         /// <summary>
-        /// 三相电表：PT 测压 + CT 测流（贴近真实电能表接线）。
-        /// PT 三相接母线相线测电压；CT 三相接同一母线测电流（仿真中为母线测量抽头）。
+        /// 三相电表：上方三相拐角在模型层同时表示 PT 与 CT（统一测量抽头）。
+        /// 属性中仍分别配置 PT 变比与 CT 变比；连线只需接母线三相一次即可同时取得电压与电流。
         /// </summary>
         private static TopologyTemplate BuildAcMeter() => new()
         {
             Id = "ac_meter",
             Name = "三相电表",
             Category = "测量",
-            Description = "经 PT/CT 测量母线电压与电流。上方 PT(A/B/C) 接母线相电压；下方 CT(A/B/C) 接同一母线电流抽头。PT 一次额定须匹配母线电压。",
+            Description = "上方三个拐角为一次侧统一测量抽头（同时含 PT/CT）：接母线 A/B/C 即可。二次侧（PT 100V / CT 5A）由仿真固定，组态无需填写。",
             IsVoltageSource = false,
             Ports =
             {
-                new() { Id = "pt_a", Label = "PT-A", Kind = "ac_phase", Phase = "A", Side = "top", Offset = 0.2, VoltageParam = "ptPrimaryVoltage" },
-                new() { Id = "pt_b", Label = "PT-B", Kind = "ac_phase", Phase = "B", Side = "top", Offset = 0.5, VoltageParam = "ptPrimaryVoltage" },
-                new() { Id = "pt_c", Label = "PT-C", Kind = "ac_phase", Phase = "C", Side = "top", Offset = 0.8, VoltageParam = "ptPrimaryVoltage" },
-                new() { Id = "ct_a", Label = "CT-A", Kind = "ac_phase", Phase = "A", Side = "bottom", Offset = 0.2 },
-                new() { Id = "ct_b", Label = "CT-B", Kind = "ac_phase", Phase = "B", Side = "bottom", Offset = 0.5 },
-                new() { Id = "ct_c", Label = "CT-C", Kind = "ac_phase", Phase = "C", Side = "bottom", Offset = 0.8 }
+                new() { Id = "pt_a", Label = "PT/CT-A", Kind = "ac_phase", Phase = "A", Side = "top", Offset = 0.2, VoltageParam = "ptPrimaryVoltage" },
+                new() { Id = "pt_b", Label = "PT/CT-B", Kind = "ac_phase", Phase = "B", Side = "top", Offset = 0.5, VoltageParam = "ptPrimaryVoltage" },
+                new() { Id = "pt_c", Label = "PT/CT-C", Kind = "ac_phase", Phase = "C", Side = "top", Offset = 0.8, VoltageParam = "ptPrimaryVoltage" }
             },
             Parameters =
             {
-                new() { Key = "ptPrimaryVoltage", Label = "PT 一次线电压", Type = "number", Unit = "V", Min = 100, Description = "须与被测母线电压匹配" },
-                new() { Key = "ptSecondaryVoltage", Label = "PT 二次线电压", Type = "number", Unit = "V", Min = 1 },
-                new() { Key = "ctPrimaryCurrent", Label = "CT 一次电流", Type = "number", Unit = "A", Min = 1 },
-                new() { Key = "ctSecondaryCurrent", Label = "CT 二次电流", Type = "number", Unit = "A", Min = 1 },
-                new() { Key = "accuracyClass", Label = "精度等级", Type = "string" }
+                // 三拐角只建模一次侧挂点；二次额定在运行时固定为 PT 100V / CT 5A
+                new() { Key = "ptPrimaryVoltage", Label = "额定线电压（一次）", Type = "number", Unit = "V", Min = 100, Description = "被测母线一次线电压，须与母线匹配" },
+                new() { Key = "ctPrimaryCurrent", Label = "额定电流（一次）", Type = "number", Unit = "A", Min = 1, Description = "CT 一次额定电流" },
+                new() { Key = "accuracyClass", Label = "精度等级", Type = "string" },
+                new() { Key = "isPccMeter", Label = "作为并网点电表", Type = "boolean", Description = "勾选后与电站概览电表数据绑定；全工程有且仅能指定一个" }
             },
             DefaultParameters = new Dictionary<string, object?>
             {
                 ["ptPrimaryVoltage"] = 220000d,
-                ["ptSecondaryVoltage"] = 100d,
                 ["ctPrimaryCurrent"] = 2000d,
-                ["ctSecondaryCurrent"] = 5d,
-                ["accuracyClass"] = "0.2S"
+                ["accuracyClass"] = "0.2S",
+                ["isPccMeter"] = false
+            }
+        };
+
+        /// <summary>
+        /// 站用/馈线负载：纯有功消耗模型（有功仅允许 ≤0），无功可感性/容性。
+        /// 应用组态后绑定电站概览「35kV 负载」有功/无功。
+        /// </summary>
+        private static TopologyTemplate BuildLoad() => new()
+        {
+            Id = "load",
+            Name = "负载",
+            Category = "负荷",
+            Description = "有功消耗模型：有功仅能从电网取电（设定值 ≤0，负=消耗）；无功可正可负（感性/容性）。初始化默认有功/无功均为 0，并与主接线电站概览负载数据绑定。",
+            IsVoltageSource = false,
+            Ports =
+            {
+                new() { Id = "a", Label = "A", Kind = "ac_phase", Phase = "A", Side = "top", Offset = 0.2, VoltageParam = "ratedVoltage" },
+                new() { Id = "b", Label = "B", Kind = "ac_phase", Phase = "B", Side = "top", Offset = 0.5, VoltageParam = "ratedVoltage" },
+                new() { Id = "c", Label = "C", Kind = "ac_phase", Phase = "C", Side = "top", Offset = 0.8, VoltageParam = "ratedVoltage" }
+            },
+            Parameters =
+            {
+                new() { Key = "ratedVoltage", Label = "额定线电压", Type = "number", Unit = "V", Min = 100, Description = "接入母线电压等级，须与母线匹配" },
+                new()
+                {
+                    Key = "activePowerKw",
+                    Label = "有功功率",
+                    Type = "number",
+                    Unit = "kW",
+                    Max = 0,
+                    Description = "仅允许 ≤0：负值=消耗有功，禁止向电网释放（正值）"
+                },
+                new()
+                {
+                    Key = "reactivePowerKvar",
+                    Label = "无功功率",
+                    Type = "number",
+                    Unit = "kvar",
+                    Description = "可正可负：正/负分别对应容性或感性无功（与仿真约定一致）"
+                },
+                new() { Key = "name", Label = "名称", Type = "string" }
+            },
+            DefaultParameters = new Dictionary<string, object?>
+            {
+                ["ratedVoltage"] = 220000d,
+                ["activePowerKw"] = 0d,
+                ["reactivePowerKvar"] = 0d,
+                ["name"] = "站用负载"
             }
         };
 

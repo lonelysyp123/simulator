@@ -11,7 +11,8 @@ const MAT = {
   darkSteel: () => new THREE.MeshStandardMaterial({ color: 0x3e4654, metalness: 0.55, roughness: 0.42 }),
   galvanized: () => new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.7, roughness: 0.32 }),
   steel: () => new THREE.MeshStandardMaterial({ color: 0xa8b0bc, metalness: 0.62, roughness: 0.38 }),
-  concrete: () => new THREE.MeshStandardMaterial({ color: 0x7a8494, metalness: 0.05, roughness: 0.9 }),
+  floor: () => new THREE.MeshStandardMaterial({ color: 0x8e959e, metalness: 0.06, roughness: 0.92 }),
+  concrete: () => new THREE.MeshStandardMaterial({ color: 0x9aa1aa, metalness: 0.05, roughness: 0.9 }),
   module: () => new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.45, roughness: 0.4 }),
   heatsink: () => new THREE.MeshStandardMaterial({ color: 0x6b7a88, metalness: 0.65, roughness: 0.35 }),
   busDc: () => new THREE.MeshStandardMaterial({
@@ -40,10 +41,8 @@ const MAT = {
   bmsRoof: () => new THREE.MeshStandardMaterial({ color: 0xe4e7ed, metalness: 0.3, roughness: 0.45 }),
   bmsCorrugation: () => new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.18, roughness: 0.55 }),
   rackFrame: () => new THREE.MeshStandardMaterial({ color: 0x4a5568, metalness: 0.4, roughness: 0.5 }),
-  packBase: () => new THREE.MeshStandardMaterial({ color: 0x2d3748, metalness: 0.35, roughness: 0.45 }),
-  floor: () => new THREE.MeshStandardMaterial({ color: 0x5a6570, metalness: 0.1, roughness: 0.85 })
+  packBase: () => new THREE.MeshStandardMaterial({ color: 0x2d3748, metalness: 0.35, roughness: 0.45 })
 }
-
 function box(w, h, d, mat, y = h / 2) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)
   m.position.y = y
@@ -361,64 +360,33 @@ export function buildBmsDetail(channel, topology = {}, batteryOverview = null) {
     return m
   }
 
-  g.add(box(L + 1.6, 0.08, W + 1.4, MAT.floor(), 0.04))
-
   const wallT = 0.07
-  const floorY = 0.2
-  const back = box(L, H, wallT, cabinMat(MAT.bmsWall), floorY + H / 2)
-  back.position.z = -W / 2
-  back.userData.isCabinShell = true
-  g.add(back)
-  const left = box(wallT, H, W, cabinMat(MAT.bmsWall), floorY + H / 2)
-  left.position.x = -L / 2
-  left.userData.isCabinShell = true
-  g.add(left)
-
-  const endPostW = 0.08
-  for (const dz of [-W / 2 + 0.05, W / 2 - 0.05]) {
-    const post = box(endPostW, H, 0.1, cabinMat(MAT.darkSteel), floorY + H / 2)
-    post.position.set(L / 2, 0, dz)
-    post.userData.isCabinShell = true
-    g.add(post)
-  }
-  const endLintel = box(endPostW, 0.1, W, cabinMat(MAT.darkSteel), floorY + H - 0.05)
-  endLintel.position.x = L / 2
-  endLintel.userData.isCabinShell = true
-  g.add(endLintel)
-
-  const roof = box(L + 0.08, 0.08, W + 0.08, cabinMat(MAT.bmsRoof), floorY + H + 0.04)
-  roof.userData.isCabinShell = true
-  g.add(roof)
-  const cabinFloor = box(L - 0.04, 0.08, W - 0.04, cabinMat(MAT.darkSteel), floorY)
+  const floorH = 0.1
+  const floorY = floorH / 2
+  // 不透明实心底板：底部干净收口，避免透明排序造成“悬空腿/重影”
+  const floorMat = MAT.concrete()
+  floorMat.transparent = false
+  floorMat.opacity = 1
+  floorMat.depthWrite = true
+  const cabinFloor = box(L + 0.02, floorH, W + 0.02, floorMat, floorY)
+  cabinFloor.receiveShadow = true
   cabinFloor.userData.isCabinShell = true
   g.add(cabinFloor)
 
-  for (let i = 0; i < Math.max(4, Math.ceil(L / 0.35)); i++) {
-    const rib = box(0.08, H * 0.9, 0.04, cabinMat(MAT.bmsCorrugation), floorY + H / 2)
-    rib.position.set(-L / 2 + 0.25 + i * 0.35, 0, -W / 2 - 0.03)
-    rib.userData.isCabinShell = true
-    g.add(rib)
-  }
+  const wallBottom = floorH
+  // 仅保留后墙+顶板+实心底板；去掉两端侧墙与白色波纹筋
+  // （透明端墙/波纹筋在俯视透视下会投影到地板下方，形成白色竖条与灰色凸块）
+  const back = box(L, H, wallT, cabinMat(MAT.bmsWall), wallBottom + H / 2)
+  back.position.z = -W / 2
+  back.userData.isCabinShell = true
+  g.add(back)
 
-  const doorClear = 0.06
-  const doorW = (W - doorClear * 2 - 0.05) / 2
-  const doorH = H * 0.94
-  const doorY = floorY + doorH / 2 + 0.02
-  for (const side of [-1, 1]) {
-    const door = box(0.06, doorH, doorW, cabinMat(MAT.bmsDoor), doorY)
-    door.position.set(L / 2 + 0.03, 0, side * (doorW / 2 + doorClear / 2 + 0.02))
-    door.rotation.y = side > 0 ? -Math.PI * 0.88 : Math.PI * 0.88
-    door.userData.isCabinShell = true
-    g.add(door)
-    const bar = cyl(0.03, 0.03, doorH * 0.8, cabinMat(MAT.galvanized), doorY, 8)
-    bar.position.copy(door.position)
-    bar.position.x += 0.05
-    bar.userData.isCabinShell = true
-    g.add(bar)
-  }
+  const roof = box(L + 0.08, 0.08, W + 0.08, cabinMat(MAT.bmsRoof), wallBottom + H + 0.04)
+  roof.userData.isCabinShell = true
+  g.add(roof)
 
   const hvacW = Math.min(1.4, L * 0.18)
-  const hvac = box(hvacW, 0.38, Math.min(0.85, W * 0.45), cabinMat(MAT.darkSteel), floorY + H + 0.35)
+  const hvac = box(hvacW, 0.38, Math.min(0.85, W * 0.45), cabinMat(MAT.darkSteel), wallBottom + H + 0.35)
   hvac.position.set(-L / 2 + hvacW * 0.55 + 0.25, 0, 0)
   hvac.userData.isCabinShell = true
   g.add(hvac)
@@ -428,9 +396,14 @@ export function buildBmsDetail(channel, topology = {}, batteryOverview = null) {
     '#e8f0fa',
     28
   )
-  title.position.set(0, floorY + H + 0.65, W / 2 - 0.08)
+  title.position.set(0, wallBottom + H + 0.65, W / 2 - 0.08)
   title.scale.set(Math.min(4.2, Math.max(2.4, L * 0.28)), 0.55, 1)
   g.add(title)
+
+  // 簇架落在实心底板上，不再用通高四角立柱（避免底部条形码悬空腿）
+  const packBaseY = floorH + 0.04
+  const stackH = packCount * (packHActual + packGapY)
+  const rackFrameH = stackH + 0.06
 
   const cellGeo = new THREE.CylinderGeometry(cellR, cellR, cellH, 8)
   const clusterSocMats = []
@@ -441,7 +414,7 @@ export function buildBmsDetail(channel, topology = {}, batteryOverview = null) {
 
   for (let ci = 0; ci < clusterCount; ci++) {
     const cx = startX + ci * (rackW + clusterGapX)
-    const frameColor = new THREE.Color(0x6a7d8c) // 统一青灰色
+    const frameColor = new THREE.Color(0x6a7d8c)
     const frameMat = new THREE.MeshStandardMaterial({
       color: frameColor,
       metalness: 0.35,
@@ -463,23 +436,23 @@ export function buildBmsDetail(channel, topology = {}, batteryOverview = null) {
       obj.userData.isClusterPart = true
     }
 
-    const baseMesh = box(rackW, 0.06, rackD, frameMat, 0.26)
+    // 底座贴地板
+    const baseMesh = box(rackW, 0.04, rackD, frameMat, packBaseY)
     tagCluster(baseMesh)
     rack.add(baseMesh)
-    for (const dx of [-rackW / 2 + 0.03, rackW / 2 - 0.03]) {
-      for (const dz of [-rackD / 2 + 0.03, rackD / 2 - 0.03]) {
-        const post = box(0.04, rackH, 0.04, frameMat, rackH / 2 + 0.28)
-        post.position.set(dx, 0, dz)
-        tagCluster(post)
-        rack.add(post)
-      }
+    // 仅左右侧板（短），不再做四角通高立柱
+    for (const dx of [-rackW / 2 + 0.02, rackW / 2 - 0.02]) {
+      const side = box(0.03, rackFrameH, rackD * 0.92, frameMat, packBaseY + rackFrameH / 2)
+      side.position.x = dx
+      tagCluster(side)
+      rack.add(side)
     }
-    const topBeam = box(rackW, 0.04, rackD, frameMat, rackH + 0.28)
+    const topBeam = box(rackW, 0.03, rackD, frameMat, packBaseY + rackFrameH)
     tagCluster(topBeam)
     rack.add(topBeam)
 
     const cLabel = makeTextSprite(`簇${ci + 1}`, '#ffffff', 36)
-    cLabel.position.set(0, rackH + 0.42, rackD / 2 + 0.04)
+    cLabel.position.set(0, packBaseY + rackFrameH + 0.16, rackD / 2 + 0.04)
     cLabel.scale.set(0.55, 0.22, 1)
     cLabel.userData.clusterIndex = ci
     rack.add(cLabel)
@@ -503,7 +476,7 @@ export function buildBmsDetail(channel, topology = {}, batteryOverview = null) {
     let instanceId = 0
 
     for (let pi = 0; pi < packCount; pi++) {
-      const py = 0.38 + pi * (packHActual + packGapY)
+      const py = packBaseY + 0.03 + pi * (packHActual + packGapY)
       const trayMat = new THREE.MeshStandardMaterial({
         color: 0x2d3748,
         metalness: 0.4,
@@ -552,20 +525,21 @@ export function buildBmsDetail(channel, topology = {}, batteryOverview = null) {
     cellInst.instanceMatrix.needsUpdate = true
     rack.add(cellInst)
 
-    const pickGeo = new THREE.BoxGeometry(rackW + 0.04, rackH + 0.2, rackD + 0.04)
+    const pickCenterY = packBaseY + rackFrameH / 2
+    const pickGeo = new THREE.BoxGeometry(rackW + 0.04, rackFrameH + 0.08, rackD + 0.04)
     const pickMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
     const pickMesh = new THREE.Mesh(pickGeo, pickMat)
-    pickMesh.position.y = rackH / 2 + 0.28
+    pickMesh.position.y = pickCenterY
     pickMesh.userData.clusterIndex = ci
     pickMesh.userData.isClusterPick = true
     pickMesh.userData.isClusterPart = true
     rack.add(pickMesh)
 
-    const hlGeo = new THREE.BoxGeometry(rackW + 0.08, rackH + 0.24, rackD + 0.08)
+    const hlGeo = new THREE.BoxGeometry(rackW + 0.08, rackFrameH + 0.1, rackD + 0.08)
     const hlEdges = new THREE.EdgesGeometry(hlGeo)
     const hlMat = new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.95 })
     const hl = new THREE.LineSegments(hlEdges, hlMat)
-    hl.position.y = rackH / 2 + 0.28
+    hl.position.y = pickCenterY
     hl.visible = false
     hl.userData.isClusterHighlight = true
     rack.add(hl)
@@ -574,7 +548,7 @@ export function buildBmsDetail(channel, topology = {}, batteryOverview = null) {
       color: 0x38bdf8, transparent: true, opacity: 0, depthWrite: false
     })
     const glow = new THREE.Mesh(new THREE.BoxGeometry(rackW + 0.1, 0.03, rackD + 0.1), glowMat)
-    glow.position.y = 0.24
+    glow.position.y = packBaseY
     glow.visible = false
     glow.userData.isClusterGlow = true
     rack.add(glow)
@@ -598,7 +572,7 @@ export function buildBmsDetail(channel, topology = {}, batteryOverview = null) {
       cellH,
       cellGapX,
       cellGapZ,
-      packBaseY: 0.38
+      packBaseY: packBaseY + 0.03
     }
     g.add(rack)
     clusterGroups.push(rack)
@@ -607,13 +581,10 @@ export function buildBmsDetail(channel, topology = {}, batteryOverview = null) {
   const dcMat = MAT.busDc()
   dcMat.transparent = true
   dcMat.opacity = Math.min(0.85, CLUSTER_OPACITY + 0.15)
-  const bus = box(L - 0.5, 0.05, 0.08, dcMat, floorY + H - 0.15)
+  const bus = box(L - 0.5, 0.05, 0.08, dcMat, wallBottom + H - 0.15)
   bus.position.z = 0.04
   bus.userData.isCabinShell = true
   g.add(bus)
-  const pad = box(L + 0.12, 0.18, W + 0.1, cabinMat(MAT.concrete), 0.1)
-  pad.userData.isCabinShell = true
-  g.add(pad)
 
   g.userData.clusterSocMats = clusterSocMats
   g.userData.packFrameMats = packFrameMats

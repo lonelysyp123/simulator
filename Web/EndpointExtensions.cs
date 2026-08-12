@@ -22,7 +22,8 @@ namespace EssSimulator.Web
                 ready = IsSimulatorReady()
             }));
 
-            app.MapGet("/api/mainline", () => Results.Ok(MainLineEnricher.Build()));
+            app.MapGet("/api/mainline", (TopologyStore topologyStore) =>
+                Results.Ok(MainLineEnricher.Build(topologyStore)));
 
             app.MapGet("/api/battery/{unit}", (int unit) =>
             {
@@ -278,6 +279,8 @@ namespace EssSimulator.Web
 
             // 组态编辑：模板 / 工程 / 连线校验 / 设备库
             app.MapTopologyEndpoints();
+            // 系统配置：工程模式 / 应用到仿真
+            app.MapSystemConfigEndpoints();
 
             return app;
         }

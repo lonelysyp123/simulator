@@ -1,6 +1,6 @@
 namespace EssSimulator.Web.Topology
 {
-    /// <summary>组态连线校验：电压源独占、母线未带电拒绝、变压器匹配、电表 PT/CT 接线等。</summary>
+    /// <summary>组态连线校验：电压源独占、母线未带电拒绝、变压器匹配、电表统一 PT/CT 抽头等。</summary>
     public static class TopologyValidator
     {
         private const double VoltageMatchTolerancePu = 0.02; // 2%
@@ -64,7 +64,7 @@ namespace EssSimulator.Web.Topology
                 if (!busResult.Ok) return busResult;
             }
 
-            // 电表：PT/CT 必须接到同一 AC 母线，且相位正确；PT 一次电压匹配
+            // 电表：统一 PT/CT 三相口须接同一 AC 母线，相位正确，且 PT 一次电压匹配
             var meterResult = ValidateMeterConnection(project, fromNode, fromTpl, fromPort, toNode, toTpl, toPort, newEdge);
             if (!meterResult.Ok) return meterResult;
 
@@ -139,51 +139,59 @@ namespace EssSimulator.Web.Topology
         {
             // 仅端口级标记计为电压源（避免变压器一次侧被误判为第二电源）
             bool otherIsSource = otherPort.IsVoltageSourcePort;
+            bool otherIsBreaker = other.TemplateId == "ac_breaker";
             bool busTop = string.Equals(busPort.Side, "top", StringComparison.OrdinalIgnoreCase);
 
             var existingSources = FindVoltageSourcesOnBus(project, bus.Id);
 
-            // 上侧：只接受电压源，且每相拐角独占（占用检查在 PortBusyExclusive）
+            // 上侧：电压源，或串联三相断路器（其后可接电压源）
             if (busTop)
             {
-                if (!otherIsSource)
+                if (!otherIsSource && !otherIsBreaker)
                 {
                     return Fail(
                         "BUS_TOP_SOURCE_ONLY",
-                        $"母线「{bus.Label}」上侧拐角只能连接电压源（电网，或变压器二次侧），不能接入「{other.Label}」。负荷设备请接到下侧拐角。",
+                        $"母线「{bus.Label}」上侧拐角只能连接电压源（电网，或变压器二次侧）或三相断路器，不能接入「{other.Label}」。负荷设备请接到下侧拐角。",
                         newEdge.Id);
                 }
 
-                if (existingSources.Count > 0 &&
-                    existingSources.All(s => s.sourceNodeId != other.Id))
-                {
-                    return Fail(
-                        "BUS_MULTI_SOURCE",
-                        $"母线「{bus.Label}」已接入电压源「{LabelOf(project, existingSources[0].sourceNodeId)}」，" +
-                        $"禁止再接入「{other.Label}」。已拒绝本次连接。",
-                        newEdge.Id,
-                        new List<string>
-                        {
-                            $"既有电压源节点: {existingSources[0].sourceNodeId}",
-                            $"冲突电压源节点: {other.Id}"
-                        });
-                }
+                // 断路器对侧已有电压源时，按该源做多源/电压校验
+                var incomingSources = otherIsBreaker
+                    ? FindVoltageSourcesBehindBreaker(project, other, otherPort.Id)
+                    : new List<(string sourceNodeId, double voltage)> { (other.Id, PortVoltage(other, otherPort)) };
 
-                double v = PortVoltage(other, otherPort);
-                double busV = TopologyParamHelper.GetDouble(bus.Parameters, "nominalVoltage", 0);
-                bool energized = IsTruthy(bus.Parameters, "energized") || existingSources.Count > 0;
-                if (energized && busV > 1 && !VoltageMatches(busV, v))
+                foreach (var src in incomingSources)
                 {
-                    return Fail(
-                        "BUS_VOLTAGE_MISMATCH",
-                        $"电压源「{other.Label}」输出 {v:0.##} V，与母线「{bus.Label}」电压 {busV:0.##} V 不匹配",
-                        newEdge.Id);
+                    if (existingSources.Count > 0 &&
+                        existingSources.All(s => s.sourceNodeId != src.sourceNodeId))
+                    {
+                        return Fail(
+                            "BUS_MULTI_SOURCE",
+                            $"母线「{bus.Label}」已接入电压源「{LabelOf(project, existingSources[0].sourceNodeId)}」，" +
+                            $"禁止再接入「{LabelOf(project, src.sourceNodeId)}」。已拒绝本次连接。",
+                            newEdge.Id,
+                            new List<string>
+                            {
+                                $"既有电压源节点: {existingSources[0].sourceNodeId}",
+                                $"冲突电压源节点: {src.sourceNodeId}"
+                            });
+                    }
+
+                    double busV = TopologyParamHelper.GetDouble(bus.Parameters, "nominalVoltage", 0);
+                    bool energized = IsTruthy(bus.Parameters, "energized") || existingSources.Count > 0;
+                    if (energized && busV > 1 && src.voltage > 1 && !VoltageMatches(busV, src.voltage))
+                    {
+                        return Fail(
+                            "BUS_VOLTAGE_MISMATCH",
+                            $"电压源「{LabelOf(project, src.sourceNodeId)}」输出 {src.voltage:0.##} V，与母线「{bus.Label}」电压 {busV:0.##} V 不匹配",
+                            newEdge.Id);
+                    }
                 }
 
                 return Ok();
             }
 
-            // 下侧：挂载负荷/测量设备，允许多台；电压源应接上侧
+            // 下侧：挂载负荷/测量设备/串联断路器，允许多台；电压源应接上侧
             if (otherIsSource)
             {
                 return Fail(
@@ -219,28 +227,30 @@ namespace EssSimulator.Web.Topology
             else return Ok();
 
             if (other!.TemplateId != "ac_bus")
-                return Fail("METER_NOT_BUS", $"电表「{meter!.Label}」的 {meterPort!.Label} 必须连接到三相母线，不能接到「{other.Label}」", newEdge.Id);
+                return Fail("METER_NOT_BUS",
+                    $"电表「{meter!.Label}」的 {meterPort!.Label}（PT/CT 统一口）必须连接到三相母线，不能接到「{other.Label}」",
+                    newEdge.Id);
 
             if (otherPort!.Phase != meterPort!.Phase)
-                return Fail("METER_PHASE", $"电表端口 {meterPort.Label}（{meterPort.Phase} 相）与母线端口 {otherPort.Label}（{otherPort.Phase} 相）相位不一致", newEdge.Id);
+                return Fail("METER_PHASE",
+                    $"电表端口 {meterPort.Label}（{meterPort.Phase} 相）与母线端口 {otherPort.Label}（{otherPort.Phase} 相）相位不一致",
+                    newEdge.Id);
 
-            // PT 端口：一次电压匹配母线
-            if (meterPort.Id.StartsWith("pt_", StringComparison.Ordinal))
-            {
-                double ptV = TopologyParamHelper.GetDouble(meter.Parameters, "ptPrimaryVoltage", 0);
-                double busV = ResolveBusVoltage(project, other);
-                if (busV > 1 && !VoltageMatches(busV, ptV))
-                    return Fail("METER_PT_MISMATCH",
-                        $"电表 PT 一次 {ptV:0.##} V 与母线「{other.Label}」电压 {busV:0.##} V 不匹配", newEdge.Id);
-            }
+            // 统一抽头：该口同时承载 PT/CT，校验 PT 一次与母线电压
+            double ptV = TopologyParamHelper.GetDouble(meter.Parameters, "ptPrimaryVoltage", 0);
+            double busV = ResolveBusVoltage(project, other);
+            if (busV > 1 && !VoltageMatches(busV, ptV))
+                return Fail("METER_PT_MISMATCH",
+                    $"电表 PT 一次 {ptV:0.##} V 与母线「{other.Label}」电压 {busV:0.##} V 不匹配（PT/CT 共用端口）",
+                    newEdge.Id);
 
-            // CT 与 PT 须在同一母线（检查已有连接）
+            // 三相统一口须接到同一母线
             var meterEdges = project.Edges.Where(e => e.FromNodeId == meter.Id || e.ToNodeId == meter.Id).ToList();
             foreach (var e in meterEdges)
             {
                 var otherId = e.FromNodeId == meter.Id ? e.ToNodeId : e.FromNodeId;
                 if (otherId != other.Id && project.Nodes.Any(n => n.Id == otherId && n.TemplateId == "ac_bus"))
-                    return Fail("METER_MULTI_BUS", $"电表「{meter.Label}」的 PT/CT 必须全部接到同一母线", newEdge.Id);
+                    return Fail("METER_MULTI_BUS", $"电表「{meter.Label}」的 PT/CT 三相口必须全部接到同一母线", newEdge.Id);
             }
 
             return Ok();
@@ -388,8 +398,16 @@ namespace EssSimulator.Web.Topology
                 var tpl = TopologyTemplates.Get(other.TemplateId);
                 var port = tpl?.Ports.FirstOrDefault(p => p.Id == otherPortId);
                 if (port == null) continue;
-                if (!port.IsVoltageSourcePort) continue;
 
+                // 三相断路器合闸时透明穿越，查找对侧电压源
+                if (other.TemplateId == "ac_breaker")
+                {
+                    if (!IsBreakerClosed(other)) continue;
+                    list.AddRange(FindVoltageSourcesBehindBreaker(project, other, otherPortId!));
+                    continue;
+                }
+
+                if (!port.IsVoltageSourcePort) continue;
                 list.Add((other.Id, PortVoltage(other, port)));
             }
 
@@ -397,6 +415,66 @@ namespace EssSimulator.Web.Topology
                 .GroupBy(x => x.Item1)
                 .Select(g => g.First())
                 .ToList();
+        }
+
+        /// <summary>经断路器对侧端口查找电压源（合闸时）。</summary>
+        private static List<(string sourceNodeId, double voltage)> FindVoltageSourcesBehindBreaker(
+            TopologyProject project, TopologyNode breaker, string portFacingBus)
+        {
+            var list = new List<(string, double)>();
+            if (!IsBreakerClosed(breaker)) return list;
+
+            string? opposite = OppositeBreakerPort(portFacingBus);
+            if (opposite == null) return list;
+
+            foreach (var e in project.Edges)
+            {
+                string? otherId = null;
+                string? otherPortId = null;
+                if (e.FromNodeId == breaker.Id && e.FromPortId == opposite)
+                { otherId = e.ToNodeId; otherPortId = e.ToPortId; }
+                else if (e.ToNodeId == breaker.Id && e.ToPortId == opposite)
+                { otherId = e.FromNodeId; otherPortId = e.FromPortId; }
+                else continue;
+
+                var other = FindNode(project, otherId);
+                if (other == null) continue;
+                var tpl = TopologyTemplates.Get(other.TemplateId);
+                var port = tpl?.Ports.FirstOrDefault(p => p.Id == otherPortId);
+                if (port == null || !port.IsVoltageSourcePort) continue;
+                list.Add((other.Id, PortVoltage(other, port)));
+            }
+
+            return list
+                .GroupBy(x => x.Item1)
+                .Select(g => g.First())
+                .ToList();
+        }
+
+        private static string? OppositeBreakerPort(string portId) => portId switch
+        {
+            "a" => "a2",
+            "b" => "b2",
+            "c" => "c2",
+            "a2" => "a",
+            "b2" => "b",
+            "c2" => "c",
+            _ => null
+        };
+
+        private static bool IsBreakerClosed(TopologyNode breaker)
+        {
+            if (!breaker.Parameters.TryGetValue("closed", out var v) || v == null) return true;
+            if (v is bool b) return b;
+            if (v is System.Text.Json.JsonElement je)
+            {
+                if (je.ValueKind == System.Text.Json.JsonValueKind.True) return true;
+                if (je.ValueKind == System.Text.Json.JsonValueKind.False) return false;
+                if (je.ValueKind == System.Text.Json.JsonValueKind.String &&
+                    bool.TryParse(je.GetString(), out var pb)) return pb;
+            }
+            if (bool.TryParse(v.ToString(), out var parsed)) return parsed;
+            return true;
         }
 
         private static double ResolveBusVoltage(TopologyProject project, TopologyNode bus)
@@ -452,6 +530,242 @@ namespace EssSimulator.Web.Topology
                 (e.FromNodeId == edge.ToNodeId && e.FromPortId == edge.ToPortId &&
                  e.ToNodeId == edge.FromNodeId && e.ToPortId == edge.FromPortId));
 
+        /// <summary>
+        /// 将单条连线扩展为同组端口：交流同侧 A/B/C，或直流同侧正/负。
+        /// 非成组端口则原样返回一条。
+        /// </summary>
+        public static List<TopologyEdge> ExpandBundle(TopologyProject project, TopologyEdge seed)
+        {
+            if (project == null || seed == null) return new List<TopologyEdge>();
+
+            var fromNode = FindNode(project, seed.FromNodeId);
+            var toNode = FindNode(project, seed.ToNodeId);
+            if (fromNode == null || toNode == null)
+                return new List<TopologyEdge> { CloneEdge(seed) };
+
+            var fromTpl = TopologyTemplates.Get(fromNode.TemplateId);
+            var toTpl = TopologyTemplates.Get(toNode.TemplateId);
+            if (fromTpl == null || toTpl == null)
+                return new List<TopologyEdge> { CloneEdge(seed) };
+
+            var fromPort = fromTpl.Ports.FirstOrDefault(p => p.Id == seed.FromPortId);
+            var toPort = toTpl.Ports.FirstOrDefault(p => p.Id == seed.ToPortId);
+            if (fromPort == null || toPort == null)
+                return new List<TopologyEdge> { CloneEdge(seed) };
+
+            // 交流三相：按相位配对，限定在各自所选侧
+            if (fromPort.Kind == "ac_phase" && toPort.Kind == "ac_phase" &&
+                !string.IsNullOrEmpty(fromPort.Phase) && !string.IsNullOrEmpty(toPort.Phase))
+            {
+                var fromGroup = fromTpl.Ports
+                    .Where(p => p.Kind == "ac_phase" &&
+                                string.Equals(p.Side, fromPort.Side, StringComparison.OrdinalIgnoreCase) &&
+                                !string.IsNullOrEmpty(p.Phase))
+                    .ToList();
+                var toByPhase = toTpl.Ports
+                    .Where(p => p.Kind == "ac_phase" &&
+                                string.Equals(p.Side, toPort.Side, StringComparison.OrdinalIgnoreCase) &&
+                                !string.IsNullOrEmpty(p.Phase))
+                    .GroupBy(p => p.Phase!, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+                if (fromGroup.Count >= 2 && toByPhase.Count >= 2)
+                {
+                    var list = new List<TopologyEdge>();
+                    foreach (var fp in fromGroup.OrderBy(p => PhaseOrder(p.Phase)))
+                    {
+                        if (!toByPhase.TryGetValue(fp.Phase!, out var tp)) continue;
+                        list.Add(new TopologyEdge
+                        {
+                            Id = Guid.NewGuid().ToString("N"),
+                            FromNodeId = seed.FromNodeId,
+                            FromPortId = fp.Id,
+                            ToNodeId = seed.ToNodeId,
+                            ToPortId = tp.Id
+                        });
+                    }
+                    if (list.Count > 0) return list;
+                }
+            }
+
+            // 直流正负：同侧成对
+            if (IsDc(fromPort.Kind) && IsDc(toPort.Kind))
+            {
+                var fromPair = FindDcPair(fromTpl, fromPort);
+                var toPair = FindDcPair(toTpl, toPort);
+                if (fromPair != null && toPair != null)
+                {
+                    return new List<TopologyEdge>
+                    {
+                        new()
+                        {
+                            Id = Guid.NewGuid().ToString("N"),
+                            FromNodeId = seed.FromNodeId,
+                            FromPortId = fromPair.Value.pos.Id,
+                            ToNodeId = seed.ToNodeId,
+                            ToPortId = toPair.Value.pos.Id
+                        },
+                        new()
+                        {
+                            Id = Guid.NewGuid().ToString("N"),
+                            FromNodeId = seed.FromNodeId,
+                            FromPortId = fromPair.Value.neg.Id,
+                            ToNodeId = seed.ToNodeId,
+                            ToPortId = toPair.Value.neg.Id
+                        }
+                    };
+                }
+            }
+
+            return new List<TopologyEdge> { CloneEdge(seed) };
+        }
+
+        /// <summary>
+        /// 成组连接：先 ExpandBundle，再逐条校验并写入；任一条失败则整组回滚（不修改入参 project）。
+        /// </summary>
+        public static TopologyValidationResult TryConnectBundle(
+            TopologyProject project,
+            TopologyEdge seed,
+            out TopologyProject? updated)
+        {
+            updated = null;
+            if (project == null || seed == null)
+                return Fail("BAD_REQUEST", "工程或连线为空");
+
+            var bundle = ExpandBundle(project, seed);
+            if (bundle.Count == 0)
+                return Fail("BUNDLE_EMPTY", "无法生成连线");
+
+            var work = CloneProject(project);
+            var applied = 0;
+            foreach (var edge in bundle)
+            {
+                if (IsDuplicateEdge(work, edge))
+                    continue;
+
+                var validation = TryConnect(work, edge);
+                if (!validation.Ok)
+                {
+                    validation.ProblemNodeIds = new List<string> { seed.FromNodeId, seed.ToNodeId }
+                        .Distinct(StringComparer.Ordinal)
+                        .ToList();
+                    return validation;
+                }
+
+                ApplyConnect(work, edge);
+                applied++;
+            }
+
+            updated = work;
+            return new TopologyValidationResult
+            {
+                Ok = true,
+                Message = applied == 0 ? "连接已存在" : $"已连接 {applied} 条",
+                Details = { $"成组端口 {bundle.Count}，新建 {applied}" }
+            };
+        }
+
+        /// <summary>
+        /// 保存工程前的合理性检查：须有电网；有且仅有一个主断路器；有且仅有一个并网点电表。
+        /// </summary>
+        public static TopologyValidationResult ValidateProjectForSave(TopologyProject project)
+        {
+            if (project == null)
+                return Fail("PROJECT_NULL", "工程为空");
+
+            var details = new List<string>();
+            var grids = project.Nodes.Where(n => n.TemplateId == "grid").ToList();
+            if (grids.Count == 0)
+            {
+                details.Add("缺少电网模型");
+                return Fail("NEED_GRID", "工程须包含至少一个电网模型",
+                    details: details,
+                    problemNodeIds: project.Nodes.Select(n => n.Id).ToList());
+            }
+
+            var mainBreakers = project.Nodes
+                .Where(n => n.TemplateId == "ac_breaker" && TopologyParamHelper.GetBool(n.Parameters, "isMainBreaker"))
+                .ToList();
+            if (mainBreakers.Count == 0)
+            {
+                var breakers = project.Nodes.Where(n => n.TemplateId == "ac_breaker").Select(n => n.Id).ToList();
+                details.Add("未指定主断路器（请在三相断路器属性中勾选「作为主断路器」）");
+                return Fail("NEED_MAIN_BREAKER", "须指定有且仅有一个主断路器",
+                    details: details, problemNodeIds: breakers);
+            }
+            if (mainBreakers.Count > 1)
+            {
+                details.Add($"当前主断路器：{string.Join("、", mainBreakers.Select(n => n.Label))}");
+                return Fail("MULTI_MAIN_BREAKER", "主断路器有且只能有一个",
+                    details: details, problemNodeIds: mainBreakers.Select(n => n.Id).ToList());
+            }
+
+            var pccMeters = project.Nodes
+                .Where(n => n.TemplateId == "ac_meter" && TopologyParamHelper.GetBool(n.Parameters, "isPccMeter"))
+                .ToList();
+            if (pccMeters.Count == 0)
+            {
+                var meters = project.Nodes.Where(n => n.TemplateId == "ac_meter").Select(n => n.Id).ToList();
+                details.Add("未指定并网点电表（请在三相电表属性中勾选「作为并网点电表」）");
+                return Fail("NEED_PCC_METER", "须指定有且仅有一个并网点电表",
+                    details: details, problemNodeIds: meters);
+            }
+            if (pccMeters.Count > 1)
+            {
+                details.Add($"当前并网点电表：{string.Join("、", pccMeters.Select(n => n.Label))}");
+                return Fail("MULTI_PCC_METER", "并网点电表有且只能有一个",
+                    details: details, problemNodeIds: pccMeters.Select(n => n.Id).ToList());
+            }
+
+            return new TopologyValidationResult
+            {
+                Ok = true,
+                Message = "工程配置校验通过",
+                Details =
+                {
+                    $"电网：{grids[0].Label}",
+                    $"主断路器：{mainBreakers[0].Label}",
+                    $"并网点电表：{pccMeters[0].Label}"
+                }
+            };
+        }
+
+        private static int PhaseOrder(string? phase) => phase?.ToUpperInvariant() switch
+        {
+            "A" => 0,
+            "B" => 1,
+            "C" => 2,
+            _ => 9
+        };
+
+        private static (TopologyPortDef pos, TopologyPortDef neg)? FindDcPair(TopologyTemplate tpl, TopologyPortDef seed)
+        {
+            var sidePorts = tpl.Ports
+                .Where(p => IsDc(p.Kind) &&
+                            string.Equals(p.Side, seed.Side, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var pos = sidePorts.FirstOrDefault(p => p.Kind is "dc_pos" or "dc");
+            var neg = sidePorts.FirstOrDefault(p => p.Kind == "dc_neg");
+            if (pos == null || neg == null) return null;
+            return (pos, neg);
+        }
+
+        private static TopologyEdge CloneEdge(TopologyEdge e) => new()
+        {
+            Id = string.IsNullOrWhiteSpace(e.Id) ? Guid.NewGuid().ToString("N") : e.Id,
+            FromNodeId = e.FromNodeId,
+            FromPortId = e.FromPortId,
+            ToNodeId = e.ToNodeId,
+            ToPortId = e.ToPortId
+        };
+
+        internal static TopologyProject CloneProject(TopologyProject project)
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(project);
+            return System.Text.Json.JsonSerializer.Deserialize<TopologyProject>(json)
+                   ?? new TopologyProject();
+        }
+
         private static TopologyNode? FindNode(TopologyProject p, string id) =>
             p.Nodes.FirstOrDefault(n => n.Id == id);
 
@@ -475,14 +789,20 @@ namespace EssSimulator.Web.Topology
 
         private static TopologyValidationResult Ok() => new() { Ok = true, Message = "ok" };
 
-        private static TopologyValidationResult Fail(string code, string message, string? rejectEdgeId = null, List<string>? details = null) =>
+        private static TopologyValidationResult Fail(
+            string code,
+            string message,
+            string? rejectEdgeId = null,
+            List<string>? details = null,
+            List<string>? problemNodeIds = null) =>
             new()
             {
                 Ok = false,
                 Code = code,
                 Message = message,
                 RejectEdgeId = rejectEdgeId,
-                Details = details ?? new List<string>()
+                Details = details ?? new List<string>(),
+                ProblemNodeIds = problemNodeIds ?? new List<string>()
             };
     }
 }

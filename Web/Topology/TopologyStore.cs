@@ -7,8 +7,11 @@ namespace EssSimulator.Web.Topology
     /// <summary>
     /// 组态工程与设备库的 JSON 文件持久化。
     /// 目录：{ContentRoot}/configs/topology/
-    ///   project.json           — 当前画布工程
-    ///   library/{id}.json      — 基于模板改参后的可复用设备
+    ///   project.json                 — 当前画布工程
+    ///   projects/{id}.json           — 已保存的命名工程
+    ///   runtime-mode.json            — 工程模式开关与激活工程
+    ///   generated/runtime-overlay.json — 应用到仿真的运行时补丁
+    ///   library/{id}.json            — 设备库
     /// </summary>
     public sealed class TopologyStore
     {
@@ -25,16 +28,25 @@ namespace EssSimulator.Web.Topology
         private readonly string _rootDir;
         private readonly string _projectPath;
         private readonly string _libraryDir;
+        private readonly string _projectsDir;
+        private readonly string _modePath;
+        private readonly string _overlayPath;
 
         public TopologyStore(IWebHostEnvironment env)
         {
             _rootDir = Path.Combine(env.ContentRootPath, "configs", "topology");
             _projectPath = Path.Combine(_rootDir, "project.json");
             _libraryDir = Path.Combine(_rootDir, "library");
+            _projectsDir = Path.Combine(_rootDir, "projects");
+            _modePath = Path.Combine(_rootDir, "runtime-mode.json");
+            _overlayPath = Path.Combine(_rootDir, "generated", "runtime-overlay.json");
             Directory.CreateDirectory(_libraryDir);
+            Directory.CreateDirectory(_projectsDir);
+            Directory.CreateDirectory(Path.GetDirectoryName(_overlayPath)!);
         }
 
         public string RootDirectory => _rootDir;
+        public string OverlayPath => _overlayPath;
 
         public TopologyProject LoadProject()
         {
@@ -70,14 +82,318 @@ namespace EssSimulator.Web.Topology
                 TopologyValidator.RefreshAcBusEnergization(project);
                 var json = JsonSerializer.Serialize(project, JsonOpts);
                 File.WriteAllText(_projectPath, json);
+                // 同步到命名工程目录，供系统配置下拉选择
+                SaveNamedProjectUnlocked(project);
                 return project;
             }
         }
+
+        public IReadOnlyList<TopologyProjectSummary> ListProjects()
+        {
+            lock (_gate)
+            {
+                Directory.CreateDirectory(_projectsDir);
+                var list = new List<TopologyProjectSummary>();
+                foreach (var path in Directory.EnumerateFiles(_projectsDir, "*.json"))
+                {
+                    try
+                    {
+                        var p = JsonSerializer.Deserialize<TopologyProject>(File.ReadAllText(path), JsonOpts);
+                        if (p == null) continue;
+                        list.Add(ToSummary(p));
+                    }
+                    catch { /* skip */ }
+                }
+
+                // 若当前画布工程尚未入 projects，也列出来
+                if (File.Exists(_projectPath))
+                {
+                    try
+                    {
+                        var cur = JsonSerializer.Deserialize<TopologyProject>(File.ReadAllText(_projectPath), JsonOpts);
+                        if (cur != null && list.All(x => x.Id != cur.Id))
+                            list.Add(ToSummary(cur));
+                    }
+                    catch { /* skip */ }
+                }
+
+                return list.OrderByDescending(x => x.UpdatedAtUtc).ToList();
+            }
+        }
+
+        public TopologyProject? LoadNamedProject(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return null;
+            lock (_gate)
+            {
+                var path = ProjectPath(id);
+                if (!File.Exists(path) && File.Exists(_projectPath))
+                {
+                    var cur = JsonSerializer.Deserialize<TopologyProject>(File.ReadAllText(_projectPath), JsonOpts);
+                    if (cur != null && string.Equals(cur.Id, id, StringComparison.OrdinalIgnoreCase))
+                    {
+                        TopologyValidator.RefreshAcBusEnergization(cur);
+                        return cur;
+                    }
+                }
+                if (!File.Exists(path)) return null;
+                try
+                {
+                    var p = JsonSerializer.Deserialize<TopologyProject>(File.ReadAllText(path), JsonOpts);
+                    if (p != null) TopologyValidator.RefreshAcBusEnergization(p);
+                    return p;
+                }
+                catch { return null; }
+            }
+        }
+
+        public TopologyProject SaveNamedProject(TopologyProject project)
+        {
+            if (project == null) throw new ArgumentNullException(nameof(project));
+            lock (_gate)
+            {
+                NormalizeParameters(project);
+                if (string.IsNullOrWhiteSpace(project.Id))
+                    project.Id = Guid.NewGuid().ToString("N");
+                project.UpdatedAtUtc = DateTime.UtcNow;
+                TopologyValidator.RefreshAcBusEnergization(project);
+                SaveNamedProjectUnlocked(project);
+                return project;
+            }
+        }
+
+        /// <summary>按工程名称查找（忽略大小写与首尾空白）；用于保存时同名检测。</summary>
+        public TopologyProjectSummary? FindProjectByName(string name, string? excludeId = null)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            var needle = name.Trim();
+            return ListProjects().FirstOrDefault(p =>
+                string.Equals(p.Name?.Trim(), needle, StringComparison.OrdinalIgnoreCase) &&
+                (excludeId == null || !string.Equals(p.Id, excludeId, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        public bool DeleteNamedProject(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return false;
+            lock (_gate)
+            {
+                var path = ProjectPath(id);
+                var deleted = false;
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    deleted = true;
+                }
+
+                // 若删除的是当前画布工程，清空画布文件
+                if (File.Exists(_projectPath))
+                {
+                    try
+                    {
+                        var cur = JsonSerializer.Deserialize<TopologyProject>(File.ReadAllText(_projectPath), JsonOpts);
+                        if (cur != null && string.Equals(cur.Id, id, StringComparison.OrdinalIgnoreCase))
+                            File.Delete(_projectPath);
+                    }
+                    catch { /* ignore */ }
+                }
+
+                // 若删除的是激活运行工程，清除引用
+                var mode = LoadRuntimeModeUnlocked();
+                if (mode.EngineeringMode &&
+                    string.Equals(mode.ActiveProjectId, id, StringComparison.OrdinalIgnoreCase))
+                {
+                    mode.ActiveProjectId = null;
+                    mode.ActiveProjectName = null;
+                    SaveRuntimeModeUnlocked(mode);
+                }
+
+                return deleted;
+            }
+        }
+
+        /// <summary>将命名工程载入当前画布（供「修改」进入组态编辑）。</summary>
+        public TopologyProject? OpenNamedProject(string id)
+        {
+            var project = LoadNamedProject(id);
+            if (project == null) return null;
+            return SaveProject(project);
+        }
+
+        /// <summary>新建空工程并写入当前画布（暂不入库 projects/，待用户首次保存）。</summary>
+        public TopologyProject CreateEmptyProject(string? name = null)
+        {
+            lock (_gate)
+            {
+                Directory.CreateDirectory(_rootDir);
+                var project = new TopologyProject
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Name = string.IsNullOrWhiteSpace(name) ? "未命名工程" : name.Trim(),
+                    Nodes = new List<TopologyNode>(),
+                    Edges = new List<TopologyEdge>(),
+                    UpdatedAtUtc = DateTime.UtcNow
+                };
+                NormalizeParameters(project);
+                File.WriteAllText(_projectPath, JsonSerializer.Serialize(project, JsonOpts));
+                return project;
+            }
+        }
+
+        public TopologyRuntimeMode LoadRuntimeMode()
+        {
+            lock (_gate)
+                return LoadRuntimeModeUnlocked();
+        }
+
+        public TopologyRuntimeMode SaveRuntimeMode(TopologyRuntimeMode mode)
+        {
+            if (mode == null) throw new ArgumentNullException(nameof(mode));
+            lock (_gate)
+                return SaveRuntimeModeUnlocked(mode);
+        }
+
+        private TopologyRuntimeMode LoadRuntimeModeUnlocked()
+        {
+            if (!File.Exists(_modePath))
+                return new TopologyRuntimeMode();
+            try
+            {
+                return JsonSerializer.Deserialize<TopologyRuntimeMode>(File.ReadAllText(_modePath), JsonOpts)
+                       ?? new TopologyRuntimeMode();
+            }
+            catch
+            {
+                return new TopologyRuntimeMode();
+            }
+        }
+
+        private TopologyRuntimeMode SaveRuntimeModeUnlocked(TopologyRuntimeMode mode)
+        {
+            Directory.CreateDirectory(_rootDir);
+            mode.UpdatedAtUtc = DateTime.UtcNow;
+            File.WriteAllText(_modePath, JsonSerializer.Serialize(mode, JsonOpts));
+            return mode;
+        }
+
+        public TopologyRuntimeOverlay? LoadOverlay()
+        {
+            lock (_gate)
+            {
+                if (!File.Exists(_overlayPath)) return null;
+                try
+                {
+                    return JsonSerializer.Deserialize<TopologyRuntimeOverlay>(File.ReadAllText(_overlayPath), JsonOpts);
+                }
+                catch { return null; }
+            }
+        }
+
+        public TopologyRuntimeOverlay SaveOverlay(TopologyRuntimeOverlay overlay)
+        {
+            if (overlay == null) throw new ArgumentNullException(nameof(overlay));
+            lock (_gate)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_overlayPath)!);
+                overlay.GeneratedAtUtc = DateTime.UtcNow;
+                File.WriteAllText(_overlayPath, JsonSerializer.Serialize(overlay, JsonOpts));
+                return overlay;
+            }
+        }
+
+        public void ClearOverlay()
+        {
+            lock (_gate)
+            {
+                if (File.Exists(_overlayPath))
+                    File.Delete(_overlayPath);
+            }
+        }
+
+        private void SaveNamedProjectUnlocked(TopologyProject project)
+        {
+            Directory.CreateDirectory(_projectsDir);
+            if (string.IsNullOrWhiteSpace(project.Id))
+                project.Id = Guid.NewGuid().ToString("N");
+            File.WriteAllText(ProjectPath(project.Id), JsonSerializer.Serialize(project, JsonOpts));
+        }
+
+        private string ProjectPath(string id) =>
+            Path.Combine(_projectsDir, Path.GetFileName(id) + ".json");
+
+        private static TopologyProjectSummary ToSummary(TopologyProject p) => new()
+        {
+            Id = p.Id,
+            Name = string.IsNullOrWhiteSpace(p.Name) ? p.Id : p.Name,
+            UpdatedAtUtc = p.UpdatedAtUtc,
+            NodeCount = p.Nodes?.Count ?? 0,
+            EmuCount = p.Nodes?.Count(n => n.TemplateId == "emu") ?? 0
+        };
 
         private static void NormalizeParameters(TopologyProject project)
         {
             foreach (var node in project.Nodes)
                 node.Parameters = NormalizeDict(node.Parameters);
+            MigrateMeterUnifiedPorts(project);
+            PruneInvalidEdges(project);
+        }
+
+        /// <summary>
+        /// 旧版电表下方 CT 口并入上方统一 PT/CT 口：ct_a→pt_a 等同相映射，再去重。
+        /// </summary>
+        private static void MigrateMeterUnifiedPorts(TopologyProject project)
+        {
+            if (project.Edges == null || project.Edges.Count == 0) return;
+            static string? MapLegacyMeterPort(string? portId) => portId switch
+            {
+                "ct_a" => "pt_a",
+                "ct_b" => "pt_b",
+                "ct_c" => "pt_c",
+                _ => null
+            };
+
+            var meterIds = new HashSet<string>(
+                project.Nodes.Where(n => n.TemplateId == "ac_meter").Select(n => n.Id));
+            foreach (var e in project.Edges)
+            {
+                if (meterIds.Contains(e.FromNodeId))
+                {
+                    var mapped = MapLegacyMeterPort(e.FromPortId);
+                    if (mapped != null) e.FromPortId = mapped;
+                }
+                if (meterIds.Contains(e.ToNodeId))
+                {
+                    var mapped = MapLegacyMeterPort(e.ToPortId);
+                    if (mapped != null) e.ToPortId = mapped;
+                }
+            }
+
+            // 同一端口对可能因 PT+CT 双线并存而重复，保留一条
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            project.Edges.RemoveAll(e =>
+            {
+                var a = $"{e.FromNodeId}|{e.FromPortId}|{e.ToNodeId}|{e.ToPortId}";
+                var b = $"{e.ToNodeId}|{e.ToPortId}|{e.FromNodeId}|{e.FromPortId}";
+                if (seen.Contains(a) || seen.Contains(b)) return true;
+                seen.Add(a);
+                return false;
+            });
+        }
+
+        /// <summary>去掉仍指向无效端口的连线。</summary>
+        private static void PruneInvalidEdges(TopologyProject project)
+        {
+            if (project.Edges == null || project.Edges.Count == 0) return;
+            var byId = project.Nodes.ToDictionary(n => n.Id);
+            project.Edges.RemoveAll(e =>
+            {
+                if (!byId.TryGetValue(e.FromNodeId, out var from) || !byId.TryGetValue(e.ToNodeId, out var to))
+                    return true;
+                var fromTpl = TopologyTemplates.Get(from.TemplateId);
+                var toTpl = TopologyTemplates.Get(to.TemplateId);
+                if (fromTpl == null || toTpl == null) return true;
+                return fromTpl.Ports.All(p => p.Id != e.FromPortId)
+                       || toTpl.Ports.All(p => p.Id != e.ToPortId);
+            });
         }
 
         private static Dictionary<string, object?> NormalizeDict(Dictionary<string, object?>? src)

@@ -24,7 +24,23 @@ namespace EssSimulator.Web.Topology
             {
                 if (project == null)
                     return Results.BadRequest(new { message = "工程体为空" });
+                var validation = TopologyValidator.ValidateProjectForSave(project);
+                if (!validation.Ok)
+                {
+                    return Results.BadRequest(new
+                    {
+                        message = validation.Message,
+                        validation
+                    });
+                }
                 return Results.Ok(store.SaveProject(project));
+            });
+
+            g.MapPost("/validate", (TopologyProject project) =>
+            {
+                if (project == null)
+                    return Results.BadRequest(new { message = "工程体为空" });
+                return Results.Ok(TopologyValidator.ValidateProjectForSave(project));
             });
 
             g.MapPost("/connect", (ConnectRequest req, TopologyStore store) =>
@@ -39,6 +55,16 @@ namespace EssSimulator.Web.Topology
                             Message = "请求缺少 Project 或 Edge"
                         }
                     });
+
+                if (req.ExpandBundle)
+                {
+                    var bundleResult = TopologyValidator.TryConnectBundle(req.Project, req.Edge, out var bundled);
+                    return Results.Ok(new ConnectResponse
+                    {
+                        Validation = bundleResult,
+                        Project = bundled ?? req.Project
+                    });
+                }
 
                 var validation = TopologyValidator.TryConnect(req.Project, req.Edge);
                 if (!validation.Ok)
@@ -56,6 +82,27 @@ namespace EssSimulator.Web.Topology
                     Validation = validation,
                     Project = updated
                 });
+            });
+
+            g.MapPost("/scaffold", (ScaffoldRequest? body) =>
+            {
+                try
+                {
+                    var emuCount = body?.EmuCount ?? 1;
+                    var project = TopologyScaffold.BuildRadial(
+                        emuCount,
+                        body?.Name,
+                        body?.IncludeLoad ?? true);
+                    return Results.Ok(project);
+                }
+                catch (ArgumentOutOfRangeException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
             });
 
             g.MapPost("/disconnect", (DisconnectRequest req) =>
@@ -95,11 +142,54 @@ namespace EssSimulator.Web.Topology
             {
                 root = store.RootDirectory,
                 project = Path.Combine(store.RootDirectory, "project.json"),
-                library = Path.Combine(store.RootDirectory, "library")
+                library = Path.Combine(store.RootDirectory, "library"),
+                projects = Path.Combine(store.RootDirectory, "projects")
             }));
+
+            g.MapGet("/projects", (TopologyStore store) => Results.Ok(store.ListProjects()));
+
+            // 静态路径须注册在 {id} 之前，避免被当成 id
+            g.MapGet("/projects/check-name", (string name, string? excludeId, TopologyStore store) =>
+            {
+                var hit = store.FindProjectByName(name, excludeId);
+                return Results.Ok(new
+                {
+                    exists = hit != null,
+                    project = hit
+                });
+            });
+
+            g.MapPost("/projects/new", (TopologyStore store, CreateProjectRequest? body) =>
+                Results.Ok(store.CreateEmptyProject(body?.Name)));
+
+            g.MapGet("/projects/{id}", (string id, TopologyStore store) =>
+            {
+                var p = store.LoadNamedProject(id);
+                return p == null
+                    ? Results.NotFound(new { message = "工程不存在" })
+                    : Results.Ok(p);
+            });
+
+            g.MapPost("/projects/{id}/open", (string id, TopologyStore store) =>
+            {
+                var p = store.OpenNamedProject(id);
+                return p == null
+                    ? Results.NotFound(new { message = "工程不存在" })
+                    : Results.Ok(p);
+            });
+
+            g.MapDelete("/projects/{id}", (string id, TopologyStore store) =>
+                store.DeleteNamedProject(id)
+                    ? Results.Ok(new { ok = true })
+                    : Results.NotFound(new { message = "工程不存在" }));
 
             return app;
         }
+    }
+
+    public sealed class CreateProjectRequest
+    {
+        public string? Name { get; set; }
     }
 
     public sealed class DisconnectRequest

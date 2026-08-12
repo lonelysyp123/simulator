@@ -13,8 +13,9 @@ namespace EssSimulator.EssDeviceSimModel
         public int ParallelCount { get; set; }  // 并联电芯数量
         public double NominalVoltage { get; set; } // 单芯额定电压(V)
         public double NominalCapacity { get; set; } // 单芯额定容量(Ah)
-        public double InitialSoc { get; set; } = 0.5; // 电芯初始SOC基准(0-1)
-        public double InitialSocRandomRange { get; set; } = 0.05; // 初始SOC随机扰动范围(±)
+        public double InitialSoc { get; set; } = 0.5; // 电芯初始SOC(0-1)，建模时精确使用
+        /// <summary>已废弃：初始 SOC 不再施加随机扰动，保留仅兼容旧配置。</summary>
+        public double InitialSocRandomRange { get; set; } = 0;
         public double PackInternalResistance { get; set; } // 模组总内阻(Ohm)
         public double CoolingEfficiency { get; set; } = 0.7; // 冷却系统效率(0-1)
     }
@@ -66,9 +67,7 @@ namespace EssSimulator.EssDeviceSimModel
                         NominalVoltage = config.NominalVoltage,
                         MinVoltage = 2.5,
                         MaxVoltage = 3.65,
-                        InitialSOC = Math.Clamp(
-                            config.InitialSoc + (_random.NextDouble() - 0.5) * 2.0 * config.InitialSocRandomRange,
-                            0.0, 1.0),
+                        InitialSOC = Math.Clamp(config.InitialSoc, 0.0, 1.0),
                         InternalResistance = 0.0002 * (1 + (_random.NextDouble() - 0.5) * 0.1), // ±10%内阻差异
                         Mass = 0.05,
                         Volume = 0.0001
@@ -85,6 +84,18 @@ namespace EssSimulator.EssDeviceSimModel
         // 获取当前模组状态
         public PackState GetPackState() => _currentState;
         public PackConfiguration GetPackConfiguration() => _config;
+
+        /// <summary>热设模组内全部电芯 SOC，并刷新模组汇总。</summary>
+        public void SetSoc(double soc)
+        {
+            foreach (var series in _cells)
+            {
+                foreach (var cell in series)
+                    cell.SetSoc(soc);
+            }
+
+            UpdatePackState(_currentState?.TotalCurrent ?? 0, _currentState?.AvgCellTemp ?? 25.0, DateTime.UtcNow);
+        }
 
         // 更新模组状态
         public void Update(double packCurrent, double ambientTemp, DateTime timeStamp, TimeSpan timeStep)
