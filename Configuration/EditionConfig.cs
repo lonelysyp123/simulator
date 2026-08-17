@@ -3,7 +3,7 @@ namespace EssSimulator.Configuration
     /// <summary>
     /// 产品档位开关（appsettings: Simulator.Edition）。
     /// 同一套代码通过 Name 在社区版 / 商业版间切换；发布脚本用不同配置模板写入该节。
-    /// 高级能力差异优先体现在 API 屏蔽（如白盒切片），拓扑上限仅在 LockTopology 时生效。
+    /// 高级能力差异优先体现在 API/菜单屏蔽（白盒切片、3D、组态），拓扑上限仅在 LockTopology 时生效。
     /// </summary>
     public class EditionConfig
     {
@@ -21,6 +21,12 @@ namespace EssSimulator.Configuration
         /// <summary>是否开放白盒切片等高级 API。社区版强制为 false。</summary>
         public bool AllowDroopSlices { get; set; } = true;
 
+        /// <summary>是否开放主接线 3D 视图。社区版强制为 false。</summary>
+        public bool AllowMainline3d { get; set; } = true;
+
+        /// <summary>是否开放组态编辑 / 工程管理 / 系统配置（工程模式）。社区版强制为 false。</summary>
+        public bool AllowTopologyEditor { get; set; } = true;
+
         public bool IsCommunity =>
             string.Equals(Name, "Community", StringComparison.OrdinalIgnoreCase)
             || string.Equals(Name, "社区版", StringComparison.OrdinalIgnoreCase);
@@ -33,13 +39,15 @@ namespace EssSimulator.Configuration
             string.Equals(Name, "Custom", StringComparison.OrdinalIgnoreCase)
             || string.Equals(Name, "定制版", StringComparison.OrdinalIgnoreCase);
 
-        /// <summary>按 Name 套用档位预设（社区版关闭高级 API 并锁定单元上限）。</summary>
+        /// <summary>按 Name 套用档位预设（社区版关闭高级能力并锁定单元上限）。</summary>
         public void ApplyPresets()
         {
             if (!IsCommunity)
                 return;
 
             AllowDroopSlices = false;
+            AllowMainline3d = false;
+            AllowTopologyEditor = false;
             LockTopology = true;
             if (MaxEssUnits <= 0)
                 MaxEssUnits = 2;

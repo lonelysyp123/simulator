@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isSystemLocked } from './services/systemLock.js'
+import { isEditionRouteAllowed, loadEditionFeatures } from './services/editionFeatures.js'
 
 const routes = [
   { path: '/', redirect: '/mainline' },
@@ -22,11 +23,18 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   if (isSystemLocked() && to.path !== from.path) {
     next(false)
     return
   }
+
+  await loadEditionFeatures()
+  if (!isEditionRouteAllowed(to.path)) {
+    next('/mainline')
+    return
+  }
+
   next()
 })
 

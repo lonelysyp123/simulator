@@ -5,12 +5,19 @@ import * as ElIcons from '@element-plus/icons-vue'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import App from './App.vue'
 import router from './router.js'
+import { loadEditionFeatures } from './services/editionFeatures.js'
 import './styles/app.css'
 
-const app = createApp(App)
-for (const [key, comp] of Object.entries(ElIcons)) {
-  app.component(key, comp)
+async function bootstrap() {
+  await loadEditionFeatures()
+
+  const app = createApp(App)
+  for (const [key, comp] of Object.entries(ElIcons)) {
+    app.component(key, comp)
+  }
+  app.use(ElementPlus, { locale: zhCn })
+  app.use(router)
+  app.mount('#app')
 }
-app.use(ElementPlus, { locale: zhCn })
-app.use(router)
-app.mount('#app')
+
+bootstrap()

@@ -110,6 +110,8 @@ namespace EssSimulator.Web
                         e.LockTopology,
                         e.MaxEssUnits,
                         e.AllowDroopSlices,
+                        e.AllowMainline3d,
+                        e.AllowTopologyEditor,
                         e.IsCommunity
                     },
                     web = new

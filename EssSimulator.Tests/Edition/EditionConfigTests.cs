@@ -12,11 +12,15 @@ public class EditionConfigTests
         {
             Name = "Community",
             AllowDroopSlices = true,
+            AllowMainline3d = true,
+            AllowTopologyEditor = true,
             LockTopology = false,
             MaxEssUnits = 0
         };
         e.ApplyPresets();
         Assert.False(e.AllowDroopSlices);
+        Assert.False(e.AllowMainline3d);
+        Assert.False(e.AllowTopologyEditor);
         Assert.True(e.LockTopology);
         Assert.Equal(2, e.MaxEssUnits);
         Assert.True(e.IsCommunity);
@@ -29,11 +33,15 @@ public class EditionConfigTests
         {
             Name = "Commercial",
             AllowDroopSlices = true,
+            AllowMainline3d = true,
+            AllowTopologyEditor = true,
             LockTopology = false,
             MaxEssUnits = 0
         };
         e.ApplyPresets();
         Assert.True(e.AllowDroopSlices);
+        Assert.True(e.AllowMainline3d);
+        Assert.True(e.AllowTopologyEditor);
         Assert.False(e.LockTopology);
         Assert.Equal(0, e.MaxEssUnits);
         Assert.True(e.IsCommercial);

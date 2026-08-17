@@ -24,7 +24,9 @@
       "Name": "Commercial",
       "LockTopology": false,
       "MaxEssUnits": 0,
-      "AllowDroopSlices": true
+      "AllowDroopSlices": true,
+      "AllowMainline3d": true,
+      "AllowTopologyEditor": true
     },
     "Protocol": {
       "BaseBmsModbusPort": 1501,

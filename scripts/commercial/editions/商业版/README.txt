@@ -7,6 +7,8 @@
 档位开关（appsettings.json → Simulator.Edition）：
   Name = Commercial
   AllowDroopSlices = true
+  AllowMainline3d = true
+  AllowTopologyEditor = true
   LockTopology = false
 
 授权（Simulator.License.Required = true）：

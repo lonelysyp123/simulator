@@ -48,6 +48,8 @@ sim["Edition"] = {
     "LockTopology": False,
     "MaxEssUnits": 0,
     "AllowDroopSlices": True,
+    "AllowMainline3d": True,
+    "AllowTopologyEditor": True,
 }
 
 units = len(data.get("EssUnits") or [])

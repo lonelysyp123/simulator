@@ -9,14 +9,6 @@
       "PropagationQuvMaxIterations": 3,
       "PropagationVoltageTolerancePu": 0.001
     },
-    "Edition": {
-      "Name": "Community",
-      "LockTopology": true,
-      "MaxEssUnits": 2,
-      "AllowDroopSlices": false,
-      "AllowMainline3d": false,
-      "AllowTopologyEditor": false
-    },
     "Web": {
       "HttpPort": 5050,
       "HttpBaseUrl": "http://127.0.0.1",
@@ -24,12 +16,19 @@
       "CorsOrigins": [],
       "SnapshotIntervalMs": 200,
       "DroopSliceCaptureEnabled": false,
-      "DroopSliceMaxCount": 100,
+      "DroopSliceMaxCount": 500,
       "ApiKeyEnabled": false,
       "ApiKey": ""
     },
+    "Edition": {
+      "Name": "Commercial",
+      "LockTopology": false,
+      "MaxEssUnits": 0,
+      "AllowDroopSlices": true,
+      "AllowMainline3d": true,
+      "AllowTopologyEditor": true
+    },
     "Protocol": {
-      "BindAddress": "127.0.0.1",
       "BaseBmsModbusPort": 1501,
       "BmsPortStep": 1,
       "BaseEmuModbusPort": 1601,
@@ -40,15 +39,16 @@
       "LocalControlPortStep": 1,
       "LocalControlEmuPerGroup": 4
     },
-    "Observability": {
-      "EnableHttp": true,
-      "HttpPort": 8080,
-      "HttpBindAddress": "127.0.0.1"
-    },
     "License": {
       "Required": false,
       "FileName": "license.txt"
     }
+  },
+  "DataExchange": {
+    "TelemetryIntervalMs": 500,
+    "EmuTelemetryIntervalMs": 100,
+    "ControlEventDriven": true,
+    "ControlPollIntervalMs": 100
   },
   "Pcc": {
     "NominalLineVoltage": 220000,
@@ -56,6 +56,23 @@
     "MaxVoltageShiftPercent": 5,
     "ReactiveVoltageInfluenceCoefficient": 1.0,
     "StationBusNominalLineVoltage": 35000
+  },
+  "Meter": {
+    "PccMeter": {
+      "MountDescription": "220kV PCC，主变一次侧",
+      "ReportedQuantity": "Primary",
+      "BurdenVa": 5,
+      "AccuracyClass": "0.2S",
+      "Pt": {
+        "PrimaryLineVoltageV": 220000,
+        "SecondaryLineVoltageV": 100,
+        "Connection": "Star"
+      },
+      "Ct": {
+        "PrimaryCurrentA": 2000,
+        "SecondaryCurrentA": 5
+      }
+    }
   },
   "Transformer": {
     "RatedPower": 31500,
@@ -92,14 +109,14 @@
     "ReactivePowerPlan": 0
   },
   "Pcs": {
-    "RatedPower": 2508,
-    "MaxPower": 2508,
+    "RatedPower": 1250,
+    "MaxPower": 1250,
     "Efficiency": 0.99,
     "DcVoltageRangeMin": 1000,
     "DcVoltageRangeMax": 1500,
     "AcVoltageNominal": 690,
     "FrequencyNominal": 50,
-    "MaxCurrent": 2200,
+    "MaxCurrent": 1100,
     "GridLossCoefficient": 0.11,
     "IslandVoltageRampDurationMs": 100,
     "BlackStartActivePowerGainKwPerVolt": 2.174,
@@ -138,7 +155,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.55,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -152,7 +169,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.5,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -189,7 +206,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.58,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,
@@ -203,7 +220,7 @@
           "CellParallelCount": 1,
           "CellNominalVoltage": 3.2,
           "CellNominalCapacity": 314,
-          "CellInitialSoc": 0.53,
+          "CellInitialSoc": 0.7,
           "CellInitialSocRandomRange": 0.03,
           "PackInternalResistance": 0.05,
           "ClusterInternalResistance": 0.1,

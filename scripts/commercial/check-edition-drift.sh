@@ -50,6 +50,10 @@ c_name="$(json_get "$COMMUNITY" "Simulator.Edition.Name")"
 m_name="$(json_get "$COMMERCIAL" "Simulator.Edition.Name")"
 c_droop="$(json_get "$COMMUNITY" "Simulator.Edition.AllowDroopSlices")"
 m_droop="$(json_get "$COMMERCIAL" "Simulator.Edition.AllowDroopSlices")"
+c_3d="$(json_get "$COMMUNITY" "Simulator.Edition.AllowMainline3d")"
+m_3d="$(json_get "$COMMERCIAL" "Simulator.Edition.AllowMainline3d")"
+c_topo="$(json_get "$COMMUNITY" "Simulator.Edition.AllowTopologyEditor")"
+m_topo="$(json_get "$COMMERCIAL" "Simulator.Edition.AllowTopologyEditor")"
 c_lock="$(json_get "$COMMUNITY" "Simulator.Edition.LockTopology")"
 c_max="$(json_get "$COMMUNITY" "Simulator.Edition.MaxEssUnits")"
 c_units="$(json_get "$COMMUNITY" "EssUnits")"
@@ -58,8 +62,8 @@ custom_units="$(json_get "$CUSTOM" "EssUnits")"
 root_units="$(json_get "$ROOT_CFG" "EssUnits")"
 c_bind="$(json_get "$COMMUNITY" "Simulator.Protocol.BindAddress")"
 
-echo "    社区版 Edition=$c_name AllowDroop=$c_droop Lock=$c_lock MaxUnits=$c_max Units=$c_units Bind=$c_bind"
-echo "    商业版 Edition=$m_name AllowDroop=$m_droop Units=$m_units"
+echo "    社区版 Edition=$c_name AllowDroop=$c_droop Allow3d=$c_3d AllowTopo=$c_topo Lock=$c_lock MaxUnits=$c_max Units=$c_units Bind=$c_bind"
+echo "    商业版 Edition=$m_name AllowDroop=$m_droop Allow3d=$m_3d AllowTopo=$m_topo Units=$m_units"
 echo "    定制版 Units=$custom_units  |  根 appsettings Units=$root_units"
 
 if [[ "$c_name" != "Community" && "$c_name" != "社区版" ]]; then
@@ -68,6 +72,14 @@ if [[ "$c_name" != "Community" && "$c_name" != "社区版" ]]; then
 fi
 if [[ "$c_droop" != "false" ]]; then
   echo "ERROR: 社区版 AllowDroopSlices 应为 false（高级 API 关闭），当前=$c_droop" >&2
+  fail=1
+fi
+if [[ "$c_3d" != "false" ]]; then
+  echo "ERROR: 社区版 AllowMainline3d 应为 false，当前=$c_3d" >&2
+  fail=1
+fi
+if [[ "$c_topo" != "false" ]]; then
+  echo "ERROR: 社区版 AllowTopologyEditor 应为 false，当前=$c_topo" >&2
   fail=1
 fi
 if [[ "$c_lock" != "true" ]]; then
@@ -89,6 +101,14 @@ if [[ "$m_name" != "Commercial" && "$m_name" != "商业版" ]]; then
 fi
 if [[ "$m_droop" != "true" ]]; then
   echo "ERROR: 商业版 AllowDroopSlices 应为 true，当前=$m_droop" >&2
+  fail=1
+fi
+if [[ "$m_3d" != "true" ]]; then
+  echo "ERROR: 商业版 AllowMainline3d 应为 true，当前=$m_3d" >&2
+  fail=1
+fi
+if [[ "$m_topo" != "true" ]]; then
+  echo "ERROR: 商业版 AllowTopologyEditor 应为 true，当前=$m_topo" >&2
   fail=1
 fi
 

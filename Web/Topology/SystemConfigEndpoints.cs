@@ -2,6 +2,7 @@ using EssSimulator.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -12,6 +13,7 @@ namespace EssSimulator.Web.Topology
         public static IEndpointRouteBuilder MapSystemConfigEndpoints(this IEndpointRouteBuilder app)
         {
             var g = app.MapGroup("/api/system");
+            g.AddEndpointFilter(EditionTopologyGate);
 
             g.MapGet("/config", (
                 TopologyStore store,
@@ -163,6 +165,20 @@ namespace EssSimulator.Web.Topology
             });
 
             return app;
+        }
+
+        private static async ValueTask<object?> EditionTopologyGate(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
+        {
+            var edition = ctx.HttpContext.RequestServices.GetRequiredService<IOptions<EditionConfig>>().Value;
+            edition.ApplyPresets();
+            if (!edition.AllowTopologyEditor)
+            {
+                return Results.Json(
+                    new { message = "当前产品档位不包含组态编辑功能" },
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return await next(ctx);
         }
     }
 }

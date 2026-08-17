@@ -19,15 +19,15 @@
             <el-icon><Connection /></el-icon>
             <span>主电气接线</span>
           </el-menu-item>
-          <el-menu-item index="/mainline-3d">
+          <el-menu-item v-if="allowMainline3d" index="/mainline-3d">
             <el-icon><Monitor /></el-icon>
             <span>主接线 3D（增强）</span>
           </el-menu-item>
-          <el-menu-item index="/topology">
+          <el-menu-item v-if="allowTopologyEditor" index="/topology">
             <el-icon><EditPen /></el-icon>
             <span>组态编辑</span>
           </el-menu-item>
-          <el-menu-item index="/projects">
+          <el-menu-item v-if="allowTopologyEditor" index="/projects">
             <el-icon><FolderOpened /></el-icon>
             <span>工程管理</span>
           </el-menu-item>
@@ -51,7 +51,7 @@
           </el-menu-item>
 
           <div class="menu-group-label">运维工具</div>
-          <el-menu-item index="/system">
+          <el-menu-item v-if="allowTopologyEditor" index="/system">
             <el-icon><Setting /></el-icon>
             <span>系统配置</span>
           </el-menu-item>
@@ -105,13 +105,17 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
-import { getHealth, getAlert, getHub, getConfig } from '@/services/api.js'
+import { getHealth, getAlert, getHub } from '@/services/api.js'
 import { RealtimeMethods } from '@/services/constants.js'
 import { systemLock } from '@/services/systemLock.js'
+import { getEditionFeatures, loadEditionFeatures } from '@/services/editionFeatures.js'
 import BatteryStackIcon from '@/components/icons/BatteryStackIcon.vue'
 
 const ready = ref(false)
-const allowDroopSlices = ref(true)
+const features = getEditionFeatures()
+const allowDroopSlices = ref(features.allowDroopSlices)
+const allowMainline3d = ref(features.allowMainline3d)
+const allowTopologyEditor = ref(features.allowTopologyEditor)
 const alert = reactive({ isActive: false, message: '', detail: '', secondsUntilExit: 0 })
 
 async function pollHealth() {
@@ -126,8 +130,10 @@ onMounted(async () => {
   setInterval(pollHealth, 3000)
 
   try {
-    const cfg = await getConfig()
-    allowDroopSlices.value = cfg?.edition?.allowDroopSlices !== false
+    const f = await loadEditionFeatures()
+    allowDroopSlices.value = f.allowDroopSlices
+    allowMainline3d.value = f.allowMainline3d
+    allowTopologyEditor.value = f.allowTopologyEditor
   } catch { /* ignore */ }
 
   try {

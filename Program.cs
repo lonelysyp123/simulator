@@ -239,6 +239,14 @@ namespace EssSimulator
 
             // 组态工程模式：若已应用 overlay，则覆盖 EssUnits / Pcc / 变压器等
             var topologyOverlay = TryLoadTopologyOverlay(builder.Environment.ContentRootPath);
+            var editionEarly = builder.Configuration.GetSection(EditionConfig.Section).Get<EditionConfig>()
+                ?? new EditionConfig();
+            editionEarly.ApplyPresets();
+            if (topologyOverlay != null && !editionEarly.AllowTopologyEditor)
+            {
+                Console.WriteLine("[Topology] 当前档位未开放组态编辑，已忽略工程 overlay，改用 appsettings");
+                topologyOverlay = null;
+            }
             if (topologyOverlay != null)
             {
                 Console.WriteLine(
