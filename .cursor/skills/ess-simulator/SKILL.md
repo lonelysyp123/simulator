@@ -76,10 +76,11 @@ EMS/测试工具 ──Modbus TCP──► ModbusSimServer + DataExchangeSession
 | Modbus 服务 | `Protocol/ModbusHostedService.cs` |
 | 文档索引 | `docs/README.md` |
 | 用户手册 | `docs/用户手册.md` |
+| B/S 架构 | `docs/B-S架构说明.md` |
 | 系统设计 | `docs/系统设计说明.md` |
 | 编译发布 | `docs/项目编译说明.md` |
 | 指令说明 | `docs/指令详细说明.md` |
-| 发布（商业） | `scripts/commercial/publish-all.sh` → `dist/{社区版,充值版,定制版}/{win-x64,linux-arm64}/` |
+| 发布（商业） | `scripts/commercial/publish-all.sh`、`publish-demo.sh` → `dist/{社区版,商业版,定制版,演示版}/` |
 | 发布（开发） | `scripts/publish-windows.sh` / `publish-linux.sh` → `dist/win-x64`、`dist/linux-arm64` |
 
 ## 默认 Modbus 端口（以配置为准）
