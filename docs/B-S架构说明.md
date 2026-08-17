@@ -36,7 +36,7 @@ Modbus TCP（simEm / simBms{N} / simEmu{N}）  ← EMS/测试工具接入
 | `StaticFiles` | true | 是否托管 `wwwroot/` 前端文件 |
 | `CorsOrigins` | `[]` | 额外允许的 CORS 来源（dev 自动放行 5173） |
 | `SnapshotIntervalMs` | 200 | 实时快照推送间隔；PCS 启停等控制变更会额外立即推一帧 |
-| `ApiKeyEnabled` | false | 是否保护 `/api/*`（`/api/health` 豁免）；充值版建议 true |
+| `ApiKeyEnabled` | false | 是否保护 `/api/*`（`/api/health` 豁免）；仓外托管建议 true |
 | `ApiKey` | `""` | 密钥明文；启用时必填，推荐环境变量 `Simulator__Web__ApiKey` |
 
 > `Runtime.NoGui` 已无实际意义（TUI 已移除），保留兼容旧配置。
@@ -61,11 +61,15 @@ start.bat         # Windows
 ### 开发
 
 ```bash
+# 推荐：一键
+./scripts/dev-up.sh
+
+# 或分终端
 # 终端 1：后端
 dotnet run --project EssSimulator.csproj
 
-# 终端 2：前端 dev（HMR，代理 /api 与 /hub 到 5000）
-cd web && npm install && npm run dev
+# 终端 2：前端 HMR（代理 /api 与 /hub 到后端端口）
+cd Web && npm install && npm run dev
 # 浏览器访问 http://localhost:5173
 ```
 
@@ -88,7 +92,10 @@ cd web && npm install && npm run dev
 | GET | `/api/cells/{unit}/{cluster}` | 指定簇 4×104 单体电压 |
 | GET | `/api/connections` | 网络接口/监听/客户端/链路状态 |
 | GET | `/api/alert` | 严重告警状态 |
-| GET | `/api/config` | 仿真与 Web 配置概要（不回传 ApiKey 明文） |
+| GET | `/api/config` | 仿真与 Web/档位概要（不回传 ApiKey 明文） |
+| GET | `/api/topology/*` | 组态模板/工程/设备库（档位关闭时 403） |
+| GET | `/api/system/config` | 工程模式与 overlay 状态 |
+| POST | `/api/system/apply` | 应用组态工程并可选重启 |
 | GET | `/api/protocol` | Modbus 端口表 |
 | GET | `/api/autotest` | autotest.json 测试用例列表 |
 | GET | `/api/pointmaps` | 各 sim 设备点表（DataMaps/ControlMaps） |
@@ -115,37 +122,27 @@ cd web && npm install && npm run dev
 
 ## 六、前端页面
 
-| 路由 | 对应原 TUI 视图 |
-|------|------------------|
-| `/mainline` | 主电气接线（SVG 拓扑 + 表格 + 概览卡片） |
-| `/battery` | 电池堆簇信息（总览 + 簇表 + SOC/功率图） |
-| `/cells` | 电池单体信息（4 包 × 104 单体热力色块） |
-| `/command` | 命令输入（esscmd/breaker/dpc/dpctest + 快捷按钮 + autotest 列表） |
-| `/connections` | 连接信息（网卡/监听/链路/客户端，可在线切换链路） |
-| `/logs` | 日志信息（实时滚动，按级别着色） |
+| 路由 | 说明 |
+|------|------|
+| `/mainline` | 主电气接线（SVG；工程模式可用组态单线图） |
+| `/mainline-3d` | 三维站场（`AllowMainline3d`） |
+| `/topology` `/projects` `/system` | 组态编辑、工程管理、系统配置（`AllowTopologyEditor`） |
+| `/battery` `/cells` | 电池堆簇 / 单体 |
+| `/thresholds` `/alarms` | BMS 门限 / 设备告警 |
+| `/command` | 命令输入 |
+| `/droop-slices` | 白盒切片（`AllowDroopSlices`） |
+| `/connections` | 连接与链路 |
 
 ## 七、文件结构
 
 ```
 EssSimulator/
 ├── Program.cs                # WebApplication 入口
-├── Web/                      # B/S 后端
-│   ├── RealtimeHub.cs
-│   ├── SnapshotService.cs
-│   ├── LogHubAppender.cs
-│   ├── BatterySnapshotReader.cs
-│   ├── ConnectionSnapshotReader.cs
-│   ├── WebCommandExecutor.cs
-│   └── EndpointExtensions.cs
-├── Display/                  # 命令与状态读取（保留，已去 Spectre）
-│   ├── CommandProcessor.cs / ICommand.cs / CommandResult.cs
-│   ├── EssCommand.cs / BreakerCommand.cs / DataPointChangeCommand.cs / DpcAutoTestCommand.cs
-│   ├── GuiElectricalReader.cs / GuiSimDataAccess.cs / GuiStatusFormatters.cs
-│   └── FatalSystemAlert.cs   # 改为事件模式供 Web 订阅
-├── web/                      # Vue 3 前端源码
-│   ├── src/{views,components,services,styles}
-│   ├── vite.config.js        # 构建输出到 ../wwwroot
-│   └── package.json
+├── Web/                      # B/S 后端 + Vue 源码（Web/src）
+│   ├── EndpointExtensions.cs
+│   ├── Topology/             # 组态工程、overlay、校验
+│   └── src/                  # Vue 3 SPA
+├── Display/                  # 命令与状态读取（已去 Spectre）
 ├── wwwroot/                  # 前端构建产物（gitignore，发布时生成）
 └── ...（仿真核心/协议/点表/文档 保持不变）
 ```
@@ -160,6 +157,6 @@ EssSimulator/
 | `DrawCellInfo` | `/cells` 热力色块 |
 | `DrawCmd` | `/command` |
 | `DrawClientConnectInfo` | `/connections` |
-| `DrawLog` + `LogDisplay` | `/logs` + `LogHubAppender` |
+| `DrawLog` + `LogDisplay` | SignalR `logs` 频道（若前端接入） |
 | `FatalSystemAlert` overlay | `ReceiveAlert` 推送 + 顶栏红条 |
 | `Spectre.Console` | 已移除 |

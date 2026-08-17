@@ -26,10 +26,11 @@ dotnet test EssSimulator.Tests/EssSimulator.Tests.csproj
 
 ## 启动流程
 
-`Program.cs` → 加载配置 → 创建 `EnergyStorageSystem` → 启动 `BmsDataService` / `PcsDataServer` / `EmDataService` / `ModbusHostedService` →（可选）GUI。
+`Program.cs` → 加载配置（可选组态 overlay）→ 创建 `EnergyStorageSystem` → 启动 BMS/PCS/EM 数据服务与 `ModbusHostedService` → **Kestrel Web**（默认 5050）。
 
-- `Simulator.Runtime.NoGui: true` — 无界面，适合服务器/ARM 部署
-- 启动会等待 Modbus 就绪（GUI 模式最多约 60s）
+- 操作界面为浏览器，不是控制台菜单
+- `Simulator.Runtime.NoGui` 仅兼容旧配置，不再关闭 Web
+- 开发一键：`./scripts/dev-up.sh`
 
 ## 控制台命令（运行时）
 
@@ -44,24 +45,26 @@ dotnet test EssSimulator.Tests/EssSimulator.Tests.csproj
 
 ## 发布
 
-**发布目录**（`dist/` 仅三个版本文件夹 + 压缩包，见 `docs/项目编译说明.md`）：
+**发布目录**（见 `docs/项目编译说明.md`）：
 
 | 版本 | 配置源 |
 |------|--------|
-| 社区版 | `configs/社区版.appsettings.json`（2 单元） |
-| 充值版 | `configs/充值版.appsettings.json` |
-| 定制版 | `configs/定制版.appsettings.json`（完整拓扑） |
+| 社区版 | `configs/社区版.appsettings.json`（2 单元，高级 UI 关） |
+| 商业版 | `configs/商业版.appsettings.json`（需 license） |
+| 定制版 | `configs/定制版.appsettings.json` |
+| 演示版 | `configs/演示版.appsettings.json`（`publish-demo.sh`） |
 
 ```bash
 # 商业多版本
-EDITION=社区版 ./scripts/commercial/publish-windows.sh   # → dist/社区版/win-x64/
-EDITION=社区版 ./scripts/commercial/publish-linux.sh     # → dist/社区版/linux-arm64/
-./scripts/commercial/publish-all.sh                      # 三版本 × 双平台
-./scripts/commercial/sync-runtime.sh                     # 仅同步 CSV/配置/文档
+EDITION=社区版 ./scripts/commercial/publish-windows.sh
+EDITION=商业版 ./scripts/commercial/publish-linux.sh
+./scripts/commercial/publish-all.sh
+./scripts/commercial/publish-demo.sh
+./scripts/commercial/sync-runtime.sh
 
 # 开发联调（单配置）
-./scripts/publish-windows.sh                             # → dist/win-x64/
-./scripts/publish-linux.sh                               # → dist/linux-arm64/
+./scripts/publish-windows.sh
+./scripts/publish-linux.sh
 ```
 
 发布包需含：`EssSimulator`、`appsettings.json`、`*.csv`、`log4net.config`、`start.sh` / `start.bat`。
@@ -79,6 +82,8 @@ EDITION=社区版 ./scripts/commercial/publish-linux.sh     # → dist/社区版
 见 `docs/README.md`：
 
 - 用户手册：`docs/用户手册.md`
+- B/S 架构：`docs/B-S架构说明.md`
 - 系统设计：`docs/系统设计说明.md`
 - 编译发布：`docs/项目编译说明.md`
 - 指令说明：`docs/指令详细说明.md`
+- 产品分档：`docs/产品分档与交付边界.md`
