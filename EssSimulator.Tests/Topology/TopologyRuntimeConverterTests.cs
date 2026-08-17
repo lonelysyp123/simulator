@@ -88,4 +88,38 @@ public class TopologyRuntimeConverterTests
         Assert.Null(overlay);
         Assert.Equal("NO_EMU", validation.Code);
     }
+
+    [Fact]
+    public void ConvertForApply_rejects_project_without_main_breaker()
+    {
+        var project = new TopologyProject
+        {
+            Nodes =
+            {
+                new TopologyNode { Id = "g1", TemplateId = "grid", Label = "电网", Parameters = new() },
+                new TopologyNode
+                {
+                    Id = "e1",
+                    TemplateId = "emu",
+                    Label = "Unit-A",
+                    Parameters = new Dictionary<string, object?>(TopologyTemplates.Get("emu")!.DefaultParameters)
+                }
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.ConvertForApply(project);
+        Assert.False(validation.Ok);
+        Assert.Null(overlay);
+        Assert.Equal("NEED_MAIN_BREAKER", validation.Code);
+    }
+
+    [Fact]
+    public void ConvertForApply_accepts_scaffold_radial_project()
+    {
+        var project = TopologyScaffold.BuildRadial(emuCount: 2, name: "apply-ok");
+        var (overlay, validation) = TopologyRuntimeConverter.ConvertForApply(project);
+        Assert.True(validation.Ok, validation.Message);
+        Assert.NotNull(overlay);
+        Assert.Equal(2, overlay!.EssUnits.Count);
+    }
 }

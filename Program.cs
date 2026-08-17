@@ -238,7 +238,7 @@ namespace EssSimulator
                 return;
 
             // 组态工程模式：若已应用 overlay，则覆盖 EssUnits / Pcc / 变压器等
-            var topologyOverlay = TryLoadTopologyOverlay(builder.Environment.ContentRootPath);
+            var topologyOverlay = TopologyOverlayLoader.TryLoad(builder.Environment.ContentRootPath);
             var editionEarly = builder.Configuration.GetSection(EditionConfig.Section).Get<EditionConfig>()
                 ?? new EditionConfig();
             editionEarly.ApplyPresets();
@@ -475,33 +475,6 @@ namespace EssSimulator
             _ = WaitForSimulatorReadyAsync(simCfg, app.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
 
             await app.WaitForShutdownAsync();
-        }
-
-        private static TopologyRuntimeOverlay? TryLoadTopologyOverlay(string contentRoot)
-        {
-            try
-            {
-                var modePath = Path.Combine(contentRoot, "configs", "topology", "runtime-mode.json");
-                var overlayPath = Path.Combine(contentRoot, "configs", "topology", "generated", "runtime-overlay.json");
-                if (!File.Exists(modePath) || !File.Exists(overlayPath))
-                    return null;
-
-                var jsonOpts = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                };
-                var mode = JsonSerializer.Deserialize<TopologyRuntimeMode>(File.ReadAllText(modePath), jsonOpts);
-                if (mode?.EngineeringMode != true)
-                    return null;
-
-                return JsonSerializer.Deserialize<TopologyRuntimeOverlay>(File.ReadAllText(overlayPath), jsonOpts);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Topology] 加载工程 overlay 失败：{ex.Message}");
-                return null;
-            }
         }
 
         private static void CopyPcs(PcsPhysicalConfig src, PcsPhysicalConfig dst)

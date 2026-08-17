@@ -9,6 +9,17 @@ namespace EssSimulator.Web.Topology
     /// </summary>
     public static class TopologyRuntimeConverter
     {
+        /// <summary>
+        /// 应用到仿真前：先走保存级校验（电网/主断路器/并网点电表），再生成 overlay。
+        /// </summary>
+        public static (TopologyRuntimeOverlay? Overlay, TopologyValidationResult Validation) ConvertForApply(TopologyProject project)
+        {
+            var save = TopologyValidator.ValidateProjectForSave(project);
+            if (!save.Ok)
+                return (null, save);
+            return Convert(project);
+        }
+
         public static (TopologyRuntimeOverlay? Overlay, TopologyValidationResult Validation) Convert(TopologyProject project)
         {
             if (project == null)

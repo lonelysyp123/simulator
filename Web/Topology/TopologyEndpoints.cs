@@ -142,12 +142,12 @@ namespace EssSimulator.Web.Topology
                     ? Results.Ok(new { ok = true })
                     : Results.NotFound(new { message = "设备库条目不存在" }));
 
-            g.MapGet("/paths", (TopologyStore store) => Results.Ok(new
+            g.MapGet("/paths", () => Results.Ok(new
             {
-                root = store.RootDirectory,
-                project = Path.Combine(store.RootDirectory, "project.json"),
-                library = Path.Combine(store.RootDirectory, "library"),
-                projects = Path.Combine(store.RootDirectory, "projects")
+                root = "configs/topology",
+                project = "configs/topology/project.json",
+                library = "configs/topology/library",
+                projects = "configs/topology/projects"
             }));
 
             g.MapGet("/projects", (TopologyStore store) => Results.Ok(store.ListProjects()));

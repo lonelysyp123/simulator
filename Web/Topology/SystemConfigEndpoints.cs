@@ -116,7 +116,7 @@ namespace EssSimulator.Web.Topology
                 store.SaveNamedProject(project);
                 store.SaveProject(project);
 
-                var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+                var (overlay, validation) = TopologyRuntimeConverter.ConvertForApply(project);
                 if (!validation.Ok || overlay == null)
                     return Results.BadRequest(new SystemApplyResponse
                     {

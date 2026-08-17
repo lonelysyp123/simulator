@@ -2,9 +2,9 @@ import { getConfig } from './api.js'
 
 /** @type {{ allowDroopSlices: boolean, allowMainline3d: boolean, allowTopologyEditor: boolean }} */
 let features = {
-  allowDroopSlices: true,
-  allowMainline3d: true,
-  allowTopologyEditor: true
+  allowDroopSlices: false,
+  allowMainline3d: false,
+  allowTopologyEditor: false
 }
 
 let loadPromise = null
@@ -19,9 +19,9 @@ export function loadEditionFeatures() {
     loadPromise = getConfig()
       .then(cfg => {
         features = {
-          allowDroopSlices: cfg?.edition?.allowDroopSlices !== false,
-          allowMainline3d: cfg?.edition?.allowMainline3d !== false,
-          allowTopologyEditor: cfg?.edition?.allowTopologyEditor !== false
+          allowDroopSlices: cfg?.edition?.allowDroopSlices === true,
+          allowMainline3d: cfg?.edition?.allowMainline3d === true,
+          allowTopologyEditor: cfg?.edition?.allowTopologyEditor === true
         }
         return features
       })
