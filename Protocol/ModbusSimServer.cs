@@ -73,6 +73,7 @@ namespace EssSimulator
         private static bool RequiresDataExchange(string serverName) =>
             serverName.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase)
             || serverName.StartsWith("simBms", StringComparison.OrdinalIgnoreCase)
+            || serverName.StartsWith("simPv", StringComparison.OrdinalIgnoreCase)
             || serverName.Equals("simEm", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>

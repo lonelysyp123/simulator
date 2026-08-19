@@ -48,6 +48,8 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 5,1046,bool,1,yx50,1,系统单体压差过高一级保护,model=4|arg1=bmsdeviceId.BatteryStacks[0].SystemAlarms.VoltageDifferenceProtection|arg2=|arg3=|arg4=1000
 5,1047,bool,1,yx51,1,系统温差过高一级保护,model=4|arg1=bmsdeviceId.BatteryStacks[0].SystemAlarms.TempDifferenceProtection|arg2=|arg3=|arg4=1000
 5,1048,bool,1,yx52,1,系统SOC过低一级保护,model=4|arg1=bmsdeviceId.BatteryStacks[0].SystemAlarms.LowSOCProtection|arg2=|arg3=|arg4=1000
+6,1049,u16,16,yt1,1,空调启停(1开机0停机),model=4|arg1=bmsdeviceId.AirConditioners[0].OnCommand|arg2=|arg3=|arg4=1000
+6,1050,u16,16,yt2,10,空调制冷设定温度(0.1C),model=4|arg1=bmsdeviceId.AirConditioners[0].CoolingSetpointCommand|arg2=|arg3=|arg4=1000
 4,10000,u16,16,yc0,1,一键并网状态0未开始1进行中2成功3失败,model=4|arg1=bmsdeviceId.BatteryStacks[0].GridConnectStatus|arg2=|arg3=|arg4=1000
 4,10001,u16,16,yc1,1,Rack启用/停用状态,1
 4,10002,u16,16,yc2,1,RACK 在线状态,1
@@ -112,11 +114,11 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10063,u16,16,yc61,1,TMS报警2,0
 4,10064,u16,16,yc62,1,液冷通信状态,0
 4,10065,u16,16,yc63,1,冷凝风机运行状态,0
-4,10066,u16,16,yc64,1,空调整机状态,0
-4,10067,u16,16,yc65,1,空调内风机状态,0
-4,10068,u16,16,yc66,1,空调外风机状态,0
-4,10069,u16,16,yc67,1,空调压缩机状态,0
-4,10070,u16,16,yc68,1,空调电加热状态,0
+4,10066,u16,16,yc64,1,空调整机状态,model=4|arg1=bmsdeviceId.AirConditioners[0].DeviceOperationStatus|arg2=|arg3=|arg4=1000
+4,10067,u16,16,yc65,1,空调内风机状态,model=4|arg1=bmsdeviceId.AirConditioners[0].IndoorFanStatus|arg2=|arg3=|arg4=1000
+4,10068,u16,16,yc66,1,空调外风机状态,model=4|arg1=bmsdeviceId.AirConditioners[0].OutdoorFanStatus|arg2=|arg3=|arg4=1000
+4,10069,u16,16,yc67,1,空调压缩机状态,model=4|arg1=bmsdeviceId.AirConditioners[0].CompressorStatus|arg2=|arg3=|arg4=1000
+4,10070,u16,16,yc68,1,空调电加热状态,model=4|arg1=bmsdeviceId.AirConditioners[0].ElectricHeaterStatus|arg2=|arg3=|arg4=1000
 4,10071,u16,16,yc69,1,空调盘管温度,model=4|arg1=bmsdeviceId.AirConditioners[0].DefrostTemp|arg2=|arg3=|arg4=1000
 4,10072,u16,16,yc70,1,空调冷凝温度,model=4|arg1=bmsdeviceId.AirConditioners[0].CondensationTemp|arg2=|arg3=|arg4=1000
 4,10073,u16,16,yc71,1,空调柜内温度,model=4|arg1=bmsdeviceId.AirConditioners[0].CabinetTemp|arg2=|arg3=|arg4=1000
@@ -124,7 +126,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10075,u16,16,yc73,1,空调告警信息1,0
 4,10076,u16,16,yc74,1,空调告警信息2,0
 4,10077,u16,16,yc75,1,空调告警信息3,0
-4,10078,u16,16,yc76,1,空调制冷点,0
+4,10078,u16,16,yc76,1,空调制冷点,model=4|arg1=bmsdeviceId.AirConditioners[0].CoolingSetTemp|arg2=|arg3=|arg4=1000
 4,10079,u16,16,yc77,1,空调制冷回差,0
 4,10080,u16,16,yc78,1,空调加热点,0
 4,10081,u16,16,yc79,1,空调加热回差,0

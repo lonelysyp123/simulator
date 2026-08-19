@@ -8,6 +8,9 @@
         <el-option v-for="i in clusterCount" :key="i" :label="`簇 ${i}`" :value="i" />
       </el-select>
       <el-button style="margin-left:12px" @click="reload">刷新</el-button>
+      <el-tag v-if="data" style="margin-left:12px" size="small" type="warning">
+        电池节点温度 {{ formatTemp(data.batteryNodeTempC) }}
+      </el-tag>
       <el-tag v-if="data" style="margin-left:12px" size="small">
         单体最高 簇{{ clusterNumber }} 包{{ data.maxCellVoltagePackId }} 单体{{ data.maxCellVoltageCellId }}
         {{ data.maxCellVoltage.toFixed(3) }} V
@@ -50,6 +53,11 @@ const data = ref(null)
 
 function formatVoltage(v) {
   return v > 0 ? v.toFixed(3) : '—'
+}
+
+function formatTemp(t) {
+  const n = Number(t)
+  return Number.isFinite(n) && n > 0 ? `${n.toFixed(1)} °C` : '—'
 }
 
 function cellClass(packIndex, cellIndex) {

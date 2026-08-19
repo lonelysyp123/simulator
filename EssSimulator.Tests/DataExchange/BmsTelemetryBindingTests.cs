@@ -58,7 +58,7 @@ public class BmsTelemetryBindingTests
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simBms1", new DataExchangeOptions());
 
         var yc11 = catalog.TelemetryPoints.First(p => p.ParamName == "yc11");
-        Assert.Equal(4110, yc11.Entry.Address);
+        Assert.Equal(10011, yc11.Entry.Address);
         Assert.Equal(1000, yc11.Entry.Scale);
         Assert.Equal("bms1", yc11.Target.RootKey);
         Assert.Equal("BatteryStacks[0].SOC", yc11.Target.PropertyPath);

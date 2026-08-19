@@ -77,7 +77,7 @@ public class TopologyRuntimeConverterTests
     }
 
     [Fact]
-    public void Convert_rejects_project_without_emu()
+    public void Convert_rejects_project_without_emu_or_pv_unit()
     {
         var project = new TopologyProject
         {
@@ -86,7 +86,42 @@ public class TopologyRuntimeConverterTests
         var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
         Assert.False(validation.Ok);
         Assert.Null(overlay);
-        Assert.Equal("NO_EMU", validation.Code);
+        Assert.Equal("NO_GENERATION_UNIT", validation.Code);
+    }
+
+    [Fact]
+    public void Convert_accepts_project_with_only_pv_unit()
+    {
+        var pvTpl = TopologyTemplates.Get("pv_unit")!;
+        var project = new TopologyProject
+        {
+            Nodes =
+            {
+                new TopologyNode
+                {
+                    Id = "pv1", TemplateId = "pv_unit", Label = "光伏单元-1",
+                    Parameters = new Dictionary<string, object?>(pvTpl.DefaultParameters)
+                }
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        Assert.NotNull(overlay);
+        Assert.Empty(overlay!.EssUnits);
+        Assert.Single(overlay.PvUnits);
+        Assert.Equal("光伏单元-1", overlay.PvUnits[0].Name);
+        Assert.Equal(16, overlay.PvUnits[0].InverterCount);
+        Assert.Equal(320, overlay.PvUnits[0].InverterRatedPowerKw);
+        Assert.Equal(35000, overlay.PvUnits[0].UnitXfPrimaryV);
+        Assert.Contains(overlay.Notes, n => n.Contains("光伏单元") && n.Contains("已展开"));
+        Assert.Contains("光伏单元", validation.Message);
+        Assert.DoesNotContain("暂未展开", validation.Message);
+        Assert.NotNull(overlay.UnitTransformer);
+        Assert.Equal(35000, overlay.UnitTransformer!.PrimaryVoltage);
+        Assert.Equal(690, overlay.UnitTransformer.SecondaryVoltage);
+        Assert.NotNull(overlay.Pcs);
+        Assert.Equal(320, overlay.Pcs!.RatedPower);
     }
 
     [Fact]
@@ -114,12 +149,71 @@ public class TopologyRuntimeConverterTests
     }
 
     [Fact]
-    public void ConvertForApply_accepts_scaffold_radial_project()
+    public void Convert_keeps_ess_units_and_notes_pv_units()
     {
-        var project = TopologyScaffold.BuildRadial(emuCount: 2, name: "apply-ok");
+        var emuTpl = TopologyTemplates.Get("emu")!;
+        var pvTpl = TopologyTemplates.Get("pv_unit")!;
+        var project = new TopologyProject
+        {
+            Nodes =
+            {
+                new TopologyNode
+                {
+                    Id = "e1", TemplateId = "emu", Label = "Unit-A",
+                    Parameters = new Dictionary<string, object?>(emuTpl.DefaultParameters)
+                },
+                new TopologyNode
+                {
+                    Id = "pv1", TemplateId = "pv_unit", Label = "光伏单元-1",
+                    Parameters = new Dictionary<string, object?>(pvTpl.DefaultParameters)
+                }
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        Assert.NotNull(overlay);
+        Assert.Single(overlay!.EssUnits);
+        Assert.Single(overlay.PvUnits);
+        Assert.Equal("光伏单元-1", overlay.PvUnits[0].Name);
+        Assert.Contains(overlay.Notes, n => n.Contains("光伏单元") && n.Contains("已展开"));
+    }
+
+    [Fact]
+    public void Convert_reads_pv_unit_inverter_count_from_node_parameters()
+    {
+        var pvTpl = TopologyTemplates.Get("pv_unit")!;
+        var parameters = new Dictionary<string, object?>(pvTpl.DefaultParameters)
+        {
+            ["inverterCount"] = 20d,
+            ["unitXfRatedKva"] = 6400d
+        };
+        var project = new TopologyProject
+        {
+            Nodes =
+            {
+                new TopologyNode
+                {
+                    Id = "pv1", TemplateId = "pv_unit", Label = "PV-A",
+                    Parameters = parameters
+                }
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        Assert.Equal(20, overlay!.PvUnits[0].InverterCount);
+        Assert.Equal(6400, overlay.PvUnits[0].UnitXfRatedKva);
+    }
+
+    [Fact]
+    public void ConvertForApply_accepts_pv_only_scaffold()
+    {
+        var project = TopologyScaffold.BuildRadial(emuCount: 0, name: "pv-apply", pvCount: 2);
         var (overlay, validation) = TopologyRuntimeConverter.ConvertForApply(project);
         Assert.True(validation.Ok, validation.Message);
         Assert.NotNull(overlay);
-        Assert.Equal(2, overlay!.EssUnits.Count);
+        Assert.Empty(overlay!.EssUnits);
+        Assert.Equal(2, overlay.PvUnits.Count);
     }
 }

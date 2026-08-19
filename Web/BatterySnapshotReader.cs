@@ -62,6 +62,8 @@ namespace EssSimulator.Web
         public int MaxCellVoltageCellId { get; set; }
         public int MinCellVoltagePackId { get; set; }
         public int MinCellVoltageCellId { get; set; }
+        /// <summary>当前舱（BMS 堆）热网络电池节点温度（°C），与功率降额/BMS 过温保护同一感温。</summary>
+        public double BatteryNodeTempC { get; set; }
     }
 
     public static class BatterySnapshotReader
@@ -164,7 +166,9 @@ namespace EssSimulator.Web
                 PackCount = packCount,
                 CellsPerPack = cellsPerPack,
                 MaxCellVoltage = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MaxCellVoltage"),
-                MinCellVoltage = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MinCellVoltage")
+                MinCellVoltage = GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MinCellVoltage"),
+                BatteryNodeTempC = GuiSimDataAccess.SafeGetDouble(
+                    $"ess._bmsRackDevices[{unitIndex0}].BatteryNodeTemperatureCelsius", 25)
             };
 
             int maxIdFlat = (int)GuiSimDataAccess.SafeGetDouble($"{clusterPath}.Measurements.MaxCellVoltageId");

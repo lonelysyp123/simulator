@@ -27,8 +27,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             breakerCfg ??= new BreakerConfig();
             meterCfg ??= new MeterConfig();
 
-            int unitCount = Math.Max(1, simCfg.Devices?.Count ?? 1);
-            int channelCount = Math.Max(2, unitCount * 2);
+            int unitCount = simCfg.EffectiveEssUnitCount;
 
             var gridConfig = new GridConfig
             {

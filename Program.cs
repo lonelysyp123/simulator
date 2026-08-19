@@ -49,16 +49,27 @@ namespace EssSimulator
             return ms;
         }
 
-        private static bool IsSimulatorReady(int expectedServerCount, bool expectLocalControl)
+        private static bool IsSimulatorReady(int expectedServerCount, bool expectLocalControl, SimulatorConfig cfg)
         {
             var store = SimulatorHost.Instance;
             if (!store.Contains("ess") ||
                 !store.Contains("em") ||
-                !store.Contains("bms1") ||
-                !store.Contains("emu1") ||
-                !store.Contains("simEm") ||
-                !store.Contains("simBms1") ||
-                !store.Contains("simEmu1"))
+                !store.Contains("simEm"))
+            {
+                return false;
+            }
+
+            if (cfg.EffectiveEssUnitCount > 0 &&
+                (!store.Contains("bms1") ||
+                 !store.Contains("emu1") ||
+                 !store.Contains("simBms1") ||
+                 !store.Contains("simEmu1")))
+            {
+                return false;
+            }
+
+            if (cfg.PvUnitCount > 0 &&
+                (!store.Contains("pv1") || !store.Contains("simPv1")))
             {
                 return false;
             }
@@ -71,10 +82,26 @@ namespace EssSimulator
 
             try
             {
-                var soc = SimServer.GetExtIfVariableVal("bms1.BatteryStacks[0].SOC");
                 var totalActivePower = SimServer.GetExtIfVariableVal("em.TotalActivePower");
-                var pcsList = SimServer.GetExtIfVariableVal("ess._pcsList") as System.Collections.ICollection;
-                return soc != null && totalActivePower != null && pcsList != null && pcsList.Count > 0;
+                if (totalActivePower == null)
+                    return false;
+
+                if (cfg.EffectiveEssUnitCount > 0)
+                {
+                    var soc = SimServer.GetExtIfVariableVal("bms1.BatteryStacks[0].SOC");
+                    var pcsList = SimServer.GetExtIfVariableVal("ess._pcsList") as System.Collections.ICollection;
+                    if (soc == null || pcsList == null || pcsList.Count == 0)
+                        return false;
+                }
+
+                if (cfg.PvUnitCount > 0)
+                {
+                    var pvPower = SimServer.GetExtIfVariableVal("pv1.ActivePowerKw");
+                    if (pvPower == null)
+                        return false;
+                }
+
+                return true;
             }
             catch
             {
@@ -84,21 +111,22 @@ namespace EssSimulator
 
         private static async Task WaitForSimulatorReadyAsync(SimulatorConfig cfg, CancellationToken cancellationToken)
         {
-            int expectedBmsCount = Math.Max(1, cfg.UnitCount);
-            int expectedEmuCount = Math.Max(1, cfg.Devices?.Count ?? 1);
+            int expectedBmsCount = cfg.UnitCount;
+            int expectedEmuCount = cfg.EffectiveEssUnitCount;
+            int expectedPvCount = cfg.PvUnitCount * 2; // Logger + 电表
             int expectedLcCount = 0;
-            if (cfg.Protocol.EnableLocalControl)
+            if (cfg.Protocol.EnableLocalControl && expectedEmuCount > 0)
             {
                 int emuPerGroup = Math.Max(1, cfg.Protocol.LocalControlEmuPerGroup);
                 expectedLcCount = (int)Math.Ceiling(expectedEmuCount / (double)emuPerGroup);
             }
-            int expectedServerCount = expectedBmsCount + expectedEmuCount + expectedLcCount + 1;
+            int expectedServerCount = expectedBmsCount + expectedEmuCount + expectedPvCount + expectedLcCount + 1;
             var timeout = TimeSpan.FromSeconds(60);
             var start = DateTime.UtcNow;
 
             while ((DateTime.UtcNow - start) < timeout)
             {
-                if (IsSimulatorReady(expectedServerCount, cfg.Protocol.EnableLocalControl))
+                if (IsSimulatorReady(expectedServerCount, cfg.Protocol.EnableLocalControl, cfg))
                 {
                     LogManager.GetLogger(typeof(Program)).Info("[Program] 仿真器已就绪");
                     return;
@@ -154,13 +182,13 @@ namespace EssSimulator
             var log = LogManager.GetLogger(typeof(Program));
             log.Info("==== 协议模拟器创建 ====");
             log.Info($"电表   simEm  : Modbus TCP 端口 {cfg.Protocol.EmModbusPort}");
-            int unitCount = Math.Max(1, cfg.Devices?.Count ?? 1);
+            int unitCount = cfg.EffectiveEssUnitCount;
             for (int i = 0; i < unitCount; i++)
             {
                 int emuPort = cfg.Protocol.BaseEmuModbusPort + i * cfg.Protocol.EmuPortStep;
                 log.Info($"EMU 单元{i + 1} simEmu{i + 1}: Modbus TCP 端口 {emuPort}（承载 emu{i + 1}.PcsList[0..1]）");
             }
-            if (cfg.Protocol.EnableLocalControl)
+            if (cfg.Protocol.EnableLocalControl && unitCount > 0)
             {
                 int emuPerGroup = Math.Max(1, cfg.Protocol.LocalControlEmuPerGroup);
                 int lcCount = (int)Math.Ceiling(unitCount / (double)emuPerGroup);
@@ -170,10 +198,17 @@ namespace EssSimulator
                     log.Info($"LC 聚合{i + 1} simLc{i + 1}: Modbus TCP 端口 {lcPort}（聚合 {emuPerGroup} 个 EMU / {emuPerGroup * 2} 台 PCS）");
                 }
             }
-            for (int i = 0; i < Math.Max(1, cfg.UnitCount); i++)
+            for (int i = 0; i < cfg.UnitCount; i++)
             {
                 int port = cfg.Protocol.BaseBmsModbusPort + i * cfg.Protocol.BmsPortStep;
                 log.Info($"BMS 路{i + 1} simBms{i + 1}: Modbus TCP 端口 {port}");
+            }
+            for (int i = 0; i < cfg.PvUnitCount; i++)
+            {
+                int loggerPort = cfg.Protocol.BasePvLoggerModbusPort + i * cfg.Protocol.PvLoggerPortStep;
+                int meterPort = cfg.Protocol.BasePvMeterModbusPort + i * cfg.Protocol.PvMeterPortStep;
+                log.Info($"光伏 Logger{i + 1} simPv{i + 1}: Modbus TCP 端口 {loggerPort}（承载 pv{i + 1}.Logger）");
+                log.Info($"光伏电表{i + 1} simPvMeter{i + 1}: Modbus TCP 端口 {meterPort}（承载 pv{i + 1}.MeterLv）");
             }
             log.Info("=======================");
         }
@@ -250,7 +285,7 @@ namespace EssSimulator
             if (topologyOverlay != null)
             {
                 Console.WriteLine(
-                    $"[Topology] 工程模式已启用：{topologyOverlay.SourceProjectName}（{topologyOverlay.EssUnits.Count} 单元）");
+                    $"[Topology] 工程模式已启用：{topologyOverlay.SourceProjectName}（储能 {topologyOverlay.EssUnits.Count} / 光伏 {topologyOverlay.PvUnits.Count}）");
             }
 
             // 绑定配置节
@@ -274,8 +309,16 @@ namespace EssSimulator
                 var units = builder.Configuration.GetSection(EssUnitsConfig.Section).Get<List<EssUnitConfig>>();
                 if (units is { Count: > 0 }) opt.Devices = units;
 
-                if (topologyOverlay?.EssUnits is { Count: > 0 })
-                    opt.Devices = topologyOverlay.EssUnits;
+                if (topologyOverlay != null)
+                {
+                    if (topologyOverlay.EssUnits is { Count: > 0 })
+                        opt.Devices = topologyOverlay.EssUnits;
+                    else if (topologyOverlay.PvUnits is { Count: > 0 })
+                        opt.Devices = new List<EssUnitConfig>();
+
+                    if (topologyOverlay.PvUnits != null)
+                        opt.PvUnits = topologyOverlay.PvUnits;
+                }
 
                 var edition = builder.Configuration.GetSection(EditionConfig.Section).Get<EditionConfig>()
                     ?? new EditionConfig();
@@ -374,6 +417,8 @@ namespace EssSimulator
                 var meterCfg = sp.GetRequiredService<IOptions<EssSimulator.EssDeviceSimModel.Model.MeterConfig>>().Value;
                 var ess = new EnergyStorageSystem(simCfg, pcsCfg, transCfg, unitTransCfg, loadCfg, pccCfg, meterCfg);
                 SimulatorHost.Instance.Register("ess", ess);
+                for (int i = 0; i < ess.PvUnits.Count; i++)
+                    SimulatorHost.Instance.Register($"pv{i + 1}", ess.PvUnits[i]);
                 return ess;
             });
             builder.Services.AddHostedService(sp => sp.GetRequiredService<EnergyStorageSystem>());

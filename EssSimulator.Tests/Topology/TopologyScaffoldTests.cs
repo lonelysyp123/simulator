@@ -37,4 +37,47 @@ public class TopologyScaffoldTests
         Assert.DoesNotContain(p.Nodes, n => n.TemplateId == "load");
         Assert.True(TopologyValidator.ValidateProjectForSave(p).Ok);
     }
+
+    [Fact]
+    public void BuildRadial_creates_pv_only_plant()
+    {
+        var p = TopologyScaffold.BuildRadial(emuCount: 0, name: "光伏场站", includeLoad: true, pvCount: 2);
+        Assert.Equal("光伏场站", p.Name);
+        Assert.Empty(p.Nodes.Where(n => n.TemplateId == "emu"));
+        Assert.Equal(2, p.Nodes.Count(n => n.TemplateId == "pv_unit"));
+        Assert.DoesNotContain(p.Nodes, n => n.TemplateId == "bms");
+        Assert.Contains(p.Nodes, n => n.TemplateId == "load");
+
+        var validation = TopologyValidator.ValidateProjectForSave(p);
+        Assert.True(validation.Ok, validation.Message + " / " + string.Join("; ", validation.Details));
+
+        var (overlay, convert) = TopologyRuntimeConverter.ConvertForApply(p);
+        Assert.True(convert.Ok, convert.Message);
+        Assert.NotNull(overlay);
+        Assert.Empty(overlay!.EssUnits);
+        Assert.Equal(2, overlay.PvUnits.Count);
+    }
+
+    [Fact]
+    public void BuildRadial_creates_mixed_ess_and_pv_plant()
+    {
+        var p = TopologyScaffold.BuildRadial(emuCount: 1, pvCount: 2);
+        Assert.Single(p.Nodes.Where(n => n.TemplateId == "emu"));
+        Assert.Equal(2, p.Nodes.Count(n => n.TemplateId == "pv_unit"));
+        Assert.True(TopologyValidator.ValidateProjectForSave(p).Ok);
+    }
+
+    [Fact]
+    public void BuildRadial_rejects_zero_generation_units()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            TopologyScaffold.BuildRadial(emuCount: 0, pvCount: 0));
+    }
+
+    [Fact]
+    public void BuildRadial_rejects_invalid_pv_count()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            TopologyScaffold.BuildRadial(emuCount: 0, pvCount: 21));
+    }
 }

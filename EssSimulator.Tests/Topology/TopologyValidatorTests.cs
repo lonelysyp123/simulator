@@ -24,6 +24,36 @@ public class TopologyValidatorTests
         };
     }
 
+    private static void EnsureSaveRoles(TopologyProject p)
+    {
+        if (!p.Nodes.Any(n => n.TemplateId == "grid"))
+        {
+            var n = Node("role_grid", "grid", "电网");
+            n.Y = -400;
+            p.Nodes.Add(n);
+        }
+
+        if (!p.Nodes.Any(n => n.TemplateId == "ac_breaker" && TopologyParamHelper.GetBool(n.Parameters, "isMainBreaker")))
+        {
+            var n = Node("role_brk", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true });
+            n.Y = -360;
+            p.Nodes.Add(n);
+        }
+
+        if (!p.Nodes.Any(n => n.TemplateId == "ac_meter" && TopologyParamHelper.GetBool(n.Parameters, "isPccMeter")))
+        {
+            var n = Node("role_m", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true });
+            n.Y = -320;
+            p.Nodes.Add(n);
+        }
+    }
+
+    private static TopologyValidationResult Save(TopologyProject p)
+    {
+        EnsureSaveRoles(p);
+        return TopologyValidator.ValidateProjectForSave(p);
+    }
+
     private static TopologyEdge Edge(string from, string fromPort, string to, string toPort) => new()
     {
         Id = Guid.NewGuid().ToString("N"),
@@ -41,7 +71,7 @@ public class TopologyValidatorTests
     }
 
     [Fact]
-    public void Bus_top_rejects_non_voltage_source()
+    public void Edit_allows_emu_on_bus_top_save_rejects()
     {
         var p = new TopologyProject
         {
@@ -53,13 +83,35 @@ public class TopologyValidatorTests
         };
 
         var r = Connect(p, Edge("emu1", "ac_a", "bus1", "a"));
-        Assert.False(r.Ok);
-        Assert.Equal("BUS_TOP_SOURCE_ONLY", r.Code);
-        Assert.Empty(p.Edges);
+        Assert.True(r.Ok, r.Message);
+        Assert.NotEmpty(p.Edges);
+
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("BUS_TOP_SOURCE_ONLY", save.Code);
     }
 
     [Fact]
-    public void Bus_bottom_rejects_device_without_voltage_source()
+    public void Save_reports_first_error_from_top_to_bottom()
+    {
+        var bus = Node("bus1", "ac_bus", "母线");
+        bus.Y = 200;
+        var grid = Node("grid1", "grid", "电网");
+        grid.Y = 40;
+        var emu = Node("emu1", "emu", "EMU-1");
+        emu.Y = 400;
+        var p = new TopologyProject { Nodes = { grid, bus, emu } };
+
+        Assert.True(Connect(p, Edge("emu1", "ac_a", "bus1", "a")).Ok);
+        Assert.True(Connect(p, Edge("grid1", "a", "bus1", "b")).Ok);
+
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("PHASE_MISMATCH", save.Code);
+    }
+
+    [Fact]
+    public void Bus_bottom_allows_device_without_voltage_source()
     {
         var p = new TopologyProject
         {
@@ -71,9 +123,10 @@ public class TopologyValidatorTests
         };
 
         var r = Connect(p, Edge("emu1", "ac_a", "bus1", "a2"));
-        Assert.False(r.Ok);
-        Assert.Equal("BUS_NO_SOURCE", r.Code);
-        Assert.Empty(p.Edges);
+        Assert.True(r.Ok, r.Message);
+        TopologyValidator.RefreshAcBusEnergization(p);
+        var bus = p.Nodes.First(n => n.Id == "bus1");
+        Assert.False(bus.Parameters.TryGetValue("energized", out var en) && en is true);
     }
 
     [Fact]
@@ -89,8 +142,10 @@ public class TopologyValidatorTests
         };
 
         var r = Connect(p, Edge("grid1", "a", "bus1", "a2"));
-        Assert.False(r.Ok);
-        Assert.Equal("BUS_BOTTOM_LOAD_ONLY", r.Code);
+        Assert.True(r.Ok, r.Message);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("BUS_BOTTOM_LOAD_ONLY", save.Code);
     }
 
     [Fact]
@@ -111,10 +166,10 @@ public class TopologyValidatorTests
         };
 
         Assert.True(Connect(p, Edge("grid1", "a", "bus1", "a")).Ok);
-        // 上侧 A 已被电网占用，变压器二次侧不能再占同一拐角
-        var r = Connect(p, Edge("xfmr1", "sec_a", "bus1", "a"));
-        Assert.False(r.Ok);
-        Assert.Equal("PORT_BUSY", r.Code);
+        Assert.True(Connect(p, Edge("xfmr1", "sec_a", "bus1", "a")).Ok);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("PORT_BUSY", save.Code);
     }
 
     [Fact]
@@ -131,11 +186,10 @@ public class TopologyValidatorTests
         };
 
         Assert.True(Connect(p, Edge("grid1", "a", "bus1", "a")).Ok);
-
-        // 另一上侧相拐角再接第二个电压源 → 拒绝
-        var r = Connect(p, Edge("grid2", "b", "bus1", "b"));
-        Assert.False(r.Ok);
-        Assert.Equal("BUS_MULTI_SOURCE", r.Code);
+        Assert.True(Connect(p, Edge("grid2", "b", "bus1", "b")).Ok);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("BUS_MULTI_SOURCE", save.Code);
     }
 
     [Fact]
@@ -195,13 +249,11 @@ public class TopologyValidatorTests
 
         Assert.True(Connect(p, Edge("emu1", "dc_pos", "dc1", "pos_t")).Ok);
         Assert.True(Connect(p, Edge("emu1", "dc_neg", "dc1", "neg_t")).Ok);
+        Assert.True(Connect(p, Edge("bms1", "dc_pos", "dc1", "neg_b")).Ok);
 
-        var bad = Connect(p, Edge("bms1", "dc_pos", "dc1", "neg_b"));
-        Assert.False(bad.Ok);
-        Assert.Equal("DC_POLARITY", bad.Code);
-
-        Assert.True(Connect(p, Edge("bms1", "dc_pos", "dc1", "pos_b")).Ok);
-        Assert.True(Connect(p, Edge("bms1", "dc_neg", "dc1", "neg_b")).Ok);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("DC_POLARITY", save.Code);
     }
 
     [Fact]
@@ -217,10 +269,10 @@ public class TopologyValidatorTests
             }
         };
         Assert.True(Connect(p, Edge("grid1", "a", "bus1", "a")).Ok);
-        // 电网 A 相端口已被占用，不能再接到另一母线
-        var r = Connect(p, Edge("grid1", "a", "bus2", "a"));
-        Assert.False(r.Ok);
-        Assert.Equal("PORT_BUSY", r.Code);
+        Assert.True(Connect(p, Edge("grid1", "a", "bus2", "a")).Ok);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("PORT_BUSY", save.Code);
     }
 
     [Fact]
@@ -241,10 +293,10 @@ public class TopologyValidatorTests
             }
         };
         Assert.True(Connect(p, Edge("grid1", "a", "bus1", "a")).Ok);
-
-        var r = Connect(p, Edge("xfmr", "pri_a", "bus1", "a2"));
-        Assert.False(r.Ok);
-        Assert.Equal("XFMR_RATIO", r.Code);
+        Assert.True(Connect(p, Edge("xfmr", "pri_a", "bus1", "a2")).Ok);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("XFMR_RATIO", save.Code);
     }
 
     [Fact]
@@ -264,10 +316,10 @@ public class TopologyValidatorTests
             }
         };
         Assert.True(Connect(p, Edge("grid1", "a", "bus1", "a")).Ok);
-
-        var r = Connect(p, Edge("xfmr1", "pri_a", "bus1", "a2"));
-        Assert.False(r.Ok);
-        Assert.Equal("XFMR_BUS_MISMATCH", r.Code);
+        Assert.True(Connect(p, Edge("xfmr1", "pri_a", "bus1", "a2")).Ok);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("XFMR_BUS_MISMATCH", save.Code);
     }
 
     [Fact]
@@ -287,12 +339,10 @@ public class TopologyValidatorTests
         Assert.True(Connect(p, Edge("grid1", "c", "bus1", "c")).Ok);
 
         var phaseBad = Connect(p, Edge("m1", "pt_a", "bus1", "b2"));
-        Assert.False(phaseBad.Ok);
-        // 相位校验优先于电表专用规则
-        Assert.Equal("PHASE_MISMATCH", phaseBad.Code);
-
-        var ok = Connect(p, Edge("m1", "pt_a", "bus1", "a2"));
-        Assert.True(ok.Ok);
+        Assert.True(phaseBad.Ok, phaseBad.Message);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("PHASE_MISMATCH", save.Code);
     }
 
     [Fact]
@@ -307,8 +357,10 @@ public class TopologyValidatorTests
             }
         };
         var r = Connect(p, Edge("grid1", "a", "bus1", "b"));
-        Assert.False(r.Ok);
-        Assert.Equal("PHASE_MISMATCH", r.Code);
+        Assert.True(r.Ok, r.Message);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("PHASE_MISMATCH", save.Code);
     }
 
     [Fact]
@@ -419,5 +471,111 @@ public class TopologyValidatorTests
         Assert.True(TopologyParamHelper.GetDouble(p.Nodes.First(n => n.Id == "bus35").Parameters, "nominalVoltage") > 0);
 
         Assert.True(Connect(p, Edge("emu1", "ac_a", "bus35", "a2")).Ok);
+    }
+
+    [Fact]
+    public void Closed_breaker_propagates_energization_to_downstream_bus()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网", new Dictionary<string, object?> { ["outputVoltage"] = 35000d }),
+                Node("busUp", "ac_bus", "上段母线"),
+                Node("brk1", "ac_breaker", "分段断路器", new Dictionary<string, object?>
+                {
+                    ["ratedVoltage"] = 35000d,
+                    ["closed"] = true
+                }),
+                Node("busDown", "ac_bus", "下段母线")
+            }
+        };
+
+        Assert.True(Connect(p, Edge("grid1", "a", "busUp", "a")).Ok);
+        Assert.True(Connect(p, Edge("brk1", "a", "busUp", "a2")).Ok);
+        Assert.True(Connect(p, Edge("brk1", "a2", "busDown", "a")).Ok);
+
+        TopologyValidator.RefreshAcBusEnergization(p);
+        var down = p.Nodes.First(n => n.Id == "busDown");
+        Assert.True(down.Parameters.TryGetValue("energized", out var en) && en is true);
+        Assert.Equal(35000d, TopologyParamHelper.GetDouble(down.Parameters, "nominalVoltage", 0), 1);
+    }
+
+    [Fact]
+    public void Open_breaker_does_not_propagate_energization_to_downstream_bus()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网", new Dictionary<string, object?> { ["outputVoltage"] = 35000d }),
+                Node("busUp", "ac_bus", "上段母线"),
+                Node("brk1", "ac_breaker", "分段断路器", new Dictionary<string, object?>
+                {
+                    ["ratedVoltage"] = 35000d,
+                    ["closed"] = false
+                }),
+                Node("busDown", "ac_bus", "下段母线")
+            }
+        };
+
+        Assert.True(Connect(p, Edge("grid1", "a", "busUp", "a")).Ok);
+        Assert.True(Connect(p, Edge("brk1", "a", "busUp", "a2")).Ok);
+        Assert.True(Connect(p, Edge("brk1", "a2", "busDown", "a")).Ok);
+
+        TopologyValidator.RefreshAcBusEnergization(p);
+        Assert.True(p.Nodes.First(n => n.Id == "busUp").Parameters.TryGetValue("energized", out var upEn) && upEn is true);
+        Assert.False(p.Nodes.First(n => n.Id == "busDown").Parameters.TryGetValue("energized", out var downEn) && downEn is true);
+    }
+
+    [Fact]
+    public void Pv_unit_connects_to_energized_35kv_bus()
+    {
+        var p = Energized35kVPlant(Node("pv1", "pv_unit", "光伏单元-1"));
+
+        var r = Connect(p, Edge("pv1", "ac_a", "bus35", "a2"));
+        Assert.True(r.Ok, r.Message);
+        Assert.Contains(p.Edges, e => e.FromNodeId == "pv1" || e.ToNodeId == "pv1");
+    }
+
+    [Fact]
+    public void Pv_unit_rejects_voltage_mismatch_with_bus()
+    {
+        var p = Energized35kVPlant(Node("pv1", "pv_unit", "光伏单元-1",
+            new Dictionary<string, object?> { ["acVoltage"] = 690d }));
+
+        var r = Connect(p, Edge("pv1", "ac_a", "bus35", "a2"));
+        Assert.True(r.Ok, r.Message);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("PV_BUS_MISMATCH", save.Code);
+    }
+
+    private static TopologyProject Energized35kVPlant(params TopologyNode[] extra)
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("bus220", "ac_bus", "220kV母线"),
+                Node("xfmr1", "transformer", "主变"),
+                Node("bus35", "ac_bus", "35kV母线")
+            }
+        };
+        foreach (var n in extra)
+            p.Nodes.Add(n);
+
+        Assert.True(Connect(p, Edge("grid1", "a", "bus220", "a")).Ok);
+        Assert.True(Connect(p, Edge("grid1", "b", "bus220", "b")).Ok);
+        Assert.True(Connect(p, Edge("grid1", "c", "bus220", "c")).Ok);
+        Assert.True(Connect(p, Edge("xfmr1", "pri_a", "bus220", "a2")).Ok);
+        Assert.True(Connect(p, Edge("xfmr1", "pri_b", "bus220", "b2")).Ok);
+        Assert.True(Connect(p, Edge("xfmr1", "pri_c", "bus220", "c2")).Ok);
+        Assert.True(Connect(p, Edge("xfmr1", "sec_a", "bus35", "a")).Ok);
+        Assert.True(Connect(p, Edge("xfmr1", "sec_b", "bus35", "b")).Ok);
+        Assert.True(Connect(p, Edge("xfmr1", "sec_c", "bus35", "c")).Ok);
+        TopologyValidator.RefreshAcBusEnergization(p);
+        return p;
     }
 }

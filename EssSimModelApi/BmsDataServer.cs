@@ -33,6 +33,12 @@ namespace EssSimulator.EssSimModelApi
                 _bmsDataList[i] = BmsDataGenerator.GenerateSampleData(1, _clusterCounts[i]);
                 var bmsCfg = bmsCfgList[i];
                 var stack = _bmsDataList[i].BatteryStacks[0];
+
+                // 空调默认开启、默认制冷设定 20°C（可经 Modbus 控制点 yt1/yt2 或 dpc 修改）
+                if (_bmsDataList[i].AirConditioners.Count == 0)
+                    _bmsDataList[i].AirConditioners.Add(new AirConditionerData { UnitId = 1 });
+                _bmsDataList[i].AirConditioners[0].OnCommand = true;
+                _bmsDataList[i].AirConditioners[0].CoolingSetpointCommand = 20f;
                 float clusterEnergyKWh = (float)(
                     bmsCfg.PackCount
                     * bmsCfg.CellSeriesCount
@@ -66,10 +72,13 @@ namespace EssSimulator.EssSimModelApi
                 for (int i = 0; i < _unitCount && i < ess._bmsRackDevices.Count; i++)
                 {
                     ess._bmsRackDevices[i].SyncTelemetryAndProtection(_bmsDataList[i]);
+                    // BMS 空调控制命令写回热模型：开启时制冷控温到设定值（降低电池节点温度、改善电芯散热）
+                    ApplyAirConditionerControl(ess, i, _bmsDataList[i]);
                     BmsThermalProbeMapper.Apply(ess.Thermal, i, _bmsDataList[i]);
                 }
 
-                _bmsDataList[0].Timestamp = DateTime.Now;
+                if (_unitCount > 0)
+                    _bmsDataList[0].Timestamp = DateTime.Now;
             }
         }
 
@@ -81,5 +90,20 @@ namespace EssSimulator.EssSimModelApi
         public void UpdateStateForOver(ref bool? l1, ref bool? l2, ref bool? l3,
             float t1, float t2, float t3, float r1, float r2, float r3, double val)
             => BmsRackProtection.UpdateOver(ref l1, ref l2, ref l3, t1, t2, t3, r1, r2, r3, val);
+
+        private static void ApplyAirConditionerControl(
+            EnergyStorageSystem ess,
+            int bmsIndex,
+            BatteryManagementSystemData bmsData)
+        {
+            if (bmsData.AirConditioners.Count == 0)
+                return;
+
+            var ac = bmsData.AirConditioners[0];
+            if (ac.OnCommand.HasValue)
+                ess.Thermal.SetCabinetAirConditioningOn(bmsIndex, ac.OnCommand.Value);
+            if (ac.CoolingSetpointCommand.HasValue && ac.CoolingSetpointCommand.Value > 0)
+                ess.Thermal.SetCabinetCoolingSetpointC(bmsIndex, ac.CoolingSetpointCommand.Value);
+        }
     }
 }

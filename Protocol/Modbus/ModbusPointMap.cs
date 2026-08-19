@@ -113,6 +113,7 @@ namespace EssSimulator.Protocol.Modbus
                     if (!isEmu)
                         e.ModelSim = e.ModelSim.Replace("bmsdeviceId", $"bms{deviceId}", StringComparison.Ordinal);
 
+                    e.ModelSim = e.ModelSim.Replace("pvDeviceId", $"pv{deviceId}", StringComparison.Ordinal);
                     e.ModelSim = e.ModelSim.Replace("deviceId", deviceId.ToString(), StringComparison.Ordinal);
 
                     if (isEmu)

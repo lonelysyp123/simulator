@@ -174,6 +174,18 @@ namespace EssSimulator.Configuration
 
         /// <summary>每路 LocalControl 聚合的 EMU 数。</summary>
         public int LocalControlEmuPerGroup { get; set; } = 4;
+
+        /// <summary>光伏 Logger Modbus TCP 基础端口。</summary>
+        public int BasePvLoggerModbusPort { get; set; } = 1801;
+
+        /// <summary>光伏 Logger 端口步长。</summary>
+        public int PvLoggerPortStep { get; set; } = 1;
+
+        /// <summary>光伏低压电表 Modbus TCP 基础端口。</summary>
+        public int BasePvMeterModbusPort { get; set; } = 1901;
+
+        /// <summary>光伏低压电表端口步长。</summary>
+        public int PvMeterPortStep { get; set; } = 1;
     }
 
     public class PcsDeviceConfig
@@ -238,6 +250,25 @@ namespace EssSimulator.Configuration
         public const string Section = "EssUnits";
     }
 
+    /// <summary>光伏单元运行时配置（组态 overlay / Simulator.PvUnits）。</summary>
+    public sealed class PvUnitRuntimeConfig
+    {
+        public string Name { get; set; } = "PV";
+        public int InverterCount { get; set; } = 16;
+        public int StringCount { get; set; } = 16;
+        public int ModulesPerString { get; set; } = 30;
+        public double InverterRatedPowerKw { get; set; } = 320;
+        public double InverterMaxPowerKw { get; set; } = 352;
+        public double InverterEfficiency { get; set; } = 0.99;
+        public double InverterAcVoltageV { get; set; } = 690;
+        public double UnitXfPrimaryV { get; set; } = 35000;
+        public double UnitXfSecondaryV { get; set; } = 690;
+        public double UnitXfRatedKva { get; set; } = 5120;
+        public double DcVoltageMin { get; set; } = 500;
+        public double DcVoltageMax { get; set; } = 1500;
+        public string ModuleModel { get; set; } = "TSM-NEG21C.20Q";
+    }
+
     /// <summary>顶层仿真器配置（对应 appsettings.json: Simulator 节）</summary>
     public class SimulatorConfig
     {
@@ -246,9 +277,28 @@ namespace EssSimulator.Configuration
         public RuntimeConfig Runtime { get; set; } = new();
         public ProtocolConfig Protocol { get; set; } = new();
         public List<EssUnitConfig> Devices { get; set; } = new();
+        public List<PvUnitRuntimeConfig> PvUnits { get; set; } = new();
+
+        public int EssUnitCount => Devices?.Count ?? 0;
+        public int PvUnitCount => PvUnits?.Count ?? 0;
+
+        /// <summary>
+        /// 储能单元数。无储能且无光伏时回退 1（兼容空 Devices 的旧 appsettings）；
+        /// 纯光伏工程为 0，不伪造 BMS/PCS。
+        /// </summary>
+        public int EffectiveEssUnitCount
+        {
+            get
+            {
+                int ess = EssUnitCount;
+                if (ess > 0) return ess;
+                if (PvUnitCount > 0) return 0;
+                return 1;
+            }
+        }
 
         // 兼容旧代码的便捷属性（由新结构推导）
-        public int UnitCount => Math.Max(1, Devices?.Count ?? 1) * 2; // 每单元固定 2 路 PCS/BMS
+        public int UnitCount => EffectiveEssUnitCount * 2; // 每单元固定 2 路 PCS/BMS
         public int BaseModbusPort => Protocol.BaseBmsModbusPort;
         public int PcsModbusPort => Protocol.BaseEmuModbusPort;
         public int EmModbusPort => Protocol.EmModbusPort;
@@ -258,8 +308,7 @@ namespace EssSimulator.Configuration
         public IReadOnlyList<BmsDeviceConfig> GetBmsDeviceConfigs()
         {
             var list = new List<BmsDeviceConfig>();
-            var units = (Devices == null || Devices.Count == 0) ? new List<EssUnitConfig> { new() } : Devices;
-
+            var units = ResolveEssUnitsOrFallback();
             foreach (var unit in units)
             {
                 var bms = unit.Bms ?? new List<BmsDeviceConfig>();
@@ -273,8 +322,7 @@ namespace EssSimulator.Configuration
         public IReadOnlyList<PcsDeviceConfig> GetPcsDeviceConfigs()
         {
             var list = new List<PcsDeviceConfig>();
-            var units = (Devices == null || Devices.Count == 0) ? new List<EssUnitConfig> { new() } : Devices;
-
+            var units = ResolveEssUnitsOrFallback();
             foreach (var unit in units)
             {
                 var pcs = unit.Pcs ?? new List<PcsDeviceConfig>();
@@ -283,6 +331,15 @@ namespace EssSimulator.Configuration
                 list.Add(pcs[1]);
             }
             return list;
+        }
+
+        private IReadOnlyList<EssUnitConfig> ResolveEssUnitsOrFallback()
+        {
+            if (Devices is { Count: > 0 })
+                return Devices;
+            if (PvUnitCount > 0)
+                return Array.Empty<EssUnitConfig>();
+            return new List<EssUnitConfig> { new() };
         }
     }
 

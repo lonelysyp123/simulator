@@ -22,6 +22,20 @@ namespace EssSimulator.Display
             }
         }
 
+        public static int GetPvUnitCount()
+        {
+            try
+            {
+                var list = SimServer.GetExtIfVariableVal("ess.PvUnits");
+                return list is System.Collections.ICollection c ? c.Count : 0;
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("GetPvUnitCount 失败，回退 0", ex);
+                return 0;
+            }
+        }
+
         public static int GetMainLineSectionCount(int unitsPerSection)
         {
             int channelCount = Math.Max(1, GetEssUnitCount());

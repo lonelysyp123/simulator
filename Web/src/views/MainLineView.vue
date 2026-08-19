@@ -101,6 +101,12 @@
         @pcs-stop="onPcsStop"
         @pcs-set-power="onPcsSetPower"
         @pcs-set-reactive="onPcsSetReactive"
+        @pv-start="onPvStart"
+        @pv-stop="onPvStop"
+        @pv-set-power="onPvSetPower"
+        @pv-set-reactive="onPvSetReactive"
+        @pv-set-temp="onPvSetTemp"
+        @pv-set-angle="onPvSetAngle"
         @bms-power-on="onBmsPowerOn"
         @bms-power-off="onBmsPowerOff"
         @bms-fault-clear="onBmsFaultClear"
@@ -401,6 +407,94 @@ async function onPcsSetReactive(payload = {}) {
   }
   const raw = Math.round(kvar * 10)
   await runChannelCommand(`dpc simEmu${emuUnit}.${ytPoint} set ${raw}`)
+}
+
+function resolvePvNumber(payload) {
+  const n = Number(payload?.pvNumber ?? payload)
+  return Number.isFinite(n) && n >= 1 ? n : 0
+}
+
+async function onPvStart(payload) {
+  const n = resolvePvNumber(payload)
+  if (!n) {
+    ElMessage.error('无法解析光伏单元')
+    return
+  }
+  await runChannelCommand(`dpc simPv${n}.yt4 set 1`)
+}
+
+async function onPvStop(payload) {
+  const n = resolvePvNumber(payload)
+  if (!n) {
+    ElMessage.error('无法解析光伏单元')
+    return
+  }
+  await runChannelCommand(`dpc simPv${n}.yt4 set 0`)
+}
+
+async function onPvSetPower(payload = {}) {
+  const n = resolvePvNumber(payload)
+  const kw = Number(payload.powerKw)
+  if (!n) {
+    ElMessage.error('无法解析光伏单元')
+    return
+  }
+  if (!Number.isFinite(kw) || kw < 0) {
+    ElMessage.warning('请输入有效的有功功率（≥0）')
+    return
+  }
+  const raw = Math.round(kw * 10)
+  await runChannelCommand(`dpc simPv${n}.yt5 set ${raw}`)
+}
+
+async function onPvSetReactive(payload = {}) {
+  const n = resolvePvNumber(payload)
+  const kvar = Number(payload.reactiveKvar)
+  if (!n) {
+    ElMessage.error('无法解析光伏单元')
+    return
+  }
+  if (!Number.isFinite(kvar)) {
+    ElMessage.warning('请输入有效的无功功率')
+    return
+  }
+  const raw = Math.round(kvar * 10)
+  await runChannelCommand(`dpc simPv${n}.yt7 set ${raw}`)
+}
+
+function resolvePvSide(payload) {
+  const side = String(payload?.side || '').trim().toUpperCase()
+  return side === 'A' || side === 'B' ? side : ''
+}
+
+async function onPvSetTemp(payload = {}) {
+  const n = resolvePvNumber(payload)
+  const side = resolvePvSide(payload)
+  const temperatureC = Number(payload.temperatureC)
+  if (!n || !side) {
+    ElMessage.error('无法解析光伏方阵')
+    return
+  }
+  if (!Number.isFinite(temperatureC)) {
+    ElMessage.warning('请输入有效的温度')
+    return
+  }
+  await runChannelCommand(`esscmd setpv${n} array ${side} temperature ${temperatureC}`)
+}
+
+async function onPvSetAngle(payload = {}) {
+  const n = resolvePvNumber(payload)
+  const side = resolvePvSide(payload)
+  const angleDeg = Number(payload.angleDeg)
+  if (!n || !side) {
+    ElMessage.error('无法解析光伏方阵')
+    return
+  }
+  if (!Number.isFinite(angleDeg)) {
+    ElMessage.warning('请输入有效的入射角')
+    return
+  }
+  await runChannelCommand(`esscmd setpv${n} array ${side} angle ${angleDeg}`)
 }
 
 async function onBmsPowerOn(bmsNumber) {

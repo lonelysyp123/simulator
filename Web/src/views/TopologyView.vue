@@ -156,7 +156,7 @@
           <p class="empty">已选中连线，按 Delete 可断开。</p>
           <el-button size="small" type="danger" @click="deleteSelected">断开连线</el-button>
         </template>
-        <p v-else class="empty">从左侧拖入设备，或用「标准拓扑向导」一键生成径向骨架。</p>
+        <p v-else class="empty">从左侧拖入设备，或用「标准拓扑向导」一键生成储能 / 光伏径向骨架。</p>
       </aside>
     </div>
 
@@ -172,14 +172,17 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="wizardOpen" title="标准拓扑向导" width="460px">
-      <p class="wizard-desc">生成电网→主断→220kV 母线→主变→35kV 母线→N×EMU（含 DC 母线与双 BMS）的径向骨架，并自动三相/直流成组连线。</p>
-      <el-form label-width="100px" size="small">
+    <el-dialog v-model="wizardOpen" title="标准拓扑向导" width="480px">
+      <p class="wizard-desc">生成电网→主断→220kV 母线→主变→35kV 母线→储能 EMU 和/或光伏单元的径向骨架，并自动三相/直流成组连线。EMU 与光伏单元至少填 1 个。</p>
+      <el-form label-width="110px" size="small">
         <el-form-item label="工程名称">
-          <el-input v-model="wizardName" placeholder="标准径向-N单元" />
+          <el-input v-model="wizardName" :placeholder="wizardNamePlaceholder" />
         </el-form-item>
         <el-form-item label="EMU 单元数">
-          <el-input-number v-model="wizardEmuCount" :min="1" :max="20" controls-position="right" />
+          <el-input-number v-model="wizardEmuCount" :min="0" :max="20" controls-position="right" />
+        </el-form-item>
+        <el-form-item label="光伏单元数">
+          <el-input-number v-model="wizardPvCount" :min="0" :max="20" controls-position="right" />
         </el-form-item>
         <el-form-item label="站用负载">
           <el-switch v-model="wizardIncludeLoad" active-text="包含" inactive-text="不含" />
@@ -187,7 +190,13 @@
       </el-form>
       <template #footer>
         <el-button size="small" @click="wizardOpen = false">取消</el-button>
-        <el-button size="small" type="primary" :loading="wizardLoading" @click="applyWizard">生成到画布</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          :loading="wizardLoading"
+          :disabled="wizardEmuCount + wizardPvCount < 1"
+          @click="applyWizard"
+        >生成到画布</el-button>
       </template>
     </el-dialog>
   </div>
@@ -250,9 +259,18 @@ let applyingHistory = false
 
 const wizardOpen = ref(false)
 const wizardEmuCount = ref(2)
+const wizardPvCount = ref(0)
 const wizardIncludeLoad = ref(true)
 const wizardName = ref('')
 const wizardLoading = ref(false)
+
+const wizardNamePlaceholder = computed(() => {
+  const e = wizardEmuCount.value
+  const p = wizardPvCount.value
+  if (p > 0 && e <= 0) return `标准径向-光伏${p}单元`
+  if (p > 0) return `标准径向-储能${e}/光伏${p}`
+  return `标准径向-${Math.max(1, e)}单元`
+})
 
 /** 清空队列后只展示当前一条，避免连线过快时提示堆积/延后爆发 */
 function showConnectFeedback(type, title, detail = '') {
@@ -285,11 +303,7 @@ function dropWorldPosition(ev, templateId) {
   }
 }
 
-function isDcKind(kind) {
-  return kind === 'dc' || kind === 'dc_pos' || kind === 'dc_neg'
-}
-
-/** 常见错误本地即时校验，避免等接口才弹提示 */
+/** 编辑期仅拦结构错误；电气规则在保存时统一校验 */
 function quickReject(edge) {
   const fromNode = project.nodes.find(n => n.id === edge.fromNodeId)
   const toNode = project.nodes.find(n => n.id === edge.toNodeId)
@@ -300,30 +314,6 @@ function quickReject(edge) {
   const fromPort = fromTpl?.ports?.find(p => p.id === edge.fromPortId)
   const toPort = toTpl?.ports?.find(p => p.id === edge.toPortId)
   if (!fromPort || !toPort) return { code: 'PORT_MISSING', message: '拐角（端口）不存在' }
-
-  const aAc = fromPort.kind === 'ac_phase'
-  const bAc = toPort.kind === 'ac_phase'
-  const aDc = isDcKind(fromPort.kind)
-  const bDc = isDcKind(toPort.kind)
-  if ((aAc && bDc) || (aDc && bAc)) {
-    return { code: 'DOMAIN_MISMATCH', message: `端口类型不兼容：${fromPort.label} ↔ ${toPort.label}。交流不能接直流。` }
-  }
-  if (aAc && bAc && fromPort.phase && toPort.phase && fromPort.phase !== toPort.phase) {
-    return {
-      code: 'PHASE_MISMATCH',
-      message: `相位不匹配：${fromPort.label}(${fromPort.phase}) ↔ ${toPort.label}(${toPort.phase})`
-    }
-  }
-  if (aDc && bDc) {
-    const pa = fromPort.kind === 'dc_neg' ? 'neg' : 'pos'
-    const pb = toPort.kind === 'dc_neg' ? 'neg' : 'pos'
-    if (pa !== pb) {
-      return {
-        code: 'DC_POLARITY',
-        message: `直流极性不匹配：${fromPort.label} ↔ ${toPort.label}。正极只能接正极，负极只能接负极。`
-      }
-    }
-  }
   return null
 }
 
@@ -789,11 +779,18 @@ async function removeLibrary(id) {
 }
 
 async function applyWizard() {
+  const emuCount = Number(wizardEmuCount.value) || 0
+  const pvCount = Number(wizardPvCount.value) || 0
+  if (emuCount + pvCount < 1) {
+    ElMessage.warning('EMU 与光伏单元至少需要 1 个')
+    return
+  }
   if (!(await confirmDiscardIfDirty('生成骨架'))) return
   wizardLoading.value = true
   try {
     const scaffolded = await postTopologyScaffold({
-      emuCount: wizardEmuCount.value,
+      emuCount,
+      pvCount,
       name: wizardName.value || undefined,
       includeLoad: wizardIncludeLoad.value
     })
@@ -805,7 +802,10 @@ async function applyWizard() {
     clearValidation()
     wizardOpen.value = false
     editHint.value = '向导已生成'
-    ElMessage.success(`已生成标准径向拓扑（EMU×${wizardEmuCount.value}），请检查后保存`)
+    const parts = []
+    if (emuCount > 0) parts.push(`EMU×${emuCount}`)
+    if (pvCount > 0) parts.push(`光伏×${pvCount}`)
+    ElMessage.success(`已生成标准径向拓扑（${parts.join('、')}），请检查后保存`)
   } catch (e) {
     ElMessage.error(e.message || '生成失败')
   } finally {

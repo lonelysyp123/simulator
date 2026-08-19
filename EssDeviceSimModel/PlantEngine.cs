@@ -21,6 +21,7 @@ namespace EssSimulator.EssDeviceSimModel
         /// </summary>
         public void Step(DateTime simTime, TimeSpan elapsed, TimeSpan integrationElapsed)
         {
+            _ess.StepPvUnits(simTime, elapsed);
             RunElectricalStep(simTime, elapsed, integrationElapsed);
             _ess.Thermal.Step(simTime, elapsed);
             _ess.CouplingGraph.StepCouplings(_ess.Thermal, simTime, elapsed, integrationElapsed);

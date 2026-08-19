@@ -40,6 +40,9 @@ namespace EssSimulator.Display
             if (verb.StartsWith("pcs", StringComparison.OrdinalIgnoreCase))
                 return ExecutePcsStartStop(args);
 
+            if (verb.StartsWith("setpv", StringComparison.OrdinalIgnoreCase))
+                return ExecuteSetPv(args);
+
             return CommandResult.Fail("未知子命令，请使用 esscmd help 查看用法");
         }
 
@@ -60,6 +63,8 @@ namespace EssSimulator.Display
                 "  setbmsN power on|off           // BMS 物理并网/离网（PCS↔BMS 直流链路）",
                 "  setbmsN soc <0~1|%>            // 热设 BMS 整堆 SOC（须待机；写透电芯，立即生效）",
                 "  bmsN fault clear               // 待机时清除充放电方向内部故障，恢复可并网",
+                "  setpvN array A|B temperature <℃> // 设定光伏方阵温度，下一步按 MPPT 重算最大放电功率",
+                "  setpvN array A|B angle <度>    // 设定光伏方阵光照入射角（90=正对 1000 W/㎡，0/180=0）",
                 "",
                 "说明:",
                 "  - link off：关闭 TCP 监听，模拟通信中断；与 setbms power 无关",
@@ -68,6 +73,7 @@ namespace EssSimulator.Display
                 "  - setbmsN power off：断开 PCS↔BMS 链路，GridConnectStatus→0",
                 "  - setbmsN soc：须堆电流为 0（待机）；0~1 为标幺，>1 且≤100 按百分比",
                 "  - bmsN fault clear：待机时清除充放电方向内部故障（一次性）；再次超限会重新触发，三级故障会自动下电",
+                "  - setpvN：方阵温度/入射角替代按时刻正弦的辐照，A/B 可分别设定",
                 "  - 同一储能单元内 pcs(2n-1)/pcs(2n) 共用 simEmu{n}，关闭任一路会影响该单元两路 PCS"
             }.JoinLines();
         }
@@ -282,6 +288,55 @@ namespace EssSimulator.Display
                 return CommandResult.Fail(message);
 
             return CommandResult.Ok($"执行成功: PCS{pcs1Based} {(start.Value ? "启动" : "停机")} — {message}");
+        }
+
+        private static CommandResult ExecuteSetPv(string[] args)
+        {
+            if (args.Length != 5
+                || !args[1].Equals("array", StringComparison.OrdinalIgnoreCase))
+            {
+                return CommandResult.Fail(
+                    "用法: esscmd setpvN array A|B temperature|angle <数值>\n示例: esscmd setpv1 array A temperature 35\n      esscmd setpv1 array B angle 30");
+            }
+
+            if (!TryParseSetPvIndex(args[0], out int pv1Based, out var parseMessage))
+                return CommandResult.Fail(parseMessage);
+
+            string side = args[2].Trim().ToUpperInvariant();
+            if (side != "A" && side != "B")
+                return CommandResult.Fail("方阵侧应为 A 或 B");
+
+            if (!double.TryParse(args[4], out var value))
+                return CommandResult.Fail("请输入有效的数字");
+
+            var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
+            if (ess == null)
+                return CommandResult.Fail("找不到 ess 模型，请确认仿真已启动");
+
+            if (!ess.TrySetPvArrayClimate(pv1Based, side, args[3], value, out var message))
+                return CommandResult.Fail($"操作失败: {message}");
+
+            SnapshotService.RequestImmediatePush();
+            return CommandResult.Ok($"执行成功: {message}");
+        }
+
+        private static bool TryParseSetPvIndex(string verb, out int pv1Based, out string message)
+        {
+            pv1Based = 0;
+            message = string.Empty;
+            if (!verb.StartsWith("setpv", StringComparison.OrdinalIgnoreCase))
+            {
+                message = "子命令格式应为 setpvN，例如 setpv1";
+                return false;
+            }
+
+            if (!int.TryParse(verb.AsSpan(5), out pv1Based) || pv1Based < 1)
+            {
+                message = "子命令格式应为 setpvN，例如 setpv1";
+                return false;
+            }
+
+            return true;
         }
 
         private static bool TryParseSetBmsIndex(string verb, out int bms1Based, out string message)

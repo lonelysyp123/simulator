@@ -30,7 +30,7 @@ namespace EssSimulator.Web.Topology
                     ActiveProjectName = mode.ActiveProjectName,
                     OverlayPresent = overlay != null,
                     Source = eng ? "topology" : "appsettings",
-                    RuntimeUnitCount = Math.Max(1, simCfg.Value.Devices?.Count ?? 1),
+                    RuntimeUnitCount = simCfg.Value.EffectiveEssUnitCount,
                     Projects = projects.ToList(),
                     OverlaySummary = overlay == null ? null : new TopologyRuntimeOverlay
                     {
@@ -38,6 +38,7 @@ namespace EssSimulator.Web.Topology
                         SourceProjectName = overlay.SourceProjectName,
                         GeneratedAtUtc = overlay.GeneratedAtUtc,
                         EssUnits = overlay.EssUnits,
+                        PvUnits = overlay.PvUnits,
                         Notes = overlay.Notes
                     }
                 });
@@ -158,7 +159,7 @@ namespace EssSimulator.Web.Topology
                     Restarting = req.ConfirmRestart,
                     Overlay = overlay,
                     Message = req.ConfirmRestart
-                        ? $"已应用工程「{project.Name}」（{overlay.EssUnits.Count} 单元），模拟器即将重启"
+                            ? $"已应用工程「{project.Name}」（储能 {overlay.EssUnits.Count} / 光伏 {overlay.PvUnits.Count}），模拟器即将重启"
                         : $"已写入工程配置（需重启后生效）",
                     Details = overlay.Notes
                 });

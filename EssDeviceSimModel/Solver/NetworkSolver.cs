@@ -37,8 +37,9 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             double totalActiveKw = _network.Load.Port.Output.Ac!.Internal.ActivePowerKw;
             double totalReactiveKvar = _network.Load.Port.Output.Ac!.Internal.ReactivePowerKvar;
 
-            // S1: PCS 功率意图（使用当前 Output 或 0）
+            // S1: PCS / 光伏功率意图（使用当前 Output 或 0）
             CollectPcsPower(ref totalActiveKw, ref totalReactiveKvar);
+            CollectPvPower(ref totalActiveKw, ref totalReactiveKvar);
 
             // S2: 电网 Q-U + 主变路径
             _network.Grid.SetAggregatedReactivePowerKvar(totalReactiveKvar);
@@ -53,6 +54,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
 
             // S6: Q 反馈修正（一次迭代）
             CollectPcsPower(ref totalActiveKw, ref totalReactiveKvar);
+            CollectPvPower(ref totalActiveKw, ref totalReactiveKvar);
             totalActiveKw += _network.Load.Port.Output.Ac!.Internal.ActivePowerKw;
             totalReactiveKvar += _network.Load.Port.Output.Ac!.Internal.ReactivePowerKvar;
             _network.Grid.SetAggregatedReactivePowerKvar(totalReactiveKvar);
@@ -249,6 +251,17 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 var st = pcs.GetCurrentState();
                 totalActiveKw += pcs.GetGridSideActivePower();
                 totalReactiveKvar += st.ReactivePower;
+            }
+        }
+
+        private void CollectPvPower(ref double totalActiveKw, ref double totalReactiveKvar)
+        {
+            if (_legacyEss == null)
+                return;
+            foreach (var pv in _legacyEss.PvUnits)
+            {
+                totalActiveKw += pv.ActivePowerKw;
+                totalReactiveKvar += pv.ReactivePowerKvar;
             }
         }
 

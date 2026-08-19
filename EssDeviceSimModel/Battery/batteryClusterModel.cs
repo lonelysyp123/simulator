@@ -88,19 +88,20 @@ namespace EssSimulator.EssDeviceSimModel
         }
 
         // 更新簇状态
-        public void Update(double clusterCurrent, double ambientTemp, DateTime timeStamp, TimeSpan timeStep)
+        /// <param name="nodeTempC">电池节点温度（°C），作为电芯热环境。</param>
+        public void Update(double clusterCurrent, double nodeTempC, DateTime timeStamp, TimeSpan timeStep)
         {
             // 更新所有模组 (串联电流相同)
             foreach (var pack in _packs)
             {
                 // 模拟模组温度环境差异 (如簇中不同位置)
-                double packAmbientTemp = ambientTemp + (_random.NextDouble() - 0.5) * 5; // ±2.5°C差异
+                double packNodeTemp = nodeTempC + (_random.NextDouble() - 0.5) * 5; // ±2.5°C差异
 
-                pack.Update(clusterCurrent, packAmbientTemp, timeStamp, timeStep);
+                pack.Update(clusterCurrent, packNodeTemp, timeStamp, timeStep);
             }
 
             // 更新簇状态
-            UpdateClusterState(clusterCurrent, ambientTemp, timeStamp);
+            UpdateClusterState(clusterCurrent, nodeTempC, timeStamp);
         }
 
         // 计算并更新簇状态

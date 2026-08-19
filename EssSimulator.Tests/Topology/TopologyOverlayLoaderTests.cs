@@ -36,6 +36,15 @@ public class TopologyOverlayLoaderTests
     }
 
     [Fact]
+    public void IsUsable_true_when_only_pv_units()
+    {
+        Assert.True(TopologyOverlayLoader.IsUsable(new TopologyRuntimeOverlay
+        {
+            PvUnits = { new PvUnitRuntimeConfig { Name = "光伏单元-1" } }
+        }));
+    }
+
+    [Fact]
     public void TryLoad_returns_null_when_engineering_mode_off()
     {
         using var tmp = new TempTopologyRoot(engineeringMode: false, overlay: UsableOverlay());
@@ -83,7 +92,23 @@ public class TopologyOverlayLoaderTests
         var overlay = TopologyOverlayLoader.TryLoad(root);
         Assert.NotNull(overlay);
         Assert.True(TopologyOverlayLoader.IsUsable(overlay));
-        Assert.True(overlay!.EssUnits.Count >= 1);
+        Assert.True(overlay!.EssUnits.Count >= 1 || overlay.PvUnits.Count >= 1);
+    }
+
+    [Fact]
+    public void TryLoad_returns_overlay_when_only_pv_units()
+    {
+        var expected = new TopologyRuntimeOverlay
+        {
+            SourceProjectName = "pv-only",
+            PvUnits = { new PvUnitRuntimeConfig { Name = "光伏单元-1", InverterCount = 16 } }
+        };
+        using var tmp = new TempTopologyRoot(engineeringMode: true, overlay: expected);
+        var loaded = TopologyOverlayLoader.TryLoad(tmp.Root);
+        Assert.NotNull(loaded);
+        Assert.Equal("pv-only", loaded!.SourceProjectName);
+        Assert.Single(loaded.PvUnits);
+        Assert.Empty(loaded.EssUnits);
     }
 
     private static TopologyRuntimeOverlay UsableOverlay() => new()

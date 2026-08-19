@@ -13,17 +13,25 @@ namespace EssSimulator.Web.Topology
 
         public static bool IsUsable(TopologyRuntimeOverlay? overlay)
         {
-            if (overlay?.EssUnits is not { Count: > 0 })
+            if (overlay == null)
                 return false;
 
-            foreach (var unit in overlay.EssUnits)
+            bool hasEss = overlay.EssUnits is { Count: > 0 };
+            bool hasPv = overlay.PvUnits is { Count: > 0 };
+            if (!hasEss && !hasPv)
+                return false;
+
+            if (hasEss)
             {
-                if (unit == null)
-                    return false;
-                if (unit.Pcs is not { Count: > 0 })
-                    return false;
-                if (unit.Bms is not { Count: > 0 })
-                    return false;
+                foreach (var unit in overlay.EssUnits)
+                {
+                    if (unit == null)
+                        return false;
+                    if (unit.Pcs is not { Count: > 0 })
+                        return false;
+                    if (unit.Bms is not { Count: > 0 })
+                        return false;
+                }
             }
 
             return true;
@@ -45,7 +53,7 @@ namespace EssSimulator.Web.Topology
                 var overlay = JsonSerializer.Deserialize<TopologyRuntimeOverlay>(File.ReadAllText(overlayPath), JsonOpts);
                 if (!IsUsable(overlay))
                 {
-                    Console.WriteLine("[Topology] 工程 overlay 无效（缺少储能单元或 PCS/BMS），已忽略，改用 appsettings");
+                    Console.WriteLine("[Topology] 工程 overlay 无效（缺少储能或光伏发电单元），已忽略，改用 appsettings");
                     return null;
                 }
 

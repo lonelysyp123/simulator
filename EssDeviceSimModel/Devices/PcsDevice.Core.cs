@@ -32,7 +32,6 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         public PcsState _currentState { get; set; }
         private GridState _gridState;
         private double _ambientTemperature;
-        private double _thermalPowerDeratingFactor = 1.0;
         private readonly Random _random = new Random();
         private readonly object _setpointLock = new object();
         private double _pendingActiveSetpoint;
@@ -473,13 +472,6 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 _currentState.ReactivePower = _loadReactivePowerKvar;
             }
 
-            // 高温降额：在电气量计算前限制指令功率
-            if (_thermalPowerDeratingFactor < 0.999 && !_blackStartEnabled)
-            {
-                _currentState.ActivePower *= _thermalPowerDeratingFactor;
-                _currentState.ReactivePower *= _thermalPowerDeratingFactor;
-            }
-
             // 2) 根据模式更新电气量（过流等保护基于本步 P/Q 与 AcCurrent）
             switch (_currentState.Mode)
             {
@@ -643,12 +635,6 @@ namespace EssSimulator.EssDeviceSimModel.Devices
 
         /// <inheritdoc />
         public double TemperatureCelsius => _currentState.Temperature;
-
-        /// <summary>高温功率降额因子（0–1），由热反馈写入。</summary>
-        public void ApplyThermalPowerDerating(double factor) =>
-            _thermalPowerDeratingFactor = Math.Clamp(factor, 0, 1);
-
-        public double ThermalPowerDeratingFactor => _thermalPowerDeratingFactor;
 
         /// <inheritdoc />
         public double GetElectricalLossWatts() =>

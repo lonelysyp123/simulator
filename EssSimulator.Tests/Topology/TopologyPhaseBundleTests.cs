@@ -118,7 +118,7 @@ public class TopologyPhaseBundleTests
     }
 
     [Fact]
-    public void TryConnectBundle_rolls_back_when_any_phase_fails()
+    public void TryConnectBundle_allows_electrical_invalid_during_edit()
     {
         var p = new TopologyProject
         {
@@ -129,10 +129,10 @@ public class TopologyPhaseBundleTests
             }
         };
 
-        // 母线下侧无源拒绝
-        var r = TopologyValidator.TryConnectBundle(p, Edge("emu1", "ac_a", "bus1", "a2"), out var updated);
-        Assert.False(r.Ok);
-        Assert.Null(updated);
+        var r = TopologyValidator.TryConnectBundle(p, Edge("emu1", "ac_a", "bus1", "a"), out var updated);
+        Assert.True(r.Ok, r.Message);
+        Assert.NotNull(updated);
+        Assert.NotEmpty(updated!.Edges);
         Assert.Empty(p.Edges);
     }
 

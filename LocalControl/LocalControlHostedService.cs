@@ -33,7 +33,7 @@ namespace EssSimulator.LocalControl
                 return;
 
             int emuPerGroup = Math.Max(1, _cfg.Protocol.LocalControlEmuPerGroup);
-            int emuCount = Math.Max(1, _cfg.Devices?.Count ?? 1);
+            int emuCount = _cfg.EffectiveEssUnitCount;
             var store = SimulatorHost.Instance;
 
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
@@ -70,7 +70,10 @@ namespace EssSimulator.LocalControl
         {
             var store = SimulatorHost.Instance;
             int emuPerGroup = Math.Max(1, _cfg.Protocol.LocalControlEmuPerGroup);
-            int emuCount = Math.Max(1, _cfg.Devices?.Count ?? 1);
+            int emuCount = _cfg.EffectiveEssUnitCount;
+            if (emuCount <= 0)
+                return;
+
             int lcCount = (int)Math.Ceiling(emuCount / (double)emuPerGroup);
 
             for (int attempt = 0; attempt < 120 && !stoppingToken.IsCancellationRequested; attempt++)
