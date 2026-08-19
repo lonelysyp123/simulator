@@ -40,7 +40,7 @@ namespace EssSimulator
                     var store = SimulatorHost.Instance;
                     var bmsCfg = _cfg.GetBmsDeviceConfigs();
 
-                    // BMS Modbus 服务（每个储能单元一个，端口间隔 10）
+                    // BMS Modbus 服务（每个储能通道一个）
                     for (int i = 0; i < _cfg.UnitCount; i++)
                     {
                         int port    = _cfg.Protocol.BaseBmsModbusPort + i * _cfg.Protocol.BmsPortStep;
@@ -56,7 +56,7 @@ namespace EssSimulator
                     }
 
                     // PCS (EMU) Modbus 服务
-                    int unitCount = Math.Max(1, _cfg.Devices?.Count ?? 1);
+                    int unitCount = _cfg.EffectiveEssUnitCount;
                     for (int u = 0; u < unitCount; u++)
                     {
                         int port = _cfg.Protocol.BaseEmuModbusPort + u * _cfg.Protocol.EmuPortStep;
@@ -66,6 +66,26 @@ namespace EssSimulator
                         pcs.Start();
                         SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
                         _servers.Add(pcs);
+                    }
+
+                    // 光伏 Logger / 低压电表
+                    for (int i = 0; i < _cfg.PvUnitCount; i++)
+                    {
+                        int loggerPort = _cfg.Protocol.BasePvLoggerModbusPort + i * _cfg.Protocol.PvLoggerPortStep;
+                        string loggerName = $"simPv{i + 1}";
+                        var logger = new ModbusSimServer("pv_logger.csv", loggerPort, loggerName, dataExchangeOptions: _dataExchange);
+                        store.Register(loggerName, logger);
+                        logger.Start();
+                        SimServer.serverListenInfo[loggerName] = $"Modbus TCP 端口 {loggerPort}";
+                        _servers.Add(logger);
+
+                        int meterPort = _cfg.Protocol.BasePvMeterModbusPort + i * _cfg.Protocol.PvMeterPortStep;
+                        string meterName = $"simPvMeter{i + 1}";
+                        var meter = new ModbusSimServer("pv_apm810.csv", meterPort, meterName, dataExchangeOptions: _dataExchange);
+                        store.Register(meterName, meter);
+                        meter.Start();
+                        SimServer.serverListenInfo[meterName] = $"Modbus TCP 端口 {meterPort}";
+                        _servers.Add(meter);
                     }
 
                     // 电表 Modbus 服务

@@ -98,7 +98,8 @@ namespace EssSimulator.EssDeviceSimModel
         }
 
         // 更新模组状态
-        public void Update(double packCurrent, double ambientTemp, DateTime timeStamp, TimeSpan timeStep)
+        /// <param name="nodeTempC">电池节点温度（°C），作为电芯热环境。</param>
+        public void Update(double packCurrent, double nodeTempC, DateTime timeStamp, TimeSpan timeStep)
         {
             // 计算每个电芯的电流 (考虑并联)
             double parallelCurrent = packCurrent / _config.ParallelCount;
@@ -109,7 +110,7 @@ namespace EssSimulator.EssDeviceSimModel
             {
                 for (int p = 0; p < _config.ParallelCount; p++)
                 {
-                    _cells[s][p].Update(parallelCurrent, ambientTemp, timeStamp, timeStep);
+                    _cells[s][p].Update(parallelCurrent, nodeTempC, timeStamp, timeStep);
                 }
             }
 
@@ -150,7 +151,7 @@ namespace EssSimulator.EssDeviceSimModel
             }
 
             // 4. 更新模组状态
-            UpdatePackState(packCurrent, ambientTemp, timeStamp);
+            UpdatePackState(packCurrent, nodeTempC, timeStamp);
         }
 
         // 计算并更新模组状态

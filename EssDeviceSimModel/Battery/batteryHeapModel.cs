@@ -150,7 +150,8 @@ namespace EssSimulator.EssDeviceSimModel
         }
 
         // 更新堆状态
-        public void Update(double rackCurrent, double ambientTemp, DateTime timeStamp, TimeSpan timeStep)
+        /// <param name="nodeTempC">电池节点温度（°C），作为电芯热环境。</param>
+        public void Update(double rackCurrent, double nodeTempC, DateTime timeStamp, TimeSpan timeStep)
         {
             // 计算各簇电流分配 (考虑内阻差异)
             var clusterCurrents = CalculateCurrentDistribution(rackCurrent);
@@ -162,13 +163,13 @@ namespace EssSimulator.EssDeviceSimModel
             for (int i = 0; i < _clusters.Count; i++)
             {
                 // 模拟簇间环境温度差异
-                double clusterAmbientTemp = ambientTemp + (_random.NextDouble() - 0.5) * 3; // ±1.5°C差异
+                double clusterNodeTemp = nodeTempC + (_random.NextDouble() - 0.5) * 3; // ±1.5°C差异
 
-                _clusters[i].Update(clusterCurrents[i], clusterAmbientTemp, timeStamp, timeStep);
+                _clusters[i].Update(clusterCurrents[i], clusterNodeTemp, timeStamp, timeStep);
             }
 
             // 更新堆状态
-            UpdateRackState(rackCurrent, ambientTemp, timeStamp, timeStep);
+            UpdateRackState(rackCurrent, nodeTempC, timeStamp, timeStep);
             _currentState.IsPassiveBalancing = _passiveBalanceActive && balanceDischargeSum > 0;
             _currentState.PassiveBalanceDischargeCurrentA = balanceDischargeSum;
         }

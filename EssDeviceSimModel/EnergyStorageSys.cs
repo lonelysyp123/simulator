@@ -15,6 +15,7 @@ namespace EssSimulator.EssDeviceSimModel
     using EssSimulator.EssDeviceSimModel.Propagation;
     using EssSimulator.EssDeviceSimModel.Solver;
     using EssSimulator.EssDeviceSimModel.Thermal;
+    using EssSimulator.EssDeviceSimModel.Pv;
     using EssSimulator.EssSimModelApi;
     using EssSimulator.EssSimModelApi.BatteryManagementSystem;
     using System;
@@ -49,6 +50,9 @@ namespace EssSimulator.EssDeviceSimModel
 
         /// <summary>PCS 列表，索引 i 对应第 i+1 个 PCS。与电气网络 PcsDevices 共用实例。</summary>
         public IReadOnlyList<PcsDevice> _pcsList { get; }
+
+        /// <summary>光伏单元列表（组态/配置展开；纯光伏工程可无储能通道）。</summary>
+        public IReadOnlyList<PvUnitDevice> PvUnits { get; }
 
         /// <summary>兼容旧路径：ess._batteryRack 等价于 ess._batteryRacks[0]</summary>
         [Obsolete("请使用 _batteryRacks[0]")]
@@ -131,8 +135,8 @@ namespace EssSimulator.EssDeviceSimModel
             var pcsList = new List<PcsDevice>();
             var bmsDeviceConfigs = simCfg.GetBmsDeviceConfigs();
             var pcsDeviceConfigs = simCfg.GetPcsDeviceConfigs();
-            int channelCount = Math.Max(1, bmsDeviceConfigs.Count); // PCS/BMS 通道数（= Unit*2）
-            int unitCount = Math.Max(1, simCfg.Devices?.Count ?? 1); // 储能单元数（每单元2路PCS+2路BMS）
+            int unitCount = simCfg.EffectiveEssUnitCount;
+            int channelCount = unitCount * 2;
 
             for (int i = 0; i < channelCount; i++)
             {
@@ -161,6 +165,7 @@ namespace EssSimulator.EssDeviceSimModel
             _batteryRacks = racks;
             _bmsRackDevices = bmsRackDevices;
             _pcsList      = pcsList;
+            PvUnits = CreatePvUnits(simCfg);
 
             _breaker = new Breaker();
 
@@ -219,7 +224,7 @@ namespace EssSimulator.EssDeviceSimModel
 
             if (_useElectricalPropagation)
             {
-                RadialGraph = new RadialNetworkGraph(_electricalNetwork, pccCfg, pcsCfg);
+                RadialGraph = new RadialNetworkGraph(_electricalNetwork, pccCfg, pcsCfg, PvUnits);
                 PowerSweepEngine = new RadialPowerSweepEngine(
                     RadialGraph,
                     this,
@@ -237,6 +242,35 @@ namespace EssSimulator.EssDeviceSimModel
             PlantEngine = new PlantEngine(this);
             Thermal = new PlantThermalSystem(simCfg.Runtime.Thermal, channelCount, DateTime.UtcNow);
             CouplingGraph = PlantCouplingGraph.BuildDefault(_pcsList, _bmsRackDevices);
+        }
+
+        private static IReadOnlyList<PvUnitDevice> CreatePvUnits(SimulatorConfig simCfg)
+        {
+            var list = new List<PvUnitDevice>();
+            var configs = simCfg.PvUnits ?? new List<PvUnitRuntimeConfig>();
+            for (int i = 0; i < configs.Count; i++)
+                list.Add(PvUnitDevice.FromRuntime($"pv{i + 1}", configs[i]));
+            return list;
+        }
+
+        /// <summary>
+        /// 电气步之前更新光伏出力：方阵温度/入射角 → MPPT 最大功率 → 35 kV 母线贡献。
+        /// </summary>
+        internal void StepPvUnits(DateTime simTime, TimeSpan elapsed)
+        {
+            if (PvUnits.Count == 0)
+                return;
+
+            bool gridOk = IsMainBreakerClosed && PccLineVoltageV > 1.0;
+            double freq = _electricalNetwork.SystemFrequencyHz > 1.0
+                ? _electricalNetwork.SystemFrequencyHz
+                : 50;
+
+            foreach (var pv in PvUnits)
+            {
+                pv.UpdateGridState(pv.AcNominalLineVoltageV, freq, gridOk);
+                pv.Update(simTime, elapsed);
+            }
         }
 
         /// <summary>阶段 4 起固定为 Solver 主路径 + 网络控制面。</summary>
@@ -328,6 +362,39 @@ namespace EssSimulator.EssDeviceSimModel
 
             message = $"电网额定频率 = {frequencyHz} Hz（主断闭合后 PCS 跟网、simEm.yc19 反映此值）";
             return true;
+        }
+
+        /// <summary>设定光伏方阵环境温度或光照入射角，下一步按 MPPT 重算最大放电功率。</summary>
+        public bool TrySetPvArrayClimate(int pvNumber1Based, string side, string field, double value, out string message)
+        {
+            message = string.Empty;
+            if (pvNumber1Based < 1 || pvNumber1Based > PvUnits.Count)
+            {
+                message = $"找不到 pv{pvNumber1Based}";
+                return false;
+            }
+
+            var unit = PvUnits[pvNumber1Based - 1];
+            var climate = unit.ArrayClimate(side);
+            string label = string.Equals(side, "B", StringComparison.OrdinalIgnoreCase) ? "B" : "A";
+            if (field.Equals("temperature", StringComparison.OrdinalIgnoreCase) ||
+                field.Equals("temp", StringComparison.OrdinalIgnoreCase))
+            {
+                climate.SetAmbientTemperatureC(value);
+                message = $"pv{pvNumber1Based} 方阵{label} 环境温度 = {climate.AmbientTemperatureC:0.##} ℃";
+                return true;
+            }
+
+            if (field.Equals("angle", StringComparison.OrdinalIgnoreCase) ||
+                field.Equals("incidence", StringComparison.OrdinalIgnoreCase))
+            {
+                climate.SetIncidenceAngleDeg(value);
+                message = $"pv{pvNumber1Based} 方阵{label} 入射角 = {climate.IncidenceAngleDeg:0.##} °";
+                return true;
+            }
+
+            message = "仅支持 temperature 或 angle";
+            return false;
         }
 
         /// <summary>写入 PCS 黑启动开关（含断路器联锁）；违规则返回 false 且不开启。</summary>

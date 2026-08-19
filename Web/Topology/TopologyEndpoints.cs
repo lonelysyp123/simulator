@@ -92,11 +92,15 @@ namespace EssSimulator.Web.Topology
             {
                 try
                 {
-                    var emuCount = body?.EmuCount ?? 1;
+                    var emuCount = body?.EmuCount ?? 0;
+                    var pvCount = body?.PvCount ?? 0;
+                    if (emuCount == 0 && pvCount == 0)
+                        emuCount = 1;
                     var project = TopologyScaffold.BuildRadial(
                         emuCount,
                         body?.Name,
-                        body?.IncludeLoad ?? true);
+                        body?.IncludeLoad ?? true,
+                        pvCount);
                     return Results.Ok(project);
                 }
                 catch (ArgumentOutOfRangeException ex)

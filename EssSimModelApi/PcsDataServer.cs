@@ -24,7 +24,7 @@ namespace EssSimulator.EssSimModelApi
         {
             var sim = simOpts.Value;
             var pcsPhy = pcsPhysicalOpts.Value;
-            _unitCount = Math.Max(1, sim.Devices?.Count ?? 1);
+            _unitCount = sim.EffectiveEssUnitCount;
             _autoStartPcsOnStartup = sim.Runtime.AutoStartPcsOnStartup;
 
             for (int u = 0; u < _unitCount; u++)

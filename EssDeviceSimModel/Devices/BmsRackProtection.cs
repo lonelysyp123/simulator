@@ -87,6 +87,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             var maxTempList = Enumerable.Range(0, packCount)
                 .Select(j => (float)clusterState.PackStates[j].MaxCellTemp).ToList();
 
+            // 充/放电高温与低温保护以「电芯温度」为判据（每芯独立温度，由热环境/节点温度影响散热得到）。
+
             var thr = thresholds;
             var alm = alarms;
             bool? l1, l2, l3;

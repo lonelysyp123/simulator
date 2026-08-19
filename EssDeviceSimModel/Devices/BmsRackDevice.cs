@@ -17,7 +17,6 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         private DeviceFaultState _fault = new();
         private double _ambientCelsius = 25.0;
         private double _lastLossWatts;
-        private double _thermalPowerDeratingFactor = 1.0;
 
         public BmsRackDevice(string deviceId, BatteryRackSimulator rack)
         {
@@ -47,15 +46,14 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             }
         }
 
+        /// <summary>热网络电池节点温度（°C），由 PCS–BMS 直流耦合边在每步写入；作为电芯热环境（散热效率受其影响）。</summary>
+        public double BatteryNodeTemperatureCelsius { get; private set; } = 25.0;
+
+        public void ApplyBatteryNodeTemperature(double celsius) => BatteryNodeTemperatureCelsius = celsius;
+
         public void ApplyAmbientTemperature(double ambientCelsius) => _ambientCelsius = ambientCelsius;
 
         public double GetElectricalLossWatts() => _lastLossWatts;
-
-        /// <summary>高温功率降额因子（0–1），映射到堆 MaxCharge/DischargePower。</summary>
-        public void ApplyThermalPowerDerating(double factor) =>
-            _thermalPowerDeratingFactor = Math.Clamp(factor, 0, 1);
-
-        public double ThermalPowerDeratingFactor => _thermalPowerDeratingFactor;
 
         public bool IsLinked
         {
@@ -85,11 +83,11 @@ namespace EssSimulator.EssDeviceSimModel.Devices
 
         public void Step(DeviceStepContext context, TimeSpan step) => SyncPortFromRack();
 
-        /// <summary>ESS 主循环：推进电芯/SOC 物理并刷新 DC 端口。</summary>
+        /// <summary>ESS 主循环：推进电芯/SOC 物理并刷新 DC 端口。电芯热环境使用电池节点温度。</summary>
         public void UpdatePhysics(double rackCurrent, double ambientTemp, DateTime timeStamp, TimeSpan step)
         {
             _ambientCelsius = ambientTemp;
-            _rack.Update(rackCurrent, ambientTemp, timeStamp, step);
+            _rack.Update(rackCurrent, BatteryNodeTemperatureCelsius, timeStamp, step);
             _lastLossWatts = PlantThermalSystem.EstimateRackOhmicLossWatts(_rack, rackCurrent);
             SyncPortFromRack();
         }

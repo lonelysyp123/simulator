@@ -132,30 +132,27 @@ public partial class BatteryStack
         // public float? AvailableDischargeEnergy { get; set; } // 堆可用放电容量
 
         // 限制参数
-        /// <summary>热降额因子（0–1），由热反馈写入；默认 1。</summary>
-        public float ThermalPowerDeratingFactor { get; set; } = 1f;
-
         /// <summary>
-        /// 最大允许充电功率：各簇 <see cref="ClusterBasicMeasurements.MaxChargePower"/> 之和，
-        /// 再乘柜体热降额（堆级不再独立用 SOC/电压/温度判据）。
+        /// 最大允许充电功率：各簇 <see cref="ClusterBasicMeasurements.MaxChargePower"/> 之和。
+        /// 是否降功率只由 PCS/BMS 告警与故障决定，不再乘温度降额因子。
         /// </summary>
         public float? MaxChargePower =>
             SumClusterLimits(c => c.Measurements?.MaxChargePower);
 
         /// <summary>
-        /// 最大允许放电功率：各簇最大允许放电功率之和 × 柜体热降额。
+        /// 最大允许放电功率：各簇最大允许放电功率之和。
         /// </summary>
         public float? MaxDischargePower =>
             SumClusterLimits(c => c.Measurements?.MaxDischargePower);
 
         /// <summary>
-        /// 最大允许充电电流：各簇最大允许充电电流之和 × 柜体热降额（并联簇电流累加）。
+        /// 最大允许充电电流：各簇最大允许充电电流之和（并联簇电流累加）。
         /// </summary>
         public float? MaxChargeCurrent =>
             SumClusterLimits(c => c.Measurements?.MaxChargeCurrent);
 
         /// <summary>
-        /// 最大允许放电电流：各簇最大允许放电电流之和 × 柜体热降额。
+        /// 最大允许放电电流：各簇最大允许放电电流之和。
         /// </summary>
         public float? MaxDischargeCurrent =>
             SumClusterLimits(c => c.Measurements?.MaxDischargeCurrent);
@@ -179,7 +176,7 @@ public partial class BatteryStack
             if (!any)
                 return null;
 
-            return sum * Math.Clamp(ThermalPowerDeratingFactor, 0f, 1f);
+            return sum;
         } 
 
         public float? AvailableChargeCapacity 

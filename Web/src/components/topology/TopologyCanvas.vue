@@ -64,6 +64,13 @@
             <circle :cx="sizeOf(node).w / 2" cy="42" r="14" />
             <circle :cx="sizeOf(node).w / 2" cy="78" r="14" />
           </g>
+          <g v-if="node.templateId === 'pv_unit'" fill="none" stroke="#fff" stroke-width="1.6">
+            <rect :x="sizeOf(node).w * 0.22" y="28" :width="sizeOf(node).w * 0.56" height="36" rx="2" />
+            <line :x1="sizeOf(node).w * 0.22" y1="40" :x2="sizeOf(node).w * 0.78" y2="40" />
+            <line :x1="sizeOf(node).w * 0.22" y1="52" :x2="sizeOf(node).w * 0.78" y2="52" />
+            <line :x1="sizeOf(node).w * 0.4" y1="28" :x2="sizeOf(node).w * 0.4" y2="64" />
+            <line :x1="sizeOf(node).w * 0.6" y1="28" :x2="sizeOf(node).w * 0.6" y2="64" />
+          </g>
           <g v-if="node.templateId === 'ac_breaker'" fill="none" stroke="#fff" stroke-width="2">
             <!-- 三相竖线 + 中间联动开关 -->
             <line :x1="sizeOf(node).w * 0.2" y1="18" :x2="sizeOf(node).w * 0.2" y2="42" />
@@ -212,6 +219,13 @@ function voltageHint(node) {
     return `${formatVoltage(p.primaryVoltage)}/${formatVoltage(p.secondaryVoltage)}`
   }
   if (node.templateId === 'emu') return formatVoltage(p.acVoltage)
+  if (node.templateId === 'pv_unit') {
+    const n = Number(p.inverterCount || 1)
+    const kw = Number(p.inverterRatedPowerKw || 0)
+    if (kw <= 0) return formatVoltage(p.acVoltage)
+    const inv = n > 1 ? `${n.toFixed(0)}×${kw.toFixed(0)}kW` : `${kw.toFixed(0)}kW`
+    return `${formatVoltage(p.acVoltage)} · ${inv}`
+  }
   if (node.templateId === 'dc_bus') return formatVoltage(p.nominalVoltage)
   if (node.templateId === 'bms') {
     const series = Number(p.cellSeriesCount || 0) * Number(p.packCount || 0)

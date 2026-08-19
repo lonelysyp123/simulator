@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using log4net;
 using NModbus.Data;
 using System.Threading;
+using EssSimulator.Protocol.Modbus;
 
 namespace EssSimulator
 {
@@ -244,7 +245,6 @@ namespace EssSimulator
                 return false;
             }
             // 完成slave的自我数据写入
-            object actualValue = 0;
             byte[] actualValArrary;
             foreach (var item in data)
             {
@@ -267,94 +267,16 @@ namespace EssSimulator
                     continue;
                 }
 
-                string? typeofPoint = null;
-                if (pm.First().Type == "int32")
+                try
                 {
-                    typeofPoint = "System.Int32";
+                    actualValArrary = ModbusPointCodec.Encode(item.Value, pm.First(), applyScale);
                 }
-                else if (pm.First().Type == "u32")
+                catch (Exception ex)
                 {
-                    typeofPoint = "System.UInt32";
+                    log.Warn($"Encode failed for {pm.First().ParamName}: {ex}");
+                    continue;
                 }
-                else if (pm.First().Type == "u16")
-                {
-                    typeofPoint = "System.UInt16";
-                }
-                else if (pm.First().Type == "int16")
-                {
-                    typeofPoint = "System.Int16";
-                }
-                else if (pm.First().Type == "bool")
-                {
-                    typeofPoint = "System.Boolean";
-                }
-                if (typeofPoint == null)
-                {
-                    throw new Exception("数据类型未NULL");
-                }
-
-                actualValue = item.Value;
-
-                object valueToConvert = actualValue;
-                if (applyScale)
-                {
-                    // 仿真 → Modbus 反馈：工程值 × Scale → 原始寄存器值
-                    var scale = pm.First().Scale;
-                    try
-                    {
-                        var d = Convert.ToSingle(actualValue) * scale;
-                        if (typeofPoint == "System.Int16")
-                            valueToConvert = Convert.ToInt16(Math.Round(d));
-                        else if (typeofPoint == "System.UInt16")
-                            valueToConvert = Convert.ToUInt16(Math.Round(d));
-                        else if (typeofPoint == "System.Int32")
-                            valueToConvert = Convert.ToInt32(Math.Round(d));
-                        else if (typeofPoint == "System.UInt32")
-                            valueToConvert = Convert.ToUInt32(Math.Round(d));
-                        else
-                            valueToConvert = d;
-                    }
-                    catch (Exception ex)
-                    {
-                        log.Warn($"Scale apply failed for {pm.First().ParamName}: {ex}");
-                        valueToConvert = actualValue;
-                    }
-                }
-                else
-                {
-                    // dpc / 外部 imperative：已是原始寄存器值，不再乘 Scale
-                    try
-                    {
-                        if (typeofPoint == "System.Int16")
-                            valueToConvert = Convert.ToInt16(Math.Round(Convert.ToDouble(actualValue)));
-                        else if (typeofPoint == "System.UInt16")
-                            valueToConvert = Convert.ToUInt16(Math.Round(Convert.ToDouble(actualValue)));
-                        else if (typeofPoint == "System.Int32")
-                            valueToConvert = Convert.ToInt32(Math.Round(Convert.ToDouble(actualValue)));
-                        else if (typeofPoint == "System.UInt32")
-                            valueToConvert = Convert.ToUInt32(Math.Round(Convert.ToDouble(actualValue)));
-                    }
-                    catch (Exception ex)
-                    {
-                        log.Warn($"Raw register coerce failed for {pm.First().ParamName}: {ex}");
-                    }
-                }
-
-                actualValArrary = Common.DataUnTranslation(valueToConvert, typeofPoint);
-                //3、根据点表的定义字节顺序，排列字节数组
-                // 增加校验逻辑，当数组长度为4的时候才需要排序
-                byte[] itemdata;
-                if (actualValArrary.Length == 4)
-                {
-                    string dataOrder = "CDAB";
-                    itemdata = Common.ConverByteOrder(actualValArrary, dataOrder);
-                }
-                else
-                {
-                    string dataOrder = "AB";
-                    itemdata = Common.ConverByteOrder(actualValArrary, dataOrder);
-                }
-                WriteFunc(slaveId, (ushort)currentAddress, itemdata, itemdata.Length, functionCode);
+                WriteFunc(slaveId, (ushort)currentAddress, actualValArrary, actualValArrary.Length, functionCode);
             }
             return true;
         }

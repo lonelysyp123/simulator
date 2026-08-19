@@ -14,6 +14,7 @@ const SIZE = {
   ac_meter: { w: 110, h: 72 },
   load: { w: 110, h: 72 },
   emu: { w: 140, h: 96 },
+  pv_unit: { w: 140, h: 96 },
   bms: { w: 110, h: 72 },
   dc_bus: { w: 160, h: 48 }
 }
@@ -64,6 +65,7 @@ export function templateColor(templateId) {
     case 'ac_meter': return '#8e44ad'
     case 'load': return '#c0392b'
     case 'emu': return '#16a085'
+    case 'pv_unit': return '#e6a817'
     case 'bms': return '#27ae60'
     case 'dc_bus': return '#d35400'
     default: return '#606266'

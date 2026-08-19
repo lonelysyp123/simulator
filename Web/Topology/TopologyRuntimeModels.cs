@@ -29,6 +29,7 @@ namespace EssSimulator.Web.Topology
         public string SourceProjectName { get; set; } = "";
         public DateTime GeneratedAtUtc { get; set; } = DateTime.UtcNow;
         public List<EssUnitConfig> EssUnits { get; set; } = new();
+        public List<PvUnitRuntimeConfig> PvUnits { get; set; } = new();
         public PccConfig? Pcc { get; set; }
         public TransformerConfig? Transformer { get; set; }
         public UnitTransformerConfig? UnitTransformer { get; set; }

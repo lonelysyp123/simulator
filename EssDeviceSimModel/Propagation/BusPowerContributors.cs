@@ -32,4 +32,16 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
             return new BusPowerContribution(_pcs.GetGridSideActivePower(), st.ReactivePower);
         }
     }
+
+    internal sealed class PvUnitBusContributor : IBusPowerContributor
+    {
+        private readonly Pv.PvUnitDevice _unit;
+
+        public PvUnitBusContributor(Pv.PvUnitDevice unit) => _unit = unit;
+
+        public string ContributorId => _unit.DeviceId;
+
+        public BusPowerContribution GetBusPowerContribution(DeviceStepContext context) =>
+            new(_unit.ActivePowerKw, _unit.ReactivePowerKvar);
+    }
 }

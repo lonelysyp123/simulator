@@ -1,6 +1,6 @@
 namespace EssSimulator.Web.Topology
 {
-    /// <summary>内置组态基础模板（电网 / 母线 / 断路器 / 变压器 / 电表 / 负载 / EMU / BMS / 直流母线）。</summary>
+    /// <summary>内置组态基础模板（电网 / 母线 / 断路器 / 变压器 / 电表 / 负载 / EMU / 光伏单元 / BMS / 直流母线）。</summary>
     public static class TopologyTemplates
     {
         public static IReadOnlyList<TopologyTemplate> All { get; } = BuildAll();
@@ -17,6 +17,7 @@ namespace EssSimulator.Web.Topology
             BuildAcMeter(),
             BuildLoad(),
             BuildEmu(),
+            BuildPvUnit(),
             BuildBms(),
             BuildDcBus()
         };
@@ -53,7 +54,7 @@ namespace EssSimulator.Web.Topology
             Id = "ac_bus",
             Name = "三相母线",
             Category = "母线",
-            Description = "由 A/B/C 三条独立线组成。上侧拐角每相仅接一台电压源（电网或变压器二次侧）；下侧拐角可挂多台负荷设备。无电压源时下侧拒绝接入；同一母线禁止两个电压源。",
+            Description = "由 A/B/C 三条独立线组成。上侧拐角每相仅接一台电压源（电网或变压器二次侧）或三相断路器；下侧拐角可挂多台负荷设备。带电由上一级传递：上一级带电且路径合闸，则本段母线带电。同一母线禁止两个电压源。",
             IsVoltageSource = false,
             Ports =
             {
@@ -269,6 +270,59 @@ namespace EssSimulator.Web.Topology
                 ["pcsEfficiency"] = 0.99d,
                 ["pcsCount"] = 2d,
                 ["dcVoltageMin"] = 1000d,
+                ["dcVoltageMax"] = 1500d
+            }
+        };
+
+        /// <summary>
+        /// 光伏单元：30 块组件串联为一簇 × 16 簇为单台逆变器；
+        /// 一台 35kV/690V 箱变下挂 16 台 320 kW 单向逆变器。
+        /// </summary>
+        private static TopologyTemplate BuildPvUnit() => new()
+        {
+            Id = "pv_unit",
+            Name = "光伏单元",
+            Category = "光伏",
+            Description = "内部简化为：单台逆变器 30 块 TSM-NEG21C.20Q 串联为一簇 × 16 簇、320 kW / 690 V 只放电；一台 35kV/690V 5120 kVA 箱变下挂 16 台逆变器。上方三相交流接入 35kV 集电母线。",
+            IsVoltageSource = false,
+            Ports =
+            {
+                new() { Id = "ac_a", Label = "AC-A", Kind = "ac_phase", Phase = "A", Side = "top", Offset = 0.2, VoltageParam = "acVoltage" },
+                new() { Id = "ac_b", Label = "AC-B", Kind = "ac_phase", Phase = "B", Side = "top", Offset = 0.5, VoltageParam = "acVoltage" },
+                new() { Id = "ac_c", Label = "AC-C", Kind = "ac_phase", Phase = "C", Side = "top", Offset = 0.8, VoltageParam = "acVoltage" }
+            },
+            Parameters =
+            {
+                new() { Key = "acVoltage", Label = "交流侧线电压", Type = "number", Unit = "V", Min = 100, Description = "接入 AC 母线侧额定，默认 35kV（箱变高压侧）" },
+                new() { Key = "unitXfPrimaryV", Label = "箱变一次电压", Type = "number", Unit = "V" },
+                new() { Key = "unitXfSecondaryV", Label = "箱变二次电压", Type = "number", Unit = "V", Description = "逆变器交流侧，默认 690 V（与储能 PCS 相同）" },
+                new() { Key = "unitXfRatedKva", Label = "箱变额定容量", Type = "number", Unit = "kVA", Min = 1, Description = "默认 16×320 kW = 5120 kVA" },
+                new() { Key = "moduleModel", Label = "组件型号", Type = "string" },
+                new() { Key = "modulesPerString", Label = "每簇串联块数", Type = "number", Min = 1 },
+                new() { Key = "stringCount", Label = "单台逆变器簇数", Type = "number", Min = 1 },
+                new() { Key = "inverterCount", Label = "箱变下逆变器台数", Type = "number", Min = 1, Description = "同一台 35kV/690V 箱变低压侧并联的单向逆变器数量" },
+                new() { Key = "inverterRatedPowerKw", Label = "单台逆变器额定功率", Type = "number", Unit = "kW", Min = 1 },
+                new() { Key = "inverterMaxPowerKw", Label = "单台逆变器最大功率", Type = "number", Unit = "kW", Min = 1 },
+                new() { Key = "inverterEfficiency", Label = "逆变器效率", Type = "number", Min = 0.5, Max = 1 },
+                new() { Key = "inverterAcVoltage", Label = "逆变器交流线电压", Type = "number", Unit = "V", Min = 100 },
+                new() { Key = "dcVoltageMin", Label = "直流电压下限", Type = "number", Unit = "V" },
+                new() { Key = "dcVoltageMax", Label = "直流电压上限", Type = "number", Unit = "V" }
+            },
+            DefaultParameters = new Dictionary<string, object?>
+            {
+                ["acVoltage"] = 35000d,
+                ["unitXfPrimaryV"] = 35000d,
+                ["unitXfSecondaryV"] = 690d,
+                ["unitXfRatedKva"] = 5120d,
+                ["moduleModel"] = EssDeviceSimModel.Pv.TrinaPvModuleCatalog.Neg21c20qModel,
+                ["modulesPerString"] = 30d,
+                ["stringCount"] = 16d,
+                ["inverterCount"] = 16d,
+                ["inverterRatedPowerKw"] = 320d,
+                ["inverterMaxPowerKw"] = 352d,
+                ["inverterEfficiency"] = 0.99d,
+                ["inverterAcVoltage"] = 690d,
+                ["dcVoltageMin"] = 500d,
                 ["dcVoltageMax"] = 1500d
             }
         };

@@ -96,7 +96,8 @@ namespace EssSimulator.Web
         private bool IsSimulatorReady()
         {
             var store = EssSimulator.Core.SimulatorHost.Instance;
-            return store.Contains("ess") && store.Contains("simEm") && store.Contains("simBms1");
+            return store.Contains("ess") && store.Contains("simEm")
+                && (store.Contains("simBms1") || store.Contains("simPv1"));
         }
 
         private async Task PushAll(CancellationToken ct)

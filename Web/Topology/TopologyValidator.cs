@@ -1,11 +1,22 @@
 namespace EssSimulator.Web.Topology
 {
-    /// <summary>组态连线校验：电压源独占、母线未带电拒绝、变压器匹配、电表统一 PT/CT 抽头等。</summary>
+    /// <summary>
+    /// 组态校验：编辑连线只做结构完整性；电气连接规则在保存时从上到下回放，遇到第一处问题即中断。
+    /// </summary>
     public static class TopologyValidator
     {
         private const double VoltageMatchTolerancePu = 0.02; // 2%
 
-        public static TopologyValidationResult TryConnect(TopologyProject project, TopologyEdge newEdge)
+        /// <summary>编辑连线：只检查端点/端口存在、禁止自连与重复边，不套用电气连接规则。</summary>
+        public static TopologyValidationResult TryConnect(TopologyProject project, TopologyEdge newEdge) =>
+            TryAttachEdge(project, newEdge, enforceElectricalRules: false);
+
+        /// <summary>保存回放用：结构 + 电气连接规则（相位、母线上下侧、电压匹配等）。</summary>
+        public static TopologyValidationResult ValidateConnectionRules(TopologyProject project, TopologyEdge newEdge) =>
+            TryAttachEdge(project, newEdge, enforceElectricalRules: true);
+
+        private static TopologyValidationResult TryAttachEdge(
+            TopologyProject project, TopologyEdge newEdge, bool enforceElectricalRules)
         {
             if (project == null) return Fail("PROJECT_NULL", "工程为空");
             if (newEdge == null) return Fail("EDGE_NULL", "连线为空");
@@ -31,6 +42,9 @@ namespace EssSimulator.Web.Topology
 
             if (IsDuplicateEdge(project, newEdge))
                 return Fail("DUP_EDGE", "相同端口之间已存在连接", newEdge.Id);
+
+            if (!enforceElectricalRules)
+                return new TopologyValidationResult { Ok = true, Message = "连接成功" };
 
             // 母线拐角可挂多台设备；普通设备端口仍独占
             if (PortBusyExclusive(project, fromNode, newEdge.FromPortId) ||
@@ -72,7 +86,7 @@ namespace EssSimulator.Web.Topology
             var xfmrResult = ValidateTransformerBusVoltage(fromNode, fromTpl, fromPort, toNode, toTpl, toPort, newEdge);
             if (!xfmrResult.Ok) return xfmrResult;
 
-            // EMU AC 侧电压与母线匹配
+            // EMU / 光伏单元 AC 侧电压与母线匹配
             var emuResult = ValidateEmuBusVoltage(fromNode, fromTpl, fromPort, toNode, toTpl, toPort, newEdge);
             if (!emuResult.Ok) return emuResult;
 
@@ -102,29 +116,39 @@ namespace EssSimulator.Web.Topology
 
         public static void RefreshAcBusEnergization(TopologyProject project)
         {
-            foreach (var bus in project.Nodes.Where(n => n.TemplateId == "ac_bus"))
+            var buses = project.Nodes.Where(n => n.TemplateId == "ac_bus").ToList();
+            foreach (var bus in buses)
             {
-                var sources = FindVoltageSourcesOnBus(project, bus.Id);
-                if (sources.Count == 0)
+                bus.Parameters["energized"] = false;
+                bus.Parameters["sourceNodeId"] = null;
+            }
+
+            bool changed;
+            var guard = 0;
+            do
+            {
+                changed = false;
+                foreach (var bus in buses)
                 {
-                    bus.Parameters["energized"] = false;
-                    // 保留用户预填 nominalVoltage；若仅由源写入则可清零
-                    if (!bus.Parameters.ContainsKey("nominalVoltageLocked") ||
-                        !(bus.Parameters["nominalVoltageLocked"] is bool b && b))
+                    var sources = FindVoltageSourcesOnBus(project, bus.Id);
+                    if (sources.Count == 0)
+                        continue;
+
+                    var src = sources[0];
+                    bool was = IsTruthy(bus.Parameters, "energized");
+                    double oldV = TopologyParamHelper.GetDouble(bus.Parameters, "nominalVoltage", 0);
+                    string? oldSrc = bus.Parameters.TryGetValue("sourceNodeId", out var raw)
+                        ? raw?.ToString()
+                        : null;
+                    if (!was || Math.Abs(oldV - src.voltage) > 0.01 || oldSrc != src.sourceNodeId)
                     {
-                        // 不断开时若无源，电压记 0 表示未带电
-                        bus.Parameters["sourceNodeId"] = null;
-                        bus.Parameters["energized"] = false;
+                        bus.Parameters["energized"] = true;
+                        bus.Parameters["sourceNodeId"] = src.sourceNodeId;
+                        bus.Parameters["nominalVoltage"] = src.voltage;
+                        changed = true;
                     }
                 }
-                else
-                {
-                    var src = sources[0];
-                    bus.Parameters["energized"] = true;
-                    bus.Parameters["sourceNodeId"] = src.sourceNodeId;
-                    bus.Parameters["nominalVoltage"] = src.voltage;
-                }
-            }
+            } while (changed && ++guard < 32);
         }
 
         private static TopologyValidationResult ValidateAcBusConnection(
@@ -197,14 +221,6 @@ namespace EssSimulator.Web.Topology
                 return Fail(
                     "BUS_BOTTOM_LOAD_ONLY",
                     $"母线「{bus.Label}」下侧拐角用于挂载设备，电压源「{other.Label}」请接到上侧拐角。",
-                    newEdge.Id);
-            }
-
-            if (existingSources.Count == 0)
-            {
-                return Fail(
-                    "BUS_NO_SOURCE",
-                    $"母线「{bus.Label}」尚未接入电压源，拒绝接入设备「{other.Label}」。请先在上侧连接电网或变压器二次侧。",
                     newEdge.Id);
             }
 
@@ -294,25 +310,33 @@ namespace EssSimulator.Web.Topology
             return Ok();
         }
 
+        private static bool IsAcFeederUnit(string templateId) =>
+            templateId == "emu" || templateId == "pv_unit";
+
         private static TopologyValidationResult ValidateEmuBusVoltage(
             TopologyNode a, TopologyTemplate aTpl, TopologyPortDef aPort,
             TopologyNode b, TopologyTemplate bTpl, TopologyPortDef bPort,
             TopologyEdge newEdge)
         {
-            TopologyNode? emu = null; TopologyPortDef? emuPort = null; TopologyNode? bus = null;
-            if (a.TemplateId == "emu" && b.TemplateId == "ac_bus")
-            { emu = a; emuPort = aPort; bus = b; }
-            else if (b.TemplateId == "emu" && a.TemplateId == "ac_bus")
-            { emu = b; emuPort = bPort; bus = a; }
+            TopologyNode? unit = null; TopologyPortDef? unitPort = null; TopologyNode? bus = null;
+            if (IsAcFeederUnit(a.TemplateId) && b.TemplateId == "ac_bus")
+            { unit = a; unitPort = aPort; bus = b; }
+            else if (IsAcFeederUnit(b.TemplateId) && a.TemplateId == "ac_bus")
+            { unit = b; unitPort = bPort; bus = a; }
             else return Ok();
 
-            if (!emuPort!.Kind.StartsWith("ac")) return Ok();
+            if (!unitPort!.Kind.StartsWith("ac")) return Ok();
 
-            double emuV = TopologyParamHelper.GetDouble(emu!.Parameters, "acVoltage", 0);
+            double unitV = TopologyParamHelper.GetDouble(unit!.Parameters, "acVoltage", 0);
             double busV = TopologyParamHelper.GetDouble(bus!.Parameters, "nominalVoltage", 0);
-            if (busV > 1 && !VoltageMatches(busV, emuV))
-                return Fail("EMU_BUS_MISMATCH",
-                    $"EMU「{emu.Label}」交流侧 {emuV:0.##} V 与母线「{bus.Label}」{busV:0.##} V 不匹配", newEdge.Id);
+            if (busV > 1 && !VoltageMatches(busV, unitV))
+            {
+                bool pv = unit.TemplateId == "pv_unit";
+                return Fail(
+                    pv ? "PV_BUS_MISMATCH" : "EMU_BUS_MISMATCH",
+                    $"{(pv ? "光伏单元" : "EMU")}「{unit.Label}」交流侧 {unitV:0.##} V 与母线「{bus.Label}」{busV:0.##} V 不匹配",
+                    newEdge.Id);
+            }
 
             return Ok();
         }
@@ -385,6 +409,7 @@ namespace EssSimulator.Web.Topology
             TopologyProject project, string busId)
         {
             var list = new List<(string, double)>();
+            var visited = new HashSet<string>(StringComparer.Ordinal) { busId };
             foreach (var e in project.Edges)
             {
                 string? otherId = null;
@@ -399,11 +424,15 @@ namespace EssSimulator.Web.Topology
                 var port = tpl?.Ports.FirstOrDefault(p => p.Id == otherPortId);
                 if (port == null) continue;
 
-                // 三相断路器合闸时透明穿越，查找对侧电压源
                 if (other.TemplateId == "ac_breaker")
                 {
-                    if (!IsBreakerClosed(other)) continue;
-                    list.AddRange(FindVoltageSourcesBehindBreaker(project, other, otherPortId!));
+                    list.AddRange(CollectLiveThroughBreaker(project, other, otherPortId!, visited));
+                    continue;
+                }
+
+                if (other.TemplateId == "ac_bus")
+                {
+                    list.AddRange(LiveFromEnergizedBus(other));
                     continue;
                 }
 
@@ -417,12 +446,17 @@ namespace EssSimulator.Web.Topology
                 .ToList();
         }
 
-        /// <summary>经断路器对侧端口查找电压源（合闸时）。</summary>
+        /// <summary>经断路器对侧查找带电上一级（合闸时）：电压源、已带电母线，或再经合闸断路器穿越。</summary>
         private static List<(string sourceNodeId, double voltage)> FindVoltageSourcesBehindBreaker(
-            TopologyProject project, TopologyNode breaker, string portFacingBus)
+            TopologyProject project, TopologyNode breaker, string portFacingBus) =>
+            CollectLiveThroughBreaker(project, breaker, portFacingBus, new HashSet<string>(StringComparer.Ordinal));
+
+        private static List<(string sourceNodeId, double voltage)> CollectLiveThroughBreaker(
+            TopologyProject project, TopologyNode breaker, string portFacingBus, HashSet<string> visited)
         {
             var list = new List<(string, double)>();
             if (!IsBreakerClosed(breaker)) return list;
+            if (!visited.Add(breaker.Id)) return list;
 
             string? opposite = OppositeBreakerPort(portFacingBus);
             if (opposite == null) return list;
@@ -438,17 +472,50 @@ namespace EssSimulator.Web.Topology
                 else continue;
 
                 var other = FindNode(project, otherId);
-                if (other == null) continue;
-                var tpl = TopologyTemplates.Get(other.TemplateId);
-                var port = tpl?.Ports.FirstOrDefault(p => p.Id == otherPortId);
-                if (port == null || !port.IsVoltageSourcePort) continue;
-                list.Add((other.Id, PortVoltage(other, port)));
+                if (other == null || otherPortId == null) continue;
+                list.AddRange(CollectLiveAt(project, other, otherPortId, visited));
             }
 
             return list
                 .GroupBy(x => x.Item1)
                 .Select(g => g.First())
                 .ToList();
+        }
+
+        private static List<(string sourceNodeId, double voltage)> CollectLiveAt(
+            TopologyProject project, TopologyNode node, string portId, HashSet<string> visited)
+        {
+            if (node.TemplateId == "ac_breaker")
+                return CollectLiveThroughBreaker(project, node, portId, visited);
+
+            if (node.TemplateId == "ac_bus")
+                return LiveFromEnergizedBus(node);
+
+            var tpl = TopologyTemplates.Get(node.TemplateId);
+            var port = tpl?.Ports.FirstOrDefault(p => p.Id == portId);
+            if (port == null || !port.IsVoltageSourcePort)
+                return new List<(string, double)>();
+            return new List<(string, double)> { (node.Id, PortVoltage(node, port)) };
+        }
+
+        private static List<(string sourceNodeId, double voltage)> LiveFromEnergizedBus(TopologyNode bus)
+        {
+            var list = new List<(string, double)>();
+            if (!IsTruthy(bus.Parameters, "energized")) return list;
+            double v = TopologyParamHelper.GetDouble(bus.Parameters, "nominalVoltage", 0);
+            if (v > 1)
+                list.Add((BusSourceId(bus), v));
+            return list;
+        }
+
+        private static string BusSourceId(TopologyNode bus)
+        {
+            if (bus.Parameters.TryGetValue("sourceNodeId", out var raw) && raw != null)
+            {
+                var s = raw.ToString();
+                if (!string.IsNullOrWhiteSpace(s)) return s;
+            }
+            return bus.Id;
         }
 
         private static string? OppositeBreakerPort(string portId) => portId switch
@@ -621,7 +688,8 @@ namespace EssSimulator.Web.Topology
         }
 
         /// <summary>
-        /// 成组连接：先 ExpandBundle，再逐条校验并写入；任一条失败则整组回滚（不修改入参 project）。
+        /// 成组连接（编辑）：先 ExpandBundle，再逐条写入；不做电气规则校验。
+        /// 任一条结构失败则整组回滚（不修改入参 project）。
         /// </summary>
         public static TopologyValidationResult TryConnectBundle(
             TopologyProject project,
@@ -666,7 +734,7 @@ namespace EssSimulator.Web.Topology
         }
 
         /// <summary>
-        /// 保存工程前的合理性检查：须有电网；有且仅有一个主断路器；有且仅有一个并网点电表。
+        /// 保存工程：先查电网/主断/并网点电表，再按画布从上到下回放连线套用电气规则，遇到第一处问题即中断。
         /// </summary>
         public static TopologyValidationResult ValidateProjectForSave(TopologyProject project)
         {
@@ -717,6 +785,31 @@ namespace EssSimulator.Web.Topology
                     details: details, problemNodeIds: pccMeters.Select(n => n.Id).ToList());
             }
 
+            var work = CloneProject(project);
+            work.Edges.Clear();
+            RefreshAcBusEnergization(work);
+
+            foreach (var edge in OrderEdgesTopToBottom(project))
+            {
+                var replay = CloneEdge(edge);
+                replay.Id = string.IsNullOrWhiteSpace(edge.Id) ? replay.Id : edge.Id;
+                var rule = ValidateConnectionRules(work, replay);
+                if (!rule.Ok)
+                {
+                    if (rule.Details.Count == 0)
+                        rule.Details.Add(rule.Message);
+                    if (rule.ProblemNodeIds.Count == 0)
+                    {
+                        rule.ProblemNodeIds = new List<string> { edge.FromNodeId, edge.ToNodeId }
+                            .Distinct(StringComparer.Ordinal)
+                            .ToList();
+                    }
+                    return rule;
+                }
+
+                ApplyConnect(work, replay);
+            }
+
             return new TopologyValidationResult
             {
                 Ok = true,
@@ -728,6 +821,20 @@ namespace EssSimulator.Web.Topology
                     $"并网点电表：{pccMeters[0].Label}"
                 }
             };
+        }
+
+        private static IEnumerable<TopologyEdge> OrderEdgesTopToBottom(TopologyProject project)
+        {
+            double YOf(string id) => FindNode(project, id)?.Y ?? 0;
+            double XOf(string id) => FindNode(project, id)?.X ?? 0;
+            return project.Edges
+                .OrderBy(e => Math.Min(YOf(e.FromNodeId), YOf(e.ToNodeId)))
+                .ThenBy(e => Math.Min(XOf(e.FromNodeId), XOf(e.ToNodeId)))
+                .ThenBy(e => e.FromNodeId, StringComparer.Ordinal)
+                .ThenBy(e => e.FromPortId, StringComparer.Ordinal)
+                .ThenBy(e => e.ToNodeId, StringComparer.Ordinal)
+                .ThenBy(e => e.ToPortId, StringComparer.Ordinal)
+                .ThenBy(e => e.Id, StringComparer.Ordinal);
         }
 
         private static int PhaseOrder(string? phase) => phase?.ToUpperInvariant() switch

@@ -135,11 +135,18 @@ namespace EssSimulator.Web
                 var info = new
                 {
                     em = new { name = "simEm", port = c.Protocol.EmModbusPort },
-                    bms = Enumerable.Range(0, Math.Max(1, c.UnitCount))
+                    bms = Enumerable.Range(0, c.UnitCount)
                         .Select(i => new { name = $"simBms{i + 1}", port = c.Protocol.BaseBmsModbusPort + i * c.Protocol.BmsPortStep })
                         .ToArray(),
-                    emu = Enumerable.Range(0, Math.Max(1, c.Devices?.Count ?? 1))
+                    emu = Enumerable.Range(0, c.EffectiveEssUnitCount)
                         .Select(i => new { name = $"simEmu{i + 1}", port = c.Protocol.BaseEmuModbusPort + i * c.Protocol.EmuPortStep })
+                        .ToArray(),
+                    pv = Enumerable.Range(0, c.PvUnitCount)
+                        .Select(i => new
+                        {
+                            logger = new { name = $"simPv{i + 1}", port = c.Protocol.BasePvLoggerModbusPort + i * c.Protocol.PvLoggerPortStep },
+                            meter = new { name = $"simPvMeter{i + 1}", port = c.Protocol.BasePvMeterModbusPort + i * c.Protocol.PvMeterPortStep }
+                        })
                         .ToArray()
                 };
                 return Results.Ok(info);
@@ -190,6 +197,30 @@ namespace EssSimulator.Web
                         dataMaps = srv?.DataMaps,
                         controlMaps = srv?.ControlMaps
                     });
+                }
+                int pv = 1;
+                while (store.Contains($"simPv{pv}"))
+                {
+                    var srv = store.Get<ModbusSimServer>($"simPv{pv}");
+                    devices.Add(new
+                    {
+                        device = $"simPv{pv}",
+                        dataMaps = srv?.DataMaps,
+                        controlMaps = srv?.ControlMaps
+                    });
+                    pv++;
+                }
+                int pvMeter = 1;
+                while (store.Contains($"simPvMeter{pvMeter}"))
+                {
+                    var srv = store.Get<ModbusSimServer>($"simPvMeter{pvMeter}");
+                    devices.Add(new
+                    {
+                        device = $"simPvMeter{pvMeter}",
+                        dataMaps = srv?.DataMaps,
+                        controlMaps = srv?.ControlMaps
+                    });
+                    pvMeter++;
                 }
                 return Results.Ok(devices);
             });
@@ -290,7 +321,8 @@ namespace EssSimulator.Web
         private static bool IsSimulatorReady()
         {
             var store = SimulatorHost.Instance;
-            return store.Contains("ess") && store.Contains("simEm") && store.Contains("simBms1");
+            return store.Contains("ess") && store.Contains("simEm")
+                && (store.Contains("simBms1") || store.Contains("simPv1"));
         }
 
         private static IResult FromCommandResult(CommandResult result) =>

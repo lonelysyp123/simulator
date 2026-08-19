@@ -18,7 +18,8 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
         public RadialNetworkGraph(
             ElectricalNetwork network,
             PccConfig pccCfg,
-            PcsPhysicalConfig pcsCfg)
+            PcsPhysicalConfig pcsCfg,
+            IReadOnlyList<Pv.PvUnitDevice>? pvUnits = null)
         {
             Network = network;
             _pccCfg = pccCfg;
@@ -39,7 +40,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
 
             UnitBuses690 = unitBuses;
 
-            RegisterContributors(network);
+            RegisterContributors(network, pvUnits);
             RegisterVoltageSources(network);
             WireCouplers(network);
             _log.Info(
@@ -95,9 +96,16 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 sweep.SystemFrequencyHz);
         }
 
-        private void RegisterContributors(ElectricalNetwork network)
+        private void RegisterContributors(
+            ElectricalNetwork network,
+            IReadOnlyList<Pv.PvUnitDevice>? pvUnits)
         {
             Bus35.RegisterContributor(new LoadBusContributor(network.Load));
+            if (pvUnits != null)
+            {
+                foreach (var pv in pvUnits)
+                    Bus35.RegisterContributor(new PvUnitBusContributor(pv));
+            }
 
             for (int u = 0; u < UnitBuses690.Count; u++)
             {

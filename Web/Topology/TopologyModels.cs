@@ -106,8 +106,10 @@ namespace EssSimulator.Web.Topology
 
     public sealed class ScaffoldRequest
     {
-        /// <summary>EMU 单元数，1–20。</summary>
-        public int EmuCount { get; set; } = 1;
+        /// <summary>EMU 储能单元数，0–20；与 PvCount 至少一个大于 0。缺省且未给光伏时按 1。</summary>
+        public int? EmuCount { get; set; }
+        /// <summary>光伏单元数，0–20。</summary>
+        public int? PvCount { get; set; }
         public string? Name { get; set; }
         public bool IncludeLoad { get; set; } = true;
     }
