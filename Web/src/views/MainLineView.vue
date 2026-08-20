@@ -85,7 +85,7 @@
 
     <div class="card">
       <p class="card-title">
-        电气主接线
+        电站概览
         <span class="card-hint">
           {{ useTopologyMainLine
             ? '工程模式：经典单线图 · 右键平移 · Ctrl/⌘+滚轮缩放'
@@ -148,7 +148,7 @@
       </el-table>
     </div>
 
-    <div class="card">
+    <div v-if="unitRows.length" class="card">
       <p class="card-title">储能单元明细</p>
       <el-table :data="unitRows" size="small" border stripe>
         <el-table-column prop="unit" label="UNIT" width="80" fixed />
@@ -157,6 +157,18 @@
         <el-table-column label="PCS-B" min-width="240"><template #default="{ row }">{{ row.pcsB }}</template></el-table-column>
         <el-table-column label="舱-A" min-width="200"><template #default="{ row }">{{ row.bmsA }}</template></el-table-column>
         <el-table-column label="舱-B" min-width="200"><template #default="{ row }">{{ row.bmsB }}</template></el-table-column>
+      </el-table>
+    </div>
+
+    <div v-if="pvRows.length" class="card">
+      <p class="card-title">光伏单元明细</p>
+      <el-table :data="pvRows" size="small" border stripe>
+        <el-table-column prop="pv" label="PV" width="80" fixed />
+        <el-table-column label="状态" min-width="140"><template #default="{ row }">{{ row.status }}</template></el-table-column>
+        <el-table-column label="有功 P" min-width="180"><template #default="{ row }">{{ row.activePower }}</template></el-table-column>
+        <el-table-column label="无功 Q" min-width="180"><template #default="{ row }">{{ row.reactivePower }}</template></el-table-column>
+        <el-table-column label="方阵-A" min-width="320"><template #default="{ row }">{{ row.arrayA }}</template></el-table-column>
+        <el-table-column label="方阵-B" min-width="320"><template #default="{ row }">{{ row.arrayB }}</template></el-table-column>
       </el-table>
     </div>
   </div>
@@ -170,7 +182,7 @@ import { useRealtime, RealtimeMethods, RealtimeChannels } from '@/services/useRe
 import MainLineSvg from '@/components/MainLineSvg.vue'
 import TopologyMainLineSvg from '@/components/TopologyMainLineSvg.vue'
 
-const snap = ref({ units: [] })
+const snap = ref({ units: [], pvUnits: [] })
 const useTopologyMainLine = computed(() =>
   !!(snap.value.engineeringMode && snap.value.topology?.nodes?.length)
 )
@@ -251,7 +263,7 @@ function fmtBmsChannel(ch) {
   if (!ch) return '—'
   const energy = ch.bmsEnergy || `累计充 ${(ch.cumulativeChargeEnergyKwh ?? 0).toFixed(1)} / 放 ${(ch.cumulativeDischargeEnergyKwh ?? 0).toFixed(1)} kWh`
   const run = ch.bmsRunStatus || '运行:—'
-  return `${ch.bmsCompact} | ${run} | ${energy} | 并网:${ch.gridConnect} | ${ch.bmsBlackStart}`
+  return [ch.bmsCompact, run, energy, `并网:${ch.gridConnect}`, ch.bmsBlackStart, ch.bmsAirConditioner].filter(Boolean).join(' | ')
 }
 
 const breakerLabel = computed(() =>
@@ -316,6 +328,28 @@ const unitRows = computed(() => (snap.value.units || []).map(u => ({
   pcsB: fmtPcsChannel(u.channelB),
   bmsA: fmtBmsChannel(u.channelA),
   bmsB: fmtBmsChannel(u.channelB)
+})))
+
+function fmtPvArray(a) {
+  if (!a) return '—'
+  const parts = [
+    `辐照 ${Number(a.planeOfArrayWm2 || 0).toFixed(0)} W/m²`,
+    `电池 ${Number(a.cellTemperatureC || 0).toFixed(1)}℃`,
+    `入射角 ${Number(a.incidenceAngleDeg || 0).toFixed(0)}°`,
+    `DC ${Number(a.dcVoltageV || 0).toFixed(0)}V / ${Number(a.dcCurrentA || 0).toFixed(0)}A`,
+    `出力 ${fmtKw(a.activePowerKw)}`
+  ]
+  if (a.limitReason) parts.push(`限电:${a.limitReason}`)
+  return parts.join(' ')
+}
+
+const pvRows = computed(() => (snap.value.pvUnits || []).map(p => ({
+  pv: `PV ${p.pvNumber ?? p.pvIndex + 1}`,
+  status: `${p.running ? '运行' : '待机'} | 并网设备 ${p.gridConnectedDeviceCount ?? 0} 台`,
+  activePower: `设 ${fmtKw(p.targetActivePowerKw)} / 实 ${fmtKw(p.activePowerKw)}`,
+  reactivePower: `设 ${fmtKvar(p.targetReactivePowerKvar)} / 实 ${fmtKvar(p.reactivePowerKvar)}`,
+  arrayA: fmtPvArray(p.arrayA),
+  arrayB: fmtPvArray(p.arrayB)
 })))
 
 async function runChannelCommand(input) {

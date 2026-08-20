@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "sourceProjectId": "3ff3291825f0e19fc6be1a83",
   "sourceProjectName": "\u5E38\u7528\u50A8\u80FD\u7535\u7AD9",
-  "generatedAtUtc": "2026-08-19T00:03:06.232173Z",
+  "generatedAtUtc": "2026-08-20T01:00:38.993801Z",
   "essUnits": [
     {
       "name": "EMU \u50A8\u80FD\u5355\u5143",
@@ -437,7 +437,14 @@
     "blackStartFrequencyRampHzPerSec": 12,
     "blackStartReactiveVoltageGainKvarPerV": 4,
     "blackStartCurrentLimitFraction": 0.45,
-    "blackStartSteadyLossShareMode": "AllOnBus"
+    "blackStartSteadyLossShareMode": "AllOnBus",
+    "transientSubStepMs": 10,
+    "voltageControllerTauMs": 15,
+    "inrushPeakMultiplier": 6,
+    "inrushDecayTauMs": 300,
+    "inrushTriggerVoltageFrac": 0.15,
+    "dvDtTripThresholdVPerSec": 500,
+    "dvDtRideThroughMs": 100
   },
   "load": {
     "activePowerPlan": 0,

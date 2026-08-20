@@ -17,11 +17,11 @@
           <div class="menu-group-label">电气接线</div>
           <el-menu-item index="/mainline">
             <el-icon><Connection /></el-icon>
-            <span>主电气接线</span>
+            <span>电站概览</span>
           </el-menu-item>
           <el-menu-item v-if="allowMainline3d" index="/mainline-3d">
             <el-icon><Monitor /></el-icon>
-            <span>主接线 3D（增强）</span>
+            <span>数字孪生</span>
           </el-menu-item>
           <el-menu-item v-if="allowTopologyEditor" index="/topology">
             <el-icon><EditPen /></el-icon>

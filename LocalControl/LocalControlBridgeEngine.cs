@@ -10,6 +10,35 @@ namespace EssSimulator.LocalControl
         private readonly ILog _log;
         private readonly Dictionary<string, double> _controlShadow = new();
 
+        /// <summary>EMU 点名（对应 emu.csv）——遥测读取与控制下发共用。</summary>
+        private const string EmuPcs1Vab = "yc20";
+        private const string EmuPcs1Vbc = "yc21";
+        private const string EmuPcs1Vca = "yc22";
+        private const string EmuPcs1Freq = "yc23";
+        private const string EmuPcs1Status = "yc44";
+        private const string EmuPcs1Alarm = "yc45";
+        private const string EmuPcs1Fault = "yc46";
+        private const string EmuPcs1BlackStart = "yx2";
+        private const string EmuPcs1StartStop = "yx3";
+        private const string EmuPcs1ActivePower = "yt0";
+        private const string EmuPcs1ReactivePower = "yt1";
+        private const string EmuPcs1IslandV = "yt3";
+
+        private const string EmuPcs2Vab = "yc47";
+        private const string EmuPcs2Vbc = "yc48";
+        private const string EmuPcs2Vca = "yc49";
+        private const string EmuPcs2Freq = "yc50";
+        private const string EmuPcs2Status = "yc71";
+        private const string EmuPcs2Alarm = "yc72";
+        private const string EmuPcs2Fault = "yc73";
+        private const string EmuPcs2BlackStart = "yx4";
+        private const string EmuPcs2StartStop = "yx5";
+        private const string EmuPcs2ActivePower = "yt4";
+        private const string EmuPcs2ReactivePower = "yt5";
+        private const string EmuPcs2IslandV = "yt7";
+
+        private const string EmuHvBreaker = "yx0";
+
         public LocalControlBridgeEngine(ILog log) => _log = log;
 
         public void RunCycle(
@@ -61,14 +90,14 @@ namespace EssSimulator.LocalControl
                 }
 
                 bool slot0 = (localPcs % 2) == 0;
-                string faultParam = slot0 ? "param27" : "param54";
-                string alarmParam = slot0 ? "param26" : "param53";
-                string statusParam = slot0 ? "param25" : "param52";
-                string freqParam = slot0 ? "param4" : "param31";
-                string vabParam = slot0 ? "param1" : "param28";
-                string vbcParam = slot0 ? "param2" : "param29";
-                string vcaParam = slot0 ? "param3" : "param30";
-                string blackStartParam = slot0 ? "pcs1_blackstart_enable" : "pcs2_blackstart_enable";
+                string faultParam = slot0 ? EmuPcs1Fault : EmuPcs2Fault;
+                string alarmParam = slot0 ? EmuPcs1Alarm : EmuPcs2Alarm;
+                string statusParam = slot0 ? EmuPcs1Status : EmuPcs2Status;
+                string freqParam = slot0 ? EmuPcs1Freq : EmuPcs2Freq;
+                string vabParam = slot0 ? EmuPcs1Vab : EmuPcs2Vab;
+                string vbcParam = slot0 ? EmuPcs1Vbc : EmuPcs2Vbc;
+                string vcaParam = slot0 ? EmuPcs1Vca : EmuPcs2Vca;
+                string blackStartParam = slot0 ? EmuPcs1BlackStart : EmuPcs2BlackStart;
 
                 int faultLc = localPcs < 4 ? 4 + localPcs : 32 + (localPcs - 4);
                 int alarmLc = localPcs < 4 ? 8 + localPcs : 36 + (localPcs - 4);
@@ -84,7 +113,7 @@ namespace EssSimulator.LocalControl
                 var vbcVal = ReadParamOrDefault(emu, vbcParam);
                 var vcaVal = ReadParamOrDefault(emu, vcaParam);
                 var blackStartVal = ReadParamOrDefault(emu, blackStartParam);
-                var hvBreakerVal = ReadParamOrDefault(emu, "highvoltagebreakeronoff");
+                var hvBreakerVal = ReadParamOrDefault(emu, EmuHvBreaker);
 
                 anyFault |= ModbusValueConverter.ToDouble(faultVal) != 0;
                 allBlackStart &= ModbusValueConverter.ToDouble(blackStartVal) != 0;
@@ -126,10 +155,10 @@ namespace EssSimulator.LocalControl
                     continue;
 
                 bool slot0 = (localPcs % 2) == 0;
-                string startStopTarget = slot0 ? "pcs1_startstop" : "pcs2_startstop";
-                string pTarget = slot0 ? "param55" : "param59";
-                string qTarget = slot0 ? "param56" : "param60";
-                string islandVTarget = slot0 ? "param64" : "param65";
+                string startStopTarget = slot0 ? EmuPcs1StartStop : EmuPcs2StartStop;
+                string pTarget = slot0 ? EmuPcs1ActivePower : EmuPcs2ActivePower;
+                string qTarget = slot0 ? EmuPcs1ReactivePower : EmuPcs2ReactivePower;
+                string islandVTarget = slot0 ? EmuPcs1IslandV : EmuPcs2IslandV;
 
                 int startStopLc = localPcs < 4 ? 60 + localPcs : 80 + (localPcs - 4);
                 int pLc = localPcs < 4 ? 64 + localPcs : 84 + (localPcs - 4);
@@ -170,8 +199,8 @@ namespace EssSimulator.LocalControl
                 if (emu == null || !emu.IsOnline)
                     continue;
 
-                success &= TryPublishControlWithLog(emu, "pcs1_blackstart_enable", blackStartGlobal, asBool: true, $"{lcName}.{lcParam}");
-                success &= TryPublishControlWithLog(emu, "pcs2_blackstart_enable", blackStartGlobal, asBool: true, $"{lcName}.{lcParam}");
+                success &= TryPublishControlWithLog(emu, EmuPcs1BlackStart, blackStartGlobal, asBool: true, $"{lcName}.{lcParam}");
+                success &= TryPublishControlWithLog(emu, EmuPcs2BlackStart, blackStartGlobal, asBool: true, $"{lcName}.{lcParam}");
             }
 
             if (success)
@@ -210,7 +239,7 @@ namespace EssSimulator.LocalControl
 
                 success &= TryPublishControlWithLog(
                     emu,
-                    "highvoltagebreakeronoff",
+                    EmuHvBreaker,
                     hvClosed ? 1 : 0,
                     asBool: true,
                     $"{lcName}.{lcParam}");
@@ -320,8 +349,8 @@ namespace EssSimulator.LocalControl
                     break;
                 }
 
-                enabled &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, "pcs1_blackstart_enable")) != 0;
-                enabled &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, "pcs2_blackstart_enable")) != 0;
+                enabled &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, EmuPcs1BlackStart)) != 0;
+                enabled &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, EmuPcs2BlackStart)) != 0;
             }
 
             double val = enabled ? 1 : 0;
@@ -354,7 +383,7 @@ namespace EssSimulator.LocalControl
                     break;
                 }
 
-                closed &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, "highvoltagebreakeronoff")) != 0;
+                closed &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, EmuHvBreaker)) != 0;
             }
 
             double val = closed ? 0xEE : 0xAA;

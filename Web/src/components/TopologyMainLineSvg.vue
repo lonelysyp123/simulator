@@ -872,6 +872,7 @@ const BmsCard = defineComponent({
       const lines = [
         ch.bmsCompact,
         ch.bmsRunStatus || '运行:—',
+        ch.bmsAirConditioner,
         ch.bmsEnergy || `累计充 ${(ch.cumulativeChargeEnergyKwh ?? 0).toFixed(1)} / 放 ${(ch.cumulativeDischargeEnergyKwh ?? 0).toFixed(1)} kWh`,
         `并网:${ch.gridConnect}`,
         ch.bmsBlackStart

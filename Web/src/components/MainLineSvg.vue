@@ -267,7 +267,7 @@ const BRANCH = {
   pcsTop: 24,
   pcsH: 228,
   gap: 28,
-  bmsH: 198,
+  bmsH: 214,
   get bmsTop() { return this.pcsTop + this.pcsH + this.gap },
   get linkMid() { return this.pcsTop + this.pcsH + this.gap / 2 },
   get bottomY() { return 96 + this.bmsTop + this.bmsH }
@@ -415,6 +415,7 @@ const ChannelBranch = defineComponent({
       const bmsLines = [
         ch.bmsCompact,
         ch.bmsRunStatus || '运行:—',
+        ch.bmsAirConditioner,
         ch.bmsEnergy || `累计充 ${(ch.cumulativeChargeEnergyKwh ?? 0).toFixed(1)} / 放 ${(ch.cumulativeDischargeEnergyKwh ?? 0).toFixed(1)} kWh`,
         `并网:${ch.gridConnect}`,
         ch.bmsBlackStart

@@ -30,7 +30,7 @@
             <el-option
               v-for="p in projects"
               :key="p.id"
-              :label="`${p.name}（EMU×${p.emuCount} · 节点 ${p.nodeCount}）`"
+              :label="`${p.name}（储能×${p.emuCount} · 光伏×${p.pvCount ?? 0} · 节点 ${p.nodeCount}）`"
               :value="p.id"
             />
           </el-select>
@@ -41,7 +41,8 @@
           <el-tag :type="state.source === 'topology' ? 'warning' : 'info'" size="small">
             {{ state.source === 'topology' ? '组态工程' : 'appsettings.json' }}
           </el-tag>
-          <span class="meta">单元数 {{ state.runtimeUnitCount }}</span>
+          <span class="meta">储能单元 {{ state.runtimeUnitCount }}</span>
+          <span class="meta">光伏单元 {{ state.runtimePvUnitCount }}</span>
           <span v-if="state.activeProjectName" class="meta">工程：{{ state.activeProjectName }}</span>
         </el-form-item>
 
@@ -69,7 +70,7 @@
       <ul class="tips">
         <li>请先在「工程管理 / 组态编辑」中搭建并<strong>保存工程</strong>，再回到本页选择。</li>
         <li>确认后将按工程中的 EMU 数量生成储能单元，并重启后端以重建设备与 Modbus 端口。</li>
-        <li>主电气接线图会随单元数量自动更新；当前仍按标准径向接线展开（220→35→690）。</li>
+        <li>电站概览图会随单元数量自动更新；当前仍按标准径向接线展开（220→35→690）。</li>
         <li>重启期间页面会短暂不可用，开发模式下 <code>dev-up.sh</code> 会自动拉起后端。</li>
       </ul>
     </div>
@@ -92,6 +93,7 @@ const previewNotes = ref([])
 const state = reactive({
   source: 'appsettings',
   runtimeUnitCount: 0,
+  runtimePvUnitCount: 0,
   activeProjectName: '',
   activeProjectId: null
 })
@@ -107,6 +109,7 @@ async function reload() {
   projects.value = cfg.projects || []
   state.source = cfg.source || 'appsettings'
   state.runtimeUnitCount = cfg.runtimeUnitCount || 0
+  state.runtimePvUnitCount = cfg.runtimePvUnitCount || 0
   state.activeProjectName = cfg.activeProjectName || ''
   state.activeProjectId = cfg.activeProjectId || null
   previewNotes.value = cfg.overlaySummary?.notes || []

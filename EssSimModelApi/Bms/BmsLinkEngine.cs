@@ -21,7 +21,7 @@ namespace EssSimulator.EssSimModelApi.Bms
         private const ushort BlackStartStatusEnterFailed = 4;
         private const ushort BlackStartStatusExited = 5;
 
-        private const float BlackStartMinSoc = 50f;
+        private const float BlackStartMinSoc = 25f;
         private const float BlackStartMaxCoolingSetpointC = 25f;
         private const double VoltageEnergizedThresholdV = 1.0;
 

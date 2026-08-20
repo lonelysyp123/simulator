@@ -29,5 +29,14 @@ namespace EssSimulator.EssDeviceSimModel.Model
         public double BlackStartFrequencyRampHzPerSec { get; set; } = 12;
         public double BlackStartReactiveVoltageGainKvarPerV { get; set; } = 4.0;
         public double BlackStartCurrentLimitFraction { get; set; } = 0.45;
+
+        // 暂态建模参数
+        public double TransientSubStepMs { get; set; } = 10;
+        public double VoltageControllerTauMs { get; set; } = 15;
+        public double InrushPeakMultiplier { get; set; } = 6.0;
+        public double InrushDecayTauMs { get; set; } = 300;
+        public double InrushTriggerVoltageFrac { get; set; } = 0.15;
+        public double DvDtTripThresholdVPerSec { get; set; } = 500;
+        public double DvDtRideThroughMs { get; set; } = 100;
     }
 }

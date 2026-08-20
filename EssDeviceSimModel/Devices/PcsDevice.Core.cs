@@ -79,6 +79,24 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         private bool _externalRunCommand;
         private bool _externalRunRisingEdge;
 
+        // 暂态建模
+        private readonly double _transientSubStepSec;
+        private readonly double _voltageControllerTauSec;
+        private double _transientAcVoltageV;       // PI 滞后后的瞬时电压
+        private double _prevSubStepAcVoltageV;     // 上一子步电压(算 dV/dt)
+        private double _dvDt;                      // 当前 dV/dt(V/s)
+        private readonly double _dvDtTripThresholdVPerSec;
+        private readonly double _dvDtRideThroughLimitMs;
+        private double _dvDtRideThroughMs;         // dV/dt 越限累计时间
+        // 涌流波形
+        private readonly double _inrushPeakA;
+        private readonly double _inrushTauSec;
+        private readonly double _inrushTriggerFrac;
+        private bool _inrushTriggered;
+        private double _inrushElapsedSec;
+        private double _inrushCurrentA;
+        private double _inrushPeakThisTick;
+
         public PcsDevice(string deviceId, PcsDeviceConfig deviceConfig, double ambientTemp = 25.0)
         {
             DeviceId = deviceId;
@@ -93,7 +111,14 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 DcVoltageRangeMax = deviceConfig.DcVoltageRangeMaxV,
                 AcVoltageNominal = deviceConfig.AcNominalLineVoltageV,
                 FrequencyNominal = deviceConfig.FrequencyHz,
-                MaxCurrent = deviceConfig.MaxCurrentA
+                MaxCurrent = deviceConfig.MaxCurrentA,
+                TransientSubStepMs = deviceConfig.TransientSubStepMs,
+                VoltageControllerTauMs = deviceConfig.VoltageControllerTauMs,
+                InrushPeakMultiplier = deviceConfig.InrushPeakMultiplier,
+                InrushDecayTauMs = deviceConfig.InrushDecayTauMs,
+                InrushTriggerVoltageFrac = deviceConfig.InrushTriggerVoltageFrac,
+                DvDtTripThresholdVPerSec = deviceConfig.DvDtTripThresholdVPerSec,
+                DvDtRideThroughMs = deviceConfig.DvDtRideThroughMs
             };
             _ambientTemperature = ambientTemp;
             _gridLossCoefficient = Math.Clamp(deviceConfig.GridLossCoefficient, 0, 0.95);
@@ -109,6 +134,14 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             _blackStartReactiveVoltageGainKvarPerV = Math.Max(0, deviceConfig.BlackStartReactiveVoltageGainKvarPerV);
             _blackStartCurrentLimitFraction = Math.Clamp(deviceConfig.BlackStartCurrentLimitFraction, 0.1, 1.0);
             _blackStartIslandFreqHz = _blackStartFrequencyStartHz;
+            // 暂态参数初始化
+            _transientSubStepSec = Math.Max(0.001, _config.TransientSubStepMs / 1000.0);
+            _voltageControllerTauSec = Math.Max(0.001, _config.VoltageControllerTauMs / 1000.0);
+            _inrushPeakA = _config.MaxCurrent * Math.Max(1.0, _config.InrushPeakMultiplier);
+            _inrushTauSec = Math.Max(0.01, _config.InrushDecayTauMs / 1000.0);
+            _inrushTriggerFrac = Math.Clamp(_config.InrushTriggerVoltageFrac, 0.01, 0.5);
+            _dvDtTripThresholdVPerSec = Math.Max(1.0, _config.DvDtTripThresholdVPerSec);
+            _dvDtRideThroughLimitMs = Math.Max(1.0, _config.DvDtRideThroughMs);
             _slope = deviceConfig.RampSlope;
             _interval = Math.Max(1, deviceConfig.RampIntervalMs);
             _delay = Math.Max(0, deviceConfig.RampDelayMs);
@@ -472,6 +505,22 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 _currentState.ReactivePower = _loadReactivePowerKvar;
             }
 
+            // 子步暂态建模:10ms 粒度的电压 PI、dV/dt、涌流
+            int subSteps = Math.Max(1, (int)Math.Round(
+                timeStep.TotalMilliseconds / (_transientSubStepSec * 1000)));
+            TimeSpan subStep = TimeSpan.FromTicks(timeStep.Ticks / subSteps);
+            _inrushPeakThisTick = 0;
+            for (int i = 0; i < subSteps; i++)
+            {
+                UpdateTransientVoltage(subStep);
+                UpdateInrushCurrent(subStep);
+            }
+            // 发布暂态结果到 PcsState
+            _currentState.DvDt = _dvDt;
+            _currentState.InrushCurrentA = _inrushCurrentA;
+            _currentState.InrushPeakA = _inrushPeakThisTick;
+            _currentState.ProtectionFlags = ComputeProtectionFlags();
+
             // 2) 根据模式更新电气量（过流等保护基于本步 P/Q 与 AcCurrent）
             switch (_currentState.Mode)
             {
@@ -504,6 +553,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             if (_currentState.FaultType != 0)
             {
                 if (_currentState.FaultType == 3 ||
+                    _currentState.FaultType == 4 ||
+                    _currentState.FaultType == 5 ||
                     (_currentState.FaultType == 1 && _currentState.ActivePower < 0) ||
                     (_currentState.FaultType == 2 && _currentState.ActivePower > 0))
                 {
@@ -604,18 +655,84 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             double acV = _unitBusVoltageV > nom * 0.08
                 ? _unitBusVoltageV
                 : Math.Max(_currentState.IslandVoltageEffectiveV, 1.0);
-            _currentState.AcVoltage = acV;
+            // 暂态建模:优先使用 PI 滞后后的瞬时电压
+            _currentState.AcVoltage = _transientAcVoltageV > 1.0
+                ? _transientAcVoltageV
+                : acV;
             _currentState.Frequency = _blackStartEnabled
                 && EssIslandBusLogic.IsPcsIslandVoltageBuilding(_currentState)
                 ? _blackStartIslandFreqHz
                 : 0;
 
-            // 计算交流电流（带符号，正=放电，负=充电）
+            // 计算交流电流（带符号，正=放电，负=充电），叠加涌流电流
             double acCurrentMag = ComputeAcCurrentMagnitude(
                 _currentState.ActivePower,
                 _currentState.ReactivePower,
                 _currentState.AcVoltage);
-            _currentState.AcCurrent = _currentState.ActivePower >= 0 ? acCurrentMag : -acCurrentMag;
+            double totalCurrentMag = acCurrentMag + _inrushCurrentA;
+            _currentState.AcCurrent = _currentState.ActivePower >= 0 ? totalCurrentMag : -totalCurrentMag;
+        }
+
+        /// <summary>子步暂态:电压一阶滞后 + dV/dt 计算。</summary>
+        private void UpdateTransientVoltage(TimeSpan subStep)
+        {
+            double dt = subStep.TotalSeconds;
+            double vTarget = _currentState.IslandVoltageEffectiveV;
+
+            // 一阶滞后:模拟电压环 PI 控制器响应
+            double alpha = 1.0 - Math.Exp(-dt / _voltageControllerTauSec);
+            _transientAcVoltageV += (vTarget - _transientAcVoltageV) * alpha;
+
+            // dV/dt 计算(子步粒度)
+            if (dt > 1e-9)
+                _dvDt = (_transientAcVoltageV - _prevSubStepAcVoltageV) / dt;
+            _prevSubStepAcVoltageV = _transientAcVoltageV;
+
+            // dV/dt 穿越计时
+            if (Math.Abs(_dvDt) > _dvDtTripThresholdVPerSec)
+                _dvDtRideThroughMs += dt * 1000;
+            else
+                _dvDtRideThroughMs = Math.Max(0, _dvDtRideThroughMs - dt * 1000 * 2); // 2倍速衰减
+        }
+
+        /// <summary>子步暂态:变压器励磁涌流电流触发/峰值/指数衰减。</summary>
+        private void UpdateInrushCurrent(TimeSpan subStep)
+        {
+            double dt = subStep.TotalSeconds;
+            double nomV = Math.Max(_config.AcVoltageNominal, 1.0);
+
+            // 触发条件:电压首次穿越门槛值(变压器铁芯开始磁化)
+            if (!_inrushTriggered && _transientAcVoltageV > nomV * _inrushTriggerFrac)
+            {
+                _inrushTriggered = true;
+                _inrushElapsedSec = 0;
+            }
+
+            if (_inrushTriggered)
+            {
+                _inrushElapsedSec += dt;
+                double decay = Math.Exp(-_inrushElapsedSec / _inrushTauSec);
+                _inrushCurrentA = _inrushPeakA * decay;
+                _inrushPeakThisTick = Math.Max(_inrushPeakThisTick, _inrushCurrentA);
+
+                // 涌流衰减到可忽略
+                if (_inrushCurrentA < 1.0)
+                {
+                    _inrushTriggered = false;
+                    _inrushCurrentA = 0;
+                }
+            }
+        }
+
+        /// <summary>计算保护标志位(bit0=dV/dt越限, bit1=dV/dt跳闸, bit2=涌流激活, bit3=涌流过流)。</summary>
+        private ushort ComputeProtectionFlags()
+        {
+            ushort flags = 0;
+            if (Math.Abs(_dvDt) > _dvDtTripThresholdVPerSec) flags |= 0x01;
+            if (_dvDtRideThroughMs > _dvDtRideThroughLimitMs) flags |= 0x02;
+            if (_inrushTriggered) flags |= 0x04;
+            if (_inrushCurrentA > _config.MaxCurrent) flags |= 0x08;
+            return flags;
         }
 
         private void UpdateTemperatureModel(TimeSpan timeStep)
@@ -681,6 +798,22 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             {
                 instantFault = 3;
                 msg.Append("Black start enabled while utility grid is available; ");
+            }
+
+            // dV/dt 保护(带穿越时间)
+            if (_dvDtRideThroughMs > _dvDtRideThroughLimitMs)
+            {
+                instantFault = 4;
+                msg.Append($"dV/dt protection: {_dvDt:F0}V/s (limit {_dvDtTripThresholdVPerSec:F0}V/s), " +
+                           $"ride-through {_dvDtRideThroughMs:F0}ms; ");
+            }
+
+            // 涌流过流保护:瞬时峰值允许超过额定,仅极端情况(超 3 倍额定)才跳闸
+            if (_inrushTriggered && _inrushCurrentA > _config.MaxCurrent * 3.0)
+            {
+                instantFault = 5;
+                msg.Append($"Inrush overcurrent: {_inrushCurrentA:F0}A " +
+                           $"(limit {_config.MaxCurrent * 3.0:F0}A); ");
             }
 
             if (instantFault != 0)

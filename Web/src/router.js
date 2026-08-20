@@ -4,8 +4,8 @@ import { isEditionRouteAllowed, loadEditionFeatures } from './services/editionFe
 
 const routes = [
   { path: '/', redirect: '/mainline' },
-  { path: '/mainline', name: 'mainline', component: () => import('./views/MainLineView.vue'), meta: { title: '主电气接线' } },
-  { path: '/mainline-3d', name: 'mainline-3d', component: () => import('./views/MainLine3dView.vue'), meta: { title: '主接线 3D（增强）' } },
+  { path: '/mainline', name: 'mainline', component: () => import('./views/MainLineView.vue'), meta: { title: '电站概览' } },
+  { path: '/mainline-3d', name: 'mainline-3d', component: () => import('./views/MainLine3dView.vue'), meta: { title: '数字孪生' } },
   { path: '/topology', name: 'topology', component: () => import('./views/TopologyView.vue'), meta: { title: '组态编辑' } },
   { path: '/projects', name: 'projects', component: () => import('./views/ProjectManageView.vue'), meta: { title: '工程管理' } },
   { path: '/system', name: 'system', component: () => import('./views/SystemConfigView.vue'), meta: { title: '系统配置' } },

@@ -159,6 +159,7 @@ namespace EssSimulator.Web
                     $"ess._batteryRacks[{channelIndex0}]._currentState.TotalDischargeEnergy"),
                 BmsEnergy = BuildBmsEnergy(channelIndex0),
                 BmsRunStatus = BuildBmsRunStatus(channelIndex0),
+                BmsAirConditioner = GuiStatusFormatters.FormatBmsMainLineAirConditioner(channelIndex0),
                 PcsDeviceState = GuiStatusFormatters.FormatPcsMainLineDeviceState(unitIndex0, slotInUnit0, channelIndex0),
                 PcsStartStop = GuiStatusFormatters.FormatPcsMainLineStartStop(unitIndex0, slotInUnit0),
                 PcsTargetP = GuiStatusFormatters.FormatPcsMainLineTargetPower(unitIndex0, slotInUnit0),
@@ -335,6 +336,8 @@ namespace EssSimulator.Web
         public double CumulativeDischargeEnergyKwh { get; set; }
         public string BmsEnergy { get; set; } = "";
         public string BmsRunStatus { get; set; } = "";
+                /// <summary>BMS 舱空调状态与柜内温度（如「空调:制冷 25.3℃ 设20.0℃」）。</summary>
+                public string BmsAirConditioner { get; set; } = "";
         public string PcsDeviceState { get; set; } = "";
         public string PcsStartStop { get; set; } = "";
         public string PcsTargetP { get; set; } = "";
