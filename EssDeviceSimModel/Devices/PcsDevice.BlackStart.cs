@@ -340,6 +340,14 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             _blackStartIslandFreqHz = _blackStartFrequencyStartHz;
             _blackStartInrushActiveKw = 0;
             _blackStartInrushReactiveKvar = 0;
+            // 暂态状态重置
+            _transientAcVoltageV = 0;
+            _prevSubStepAcVoltageV = 0;
+            _dvDt = 0;
+            _dvDtRideThroughMs = 0;
+            _inrushTriggered = false;
+            _inrushElapsedSec = 0;
+            _inrushCurrentA = 0;
         }
     }
 }

@@ -398,6 +398,15 @@ namespace EssSimulator.Configuration
         /// LeaderOnly=仅建压机（有效电压最高者）承担，从机不重复励磁/空载。
         /// </summary>
         public string BlackStartSteadyLossShareMode { get; set; } = "AllOnBus";
+
+        // 暂态建模参数
+        public double TransientSubStepMs { get; set; } = 10;
+        public double VoltageControllerTauMs { get; set; } = 15;
+        public double InrushPeakMultiplier { get; set; } = 6.0;
+        public double InrushDecayTauMs { get; set; } = 300;
+        public double InrushTriggerVoltageFrac { get; set; } = 0.15;
+        public double DvDtTripThresholdVPerSec { get; set; } = 500;
+        public double DvDtRideThroughMs { get; set; } = 100;
     }
 
     /// <summary>变压器参数配置（对应 appsettings.json: Transformer 节）</summary>

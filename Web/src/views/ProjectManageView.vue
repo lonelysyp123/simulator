@@ -14,7 +14,8 @@
 
       <el-table :data="projects" v-loading="loading" stripe border size="small" empty-text="暂无工程，请点击「新增工程」">
         <el-table-column prop="name" label="工程名称" min-width="180" />
-        <el-table-column prop="emuCount" label="EMU 数" width="90" align="center" />
+        <el-table-column prop="emuCount" label="储能单元" width="90" align="center" />
+        <el-table-column prop="pvCount" label="光伏单元" width="90" align="center" />
         <el-table-column prop="nodeCount" label="节点数" width="90" align="center" />
         <el-table-column label="更新时间" width="180">
           <template #default="{ row }">{{ fmtTime(row.updatedAtUtc) }}</template>

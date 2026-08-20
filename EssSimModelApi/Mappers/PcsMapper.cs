@@ -2,6 +2,7 @@ using EssSimulator;
 using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssDeviceSimModel.Devices;
+using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
 
 namespace EssSimulator.EssSimModelApi.Mappers
@@ -11,6 +12,28 @@ namespace EssSimulator.EssSimModelApi.Mappers
     /// </summary>
     public static class PcsMapper
     {
+        /// <summary>BMS 黑启动状态：已进入（建压前置条件）。</summary>
+        private const ushort BmsBlackStartStatusActive = 3;
+
+        /// <summary>BMS 黑启动进入成功标志。</summary>
+        private const ushort BmsBlackStartEnterSuccess = 1;
+
+        /// <summary>
+        /// 校验对应 BMS 是否已进入黑启动模式（状态=3 且 进入成功=1）。
+        /// PCS 黑启动前 BMS 必须先完成自身校验并确认就绪。
+        /// </summary>
+        private static bool IsBmsBlackStartReady(int pcsSimIndex)
+        {
+            var bmsData = SimulatorHost.Instance
+                .Get<BatteryManagementSystemData>($"bms{pcsSimIndex + 1}");
+            if (bmsData?.BatteryStacks == null || bmsData.BatteryStacks.Count == 0)
+                return false;
+
+            var stack = bmsData.BatteryStacks[0];
+            return stack.BlackStartStatus == BmsBlackStartStatusActive
+                && stack.BlackStartEnterSuccess == BmsBlackStartEnterSuccess;
+        }
+
         /// <summary>将一路 PCS 物理状态同步到 PcsData DTO。</summary>
         public static void MapPcsState(PcsState src, PcsData dst, BatteryRackSimulator bms)
         {
@@ -183,6 +206,15 @@ namespace EssSimulator.EssSimModelApi.Mappers
             {
                 pcsSim.WithdrawExternalRunCommand();
                 pcsSim.TransitionToMode(OperationMode.Off, "故障已锁存，等待启停写 1 复归");
+                return;
+            }
+
+            // BMS 黑启动状态校验：PCS 建压前 BMS 必须先进入黑启动模式
+            if (pcsData.BlackStartEnabled && !IsBmsBlackStartReady(simIdx))
+            {
+                pcsSim.ApplyBlackStartEnabled(false);
+                ClearBlackStartCommand(simIdx, pcsData);
+                pcsSim.TransitionToMode(OperationMode.Off, "BMS 未进入黑启动模式，拒绝 PCS 黑启动");
                 return;
             }
 

@@ -33,7 +33,14 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 BlackStartFrequencyStartHz = pcsCfg.BlackStartFrequencyStartHz,
                 BlackStartFrequencyRampHzPerSec = pcsCfg.BlackStartFrequencyRampHzPerSec,
                 BlackStartReactiveVoltageGainKvarPerV = pcsCfg.BlackStartReactiveVoltageGainKvarPerV,
-                BlackStartCurrentLimitFraction = pcsCfg.BlackStartCurrentLimitFraction
+                BlackStartCurrentLimitFraction = pcsCfg.BlackStartCurrentLimitFraction,
+                TransientSubStepMs = pcsCfg.TransientSubStepMs,
+                VoltageControllerTauMs = pcsCfg.VoltageControllerTauMs,
+                InrushPeakMultiplier = pcsCfg.InrushPeakMultiplier,
+                InrushDecayTauMs = pcsCfg.InrushDecayTauMs,
+                InrushTriggerVoltageFrac = pcsCfg.InrushTriggerVoltageFrac,
+                DvDtTripThresholdVPerSec = pcsCfg.DvDtTripThresholdVPerSec,
+                DvDtRideThroughMs = pcsCfg.DvDtRideThroughMs
             };
         }
 

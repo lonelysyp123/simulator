@@ -19,6 +19,7 @@ namespace EssSimulator.Web.Topology
         public DateTime UpdatedAtUtc { get; set; }
         public int NodeCount { get; set; }
         public int EmuCount { get; set; }
+        public int PvCount { get; set; }
     }
 
     /// <summary>由组态工程生成、启动时覆盖 appsettings 对应节的运行时补丁。</summary>
@@ -48,6 +49,7 @@ namespace EssSimulator.Web.Topology
         public bool OverlayPresent { get; set; }
         public string Source { get; set; } = "appsettings"; // appsettings | topology
         public int RuntimeUnitCount { get; set; }
+        public int RuntimePvUnitCount { get; set; }
         public List<TopologyProjectSummary> Projects { get; set; } = new();
         public TopologyRuntimeOverlay? OverlaySummary { get; set; }
     }

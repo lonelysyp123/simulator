@@ -254,7 +254,7 @@ function expandFeederUnit(opts) {
   const pcsH = kind === 'pv' ? xfmrCardH : 228
   const dcBusY = pcsTop + pcsH + LINK_STUB * 2
   const bmsTop = kind === 'pv' ? (xfmrCardTop + xfmrCardH + LINK_STUB * 2) : (dcBusY + LINK_STUB * 2)
-  const bmsH = kind === 'pv' ? 124 : 198
+  const bmsH = kind === 'pv' ? 124 : 214
   const arraySplitY = kind === 'pv' ? (xfmrCardTop + xfmrCardH + LINK_STUB) : 0
   const unitBottom = bmsTop + bmsH + 16
   const boxTop = 4

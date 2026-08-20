@@ -11,7 +11,7 @@
     />
     <div class="card">
       <p class="card-title">
-        电气主接线 3D
+        数字孪生
         <span class="card-hint">左键旋转 · 滚轮缩放 · 右键平移 · 单击设备/断路器 · 双击 BMS 进入详情</span>
       </p>
       <MainLineScene

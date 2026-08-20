@@ -50,6 +50,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 5,1048,bool,1,yx52,1,系统SOC过低一级保护,model=4|arg1=bmsdeviceId.BatteryStacks[0].SystemAlarms.LowSOCProtection|arg2=|arg3=|arg4=1000
 6,1049,u16,16,yt1,1,空调启停(1开机0停机),model=4|arg1=bmsdeviceId.AirConditioners[0].OnCommand|arg2=|arg3=|arg4=1000
 6,1050,u16,16,yt2,10,空调制冷设定温度(0.1C),model=4|arg1=bmsdeviceId.AirConditioners[0].CoolingSetpointCommand|arg2=|arg3=|arg4=1000
+6,1051,u16,16,yk1,1,黑启动指令(写1进入写0退出),model=4|arg1=bmsdeviceId.BatteryStacks[0].BlackStartCommand|arg2=|arg3=|arg4=1000
 4,10000,u16,16,yc0,1,一键并网状态0未开始1进行中2成功3失败,model=4|arg1=bmsdeviceId.BatteryStacks[0].GridConnectStatus|arg2=|arg3=|arg4=1000
 4,10001,u16,16,yc1,1,Rack启用/停用状态,1
 4,10002,u16,16,yc2,1,RACK 在线状态,1
@@ -181,3 +182,5 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,10133,u16,16,yc128,1,气体浓度告警,0
 4,10134,u16,16,yc129,1,TCP扩展IO状态,0
 4,10135,u16,16,yc130,1,TCP扩展IO通讯故障,0
+4,10136,u16,16,yc131,1,黑启动状态0未开始3已进入4进入失败5已退出,model=4|arg1=bmsdeviceId.BatteryStacks[0].BlackStartStatus|arg2=|arg3=|arg4=1000
+4,10137,u16,16,yc132,1,进入黑启动模式是否成功0否1是,model=4|arg1=bmsdeviceId.BatteryStacks[0].BlackStartEnterSuccess|arg2=|arg3=|arg4=1000

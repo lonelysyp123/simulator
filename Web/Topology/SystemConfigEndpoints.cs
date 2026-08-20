@@ -31,6 +31,7 @@ namespace EssSimulator.Web.Topology
                     OverlayPresent = overlay != null,
                     Source = eng ? "topology" : "appsettings",
                     RuntimeUnitCount = simCfg.Value.EffectiveEssUnitCount,
+                    RuntimePvUnitCount = simCfg.Value.PvUnitCount,
                     Projects = projects.ToList(),
                     OverlaySummary = overlay == null ? null : new TopologyRuntimeOverlay
                     {

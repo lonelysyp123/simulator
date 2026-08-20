@@ -141,6 +141,7 @@ const bmsLinesCompact = computed(() => {
   return [
     ch.bmsCompact,
     ch.bmsRunStatus || null,
+    ch.bmsAirConditioner || null,
     `并网:${ch.gridConnect}`
   ].filter(Boolean)
 })

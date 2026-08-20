@@ -326,7 +326,8 @@ namespace EssSimulator.Web.Topology
             Name = string.IsNullOrWhiteSpace(p.Name) ? p.Id : p.Name,
             UpdatedAtUtc = p.UpdatedAtUtc,
             NodeCount = p.Nodes?.Count ?? 0,
-            EmuCount = p.Nodes?.Count(n => n.TemplateId == "emu") ?? 0
+            EmuCount = p.Nodes?.Count(n => n.TemplateId == "emu") ?? 0,
+            PvCount = p.Nodes?.Count(n => n.TemplateId == "pv_unit") ?? 0
         };
 
         private static void NormalizeParameters(TopologyProject project)
