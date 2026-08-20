@@ -130,7 +130,7 @@ namespace EssSimulator.LocalControl
 
             lc.SetDataStoreByMesurePointName("param1", anyFault ? 1 : 0);
             lc.SetDataStoreByMesurePointName("param2", allBlackStart ? 1 : 0);
-            lc.SetDataStoreByMesurePointName("param3", allHvClosed ? 0xEE : 0xAA);
+            lc.SetDataStoreByMesurePointName("param3", allHvClosed ? 0xAA : 0xEE);
         }
 
         private void ApplyControls(
@@ -386,7 +386,7 @@ namespace EssSimulator.LocalControl
                 closed &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, EmuHvBreaker)) != 0;
             }
 
-            double val = closed ? 0xEE : 0xAA;
+            double val = closed ? 0xAA : 0xEE;
             _controlShadow[key] = val;
             try { lc.SetDataStoreByMesurePointName(lcParam, val); }
             catch { /* 首轮对齐失败可忽略 */ }
