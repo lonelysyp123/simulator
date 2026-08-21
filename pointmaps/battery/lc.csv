@@ -1,7 +1,7 @@
 FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,107,u16,16,param1,1,系统故障总,0
 4,170,u16,16,param2,1,黑启动模式状态（所有pcs黑启动模式为开，则为1，否则为0）,0
-4,171,u16,16,param3,1,高压侧断路器状态（AA=开；EE=合）,0
+4,171,u16,16,param3,1,高压侧断路器状态（AA=合；EE=开）,0
 4,17200,u16,16,param4,1,pcs1故障状态,0
 4,17201,u16,16,param5,1,pcs2故障状态,0
 4,17202,u16,16,param6,1,pcs3故障状态,0

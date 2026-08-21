@@ -442,6 +442,93 @@ public class ClusterAlarms
             }
         }
 
+        // 对外三级报警2(主控) — 匹配 Excel 0x1016 位定义
+        // bit0:总压压差过高 bit1:模组过压 bit2:模组欠压 bit3:温升过高
+        // bit4:模组压差过大(预留) bit5:预留 bit6:铜排温度过高 bit7~12:内部预留
+        public UInt16 ExternalFaultSummary2
+        {
+            get
+            {
+                UInt16 summary = 0;
+                summary |= (UInt16)(ToBit(BatteryBoxVoltageExtremaDifferenceFault) << 0);
+                summary |= (UInt16)(ToBit(BatteryBoxOvervoltageFault) << 1);
+                summary |= (UInt16)(ToBit(BatteryBoxUndervoltageFault) << 2);
+                summary |= (UInt16)(ToBit(TempRiseFault) << 3);
+                summary |= (UInt16)(ToBit(BatteryBoxBusbarHighTempFault) << 6);
+                return summary;
+            }
+        }
+
+        // 对外二级报警2(主控) — 匹配 Excel 0x105A 位定义
+        public UInt16 ExternalAlarmSummary2
+        {
+            get
+            {
+                UInt16 summary = 0;
+                summary |= (UInt16)(ToBit(BatteryBoxVoltageExtremaDifferenceAlarm) << 0);
+                summary |= (UInt16)(ToBit(BatteryBoxOvervoltageAlarm) << 1);
+                summary |= (UInt16)(ToBit(BatteryBoxUndervoltageAlarm) << 2);
+                summary |= (UInt16)(ToBit(TempRiseAlarm) << 3);
+                summary |= (UInt16)(ToBit(BatteryBoxBusbarHighTempAlarm) << 6);
+                return summary;
+            }
+        }
+
+        // 对外一级保护2(主控) — 匹配 Excel 0x109F 位定义
+        public UInt16 ExternalProtectionSummary2
+        {
+            get
+            {
+                UInt16 summary = 0;
+                summary |= (UInt16)(ToBit(BatteryBoxVoltageExtremaDifferenceProtection) << 0);
+                summary |= (UInt16)(ToBit(BatteryBoxOvervoltageProtection) << 1);
+                summary |= (UInt16)(ToBit(BatteryBoxUndervoltageProtection) << 2);
+                summary |= (UInt16)(ToBit(TempRiseProtection) << 3);
+                summary |= (UInt16)(ToBit(BatteryBoxBusbarHighTempProtection) << 6);
+                return summary;
+            }
+        }
+
+        // 对外三级报警3(主控) — 匹配 Excel 0x1017 位定义
+        // bit0:模组温差 bit1:负极柱温差 bit2:正极柱温差 bit3:铜排温差(预留)
+        public UInt16 ExternalFaultSummary3
+        {
+            get
+            {
+                UInt16 summary = 0;
+                summary |= (UInt16)(ToBit(BatteryBoxTempDifferenceFault) << 0);
+                summary |= (UInt16)(ToBit(BatteryBoxNegativePoleTempDifferenceFault) << 1);
+                summary |= (UInt16)(ToBit(BatteryBoxPositivePoleTempDifferenceFault) << 2);
+                return summary;
+            }
+        }
+
+        // 对外二级报警3(主控) — 匹配 Excel 0x105B 位定义
+        public UInt16 ExternalAlarmSummary3
+        {
+            get
+            {
+                UInt16 summary = 0;
+                summary |= (UInt16)(ToBit(BatteryBoxTempDifferenceAlarm) << 0);
+                summary |= (UInt16)(ToBit(BatteryBoxNegativePoleTempDifferenceAlarm) << 1);
+                summary |= (UInt16)(ToBit(BatteryBoxPositivePoleTempDifferenceAlarm) << 2);
+                return summary;
+            }
+        }
+
+        // 对外一级保护3(主控) — 匹配 Excel 0x10A0 位定义
+        public UInt16 ExternalProtectionSummary3
+        {
+            get
+            {
+                UInt16 summary = 0;
+                summary |= (UInt16)(ToBit(BatteryBoxTempDifferenceProtection) << 0);
+                summary |= (UInt16)(ToBit(BatteryBoxNegativePoleTempDifferenceProtection) << 1);
+                summary |= (UInt16)(ToBit(BatteryBoxPositivePoleTempDifferenceProtection) << 2);
+                return summary;
+            }
+        }
+
         private static UInt16 ToBit(bool? flag)
         {
             return flag == true ? (UInt16)1 : (UInt16)0;

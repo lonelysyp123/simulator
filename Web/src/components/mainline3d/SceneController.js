@@ -365,7 +365,8 @@ export class SceneController {
     for (const a of this.refs.labelAnchors) {
       const el = document.createElement('div')
       el.className = 'dt-float-label'
-      el.style.pointerEvents = 'auto'
+      // 标签纯展示：不拦截鼠标，避免遮挡画布的缩放/旋转/点选操作
+      el.style.pointerEvents = 'none'
       const obj = new CSS2DObject(el)
       obj.position.copy(a.position)
       this.stationRoot.add(obj)

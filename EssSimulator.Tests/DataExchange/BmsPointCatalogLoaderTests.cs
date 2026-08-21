@@ -6,10 +6,30 @@ namespace EssSimulator.Tests.DataExchange;
 
 public class BmsPointCatalogLoaderTests
 {
+    /// <summary>
+    /// common 版点表绝对路径。根目录 bms_bank.csv 可能随交付版本切换（如 LC 版），
+    /// 本测试固定验证 pointmaps/common 版本，不能依赖复制到 bin 的运行时点表。
+    /// </summary>
+    private static string CommonBankCsvPath
+    {
+        get
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "EssSimulator.sln")))
+                    return Path.Combine(dir.FullName, "pointmaps", "common", "bms_bank.csv");
+                dir = dir.Parent;
+            }
+
+            throw new DirectoryNotFoundException("找不到仓库根目录");
+        }
+    }
+
     [Fact]
     public void FromPointMap_simBms1_HasGridConnectControlForYt0()
     {
-        var pointMap = new ModbusPointMap("bms_bank.csv", "simBms1", clusterCount: 12);
+        var pointMap = new ModbusPointMap(CommonBankCsvPath, "simBms1", clusterCount: 12);
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simBms1", new DataExchangeOptions());
 
         var yt0 = catalog.ControlPoints.First(p => p.ParamName == "yt0");
@@ -28,7 +48,7 @@ public class BmsPointCatalogLoaderTests
     [Fact]
     public void FromPointMap_IncludesRackControlThresholds()
     {
-        var pointMap = new ModbusPointMap("bms_bank.csv", "simBms1", clusterCount: 12);
+        var pointMap = new ModbusPointMap(CommonBankCsvPath, "simBms1", clusterCount: 12);
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simBms1");
 
         Assert.NotEmpty(catalog.RackControlPoints);

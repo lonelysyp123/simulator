@@ -22,6 +22,8 @@ namespace EssSimulator.DataExchange.Catalog
         {
             ["param11"] = ControlSemantics.Pulse,
             ["param12"] = ControlSemantics.Hold,
+            ["param131"] = ControlSemantics.Pulse,
+            ["param170"] = ControlSemantics.Pulse,
             ["yc133"] = ControlSemantics.Pulse,
             ["yt0"] = ControlSemantics.Pulse
         };
@@ -193,6 +195,12 @@ namespace EssSimulator.DataExchange.Catalog
                 return bmsDefault;
 
             if (isBms && target.PropertyPath.Contains("GridConnectCommand", StringComparison.Ordinal))
+                return ControlEffectId.BmsApplyLinkCommands;
+
+            if (isBms && target.PropertyPath.Contains("BlackStartCommand", StringComparison.Ordinal))
+                return ControlEffectId.BmsApplyLinkCommands;
+
+            if (isBms && target.PropertyPath.Contains("FaultClearCommand", StringComparison.Ordinal))
                 return ControlEffectId.BmsApplyLinkCommands;
 
             if (isEmu)
