@@ -21,7 +21,8 @@ namespace EssSimulator.EssSimModelApi.Bms
         private const ushort BlackStartStatusEnterFailed = 4;
         private const ushort BlackStartStatusExited = 5;
 
-        private const float BlackStartMinSoc = 25f;
+        // BatteryStack.SOC 为 0~1 标幺值（与电芯 CellState.SOC、点表 yc11 Scale=1000 一致）
+        private const float BlackStartMinSoc = 0.25f;
         private const float BlackStartMaxCoolingSetpointC = 25f;
         private const double VoltageEnergizedThresholdV = 1.0;
 
@@ -41,6 +42,7 @@ namespace EssSimulator.EssSimModelApi.Bms
             var bms = ess._bmsRackDevices[bmsIndex];
             ApplyLinkLogic(bmsIndex, stack, bms, ess);
             ApplyBlackStartLogic(bmsIndex, stack, bms, ess, bmsData);
+            ApplyFaultClearLogic(bmsIndex, stack, bms);
         }
 
         public static void ApplyAllChannels()
@@ -211,10 +213,10 @@ namespace EssSimulator.EssSimModelApi.Bms
                     return;
                 }
 
-                // 2. SOC 检测：总 SOC 须 > 50%
+                // 2. SOC 检测：总 SOC 须 ≥ 25%（SOC 为 0~1 标幺值）
                 if (!stack.SOC.HasValue || stack.SOC.Value < BlackStartMinSoc)
                 {
-                    FailBlackStartEnter(label, stack, $"系统SOC不足{BlackStartMinSoc}%");
+                    FailBlackStartEnter(label, stack, $"系统SOC不足{BlackStartMinSoc * 100f:0}%");
                     return;
                 }
 
@@ -350,6 +352,40 @@ namespace EssSimulator.EssSimModelApi.Bms
 
         private static void ClearBlackStartCommand(BatteryStack stack) =>
             stack.BlackStartCommand = 0;
+
+        /// <summary>一键复归脉冲处理：检测到 FaultClearCommand=1 时清除充放电方向故障，随后复位脉冲。</summary>
+        private static void ApplyFaultClearLogic(int bmsIndex, BatteryStack stack, BmsRackDevice bms)
+        {
+            if (stack.FaultClearCommand == 0)
+                return;
+
+            var label = BmsLabel(bmsIndex, bms);
+            ushort prevFaultSummary = stack.BMSFaultSummary;
+            var rackState = bms.Rack.GetRackState();
+            ushort prevRackFault = rackState?.IsFault ?? 0;
+
+            // 先复位脉冲，确保 ControlFeedbackPipeline 回写 0 到 Modbus
+            stack.FaultClearCommand = 0;
+
+            if (BmsFaultClearEngine.TryClearFaults(bmsIndex, out var message))
+            {
+                SimStateChangeLogger.BmsStateChanged(
+                    label,
+                    "FaultClear",
+                    $"BMSFaultSummary=0x{prevFaultSummary:X}, RackIsFault={SimStateChangeLogger.FormatRackFault(prevRackFault)}",
+                    "已清除充放电方向故障",
+                    "一键复归");
+            }
+            else
+            {
+                SimStateChangeLogger.BmsStateChanged(
+                    label,
+                    "FaultClear",
+                    $"BMSFaultSummary=0x{prevFaultSummary:X}, RackIsFault={SimStateChangeLogger.FormatRackFault(prevRackFault)}",
+                    $"清除失败：{message}",
+                    "一键复归");
+            }
+        }
 
         private static void SetLinked(
             EnergyStorageSystem ess,

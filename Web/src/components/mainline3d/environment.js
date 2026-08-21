@@ -282,12 +282,12 @@ export function buildEnvironment(layout) {
   curbB.position.set(cx, 0, roadZ + roadHalf + 0.2)
   root.add(curbB)
 
-  // —— 侧向联络道路 ——
+  // —— 侧向联络道路（草坪带外侧，与草坪严格不重叠）——
   const sideRoad = box(6.5, 0.08, zSpan, MAT.asphalt(), 0.03)
-  sideRoad.position.set(x0 - 10, 0, zMid)
+  sideRoad.position.set(x0 - 14.25, 0, zMid)
   root.add(sideRoad)
   const sideRoad2 = box(6.5, 0.08, zSpan, MAT.asphalt(), 0.03)
-  sideRoad2.position.set(x1 + 10, 0, zMid)
+  sideRoad2.position.set(x1 + 14.25, 0, zMid)
   root.add(sideRoad2)
 
   // —— 绿化带（道路外侧 + 储能区侧翼）——
@@ -299,12 +299,12 @@ export function buildEnvironment(layout) {
   stripBack.position.set(cx, 0, zMin - 14)
   root.add(stripBack)
 
-  // 储能区两侧草坪带（增强绿化包围感）
+  // 储能区两侧草坪带（设备垫与侧路之间，增强绿化包围感）
   const sideGrassL = box(7, 0.05, zSpan - 16, MAT.grassLight(), 0.02)
-  sideGrassL.position.set(x0 - 5.5, 0, zMid)
+  sideGrassL.position.set(x0 - 7.5, 0, zMid)
   root.add(sideGrassL)
   const sideGrassR = box(7, 0.05, zSpan - 16, MAT.grass(), 0.02)
-  sideGrassR.position.set(x1 + 5.5, 0, zMid)
+  sideGrassR.position.set(x1 + 7.5, 0, zMid)
   root.add(sideGrassR)
 
   // 绿篱（道路侧 + 侧翼矮篱）
@@ -404,33 +404,8 @@ export function buildEnvironment(layout) {
   sky.position.set(cx, 0, 4)
   root.add(sky)
 
-  // 地平线雾环（半透明带，增强远处模糊）
-  const haze = new THREE.Mesh(
-    new THREE.CylinderGeometry(140, 190, 36, 32, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0x9aabbc,
-      transparent: true,
-      opacity: 0.38,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    })
-  )
-  haze.position.set(cx, 12, 4)
-  root.add(haze)
-
-  // 外圈更淡的雾层
-  const hazeOuter = new THREE.Mesh(
-    new THREE.CylinderGeometry(200, 260, 48, 28, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0xa8b8c8,
-      transparent: true,
-      opacity: 0.2,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    })
-  )
-  hazeOuter.position.set(cx, 14, 4)
-  root.add(hazeOuter)
+  // 远景虚化由场景自适应雾效（SceneController._adaptSceneExtent）负责，
+  // 不再使用固定半径雾环——场站扩大后固定半径雾环会圈进场站内部形成白色圆环。
 
   root.userData.center = { x: cx, z: 4 }
   root.userData.width = width

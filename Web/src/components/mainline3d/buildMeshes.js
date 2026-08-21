@@ -711,32 +711,6 @@ export function createLoadBank() {
   return g
 }
 
-/** 直流母线：正/负双管，长度由组态挂接台数决定 */
-export function createDcBus(item) {
-  const g = new THREE.Group()
-  const x1 = item.x1 ?? item.x
-  const x2 = item.x2 ?? item.x
-  const len = Math.max(0.6, Math.abs(x2 - x1))
-  const y = item.y ?? Y.cable
-  const pos = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.07, 0.07, len, 10),
-    new THREE.MeshStandardMaterial({ color: 0xc0392b, metalness: 0.55, roughness: 0.35 })
-  )
-  pos.rotation.z = Math.PI / 2
-  pos.position.set(0, y + 0.12, 0)
-  g.add(pos)
-  const neg = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.07, 0.07, len, 10),
-    new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.55, roughness: 0.35 })
-  )
-  neg.rotation.z = Math.PI / 2
-  neg.position.set(0, y - 0.12, 0)
-  g.add(neg)
-  g.userData.kind = 'dc-bus'
-  g.userData.core = pos
-  return g
-}
-
 /** 母线横管（单挂省略时由布局不生成此项） */
 export function createBusBar(item) {
   const g = new THREE.Group()
@@ -875,7 +849,12 @@ const TEMPLATE_MODELS = {
     label: item.node?.label || '',
     voltage: item.voltage ?? item.node?.parameters?.nominalVoltage
   })),
-  dc_bus: (item) => createDcBus(item),
+  // 直流母线与交流母线统一：汇流点节点（球体 + 指示环），半径随挂接规模自适应
+  dc_bus: (item) => createBusNode(0, item.y ?? Y.cable, 0, {
+    radius: item.radius ?? 0.24,
+    label: item.node?.label || '',
+    voltage: item.voltage ?? item.node?.parameters?.nominalVoltage
+  }),
   ac_meter: () => createAcMeter(),
   load: () => createLoadBank(),
   bms: (item) => createBmsContainer(item.panelKey),

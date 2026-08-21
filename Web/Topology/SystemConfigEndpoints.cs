@@ -10,6 +10,20 @@ namespace EssSimulator.Web.Topology
 {
     public static class SystemConfigEndpoints
     {
+        /// <summary>
+        /// 在程序目录下创建 .restart 哨兵文件，通知启动脚本（start.bat）本次退出属于
+        /// "重新初始化"而非手动关闭，脚本检测到后会自动拉起后端。
+        /// </summary>
+        private static void WriteRestartSentinel()
+        {
+            try
+            {
+                var path = Path.Combine(AppContext.BaseDirectory, ".restart");
+                File.WriteAllText(path, DateTime.UtcNow.ToString("O"));
+            }
+            catch { /* 哨兵写入失败不影响关闭流程 */ }
+        }
+
         public static IEndpointRouteBuilder MapSystemConfigEndpoints(this IEndpointRouteBuilder app)
         {
             var g = app.MapGroup("/api/system");
@@ -75,6 +89,7 @@ namespace EssSimulator.Web.Topology
                         _ = Task.Run(async () =>
                         {
                             await Task.Delay(400);
+                            WriteRestartSentinel();
                             lifetime.StopApplication();
                         });
                     }
@@ -150,6 +165,7 @@ namespace EssSimulator.Web.Topology
                     _ = Task.Run(async () =>
                     {
                         await Task.Delay(500);
+                        WriteRestartSentinel();
                         lifetime.StopApplication();
                     });
                 }

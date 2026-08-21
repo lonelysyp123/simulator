@@ -154,7 +154,7 @@ function countFromParam(node, key, liveCount = 0) {
   return Math.max(0, liveCount | 0)
 }
 
-function expandEmu(unit, origin, items, cables) {
+function expandEmu(unit, origin, items, cables, ctx) {
   const cx = toX(unit.cx, origin)
   const busCx = unit.busCx != null ? toX(unit.busCx, origin) : cx
   const zBus = toZ(unit.originY, origin)
@@ -163,6 +163,14 @@ function expandEmu(unit, origin, items, cables) {
   const z690 = toZ(unit.originY + unit.unitBus690Y, origin)
   const zPcs = toZ(unit.originY + unit.pcsTop, origin)
   const zBms = toZ(unit.originY + unit.bmsTop, origin)
+  // 方阵区需在 z 方向避开所有单元（含储能 BMS/直流母线深度），记录单元底边；
+  // 同时记录储能单元列的 x 范围，供方阵区在 x 方向避让
+  if (ctx) {
+    ctx.maxUnitBottomZ = Math.max(ctx.maxUnitBottomZ, toZ(unit.originY + unit.bottom, origin))
+    const halfW = 6
+    ctx.emuMinX = ctx.emuMinX == null ? cx - halfW : Math.min(ctx.emuMinX, cx - halfW)
+    ctx.emuMaxX = ctx.emuMaxX == null ? cx + halfW : Math.max(ctx.emuMaxX, cx + halfW)
+  }
   const node = unit.emu
   const livePcs = [unit.pcsA, unit.pcsB].filter(Boolean).length
   const pcsCount = countFromParam(node, 'pcsCount', livePcs)
@@ -323,15 +331,19 @@ function expandEmu(unit, origin, items, cables) {
   if (unit.dcBus && !unit.omitDcBus && bmsCount > 1) {
     const zDc = toZ(unit.originY + (unit.dcBusY ?? 0), origin)
     const xs = bmsXs.length ? bmsXs : [cx]
+    const x1 = Math.min(...xs) - 1.2
+    const x2 = Math.max(...xs) + 1.2
     addItem(items, {
       key: `node-${unit.dcBus.id || `emu-dc-${unit.index}`}`,
       templateId: 'dc_bus',
       kind: 'dc-bus',
-      x: (Math.min(...xs) + Math.max(...xs)) / 2,
+      x: (x1 + x2) / 2,
       z: zDc,
       y: CABLE_Y,
-      x1: Math.min(...xs) - 1.2,
-      x2: Math.max(...xs) + 1.2,
+      x1,
+      x2,
+      // 与交流母线同一规则：半径随挂接规模自适应
+      radius: Math.max(0.26, Math.min(0.5, Math.abs(x2 - x1) * 0.03)),
       node: unit.dcBus,
       voltage: paramNum(unit.dcBus, 'nominalVoltage'),
       label: unit.dcBus.label,
@@ -377,6 +389,7 @@ function expandPv(unit, origin, items, cables, pvSnap, ctx) {
     ctx.stringCount = Math.max(ctx.stringCount, stringCount)
     ctx.modulesPerString = Math.max(ctx.modulesPerString, modulesPerString)
     ctx.maxInvZ = Math.max(ctx.maxInvZ, zInv)
+    ctx.maxUnitBottomZ = Math.max(ctx.maxUnitBottomZ, toZ(unit.originY + unit.bottom, origin))
   }
 
   addItem(items, {
@@ -529,8 +542,21 @@ function placePvArrays(ctx, items, cables) {
   const gapX = 3
   const gapZ = 3
   const meanCx = ctx.unitCxs.length ? ctx.unitCxs.reduce((a, b) => a + b, 0) / ctx.unitCxs.length : 0
-  const startX = meanCx - ((perRow - 1) * (fieldW + gapX)) / 2
-  const startZ = ctx.maxInvZ + fieldD / 2 + 10
+  let startX = meanCx - ((perRow - 1) * (fieldW + gapX)) / 2
+  // 方阵区与储能单元列在 x 方向重叠时，整体平移到储能单元靠光伏一侧，
+  // 避免方阵 dc 出线穿越储能单元 BMS/直流母线区域
+  if (ctx.emuMinX != null && ctx.emuMaxX != null) {
+    const span = (perRow - 1) * (fieldW + gapX)
+    const fieldLeft = startX - fieldW / 2
+    const fieldRight = startX + span + fieldW / 2
+    if (fieldLeft < ctx.emuMaxX && fieldRight > ctx.emuMinX) {
+      const edgeGap = 6
+      if (meanCx >= (ctx.emuMinX + ctx.emuMaxX) / 2) startX = ctx.emuMaxX + edgeGap + fieldW / 2
+      else startX = ctx.emuMinX - edgeGap - fieldW / 2 - span
+    }
+  }
+  // 方阵区排在所有单元设备（含储能 BMS/直流母线）后方，避免与储能单元重叠
+  const startZ = Math.max(ctx.maxInvZ, ctx.maxUnitBottomZ) + fieldD / 2 + 10
 
   let x = startX
   let z = startZ
@@ -583,6 +609,9 @@ function makePvCtx() {
     requests: [],
     unitCxs: [],
     maxInvZ: 0,
+    maxUnitBottomZ: 0,
+    emuMinX: null,
+    emuMaxX: null,
     stringCount: 0,
     modulesPerString: 0
   }
@@ -639,6 +668,7 @@ function drawFallbackNodesAndCables(topology, origin, items, cables, placedIds) 
       item.x1 = x - 3
       item.x2 = x + 3
       item.y = CABLE_Y
+      item.radius = 0.24
     }
     addItem(items, item)
   }
@@ -791,7 +821,7 @@ function fromTopology(topology, unitsSnap, pvSnap) {
 
   for (const unit of sld.units || []) {
     if (unit.kind === 'pv') expandPv(unit, origin, items, cables, pvSnap, ctx)
-    else expandEmu(unit, origin, items, cables)
+    else expandEmu(unit, origin, items, cables, ctx)
   }
 
   // 方阵区统一排布（每台逆变器一块方阵）
@@ -903,7 +933,7 @@ function fromSnapFallback(snap) {
       unitXfLabel: u.unitTransformerLine || '',
       label: `UNIT ${u.unitNumber ?? i + 1}`
     }
-    expandEmu(fake, { x0: 0, y0: 0 }, items, cables)
+    expandEmu(fake, { x0: 0, y0: 0 }, items, cables, ctx)
   })
   pvs.forEach((pv, i) => {
     const ux = xs[units.length + i] || 0

@@ -89,7 +89,8 @@ namespace EssSimulator.Display
             if (!BmsFaultClearEngine.TryClearFaults(bms1Based - 1, out var result))
                 return CommandResult.Fail($"操作失败: {result}");
 
-            SimulatorHost.Instance.Get<ModbusSimServer>($"simBms{bms1Based}")?.InvalidateDataShadow("yc0");
+            // 强制刷新遥测 shadow（点名随点表版本而异，不存在的点名安全忽略）
+            InvalidateBmsTelemetryShadow(bms1Based, "yc0", "param4", "param19");
             return CommandResult.Ok($"执行成功: bms{bms1Based} — {result}");
         }
 
@@ -209,7 +210,7 @@ namespace EssSimulator.Display
             if (!ess._bmsRackDevices[idx].TrySetSoc(soc, out var result))
                 return CommandResult.Fail($"操作失败: {result}");
 
-            SimulatorHost.Instance.Get<ModbusSimServer>($"simBms{bms1Based}")?.InvalidateDataShadow("yc11");
+            InvalidateBmsTelemetryShadow(bms1Based, "yc11", "param47");
             SnapshotService.RequestImmediatePush();
             return CommandResult.Ok($"执行成功: bms{bms1Based} — {result}");
         }
@@ -255,9 +256,22 @@ namespace EssSimulator.Display
             if (!BmsLinkEngine.TrySetGridPower(bms1Based - 1, connect, out var result))
                 return CommandResult.Fail($"操作失败: {result}");
 
-            SimulatorHost.Instance.Get<ModbusSimServer>($"simBms{bms1Based}")?.InvalidateDataShadow("yc0");
-            SimulatorHost.Instance.Get<ModbusSimServer>($"simBms{bms1Based}")?.InvalidateDataShadow("yc45");
+            InvalidateBmsTelemetryShadow(bms1Based, "yc0", "yc45", "param4", "param43");
             return CommandResult.Ok($"执行成功: bms{bms1Based} {(connect ? "并网" : "离网")} — {result}");
+        }
+
+        /// <summary>
+        /// 使 BMS 遥测 shadow 失效，强制下一轮数据 worker 回写实时值。
+        /// 点名随点表版本而异（common 版 yc/yt、LC 版 param），不存在的点名安全忽略。
+        /// </summary>
+        private static void InvalidateBmsTelemetryShadow(int bms1Based, params string[] pointNames)
+        {
+            var server = SimulatorHost.Instance.Get<ModbusSimServer>($"simBms{bms1Based}");
+            if (server == null)
+                return;
+
+            foreach (var name in pointNames)
+                server.InvalidateDataShadow(name);
         }
 
         private static CommandResult ExecutePcsStartStop(string[] args)

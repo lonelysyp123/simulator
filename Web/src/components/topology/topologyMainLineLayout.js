@@ -685,7 +685,7 @@ export function buildTopologyMainLineLayout(topology, units = []) {
     })
     unitLayouts.push(built.unit)
     if (built.group) groups.push(built.group)
-    unitBottom = built.unitBottom
+    unitBottom = Math.max(unitBottom, built.unitBottom)
   })
 
   const yUnitTop = unitLayouts[0]?.originY ?? yRoot
@@ -720,7 +720,7 @@ export function buildTopologyMainLineLayout(topology, units = []) {
   }
   for (const u of unitLayouts) {
     maxX = Math.max(maxX, u.cx + UNIT_W / 2)
-    maxY = Math.max(maxY, u.originY + unitBottom + 36)
+    maxY = Math.max(maxY, u.originY + u.bottom + 36)
   }
   for (const l of scene.loads) {
     maxX = Math.max(maxX, l.x + 80)

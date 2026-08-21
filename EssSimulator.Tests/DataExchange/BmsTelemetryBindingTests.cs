@@ -17,6 +17,26 @@ namespace EssSimulator.Tests.DataExchange;
 /// </summary>
 public class BmsTelemetryBindingTests
 {
+    /// <summary>
+    /// common 版点表绝对路径。根目录 bms_bank.csv 可能随交付版本切换（如 LC 版），
+    /// 本测试固定验证 pointmaps/common 版本，不能依赖复制到 bin 的运行时点表。
+    /// </summary>
+    private static string CommonBankCsvPath
+    {
+        get
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "EssSimulator.sln")))
+                    return Path.Combine(dir.FullName, "pointmaps", "common", "bms_bank.csv");
+                dir = dir.Parent;
+            }
+
+            throw new DirectoryNotFoundException("找不到仓库根目录");
+        }
+    }
+
     private sealed class FakeSimulationAdapter : ISimulationDataAdapter
     {
         private readonly Dictionary<string, object?> _values = new(StringComparer.OrdinalIgnoreCase);
@@ -54,7 +74,7 @@ public class BmsTelemetryBindingTests
     [Fact]
     public void FromPointMap_yc11_BindsToBatteryStackSoc()
     {
-        var pointMap = new ModbusPointMap("bms_bank.csv", "simBms1", clusterCount: 12);
+        var pointMap = new ModbusPointMap(CommonBankCsvPath, "simBms1", clusterCount: 12);
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simBms1", new DataExchangeOptions());
 
         var yc11 = catalog.TelemetryPoints.First(p => p.ParamName == "yc11");
@@ -145,7 +165,7 @@ public class BmsTelemetryBindingTests
     [Fact]
     public void TelemetryPipeline_RewritesAfterShadowCleared()
     {
-        var pointMap = new ModbusPointMap("bms_bank.csv", "simBms1", clusterCount: 12);
+        var pointMap = new ModbusPointMap(CommonBankCsvPath, "simBms1", clusterCount: 12);
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simBms1", new DataExchangeOptions());
 
         var simulation = new FakeSimulationAdapter();
@@ -170,7 +190,7 @@ public class BmsTelemetryBindingTests
     [Fact]
     public void TelemetryPipeline_WritesYc11WhenSocChanges()
     {
-        var pointMap = new ModbusPointMap("bms_bank.csv", "simBms1", clusterCount: 12);
+        var pointMap = new ModbusPointMap(CommonBankCsvPath, "simBms1", clusterCount: 12);
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simBms1", new DataExchangeOptions());
 
         var simulation = new FakeSimulationAdapter();

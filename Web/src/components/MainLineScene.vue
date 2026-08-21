@@ -379,16 +379,13 @@ onBeforeUnmount(() => {
   line-height: 1.35;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
   white-space: nowrap;
-  pointer-events: auto;
+  /* 标签不拦截鼠标，缩放/旋转/点选直接穿透到画布 */
+  pointer-events: none;
   opacity: 0.45;
   transition: opacity 0.18s ease;
   padding: 2px 6px;
   border-radius: 4px;
   background: rgba(20, 28, 38, 0.35);
-}
-.dt-float-label:hover {
-  opacity: 0.98;
-  background: rgba(20, 28, 38, 0.72);
 }
 .dt-float-label.dt-unit-title {
   font-size: 13px;

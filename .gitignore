@@ -458,3 +458,8 @@ wwwroot/
 # 根目录点表 CSV（本地/EMS 导出，不纳入版本管理；子目录 pointmaps/ 等不受影响）
 /*.csv
 /*.xlsx
+
+# 重新初始化哨兵文件（start.bat 运行时自动创建/删除）
+.restart
+# 发布技能目录（外部来源，不纳入版本管理）
+.publish/
