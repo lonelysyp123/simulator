@@ -71,6 +71,23 @@ copy_pointmaps_to() {
     cp -f "$src/version.json" "$out/pointmap-version.json"
     echo "    pointmap-version.json (from version.json)"
   fi
+
+  copy_device_models_to "$out"
+}
+
+# 设备型号点表（pointmaps/models/{设备类型}/{型号}/）：整目录随发布携带，
+# 运行期可在系统配置界面切换选型（configs/topology/device-models.json）。
+copy_device_models_to() {
+  local out="$1"
+  local models_src="$POINTMAP_ROOT/models"
+  if [[ ! -d "$models_src" ]]; then
+    echo "==> Skip device models (not found: $models_src)"
+    return 0
+  fi
+  echo "==> Copying device model point maps from $models_src ..."
+  rm -rf "$out/pointmaps/models"
+  mkdir -p "$out/pointmaps"
+  cp -R "$models_src" "$out/pointmaps/models"
 }
 
 list_pointmap_versions() {

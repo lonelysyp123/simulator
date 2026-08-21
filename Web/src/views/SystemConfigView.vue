@@ -65,6 +65,54 @@
       </el-alert>
     </div>
 
+    <div class="card">
+      <h3 class="card-title">系统配置 · 设备型号与点位表</h3>
+      <p class="desc">
+        不同设备型号使用不同的 Modbus 点位表；选择后确认并重新初始化，重启后生效。
+        新型号点表放入 <code>pointmaps/models/</code> 对应设备类型目录即可自动识别。
+      </p>
+
+      <el-form label-width="140px" size="default" class="form" :disabled="applying || applyingModels">
+        <el-form-item v-for="t in deviceTypes" :key="t.id" :label="t.name">
+          <el-select
+            v-model="deviceSelection[t.id]"
+            placeholder="未选型（兜底点表）"
+            clearable
+            style="width: 360px"
+            :disabled="applying || applyingModels"
+          >
+            <el-option
+              v-for="m in t.models"
+              :key="m.id"
+              :label="m.name"
+              :value="m.id"
+            >
+              <span>{{ m.name }}</span>
+              <span v-if="m.description" style="float:right; color:#909399; font-size:12px">{{ m.description }}</span>
+            </el-option>
+          </el-select>
+          <el-tag
+            v-if="pointmapEntry(t.id)"
+            :type="pointmapEntry(t.id).source === 'selection' ? 'success' : 'info'"
+            size="small"
+            style="margin-left:8px"
+          >
+            当前：{{ pointmapEntry(t.id).modelName || pointmapEntry(t.id).modelId || '兜底点表' }}
+          </el-tag>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button
+            type="primary"
+            :loading="applyingModels"
+            :disabled="!deviceModelDirty || applying || applyingModels"
+            @click="applyDeviceModels"
+          >确认并重新初始化</el-button>
+          <span v-if="!deviceModelDirty" class="meta">选型无变更</span>
+        </el-form-item>
+      </el-form>
+    </div>
+
     <div class="card tip-card">
       <div class="card-title">说明</div>
       <ul class="tips">
@@ -72,16 +120,17 @@
         <li>确认后将按工程中的 EMU 数量生成储能单元，并重启后端以重建设备与 Modbus 端口。</li>
         <li>电站概览图会随单元数量自动更新；当前仍按标准径向接线展开（220→35→690）。</li>
         <li>重启期间页面会短暂不可用，开发模式下 <code>dev-up.sh</code> 会自动拉起后端。</li>
+        <li>设备型号选型独立于工程模式，两者均通过重启生效；未选型的设备类型按兜底点表（根目录 / pointmaps 版本目录）解析。</li>
       </ul>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSystemConfig, postSystemApply, getHealth } from '@/services/api.js'
+import { getSystemConfig, postSystemApply, getDeviceModels, postDeviceModelsApply, getHealth } from '@/services/api.js'
 import { lockSystem, unlockSystem, updateSystemProgress } from '@/services/systemLock.js'
 
 const router = useRouter()
@@ -90,13 +139,31 @@ const projectId = ref(null)
 const projects = ref([])
 const applying = ref(false)
 const previewNotes = ref([])
+const deviceTypes = ref([])
+const deviceSelection = reactive({})
+const deviceSelectionLoaded = ref({})
+const applyingModels = ref(false)
 const state = reactive({
   source: 'appsettings',
   runtimeUnitCount: 0,
   runtimePvUnitCount: 0,
   activeProjectName: '',
-  activeProjectId: null
+  activeProjectId: null,
+  pointmaps: []
 })
+
+const deviceModelDirty = computed(() => {
+  for (const t of deviceTypes.value) {
+    const cur = deviceSelection[t.id] ?? null
+    const old = deviceSelectionLoaded.value[t.id] ?? null
+    if (cur !== old) return true
+  }
+  return false
+})
+
+function pointmapEntry(typeId) {
+  return state.pointmaps.find(p => p.typeId === typeId) || null
+}
 
 function onModeChange(on) {
   if (!on) projectId.value = null
@@ -112,7 +179,19 @@ async function reload() {
   state.runtimePvUnitCount = cfg.runtimePvUnitCount || 0
   state.activeProjectName = cfg.activeProjectName || ''
   state.activeProjectId = cfg.activeProjectId || null
+  state.pointmaps = cfg.pointmaps || []
   previewNotes.value = cfg.overlaySummary?.notes || []
+}
+
+async function reloadDeviceModels() {
+  const dm = await getDeviceModels()
+  deviceTypes.value = dm.types || []
+  const sel = dm.selection || {}
+  for (const key of Object.keys(deviceSelection)) delete deviceSelection[key]
+  for (const t of deviceTypes.value) {
+    deviceSelection[t.id] = sel[t.id] || null
+  }
+  deviceSelectionLoaded.value = { ...deviceSelection }
 }
 
 /**
@@ -239,9 +318,82 @@ async function apply() {
   }
 }
 
+async function applyDeviceModels() {
+  const changed = deviceTypes.value
+    .filter(t => (deviceSelection[t.id] ?? null) !== (deviceSelectionLoaded.value[t.id] ?? null))
+    .map(t => {
+      const m = t.models.find(x => x.id === deviceSelection[t.id])
+      return `${t.name}: ${m ? m.name : (deviceSelection[t.id] || '兜底点表')}`
+    })
+
+  try {
+    await ElMessageBox.confirm(
+      `应用设备型号选型：\n${changed.join('\n')}\n当前运行状态将丢失，后端将重启，是否继续？`,
+      '确认应用设备型号',
+      { type: 'warning', confirmButtonText: '确认并重启', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+
+  applyingModels.value = true
+  lockSystem('正在提交设备型号选型…', 8, '提交选型')
+  try {
+    updateSystemProgress(18, '正在写入设备型号选型…', '应用选型')
+    const selections = {}
+    for (const t of deviceTypes.value) {
+      if (deviceSelection[t.id]) selections[t.id] = deviceSelection[t.id]
+    }
+    const res = await postDeviceModelsApply({ selections, confirmRestart: true })
+    if (!res.ok) {
+      ElMessage.error(res.message || '应用失败')
+      return
+    }
+    updateSystemProgress(35, res.message || '选型已提交，准备重启后端…', '准备重启')
+
+    if (res.restarting) {
+      const ok = await waitBackendReady()
+      if (!ok) {
+        ElMessage.error('等待后端重启超时，请检查终端或手动重启')
+        return
+      }
+      updateSystemProgress(96, '正在刷新界面状态…', '完成收尾')
+      await Promise.all([reload(), reloadDeviceModels()])
+      updateSystemProgress(100, '模拟器已按新点表就绪', '完成')
+      ElMessage.success('模拟器已按新点表就绪')
+      await new Promise(r => setTimeout(r, 350))
+      unlockSystem()
+      applyingModels.value = false
+      return
+    }
+    updateSystemProgress(100, '选型已更新', '完成')
+    await Promise.all([reload(), reloadDeviceModels()])
+  } catch (e) {
+    // 重启瞬间请求可能被掐断，转入轮询
+    if (String(e.message || '').includes('Network') || String(e.message || '').includes('ECONN')) {
+      updateSystemProgress(40, '连接已中断，正在等待后端重启…', '等待后端重启')
+      const ok = await waitBackendReady()
+      if (ok) {
+        updateSystemProgress(96, '正在刷新界面状态…', '完成收尾')
+        await Promise.all([reload(), reloadDeviceModels()])
+        updateSystemProgress(100, '模拟器已重启', '完成')
+        ElMessage.success('模拟器已重启')
+        await new Promise(r => setTimeout(r, 350))
+        unlockSystem()
+        applyingModels.value = false
+        return
+      }
+    }
+    ElMessage.error(e.message || '应用失败')
+  } finally {
+    applyingModels.value = false
+    unlockSystem()
+  }
+}
+
 onMounted(async () => {
   try {
-    await reload()
+    await Promise.all([reload(), reloadDeviceModels()])
   } catch (e) {
     ElMessage.error(e.message || '加载系统配置失败')
   }

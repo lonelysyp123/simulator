@@ -52,6 +52,28 @@ namespace EssSimulator.Web.Topology
         public int RuntimePvUnitCount { get; set; }
         public List<TopologyProjectSummary> Projects { get; set; } = new();
         public TopologyRuntimeOverlay? OverlaySummary { get; set; }
+        /// <summary>各设备类型当前生效的点表型号摘要。</summary>
+        public List<PointmapRuntimeEntry> Pointmaps { get; set; } = new();
+    }
+
+    /// <summary>单个设备类型的点表生效状态（系统配置界面展示用）。</summary>
+    public sealed class PointmapRuntimeEntry
+    {
+        public string TypeId { get; set; } = "";
+        public string TypeName { get; set; } = "";
+        /// <summary>选中型号 id；未选型（legacy 兜底）时为 null。</summary>
+        public string? ModelId { get; set; }
+        public string? ModelName { get; set; }
+        /// <summary>selection=型号选型生效；legacy=未选型，按根目录/版本目录兜底。</summary>
+        public string Source { get; set; } = "legacy";
+    }
+
+    /// <summary>设备型号选型应用请求（POST /api/system/device-models/apply）。</summary>
+    public sealed class DeviceModelsApplyRequest
+    {
+        /// <summary>设备类型 id → 型号 id。</summary>
+        public Dictionary<string, string> Selections { get; set; } = new();
+        public bool ConfirmRestart { get; set; } = true;
     }
 
     public sealed class SystemApplyRequest

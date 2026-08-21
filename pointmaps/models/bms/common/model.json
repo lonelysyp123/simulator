@@ -1,0 +1,5 @@
+{
+  "id": "common",
+  "name": "标准版（common）",
+  "description": "默认联调 / 商业发布点表；develop 命名 bms_bank，精简 bms_rack"
+}

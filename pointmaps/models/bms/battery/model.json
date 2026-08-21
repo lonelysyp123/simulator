@@ -1,0 +1,5 @@
+{
+  "id": "battery",
+  "name": "电芯级遥测版",
+  "description": "全量 bms_rack（Pack / 电芯数据点）"
+}
