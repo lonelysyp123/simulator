@@ -266,6 +266,14 @@ namespace EssSimulator.Protocol.Modbus
                     paths.Select(p => SimServer.GetExtIfVariableVal(p)).ToArray());
             }
 
+            if (string.Equals(model.ModelType, MaxPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+            {
+                var paths = SumPointBinding.ParsePaths(model.Arg1, model.Arg2);
+                if (paths == null) return 0;
+                return MaxPointBinding.ComputeMax(
+                    paths.Select(p => SimServer.GetExtIfVariableVal(p)).ToArray());
+            }
+
             if (!int.TryParse(model.ModelType, out int modelType))
             {
                 var tmp = SimServer.GetExtIfVariableVal(model.Arg1!);
@@ -292,6 +300,16 @@ namespace EssSimulator.Protocol.Modbus
                     model.Arg2?.Replace("rackId", rackId.ToString()));
                 if (paths == null) return 0;
                 return SumPointBinding.ComputeSum(
+                    paths.Select(p => SimServer.GetExtIfVariableVal(p)).ToArray());
+            }
+
+            if (string.Equals(model.ModelType, MaxPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+            {
+                var paths = SumPointBinding.ParsePaths(
+                    model.Arg1?.Replace("rackId", rackId.ToString()),
+                    model.Arg2?.Replace("rackId", rackId.ToString()));
+                if (paths == null) return 0;
+                return MaxPointBinding.ComputeMax(
                     paths.Select(p => SimServer.GetExtIfVariableVal(p)).ToArray());
             }
 

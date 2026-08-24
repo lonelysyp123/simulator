@@ -22,7 +22,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5020,u16,16,yc20,1,5.5MW PCS1-电网电压 RS,model=4|arg1=emu1.PcsList[0].LineVoltageAB|arg2=|arg3=|arg4=1
 4,5021,u16,16,yc21,1,5.5MW PCS1-电网电压 ST,model=4|arg1=emu1.PcsList[0].LineVoltageBC|arg2=|arg3=|arg4=1
 4,5022,u16,16,yc22,1,5.5MW PCS1-电网电压 TR,model=4|arg1=emu1.PcsList[0].LineVoltageCA|arg2=|arg3=|arg4=1
-4,5023,int16,16,yc23,10,5.5MW PCS1-PCS 过温降载NTC,model=4|arg1=emu1.PcsList[0].IGBTMaxTemp|arg2=|arg3=|arg4=10
+4,5023,int16,16,yc23,10,5.5MW PCS1-PCS 过温降载NTC,model=max|arg1=emu1.PcsList[0].IGBTMaxTemp|arg2=emu1.PcsList[1].IGBTMaxTemp|arg3=|arg4=10
 4,5024,u16,16,yc24,1,5.5MW PCS1-PCS 可用容量,model=sum|arg1=emu1.PcsList[0].AvailableCapacity|arg2=emu1.PcsList[1].AvailableCapacity|arg3=|arg4=1
 4,5025,u16,16,yc25,1,5.5MW PCS1-PCS 额定容量,model=sum|arg1=emu1.PcsList[0].PCSRatePower|arg2=emu1.PcsList[1].PCSRatePower|arg3=|arg4=1
 4,5231,u16,16,yc190,1,5.5MW PCS1-模块1 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu1.PcsList[0]
@@ -52,7 +52,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5620,u16,16,yc215,1,5.5MW PCS2-电网电压 RS,model=4|arg1=emu2.PcsList[0].LineVoltageAB|arg2=|arg3=|arg4=1
 4,5621,u16,16,yc216,1,5.5MW PCS2-电网电压 ST,model=4|arg1=emu2.PcsList[0].LineVoltageBC|arg2=|arg3=|arg4=1
 4,5622,u16,16,yc217,1,5.5MW PCS2-电网电压 TR,model=4|arg1=emu2.PcsList[0].LineVoltageCA|arg2=|arg3=|arg4=1
-4,5623,int16,16,yc218,10,5.5MW PCS2-PCS 过温降载NTC,model=4|arg1=emu2.PcsList[0].IGBTMaxTemp|arg2=|arg3=|arg4=10
+4,5623,int16,16,yc218,10,5.5MW PCS2-PCS 过温降载NTC,model=max|arg1=emu2.PcsList[0].IGBTMaxTemp|arg2=emu2.PcsList[1].IGBTMaxTemp|arg3=|arg4=10
 4,5624,u16,16,yc219,1,5.5MW PCS2-PCS 可用容量,model=sum|arg1=emu2.PcsList[0].AvailableCapacity|arg2=emu2.PcsList[1].AvailableCapacity|arg3=|arg4=1
 4,5625,u16,16,yc220,1,5.5MW PCS2-PCS 额定容量,model=sum|arg1=emu2.PcsList[0].PCSRatePower|arg2=emu2.PcsList[1].PCSRatePower|arg3=|arg4=1
 4,5831,u16,16,yc385,1,5.5MW PCS2-模块1 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu2.PcsList[0]

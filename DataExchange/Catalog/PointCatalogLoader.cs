@@ -67,6 +67,7 @@ namespace EssSimulator.DataExchange.Catalog
             var telemetry = new List<PointBinding>();
             var pluginPoints = new List<PluginPointBinding>();
             var sumPoints = new List<SumPointBinding>();
+            var maxPoints = new List<MaxPointBinding>();
             foreach (var entry in pointMap.DataMaps)
             {
                 if (string.IsNullOrWhiteSpace(entry.ParamName))
@@ -84,6 +85,22 @@ namespace EssSimulator.DataExchange.Catalog
                         continue;
 
                     sumPoints.Add(new SumPointBinding
+                    {
+                        Entry = entry,
+                        ParamName = entry.ParamName,
+                        Paths = paths
+                    });
+                    continue;
+                }
+
+                // model=max：遥测值 = 各路径最大值（路径格式同 sum），用于单元级取最严重模块口径，不走单路径反射绑定
+                if (string.Equals(model.ModelType, MaxPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+                {
+                    var paths = SumPointBinding.ParsePaths(model.Arg1, model.Arg2);
+                    if (paths == null)
+                        continue;
+
+                    maxPoints.Add(new MaxPointBinding
                     {
                         Entry = entry,
                         ParamName = entry.ParamName,
@@ -130,8 +147,9 @@ namespace EssSimulator.DataExchange.Catalog
                 if (string.IsNullOrWhiteSpace(model.Arg1))
                     continue;
 
-                // sum 点位仅供遥测，不作为控制目标
-                if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+                // sum/max 点位仅供遥测，不作为控制目标
+                if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(model.ModelType, MaxPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 var target = DataTarget.ParseBindingPath(model.Arg1);
@@ -161,8 +179,9 @@ namespace EssSimulator.DataExchange.Catalog
                     if (string.IsNullOrWhiteSpace(model.Arg1))
                         continue;
 
-                    // sum 仅支持 bank 级点位，rack 级跳过
-                    if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+                    // sum/max 仅支持 bank 级点位，rack 级跳过
+                    if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(model.ModelType, MaxPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     rackTelemetry.Add(new RackPointBinding
@@ -182,7 +201,8 @@ namespace EssSimulator.DataExchange.Catalog
                     if (string.IsNullOrWhiteSpace(model.Arg1))
                         continue;
 
-                    if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(model.ModelType, MaxPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     rackControl.Add(new RackPointBinding
@@ -203,6 +223,7 @@ namespace EssSimulator.DataExchange.Catalog
                 RackControlPoints = rackControl,
                 PluginPoints = pluginPoints,
                 SumPoints = sumPoints,
+                MaxPoints = maxPoints,
                 DefaultValues = new Dictionary<string, object>(pointMap.DefaultBuffer)
             };
         }
