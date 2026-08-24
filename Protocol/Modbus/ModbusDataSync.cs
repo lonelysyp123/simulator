@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using EssSimulator.Core;
+using EssSimulator.DataExchange.Catalog;
 using log4net;
 
 namespace EssSimulator.Protocol.Modbus
@@ -257,6 +258,11 @@ namespace EssSimulator.Protocol.Modbus
         {
             if (!_map.ParamModelLookup.TryGetValue(entry.ParamName!, out var model)) return 0;
 
+            if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+                return SumPointBinding.ComputeSum(
+                    SimServer.GetExtIfVariableVal(model.Arg1!),
+                    string.IsNullOrWhiteSpace(model.Arg2) ? null : SimServer.GetExtIfVariableVal(model.Arg2));
+
             if (!int.TryParse(model.ModelType, out int modelType))
             {
                 var tmp = SimServer.GetExtIfVariableVal(model.Arg1!);
@@ -275,6 +281,14 @@ namespace EssSimulator.Protocol.Modbus
             if (!_map.RackParamModelLookup.TryGetValue(entry.ParamName!, out var model)) return 0;
 
             string? arg1 = model.Arg1?.Replace("rackId", rackId.ToString());
+
+            if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+            {
+                var arg2 = model.Arg2?.Replace("rackId", rackId.ToString());
+                return SumPointBinding.ComputeSum(
+                    SimServer.GetExtIfVariableVal(arg1!),
+                    string.IsNullOrWhiteSpace(arg2) ? null : SimServer.GetExtIfVariableVal(arg2));
+            }
 
             if (!int.TryParse(model.ModelType, out int modelType))
             {
