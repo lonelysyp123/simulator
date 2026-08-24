@@ -14,7 +14,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5012,u16,16,yc12,1,5.5MW PCS1-交流电流 R,model=sum|arg1=emu1.PcsList[0].PhaseACurrent|arg2=emu1.PcsList[1].PhaseACurrent|arg3=|arg4=1
 4,5013,u16,16,yc13,1,5.5MW PCS1-交流电流 S,model=sum|arg1=emu1.PcsList[0].PhaseBCurrent|arg2=emu1.PcsList[1].PhaseBCurrent|arg3=|arg4=1
 4,5014,u16,16,yc14,1,5.5MW PCS1-交流电流 T,model=sum|arg1=emu1.PcsList[0].PhaseCCurrent|arg2=emu1.PcsList[1].PhaseCCurrent|arg3=|arg4=1
-4,5015,int16,16,yc15,1,5.5MW PCS1-电池总功率,model=4|arg1=emu1.PcsList[0].BatteryPower|arg2=|arg3=|arg4=1
+4,5015,int16,16,yc15,1,5.5MW PCS1-电池总功率,model=sum|arg1=emu1.PcsList[0].BatteryPower|arg2=emu1.PcsList[1].BatteryPower|arg3=|arg4=1
 4,5016,int16,16,yc16,1,5.5MW PCS1-电池1 功率,model=4|arg1=emu1.PcsList[0].BatteryPower|arg2=|arg3=|arg4=1
 4,5017,int16,16,yc17,1,5.5MW PCS1-电池2 功率,model=4|arg1=emu1.PcsList[1].BatteryPower|arg2=|arg3=|arg4=1
 4,5018,int16,16,yc18,1,5.5MW PCS1-电网有功功率,model=4|arg1=emu1.Emu.OutputActivePower|arg2=|arg3=|arg4=1
@@ -44,7 +44,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5612,u16,16,yc207,1,5.5MW PCS2-交流电流 R,model=sum|arg1=emu2.PcsList[0].PhaseACurrent|arg2=emu2.PcsList[1].PhaseACurrent|arg3=|arg4=1
 4,5613,u16,16,yc208,1,5.5MW PCS2-交流电流 S,model=sum|arg1=emu2.PcsList[0].PhaseBCurrent|arg2=emu2.PcsList[1].PhaseBCurrent|arg3=|arg4=1
 4,5614,u16,16,yc209,1,5.5MW PCS2-交流电流 T,model=sum|arg1=emu2.PcsList[0].PhaseCCurrent|arg2=emu2.PcsList[1].PhaseCCurrent|arg3=|arg4=1
-4,5615,int16,16,yc210,1,5.5MW PCS2-电池总功率,model=4|arg1=emu2.PcsList[0].BatteryPower|arg2=|arg3=|arg4=1
+4,5615,int16,16,yc210,1,5.5MW PCS2-电池总功率,model=sum|arg1=emu2.PcsList[0].BatteryPower|arg2=emu2.PcsList[1].BatteryPower|arg3=|arg4=1
 4,5616,int16,16,yc211,1,5.5MW PCS2-电池1 功率,model=4|arg1=emu2.PcsList[0].BatteryPower|arg2=|arg3=|arg4=1
 4,5617,int16,16,yc212,1,5.5MW PCS2-电池2 功率,model=4|arg1=emu2.PcsList[1].BatteryPower|arg2=|arg3=|arg4=1
 4,5618,int16,16,yc213,1,5.5MW PCS2-电网有功功率,model=4|arg1=emu2.Emu.OutputActivePower|arg2=|arg3=|arg4=1

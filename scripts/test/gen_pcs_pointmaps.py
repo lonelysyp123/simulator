@@ -175,7 +175,6 @@ LAYOUT = {
 # 模块1 -> emu{n}.PcsList[0], 模块2 -> emu{n}.PcsList[1]
 # 机绁级聚合优先 Emu.*, 无聚合属性的取 PcsList[0] 代表。
 UNIT_BIND = {
-    '电池总功率': 'PcsList[0].BatteryPower',
     '电池1 功率': 'PcsList[0].BatteryPower',
     '电池2 功率': 'PcsList[1].BatteryPower',
     '电网有功功率': 'Emu.OutputActivePower',
@@ -213,6 +212,7 @@ UNIT_SUM_BIND = {
     '交流电流 R': ('PcsList[0].PhaseACurrent', 'PcsList[1].PhaseACurrent'),
     '交流电流 S': ('PcsList[0].PhaseBCurrent', 'PcsList[1].PhaseBCurrent'),
     '交流电流 T': ('PcsList[0].PhaseCCurrent', 'PcsList[1].PhaseCCurrent'),
+    '电池总功率': ('PcsList[0].BatteryPower', 'PcsList[1].BatteryPower'),
 }
 
 def binding_for(name, n, scale):
