@@ -6,7 +6,7 @@ namespace EssSimulator.Protocol.Modbus
     /// <summary>
     /// 解析运行时点表 CSV 路径：优先按设备型号选型（pointmaps/models/{type}/{model}），
     /// 其次工作目录/输出目录根下的文件，
-    /// 最后 <c>pointmaps/common/</c>（未执行 sync-pointmaps-to-root 时的开发兜底）。
+    /// 最后 <c>pointmaps/models/{类型}/standard/</c>（未执行 sync-pointmaps-to-root 时的开发兜底）。
     /// </summary>
     public static class PointMapPathResolver
     {
@@ -36,19 +36,9 @@ namespace EssSimulator.Protocol.Modbus
                 var direct = Path.Combine(root, name);
                 if (File.Exists(direct)) return Path.GetFullPath(direct);
 
-                var common = Path.Combine(root, "pointmaps", "common", name);
-                if (File.Exists(common)) return Path.GetFullPath(common);
-
-                // 若根目录已有 pointmap-version / 其他版本目录，尝试 common 以外的现成副本
-                var pointmaps = Path.Combine(root, "pointmaps");
-                if (Directory.Exists(pointmaps))
-                {
-                    foreach (var dir in Directory.EnumerateDirectories(pointmaps))
-                    {
-                        var candidate = Path.Combine(dir, name);
-                        if (File.Exists(candidate)) return Path.GetFullPath(candidate);
-                    }
-                }
+                // 开发兜底：未选型时回退到该文件所属设备类型的 standard 型号点表
+                var standard = ResolveStandardModel(root, fileName);
+                if (standard != null) return standard;
             }
 
             throw new FileNotFoundException(
@@ -66,6 +56,16 @@ namespace EssSimulator.Protocol.Modbus
             if (dir == null) return null;
 
             var candidate = Path.Combine(dir, Path.GetFileName(fileName));
+            return File.Exists(candidate) ? Path.GetFullPath(candidate) : null;
+        }
+
+        /// <summary>兜底解析：返回文件所属设备类型的 standard 型号点表路径，无则返回 null。</summary>
+        private static string? ResolveStandardModel(string root, string fileName)
+        {
+            var typeId = DeviceModelRegistry.FindTypeForFile(fileName);
+            if (typeId == null) return null;
+
+            var candidate = Path.Combine(root, "pointmaps", "models", typeId, "standard", Path.GetFileName(fileName));
             return File.Exists(candidate) ? Path.GetFullPath(candidate) : null;
         }
 

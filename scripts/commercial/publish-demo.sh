@@ -58,7 +58,7 @@ for f in log4net.config autotest.json; do
   cp -f "$ROOT/$f" "$OUT/$f"
   echo "    $f"
 done
-copy_pointmaps_to "$OUT" "$DEFAULT_COMMERCIAL_POINTMAP_VERSION"
+copy_pointmaps_to "$OUT"
 if [[ -d "$ROOT/docs" ]]; then
   rm -rf "$OUT/docs"
   cp -R "$ROOT/docs" "$OUT/docs"

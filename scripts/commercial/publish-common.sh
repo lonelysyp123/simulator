@@ -102,7 +102,7 @@ copy_runtime_files() {
     echo "    $f"
   done
 
-  copy_pointmaps_to "$out" "$DEFAULT_COMMERCIAL_POINTMAP_VERSION"
+  copy_pointmaps_to "$out"
 
   if [[ -f "$ROOT/pointmap.manifest.json" ]]; then
     cp -f "$ROOT/pointmap.manifest.json" "$out/pointmap.manifest.json"

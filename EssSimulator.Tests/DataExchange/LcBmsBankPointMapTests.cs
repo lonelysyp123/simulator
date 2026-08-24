@@ -7,7 +7,7 @@ using EssSimulator.Protocol.Modbus;
 namespace EssSimulator.Tests.DataExchange;
 
 /// <summary>
-/// 验证 LC 版 BMS bank 点表（pointmaps/lc/bms_bank.csv）的准确性：
+/// 验证 G2 Pro 版 BMS bank 点表（pointmaps/models/bms/g2_pro/bms_bank.csv，原 LC 版点表）的准确性：
 /// 1. 所有 ModelSim 绑定路径能通过反射解析到 BatteryStack 属性；
 /// 2. 控制点（FC6）绑定属性可写；
 /// 3. param170 一键复归绑定 FaultClearCommand 且具有 Pulse 语义与 BmsApplyLinkCommands 效果。
@@ -15,7 +15,7 @@ namespace EssSimulator.Tests.DataExchange;
 public class LcBmsBankPointMapTests
 {
     private static string LcBankCsvPath =>
-        Path.Combine(FindRepoRoot(), "pointmaps", "lc", "bms_bank.csv");
+        Path.Combine(FindRepoRoot(), "pointmaps", "models", "bms", "g2_pro", "bms_bank.csv");
 
     private static string FindRepoRoot()
     {
