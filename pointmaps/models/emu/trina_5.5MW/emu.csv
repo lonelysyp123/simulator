@@ -72,7 +72,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,125,int32,32,sysyc125,10,SYSTEM-有功功率(0.1kW),model=4|arg1=em.TotalActivePower|arg2=|arg3=|arg4=10
 4,127,int32,32,sysyc127,10,SYSTEM-无功功率(0.1kVar),model=4|arg1=em.TotalReactivePower|arg2=|arg3=|arg4=10
 4,129,u32,32,sysyc129,100,SYSTEM-交流侧频率(0.01Hz),model=4|arg1=em.Frequency|arg2=|arg3=|arg4=100
-4,131,int32,32,sysyc131,10,SYSTEM-直流侧功率(0.1kW),model=sum|arg1=emu1.PcsList[0].BatteryPower|arg2=emu1.PcsList[1].BatteryPower|arg3=|arg4=10
+4,131,int32,32,sysyc131,10,SYSTEM-直流侧功率(0.1kW),model=sum|arg1=emu1.PcsList[0].BatteryPower;emu1.PcsList[1].BatteryPower;emu2.PcsList[0].BatteryPower;emu2.PcsList[1].BatteryPower|arg2=|arg3=|arg4=10
 4,133,int32,32,sysyc133,10,SYSTEM-直流侧电流(0.1A),model=4|arg1=bms1.BatteryStacks[0].Current|arg2=|arg3=|arg4=10
 4,135,u32,32,sysyc135,10,SYSTEM-直流侧平均电压(0.1V),model=4|arg1=bms1.BatteryStacks[0].TotalVoltage|arg2=|arg3=|arg4=10
 4,141,u32,32,sysyc141,10,SYSTEM-直流侧总充电电量(0.1kWh),model=4|arg1=ess.TotalChargeEnergy|arg2=|arg3=|arg4=10
@@ -91,20 +91,20 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,205,u16,16,sysyc205,1,SYSTEM-运行BMS数量,0
 4,206,u16,16,sysyc206,1,SYSTEM-告警BMS数量,0
 4,207,u16,16,sysyc207,1,SYSTEM-故障BMS数量,0
-4,218,u16,16,sysyc218,1,SYSTEM-状态字1(一体机PCS通讯状态Bit0~15对应#1~#16PCS,1已连接),0
-4,219,u16,16,sysyc219,1,SYSTEM-状态字2(Bit8测控设备通讯;Bit9 UPS485通讯;Bit10 EMS通讯,1已连接),0
-4,220,u16,16,sysyc220,1,SYSTEM-状态字3(BMS通讯状态Bit0~9对应#1~#10BMS,1已连接),0
-4,221,u16,16,sysyc221,1,SYSTEM-状态字4(PCS组状态Bit0~15对应#1~#16组,1故障),0
-4,222,u16,16,sysyc222,1,SYSTEM-状态字5(PCS组状态Bit0~7对应#17~#24组,1故障),0
-4,223,u16,16,sysyc223,1,SYSTEM-状态字6(PCS软件版本校验字,0正常1异常),0
-4,224,u16,16,sysyc224,1,SYSTEM-状态字7(PCS安规标准校验字,0正常1异常),0
-4,225,u16,16,sysyc225,1,SYSTEM-状态字8(PCS模式校验字:总线模式/并离网/运行模式/主从机,0正常1异常),0
+4,218,u16,16,sysyc218,1,SYSTEM-状态字1(一体机PCS通讯状态Bit0~15对应#1~#16PCS;1已连接),0
+4,219,u16,16,sysyc219,1,SYSTEM-状态字2(Bit8测控设备通讯;Bit9 UPS485通讯;Bit10 EMS通讯;1已连接),0
+4,220,u16,16,sysyc220,1,SYSTEM-状态字3(BMS通讯状态Bit0~9对应#1~#10BMS;1已连接),0
+4,221,u16,16,sysyc221,1,SYSTEM-状态字4(PCS组状态Bit0~15对应#1~#16组;1故障),0
+4,222,u16,16,sysyc222,1,SYSTEM-状态字5(PCS组状态Bit0~7对应#17~#24组;1故障),0
+4,223,u16,16,sysyc223,1,SYSTEM-状态字6(PCS软件版本校验字;0正常1异常),0
+4,224,u16,16,sysyc224,1,SYSTEM-状态字7(PCS安规标准校验字;0正常1异常),0
+4,225,u16,16,sysyc225,1,SYSTEM-状态字8(PCS模式校验字:总线模式/并离网/运行模式/主从机;0正常1异常),0
 4,226,u16,16,sysyc226,1,SYSTEM-状态字9(保留),0
 4,227,u16,16,sysyc227,1,SYSTEM-状态字10(保留),0
-4,228,u16,16,sysyc228,1,SYSTEM-状态字11(5.5MW一体机PCS通讯状态Bit0~1对应#1~#2PCS,1已连接),0
+4,228,u16,16,sysyc228,1,SYSTEM-状态字11(5.5MW一体机PCS通讯状态Bit0~1对应#1~#2PCS;1已连接),0
 6,4,u16,16,syst4,1,SYSTEM-远程&本地控制使能(0禁止1使能),0
 6,5,u16,16,syst5,1,SYSTEM-远程&本地控制模式(0本地1远程),0
 6,6,u16,16,syst6,1,SYSTEM-系统操作(3启动4停止5待机6重置),0
 6,7,u16,16,syst7,1,SYSTEM-黑启动模式写入(0关闭1开启),0
-6,1010,int16,16,syst1010,1,SYSTEM-交流侧目标有功功率(1kW,正放电负充电),0
+6,1010,int16,16,syst1010,1,SYSTEM-交流侧目标有功功率(1kW;正放电负充电),0
 6,1011,int16,16,syst1011,1,SYSTEM-交流侧目标无功功率(1kVar),0
