@@ -259,6 +259,15 @@ public class TelemetryPluginTests
         Assert.NotNull(dcPower);
         Assert.Equal(4, dcPower!.Paths.Count);
         Assert.Contains("emu2.PcsList[1].BatteryPower", dcPower.Paths);
+
+        // 单元级过温降载 NTC：两模块 IGBT 温度取大
+        var ntc1 = catalog.MaxPoints.FirstOrDefault(p => p.ParamName == "yc23");
+        Assert.NotNull(ntc1);
+        Assert.Equal(new[] { "emu1.PcsList[0].IGBTMaxTemp", "emu1.PcsList[1].IGBTMaxTemp" }, ntc1!.Paths);
+
+        var ntc2 = catalog.MaxPoints.FirstOrDefault(p => p.ParamName == "yc218");
+        Assert.NotNull(ntc2);
+        Assert.Equal(new[] { "emu2.PcsList[0].IGBTMaxTemp", "emu2.PcsList[1].IGBTMaxTemp" }, ntc2!.Paths);
     }
 
     [Fact]
@@ -293,6 +302,12 @@ public class TelemetryPluginTests
             "emu1.Emu.MaxDischargePower", "emu2.Emu.MaxDischargePower",
             "emu3.Emu.MaxDischargePower", "emu4.Emu.MaxDischargePower"
         }, dischargePower!.Paths);
+
+        // 单元级过温降载 NTC：各单元两模块 IGBT 温度取大
+        Assert.Equal(4, catalog.MaxPoints.Count);
+        var ntc4 = catalog.MaxPoints.FirstOrDefault(p => p.ParamName == "yc635");
+        Assert.NotNull(ntc4);
+        Assert.Equal(new[] { "emu4.PcsList[0].IGBTMaxTemp", "emu4.PcsList[1].IGBTMaxTemp" }, ntc4!.Paths);
 
         // 描述列半角逗号修复：sysyc218 等状态字点位恢复为固定默认值点
         Assert.Contains("sysyc218", catalog.DefaultValues.Keys);

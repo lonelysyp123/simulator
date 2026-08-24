@@ -41,7 +41,7 @@ namespace EssSimulator.DataExchange.Pipeline
 
         public void RunOnce()
         {
-            if (_catalog.TelemetryPoints.Count == 0 && _pluginPoints.Count == 0 && _catalog.SumPoints.Count == 0)
+            if (_catalog.TelemetryPoints.Count == 0 && _pluginPoints.Count == 0 && _catalog.SumPoints.Count == 0 && _catalog.MaxPoints.Count == 0)
                 return;
 
             var writeBuffer = new Dictionary<string, object>();
@@ -86,6 +86,22 @@ namespace EssSimulator.DataExchange.Pipeline
                 catch (Exception ex)
                 {
                     _log.Debug($"Telemetry sum compute failed: {binding.ParamName}", ex);
+                }
+            }
+
+            // model=max：读取各仿真路径并取最大值，缺失操作数忽略
+            foreach (var binding in _catalog.MaxPoints)
+            {
+                try
+                {
+                    var value = MaxPointBinding.ComputeMax(
+                        binding.Paths.Select(_simulation.Read).ToArray());
+                    if (_shadow.TelemetryChanged(binding.ParamName, value))
+                        writeBuffer[binding.ParamName] = value;
+                }
+                catch (Exception ex)
+                {
+                    _log.Debug($"Telemetry max compute failed: {binding.ParamName}", ex);
                 }
             }
 
