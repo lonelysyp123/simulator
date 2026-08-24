@@ -11,6 +11,9 @@ namespace EssSimulator.DataExchange.Plugins
     /// </summary>
     public sealed class TrinaEmuFaultWordPlugin : ITelemetryPlugin
     {
+        /// <summary>系统故障总字键：遍历所有机组全部 PCS 模块，任一告警汇总非零即输出 1。</summary>
+        public const string SystemFaultSummaryKey = "SystemFaultSummary";
+
         /// <summary>字键 → 位映射表：(位号, 仿真故障属性名列表，任一为 true 即置位)。</summary>
         private static readonly Dictionary<string, IReadOnlyList<(int Bit, string[] Props)>> WordMaps =
             new(StringComparer.Ordinal)
@@ -46,10 +49,14 @@ namespace EssSimulator.DataExchange.Plugins
                 }
             };
 
-        public bool CanHandle(string wordKey) => WordMaps.ContainsKey(wordKey);
+        public bool CanHandle(string wordKey) =>
+            wordKey == SystemFaultSummaryKey || WordMaps.ContainsKey(wordKey);
 
         public object? Compute(string wordKey, string deviceRoot, ISimulationDataAdapter simulation)
         {
+            if (wordKey == SystemFaultSummaryKey)
+                return ComputeSystemFaultSummary(deviceRoot, simulation);
+
             if (!WordMaps.TryGetValue(wordKey, out var map))
                 return null;
 
@@ -67,6 +74,53 @@ namespace EssSimulator.DataExchange.Plugins
             }
 
             return word;
+        }
+
+        /// <summary>
+        /// 系统故障总：deviceRoot 形如 emu1，去掉尾部编号得到机组前缀，
+        /// 自 1 起逐台探测机组，对每台机组 PcsList 中全部模块读取
+        /// AlarmSummary1/AlarmSummary2，任一非零即判故障（1），否则 0。
+        /// </summary>
+        private static int ComputeSystemFaultSummary(string deviceRoot, ISimulationDataAdapter simulation)
+        {
+            string prefix = (deviceRoot ?? string.Empty).TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
+            if (prefix.Length == 0 || prefix == deviceRoot)
+                return 0;
+
+            for (int unit = 1; unit <= 32; unit++)
+            {
+                string unitRoot = $"{prefix}{unit}";
+                if (!TryReadInt(simulation, $"{unitRoot}.PcsList.Count", out int moduleCount))
+                    break; // 首个缺失机组即停止探测（机组编号连续）
+
+                for (int m = 0; m < moduleCount; m++)
+                {
+                    if (TryReadInt(simulation, $"{unitRoot}.PcsList[{m}].AlarmSummary1", out int summary1) && summary1 != 0)
+                        return 1;
+                    if (TryReadInt(simulation, $"{unitRoot}.PcsList[{m}].AlarmSummary2", out int summary2) && summary2 != 0)
+                        return 1;
+                }
+            }
+
+            return 0;
+        }
+
+        /// <summary>读取整型遥测量；路径不存在/类型不符/异常均返回 false。</summary>
+        private static bool TryReadInt(ISimulationDataAdapter simulation, string path, out int value)
+        {
+            value = 0;
+            try
+            {
+                object? raw = simulation.Read(path);
+                if (raw is not IConvertible convertible)
+                    return false;
+                value = Convert.ToInt32(convertible);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>读取仿真布尔量；路径不存在/类型不符/异常均视为 false（协议位输出 0）。</summary>

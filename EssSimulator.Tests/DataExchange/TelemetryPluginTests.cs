@@ -84,6 +84,52 @@ public class TelemetryPluginTests
     }
 
     [Fact]
+    public void Compute_SystemFaultSummary_AnyModuleAlarm_ReturnsOne()
+    {
+        var sim = new FakeSimulation
+        {
+            ["emu1.PcsList.Count"] = 2,
+            ["emu1.PcsList[0].AlarmSummary1"] = (ushort)0,
+            ["emu1.PcsList[0].AlarmSummary2"] = (ushort)0,
+            ["emu1.PcsList[1].AlarmSummary1"] = (ushort)0,
+            ["emu1.PcsList[1].AlarmSummary2"] = (ushort)0,
+            ["emu2.PcsList.Count"] = 2,
+            ["emu2.PcsList[0].AlarmSummary1"] = (ushort)0,
+            ["emu2.PcsList[0].AlarmSummary2"] = (ushort)0,
+            ["emu2.PcsList[1].AlarmSummary1"] = (ushort)0x0004,
+            ["emu2.PcsList[1].AlarmSummary2"] = (ushort)0
+        };
+        var plugin = new TrinaEmuFaultWordPlugin();
+
+        // emu2 模块2 告警汇总1 非零 → 故障总=1
+        Assert.Equal(1, plugin.Compute("SystemFaultSummary", "emu1", sim));
+
+        // 全部模块告警清零 → 故障总=0
+        sim["emu2.PcsList[1].AlarmSummary1"] = (ushort)0;
+        Assert.Equal(0, plugin.Compute("SystemFaultSummary", "emu1", sim));
+    }
+
+    [Fact]
+    public void Compute_SystemFaultSummary_ProbesUnitsUntilMissing()
+    {
+        // 仅 emu1 存在：emu2 缺失时停止探测，emu1 两模块无告警 → 0
+        var sim = new FakeSimulation
+        {
+            ["emu1.PcsList.Count"] = 2,
+            ["emu1.PcsList[0].AlarmSummary1"] = (ushort)0,
+            ["emu1.PcsList[0].AlarmSummary2"] = (ushort)0,
+            ["emu1.PcsList[1].AlarmSummary1"] = (ushort)0,
+            ["emu1.PcsList[1].AlarmSummary2"] = (ushort)0
+        };
+        var plugin = new TrinaEmuFaultWordPlugin();
+        Assert.Equal(0, plugin.Compute("SystemFaultSummary", "emu1", sim));
+
+        // 机组根路径无编号后缀：不探测，输出 0
+        Assert.Equal(0, plugin.Compute("SystemFaultSummary", "emu", sim));
+        Assert.True(plugin.CanHandle("SystemFaultSummary"));
+    }
+
+    [Fact]
     public void Registry_ResolvesFirstMatchingPlugin()
     {
         var registry = new TelemetryPluginRegistry().Register(new TrinaEmuFaultWordPlugin());
@@ -99,16 +145,16 @@ public class TelemetryPluginTests
     {
         var catalog = LoadCatalog("trina_10MW");
 
-        // 4 机组 × (模块1/2 × 警告字1/2) = 16 个插件点
-        Assert.Equal(16, catalog.PluginPoints.Count);
+        // 4 机组 × (模块1/2 × 警告字1/2) = 16 个插件点 + 系统故障总 1 个
+        Assert.Equal(17, catalog.PluginPoints.Count);
         Assert.All(catalog.PluginPoints, p =>
-            Assert.Contains(p.WordKey, new[] { "ModuleWarningWord1", "ModuleWarningWord2" }));
+            Assert.Contains(p.WordKey, new[] { "ModuleWarningWord1", "ModuleWarningWord2", "SystemFaultSummary" }));
 
-        // 设备根路径与机组/模块层级一致：emu{n}.PcsList[0/1]
+        // 设备根路径与机组/模块层级一致：emu{n}.PcsList[0/1]，系统故障总为 emu1
         var roots = catalog.PluginPoints.Select(p => p.DeviceRoot).Distinct().OrderBy(r => r).ToArray();
         Assert.Equal(new[]
         {
-            "emu1.PcsList[0]", "emu1.PcsList[1]",
+            "emu1", "emu1.PcsList[0]", "emu1.PcsList[1]",
             "emu2.PcsList[0]", "emu2.PcsList[1]",
             "emu3.PcsList[0]", "emu3.PcsList[1]",
             "emu4.PcsList[0]", "emu4.PcsList[1]"
@@ -124,7 +170,7 @@ public class TelemetryPluginTests
     {
         var catalog = LoadCatalog("trina_5.5MW");
 
-        Assert.Equal(8, catalog.PluginPoints.Count);
+        Assert.Equal(9, catalog.PluginPoints.Count);
         Assert.Contains(catalog.PluginPoints, p => p.DeviceRoot == "emu2.PcsList[1]" && p.WordKey == "ModuleWarningWord2");
     }
 

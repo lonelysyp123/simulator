@@ -59,20 +59,11 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5832,u16,16,yc386,1,5.5MW PCS2-模块1 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu2.PcsList[0]
 4,5845,u16,16,yc388,1,5.5MW PCS2-模块2 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu2.PcsList[1]
 4,5846,u16,16,yc389,1,5.5MW PCS2-模块2 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu2.PcsList[1]
-4,1,u16,16,sysyc1,1,SYSTEM-协议版本(V0.15),0
-4,2,u16,16,sysyc2,1,SYSTEM-软件平台版本,0
-4,3,u16,16,sysyc3,1,SYSTEM-软件发布版本,0
-4,4,u16,16,sysyc4,1,SYSTEM-软件变更版本,0
-4,5,u16,16,sysyc5,1,SYSTEM-软件SPC版本,0
-4,100,u32,32,sysyc100,10,SYSTEM-标称容量(0.1kVA),model=sum|arg1=emuDeviceId.PcsList[0].PCSRatePower|arg2=emuDeviceId.PcsList[1].PCSRatePower|arg3=|arg4=10
-4,102,u32,32,sysyc102,10,SYSTEM-标称电量(0.1kWh),model=4|arg1=ess.Capacity|arg2=|arg3=|arg4=10
-4,104,u16,16,sysyc104,10,SYSTEM-系统SOC(0.001,标幺),model=4|arg1=bms1.BatteryStacks[0].SOC|arg2=|arg3=|arg4=10
-4,105,u16,16,sysyc105,10,SYSTEM-系统SOH(0.001,标幺),model=4|arg1=bms1.BatteryStacks[0].SOH|arg2=|arg3=|arg4=10
 4,106,u16,16,sysyc106,1,SYSTEM-系统总状态详细版(0初始化1停机2启动中3运行中4待机),0
-4,107,u16,16,sysyc107,1,SYSTEM-系统故障总(0正常1故障),0
+4,107,u16,16,sysyc107,1,SYSTEM-系统故障总(0正常1故障;统计全部机组所有PCS模块告警),model=plugin|arg1=SystemFaultSummary|arg2=emu1
 4,108,u16,16,sysyc108,1,SYSTEM-系统总状态精简版(1停机2启动中3运行中5故障6告警),0
-4,109,u32,32,sysyc109,10,SYSTEM-允许充电电量(0.1kWh),model=4|arg1=ess.AvailableChargeEnergy|arg2=|arg3=|arg4=10
-4,111,u32,32,sysyc111,10,SYSTEM-允许放电电量(0.1kWh),model=4|arg1=ess.AvailableDischargeEnergy|arg2=|arg3=|arg4=10
+4,109,u32,32,sysyc109,10,SYSTEM-允许充电电量(0.1kWh),0
+4,111,u32,32,sysyc111,10,SYSTEM-允许放电电量(0.1kWh),0
 4,113,u32,32,sysyc113,10,SYSTEM-允许充电功率(0.1kW),0
 4,115,u32,32,sysyc115,10,SYSTEM-允许放电功率(0.1kW),0
 4,121,u16,16,sysyc121,1,SYSTEM-PCS状态汇总(0初始1关闭2待机3运行),0
@@ -81,20 +72,13 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,125,int32,32,sysyc125,10,SYSTEM-有功功率(0.1kW),model=4|arg1=em.TotalActivePower|arg2=|arg3=|arg4=10
 4,127,int32,32,sysyc127,10,SYSTEM-无功功率(0.1kVar),model=4|arg1=em.TotalReactivePower|arg2=|arg3=|arg4=10
 4,129,u32,32,sysyc129,100,SYSTEM-交流侧频率(0.01Hz),model=4|arg1=em.Frequency|arg2=|arg3=|arg4=100
-4,131,int32,32,sysyc131,10,SYSTEM-直流侧功率(0.1kW),model=sum|arg1=emuDeviceId.PcsList[0].BatteryPower|arg2=emuDeviceId.PcsList[1].BatteryPower|arg3=|arg4=10
+4,131,int32,32,sysyc131,10,SYSTEM-直流侧功率(0.1kW),model=sum|arg1=emu1.PcsList[0].BatteryPower|arg2=emu1.PcsList[1].BatteryPower|arg3=|arg4=10
 4,133,int32,32,sysyc133,10,SYSTEM-直流侧电流(0.1A),model=4|arg1=bms1.BatteryStacks[0].Current|arg2=|arg3=|arg4=10
 4,135,u32,32,sysyc135,10,SYSTEM-直流侧平均电压(0.1V),model=4|arg1=bms1.BatteryStacks[0].TotalVoltage|arg2=|arg3=|arg4=10
 4,141,u32,32,sysyc141,10,SYSTEM-直流侧总充电电量(0.1kWh),model=4|arg1=ess.TotalChargeEnergy|arg2=|arg3=|arg4=10
 4,143,u32,32,sysyc143,10,SYSTEM-直流侧总放电电量(0.1kWh),model=4|arg1=ess.TotalDischargeEnergy|arg2=|arg3=|arg4=10
 4,149,u32,32,sysyc149,10,SYSTEM-交流侧总充电有功电量(0.1kWh),model=4|arg1=em.ForwardActiveEnergy|arg2=|arg3=|arg4=10
 4,151,u32,32,sysyc151,10,SYSTEM-交流侧总放电有功电量(0.1kWh),model=4|arg1=em.ReverseActiveEnergy|arg2=|arg3=|arg4=10
-4,153,u16,16,sysyc153,1,SYSTEM-年(0~99),0
-4,154,u16,16,sysyc154,1,SYSTEM-月(1~12),0
-4,155,u16,16,sysyc155,1,SYSTEM-日(1~31),0
-4,156,u16,16,sysyc156,1,SYSTEM-小时(0~23),0
-4,157,u16,16,sysyc157,1,SYSTEM-分(0~59),0
-4,158,u16,16,sysyc158,1,SYSTEM-秒(0~59),0
-4,159,u16,16,sysyc159,1,SYSTEM-模拟对点模式(0关1开),0
 4,165,u32,32,sysyc165,10,SYSTEM-交流侧总容性无功电量(0.1kVarh),0
 4,167,u32,32,sysyc167,10,SYSTEM-交流侧总感性无功电量(0.1kVarh),0
 4,170,u16,16,sysyc170,1,SYSTEM-黑启动模式(0非电压源1电压源),0
@@ -124,10 +108,3 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 6,7,u16,16,syst7,1,SYSTEM-黑启动模式写入(0关闭1开启),0
 6,1010,int16,16,syst1010,1,SYSTEM-交流侧目标有功功率(1kW,正放电负充电),0
 6,1011,int16,16,syst1011,1,SYSTEM-交流侧目标无功功率(1kVar),0
-6,1399,u16,16,syst1399,1,SYSTEM-系统重启(AA重启),0
-6,1500,u16,16,syst1500,1,SYSTEM-对时年(0~99),0
-6,1501,u16,16,syst1501,1,SYSTEM-对时月(1~12),0
-6,1502,u16,16,syst1502,1,SYSTEM-对时日(1~31),0
-6,1503,u16,16,syst1503,1,SYSTEM-对时小时(0~23),0
-6,1504,u16,16,syst1504,1,SYSTEM-对时分(0~59),0
-6,1505,u16,16,syst1505,1,SYSTEM-对时秒(0~59),0
