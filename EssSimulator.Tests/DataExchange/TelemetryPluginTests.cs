@@ -230,6 +230,32 @@ public class TelemetryPluginTests
     }
 
     [Fact]
+    public void FromPointMap_Trina55MW_SystemLimits_BoundToModel()
+    {
+        var catalog = LoadCatalog("trina_5.5MW");
+
+        // 允许充/放电量绑定 ess 可用能量（与 10MW 表口径一致）
+        var chargeEnergy = catalog.FindTelemetry("sysyc109");
+        Assert.NotNull(chargeEnergy);
+        Assert.Equal("ess.AvailableChargeEnergy", chargeEnergy!.Target.FullPath);
+
+        var dischargeEnergy = catalog.FindTelemetry("sysyc111");
+        Assert.NotNull(dischargeEnergy);
+        Assert.Equal("ess.AvailableDischargeEnergy", dischargeEnergy!.Target.FullPath);
+
+        // 允许充/放电功率为两机组 EMU 限值求和，覆盖全系统
+        var chargePower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc113");
+        Assert.NotNull(chargePower);
+        Assert.Equal("emu1.Emu.MaxChargePower", chargePower!.FirstPath);
+        Assert.Equal("emu2.Emu.MaxChargePower", chargePower.SecondPath);
+
+        var dischargePower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc115");
+        Assert.NotNull(dischargePower);
+        Assert.Equal("emu1.Emu.MaxDischargePower", dischargePower!.FirstPath);
+        Assert.Equal("emu2.Emu.MaxDischargePower", dischargePower.SecondPath);
+    }
+
+    [Fact]
     public void TelemetryPipeline_ComputesPluginPointsAndDeduplicates()
     {
         var entry = new MapEntry { FunctionCode = 4, Address = 2831, ParamName = "yc210", Scale = 1, Size = 16, Type = "u16" };
