@@ -24,8 +24,8 @@ export function fmtVolt(v) {
 }
 
 /**
- * 组态模板与 3D 模型对应。复合模板（emu / pv_unit）在布局中按内部设备展开，
- * 不发明台数； primitive 模板各有独立网格。
+ * 组态模板与 3D 模型对应。复合模板（pv_unit）在布局中按内部设备展开，
+ * 不发明台数；primitive 模板各有独立网格；EMU 为虚拟节点不进布局。
  */
 export const TOPOLOGY_TEMPLATE_3D = {
   grid: 'primitive',
@@ -36,7 +36,7 @@ export const TOPOLOGY_TEMPLATE_3D = {
   load: 'primitive',
   bms: 'primitive',
   dc_bus: 'primitive',
-  emu: 'composite',
+  pcs: 'primitive',
   pv_unit: 'composite'
 }
 
@@ -173,7 +173,11 @@ function expandEmu(unit, origin, items, cables, ctx) {
   }
   const node = unit.emu
   const livePcs = [unit.pcsA, unit.pcsB].filter(Boolean).length
-  const pcsCount = countFromParam(node, 'pcsCount', livePcs)
+  // 新模型 PCS 台数取组态 pcsNodes；运行时兜底单元仍走 pcsCount 参数
+  const pcsCount = unit.pcsNodes?.length
+    ? unit.pcsNodes.length
+    : countFromParam(node, 'pcsCount', livePcs)
+  const firstPcs = unit.pcsNodes?.[0] || null
   const bmsNodes = unit.bmsNodes || []
   const pcsXs = slotXs(cx, pcsCount, 5.5)
   const bmsCount = bmsNodes.length
@@ -213,9 +217,10 @@ function expandEmu(unit, origin, items, cables, ctx) {
 
   const xfNode = {
     parameters: {
-      primaryVoltage: paramNum(node, 'unitXfPrimaryV', paramNum(node, 'acVoltage')),
+      primaryVoltage: paramNum(node, 'unitXfPrimaryV', paramNum(firstPcs, 'acVoltage')),
       secondaryVoltage: paramNum(node, 'unitXfSecondaryV'),
-      ratedPowerKva: paramNum(node, 'pcsRatedPowerKw', 0) * Math.max(0, pcsCount)
+      ratedPowerKva: paramNum(node, 'unitXfRatedKva', 0)
+        || paramNum(firstPcs, 'pcsRatedPowerKw', 0) * Math.max(0, pcsCount)
     },
     label: node?.label
   }
@@ -629,6 +634,7 @@ function collectSldNodeIds(sld) {
   for (const u of sld.units || []) {
     add(u.emu?.id)
     add(u.pv?.id)
+    for (const p of u.pcsNodes || []) add(p.id)
     for (const b of u.bmsNodes || []) add(b.id)
     add(u.dcBus?.id)
   }

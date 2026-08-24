@@ -26,6 +26,26 @@ pointmaps/models/
 - 新增型号：在对应设备类型目录下新建子目录，放入点表文件与 `model.json` 即可被自动识别，无需改代码。
 - PV 点表（`pv_logger.csv` 等）暂未纳入型号体系，仍从根目录读取。
 
+## EMU 系统级点位语义（emu.csv SYSTEM 工作表）
+
+EMU 为虚拟聚合模型（每储能单元 1 个 EMU，聚合 N 台 PCS），以下系统级点位
+绑定到 `emuN.Emu.*` 后由均分派发/批量语义生效：
+
+| 点位 | 绑定字段 | 语义 |
+|------|----------|------|
+| `syst4` | `Emu.RemoteControlEnable` | 远程&本地控制使能：0 禁止 / 1 使能 |
+| `syst5` | `Emu.RemoteControlMode` | 控制模式：0 本地 / 1 远程（syst4=1 且 syst5=1 时均分生效） |
+| `syst6` | `Emu.SystemOperation` | 系统操作（边沿生效）：3 启动 / 4 停止 / 5 待机（目标清零）/ 6 重置（停机清故障锁存） |
+| `syst7` | `Emu.BlackStartModeWrite` | 黑启动模式批量写入：0 关闭 / 1 开启（下发所属全部 PCS） |
+| `syst1010` | `Emu.TargetActivePower` | EMU 级目标有功（kW，正放负充）；远程使能时按台数均分 |
+| `syst1011` | `Emu.TargetReactivePower` | EMU 级目标无功（kvar）；远程使能时按台数均分 |
+| `sysyc200~203` | `Emu.TotalPcsCount` 等统计字段 | PCS 总数/运行/告警/故障台数（`MapEmuState` 同步刷新） |
+
+- 单 PCS 直控点位（yt/yx 系列，绑定 `emuN.PcsList[i].*`）在本地模式下照旧生效；
+  远程均分生效时以均分值覆盖功率设定。
+- standard 版 emu.csv 保持单 PCS 直控点位不变（向后兼容）；trina 型号点表的
+  系统级绑定待对应分支合入后手工补入。
+
 ## 版本目录（legacy 兜底）
 
 | 目录 | 说明 | 主要差异 |

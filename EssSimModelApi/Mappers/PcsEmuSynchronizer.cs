@@ -13,11 +13,22 @@ namespace EssSimulator.EssSimModelApi.Mappers
             int pcsBaseIndex)
         {
             SyncPcsStateFromModel(ess, emu, pcsBaseIndex);
-            PcsMapper.MapEmuState(emu, new[] { ess._batteryRacks[pcsBaseIndex], ess._batteryRacks[pcsBaseIndex + 1] });
+
+            int pcsCount = emu.PcsList.Count;
+            var racks = new List<BatteryRackSimulator>();
+            for (int i = 0; i < pcsCount; i++)
+            {
+                int rackIdx = pcsBaseIndex + i;
+                if (rackIdx < ess._batteryRacks.Count)
+                    racks.Add(ess._batteryRacks[rackIdx]);
+            }
+            PcsMapper.MapEmuState(emu, racks);
 
             if (unitIndex0 < ess._unitBreakers.Count)
                 ess.SetUnitBreakerClosed(unitIndex0, emu.Emu.PowerOnOff != 0);
 
+            EmuPowerDispatcher.Dispatch(emu);
+            EmuSystemOperationApplier.Apply(emu);
             PcsMapper.ApplyEmuCommands(emu, ess, pcsBaseIndex);
         }
 
@@ -27,20 +38,20 @@ namespace EssSimulator.EssSimModelApi.Mappers
             EnergyManagementData emu,
             int pcsBaseIndex)
         {
-            if (pcsBaseIndex + 1 >= ess._pcsList.Count || pcsBaseIndex + 1 >= ess._batteryRacks.Count)
+            int pcsCount = emu.PcsList.Count;
+            if (pcsCount == 0 ||
+                pcsBaseIndex + pcsCount > ess._pcsList.Count ||
+                pcsBaseIndex + pcsCount > ess._batteryRacks.Count)
                 return;
 
-            PcsMapper.MapPcsState(
-                ess._pcsList[pcsBaseIndex].GetCurrentState(),
-                emu.PcsList[0],
-                ess._batteryRacks[pcsBaseIndex]);
-            PcsMapper.MapPcsState(
-                ess._pcsList[pcsBaseIndex + 1].GetCurrentState(),
-                emu.PcsList[1],
-                ess._batteryRacks[pcsBaseIndex + 1]);
-
-            PcsMapper.SyncRunCommandFeedback(ess._pcsList[pcsBaseIndex], emu.PcsList[0]);
-            PcsMapper.SyncRunCommandFeedback(ess._pcsList[pcsBaseIndex + 1], emu.PcsList[1]);
+            for (int i = 0; i < pcsCount; i++)
+            {
+                PcsMapper.MapPcsState(
+                    ess._pcsList[pcsBaseIndex + i].GetCurrentState(),
+                    emu.PcsList[i],
+                    ess._batteryRacks[pcsBaseIndex + i]);
+                PcsMapper.SyncRunCommandFeedback(ess._pcsList[pcsBaseIndex + i], emu.PcsList[i]);
+            }
         }
     }
 }

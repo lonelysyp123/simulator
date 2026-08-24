@@ -26,7 +26,10 @@ namespace EssSimulator.Web.Topology
             var fromNode = FindNode(project, newEdge.FromNodeId);
             var toNode = FindNode(project, newEdge.ToNodeId);
             if (fromNode == null || toNode == null)
-                return Fail("NODE_MISSING", "连线端点设备不存在", newEdge.Id);
+            {
+                var missing = fromNode == null ? newEdge.FromNodeId : newEdge.ToNodeId;
+                return Fail("NODE_MISSING", $"连线端点设备不存在（节点 {missing}），请删除指向它的残留连线", newEdge.Id);
+            }
             if (fromNode.Id == toNode.Id)
                 return Fail("SELF_LINK", "不能将设备连接到自身", newEdge.Id);
 
@@ -86,7 +89,7 @@ namespace EssSimulator.Web.Topology
             var xfmrResult = ValidateTransformerBusVoltage(fromNode, fromTpl, fromPort, toNode, toTpl, toPort, newEdge);
             if (!xfmrResult.Ok) return xfmrResult;
 
-            // EMU / 光伏单元 AC 侧电压与母线匹配
+            // PCS / 光伏单元 AC 侧电压与母线匹配
             var emuResult = ValidateEmuBusVoltage(fromNode, fromTpl, fromPort, toNode, toTpl, toPort, newEdge);
             if (!emuResult.Ok) return emuResult;
 
@@ -311,7 +314,7 @@ namespace EssSimulator.Web.Topology
         }
 
         private static bool IsAcFeederUnit(string templateId) =>
-            templateId == "emu" || templateId == "pv_unit";
+            templateId == "pcs" || templateId == "pv_unit";
 
         private static TopologyValidationResult ValidateEmuBusVoltage(
             TopologyNode a, TopologyTemplate aTpl, TopologyPortDef aPort,
@@ -333,8 +336,8 @@ namespace EssSimulator.Web.Topology
             {
                 bool pv = unit.TemplateId == "pv_unit";
                 return Fail(
-                    pv ? "PV_BUS_MISMATCH" : "EMU_BUS_MISMATCH",
-                    $"{(pv ? "光伏单元" : "EMU")}「{unit.Label}」交流侧 {unitV:0.##} V 与母线「{bus.Label}」{busV:0.##} V 不匹配",
+                    pv ? "PV_BUS_MISMATCH" : "PCS_BUS_MISMATCH",
+                    $"{(pv ? "光伏单元" : "PCS")}「{unit.Label}」交流侧 {unitV:0.##} V 与母线「{bus.Label}」{busV:0.##} V 不匹配",
                     newEdge.Id);
             }
 
@@ -783,6 +786,34 @@ namespace EssSimulator.Web.Topology
                 details.Add($"当前并网点电表：{string.Join("、", pccMeters.Select(n => n.Label))}");
                 return Fail("MULTI_PCC_METER", "并网点电表有且只能有一个",
                     details: details, problemNodeIds: pccMeters.Select(n => n.Id).ToList());
+            }
+
+            // PCS 归属：每台 PCS 的 emuId 须指向工程内存在的 EMU 虚拟节点
+            var emuIds = project.Nodes.Where(n => n.TemplateId == "emu").Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+            var orphanPcs = project.Nodes
+                .Where(n => n.TemplateId == "pcs")
+                .Where(n => !emuIds.Contains(TopologyParamHelper.GetString(n.Parameters, "emuId")))
+                .ToList();
+            if (orphanPcs.Count > 0)
+            {
+                details.Add($"以下 PCS 未选择有效的所属 EMU 储能单元：{string.Join("、", orphanPcs.Select(n => n.Label))}");
+                return Fail("PCS_EMU_UNASSIGNED", "每台 PCS 变流器须在参数中选择所属 EMU 储能单元",
+                    details: details, problemNodeIds: orphanPcs.Select(n => n.Id).ToList());
+            }
+
+            // 至少一个含 PCS 的 EMU 或光伏单元
+            var emusWithPcs = project.Nodes
+                .Where(n => n.TemplateId == "emu")
+                .Where(e => project.Nodes.Any(p =>
+                    p.TemplateId == "pcs" &&
+                    TopologyParamHelper.GetString(p.Parameters, "emuId") == e.Id))
+                .ToList();
+            var pvUnits = project.Nodes.Where(n => n.TemplateId == "pv_unit").ToList();
+            if (emusWithPcs.Count == 0 && pvUnits.Count == 0)
+            {
+                details.Add("工程中至少需要一个含 PCS 的 EMU 储能单元或光伏单元");
+                return Fail("NO_GENERATION_UNIT", "工程中至少需要一个含 PCS 的 EMU 储能单元或光伏单元",
+                    details: details, problemNodeIds: project.Nodes.Select(n => n.Id).ToList());
             }
 
             var work = CloneProject(project);

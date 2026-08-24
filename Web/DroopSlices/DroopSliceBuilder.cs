@@ -19,11 +19,11 @@ namespace EssSimulator.Web.DroopSlices
         {
             ParsePcsTarget(binding.Target.PropertyPath, out int unitIndex0, out int slotInUnit, out bool isActive);
             ApplyUnitFromServer(serverName, ref unitIndex0);
-            int channelIndex = unitIndex0 * 2 + slotInUnit;
+            var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
+            int channelIndex = (ess?.PcsBaseIndexOfUnit(unitIndex0) ?? unitIndex0 * 2) + slotInUnit;
             double applied = ToDouble(appliedValue);
             double? previous = previousValue == null ? null : ToDouble(previousValue);
 
-            var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
             var emu = SimulatorHost.Instance.Get<EnergyManagementData>($"emu{unitIndex0 + 1}");
             var bms = SimulatorHost.Instance.Get<BatteryManagementSystemData>($"bms{channelIndex + 1}");
 

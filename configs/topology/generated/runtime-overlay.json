@@ -2,16 +2,196 @@
   "schemaVersion": "1.0",
   "sourceProjectId": "3ff3291825f0e19fc6be1a83",
   "sourceProjectName": "\u5E38\u7528\u50A8\u80FD\u7535\u7AD9",
-  "generatedAtUtc": "2026-08-20T06:31:30.890041Z",
+  "generatedAtUtc": "2026-08-24T09:31:58.252236Z",
   "essUnits": [
     {
-      "name": "EMU \u50A8\u80FD\u5355\u5143",
+      "name": "EMU \u50A8\u80FD\u5355\u5143#2",
       "pcs": [
         {
-          "name": "PCS-1A"
+          "name": "PCS \u53D8\u6D41\u5668"
         },
         {
-          "name": "PCS-1B"
+          "name": "PCS \u53D8\u6D41\u5668"
+        }
+      ],
+      "bms": [
+        {
+          "name": "BMS",
+          "clusterCount": 12,
+          "packCount": 4,
+          "cellSeriesCount": 104,
+          "cellParallelCount": 1,
+          "cellNominalVoltage": 3.2,
+          "cellNominalCapacity": 314,
+          "cellInitialSoc": 0.5,
+          "cellInitialSocRandomRange": 0,
+          "packInternalResistance": 0.05,
+          "clusterInternalResistance": 0.1,
+          "rackInternalResistance": 0.02,
+          "passiveBalance": {
+            "enabled": true,
+            "startSocDelta": 0.02,
+            "stopSocDelta": 0.01,
+            "balanceCRate": 0.02,
+            "idleOnly": true,
+            "idleCurrentThresholdA": 10,
+            "bleedAboveMinMargin": 0.01
+          }
+        },
+        {
+          "name": "BMS",
+          "clusterCount": 12,
+          "packCount": 4,
+          "cellSeriesCount": 104,
+          "cellParallelCount": 1,
+          "cellNominalVoltage": 3.2,
+          "cellNominalCapacity": 314,
+          "cellInitialSoc": 0.5,
+          "cellInitialSocRandomRange": 0,
+          "packInternalResistance": 0.05,
+          "clusterInternalResistance": 0.1,
+          "rackInternalResistance": 0.02,
+          "passiveBalance": {
+            "enabled": true,
+            "startSocDelta": 0.02,
+            "stopSocDelta": 0.01,
+            "balanceCRate": 0.02,
+            "idleOnly": true,
+            "idleCurrentThresholdA": 10,
+            "bleedAboveMinMargin": 0.01
+          }
+        }
+      ],
+      "pcsCount": 2
+    },
+    {
+      "name": "EMU \u50A8\u80FD\u5355\u5143#3",
+      "pcs": [
+        {
+          "name": "PCS \u53D8\u6D41\u5668"
+        },
+        {
+          "name": "PCS \u53D8\u6D41\u5668"
+        }
+      ],
+      "bms": [
+        {
+          "name": "BMS",
+          "clusterCount": 12,
+          "packCount": 4,
+          "cellSeriesCount": 104,
+          "cellParallelCount": 1,
+          "cellNominalVoltage": 3.2,
+          "cellNominalCapacity": 314,
+          "cellInitialSoc": 0.5,
+          "cellInitialSocRandomRange": 0,
+          "packInternalResistance": 0.05,
+          "clusterInternalResistance": 0.1,
+          "rackInternalResistance": 0.02,
+          "passiveBalance": {
+            "enabled": true,
+            "startSocDelta": 0.02,
+            "stopSocDelta": 0.01,
+            "balanceCRate": 0.02,
+            "idleOnly": true,
+            "idleCurrentThresholdA": 10,
+            "bleedAboveMinMargin": 0.01
+          }
+        },
+        {
+          "name": "BMS",
+          "clusterCount": 12,
+          "packCount": 4,
+          "cellSeriesCount": 104,
+          "cellParallelCount": 1,
+          "cellNominalVoltage": 3.2,
+          "cellNominalCapacity": 314,
+          "cellInitialSoc": 0.5,
+          "cellInitialSocRandomRange": 0,
+          "packInternalResistance": 0.05,
+          "clusterInternalResistance": 0.1,
+          "rackInternalResistance": 0.02,
+          "passiveBalance": {
+            "enabled": true,
+            "startSocDelta": 0.02,
+            "stopSocDelta": 0.01,
+            "balanceCRate": 0.02,
+            "idleOnly": true,
+            "idleCurrentThresholdA": 10,
+            "bleedAboveMinMargin": 0.01
+          }
+        }
+      ],
+      "pcsCount": 2
+    },
+    {
+      "name": "EMU \u50A8\u80FD\u5355\u5143#5",
+      "pcs": [
+        {
+          "name": "PCS \u53D8\u6D41\u5668"
+        },
+        {
+          "name": "PCS \u53D8\u6D41\u5668"
+        }
+      ],
+      "bms": [
+        {
+          "name": "BMS",
+          "clusterCount": 12,
+          "packCount": 4,
+          "cellSeriesCount": 104,
+          "cellParallelCount": 1,
+          "cellNominalVoltage": 3.2,
+          "cellNominalCapacity": 314,
+          "cellInitialSoc": 0.5,
+          "cellInitialSocRandomRange": 0,
+          "packInternalResistance": 0.05,
+          "clusterInternalResistance": 0.1,
+          "rackInternalResistance": 0.02,
+          "passiveBalance": {
+            "enabled": true,
+            "startSocDelta": 0.02,
+            "stopSocDelta": 0.01,
+            "balanceCRate": 0.02,
+            "idleOnly": true,
+            "idleCurrentThresholdA": 10,
+            "bleedAboveMinMargin": 0.01
+          }
+        },
+        {
+          "name": "BMS",
+          "clusterCount": 12,
+          "packCount": 4,
+          "cellSeriesCount": 104,
+          "cellParallelCount": 1,
+          "cellNominalVoltage": 3.2,
+          "cellNominalCapacity": 314,
+          "cellInitialSoc": 0.5,
+          "cellInitialSocRandomRange": 0,
+          "packInternalResistance": 0.05,
+          "clusterInternalResistance": 0.1,
+          "rackInternalResistance": 0.02,
+          "passiveBalance": {
+            "enabled": true,
+            "startSocDelta": 0.02,
+            "stopSocDelta": 0.01,
+            "balanceCRate": 0.02,
+            "idleOnly": true,
+            "idleCurrentThresholdA": 10,
+            "bleedAboveMinMargin": 0.01
+          }
+        }
+      ],
+      "pcsCount": 2
+    },
+    {
+      "name": "EMU \u50A8\u80FD\u5355\u5143#4",
+      "pcs": [
+        {
+          "name": "PCS \u53D8\u6D41\u5668"
+        },
+        {
+          "name": "PCS \u53D8\u6D41\u5668"
         }
       ],
       "bms": [
@@ -61,16 +241,17 @@
             "bleedAboveMinMargin": 0.01
           }
         }
-      ]
+      ],
+      "pcsCount": 2
     },
     {
-      "name": "EMU \u50A8\u80FD\u5355\u5143",
+      "name": "EMU \u50A8\u80FD\u5355\u5143#6",
       "pcs": [
         {
-          "name": "PCS-2A"
+          "name": "PCS \u53D8\u6D41\u5668"
         },
         {
-          "name": "PCS-2B"
+          "name": "PCS \u53D8\u6D41\u5668"
         }
       ],
       "bms": [
@@ -120,16 +301,17 @@
             "bleedAboveMinMargin": 0.01
           }
         }
-      ]
+      ],
+      "pcsCount": 2
     },
     {
-      "name": "EMU \u50A8\u80FD\u5355\u5143",
+      "name": "EMU \u50A8\u80FD\u5355\u5143#1",
       "pcs": [
         {
-          "name": "PCS-3A"
+          "name": "PCS \u53D8\u6D41\u5668"
         },
         {
-          "name": "PCS-3B"
+          "name": "PCS \u53D8\u6D41\u5668"
         }
       ],
       "bms": [
@@ -179,184 +361,8 @@
             "bleedAboveMinMargin": 0.01
           }
         }
-      ]
-    },
-    {
-      "name": "EMU \u50A8\u80FD\u5355\u5143",
-      "pcs": [
-        {
-          "name": "PCS-4A"
-        },
-        {
-          "name": "PCS-4B"
-        }
       ],
-      "bms": [
-        {
-          "name": "BMS",
-          "clusterCount": 12,
-          "packCount": 4,
-          "cellSeriesCount": 104,
-          "cellParallelCount": 1,
-          "cellNominalVoltage": 3.2,
-          "cellNominalCapacity": 314,
-          "cellInitialSoc": 0.5,
-          "cellInitialSocRandomRange": 0,
-          "packInternalResistance": 0.05,
-          "clusterInternalResistance": 0.1,
-          "rackInternalResistance": 0.02,
-          "passiveBalance": {
-            "enabled": true,
-            "startSocDelta": 0.02,
-            "stopSocDelta": 0.01,
-            "balanceCRate": 0.02,
-            "idleOnly": true,
-            "idleCurrentThresholdA": 10,
-            "bleedAboveMinMargin": 0.01
-          }
-        },
-        {
-          "name": "BMS",
-          "clusterCount": 12,
-          "packCount": 4,
-          "cellSeriesCount": 104,
-          "cellParallelCount": 1,
-          "cellNominalVoltage": 3.2,
-          "cellNominalCapacity": 314,
-          "cellInitialSoc": 0.5,
-          "cellInitialSocRandomRange": 0,
-          "packInternalResistance": 0.05,
-          "clusterInternalResistance": 0.1,
-          "rackInternalResistance": 0.02,
-          "passiveBalance": {
-            "enabled": true,
-            "startSocDelta": 0.02,
-            "stopSocDelta": 0.01,
-            "balanceCRate": 0.02,
-            "idleOnly": true,
-            "idleCurrentThresholdA": 10,
-            "bleedAboveMinMargin": 0.01
-          }
-        }
-      ]
-    },
-    {
-      "name": "EMU \u50A8\u80FD\u5355\u5143",
-      "pcs": [
-        {
-          "name": "PCS-5A"
-        },
-        {
-          "name": "PCS-5B"
-        }
-      ],
-      "bms": [
-        {
-          "name": "BMS",
-          "clusterCount": 12,
-          "packCount": 4,
-          "cellSeriesCount": 104,
-          "cellParallelCount": 1,
-          "cellNominalVoltage": 3.2,
-          "cellNominalCapacity": 314,
-          "cellInitialSoc": 0.5,
-          "cellInitialSocRandomRange": 0,
-          "packInternalResistance": 0.05,
-          "clusterInternalResistance": 0.1,
-          "rackInternalResistance": 0.02,
-          "passiveBalance": {
-            "enabled": true,
-            "startSocDelta": 0.02,
-            "stopSocDelta": 0.01,
-            "balanceCRate": 0.02,
-            "idleOnly": true,
-            "idleCurrentThresholdA": 10,
-            "bleedAboveMinMargin": 0.01
-          }
-        },
-        {
-          "name": "BMS",
-          "clusterCount": 12,
-          "packCount": 4,
-          "cellSeriesCount": 104,
-          "cellParallelCount": 1,
-          "cellNominalVoltage": 3.2,
-          "cellNominalCapacity": 314,
-          "cellInitialSoc": 0.5,
-          "cellInitialSocRandomRange": 0,
-          "packInternalResistance": 0.05,
-          "clusterInternalResistance": 0.1,
-          "rackInternalResistance": 0.02,
-          "passiveBalance": {
-            "enabled": true,
-            "startSocDelta": 0.02,
-            "stopSocDelta": 0.01,
-            "balanceCRate": 0.02,
-            "idleOnly": true,
-            "idleCurrentThresholdA": 10,
-            "bleedAboveMinMargin": 0.01
-          }
-        }
-      ]
-    },
-    {
-      "name": "EMU \u50A8\u80FD\u5355\u5143",
-      "pcs": [
-        {
-          "name": "PCS-6A"
-        },
-        {
-          "name": "PCS-6B"
-        }
-      ],
-      "bms": [
-        {
-          "name": "BMS",
-          "clusterCount": 12,
-          "packCount": 4,
-          "cellSeriesCount": 104,
-          "cellParallelCount": 1,
-          "cellNominalVoltage": 3.2,
-          "cellNominalCapacity": 314,
-          "cellInitialSoc": 0.5,
-          "cellInitialSocRandomRange": 0,
-          "packInternalResistance": 0.05,
-          "clusterInternalResistance": 0.1,
-          "rackInternalResistance": 0.02,
-          "passiveBalance": {
-            "enabled": true,
-            "startSocDelta": 0.02,
-            "stopSocDelta": 0.01,
-            "balanceCRate": 0.02,
-            "idleOnly": true,
-            "idleCurrentThresholdA": 10,
-            "bleedAboveMinMargin": 0.01
-          }
-        },
-        {
-          "name": "BMS",
-          "clusterCount": 12,
-          "packCount": 4,
-          "cellSeriesCount": 104,
-          "cellParallelCount": 1,
-          "cellNominalVoltage": 3.2,
-          "cellNominalCapacity": 314,
-          "cellInitialSoc": 0.5,
-          "cellInitialSocRandomRange": 0,
-          "packInternalResistance": 0.05,
-          "clusterInternalResistance": 0.1,
-          "rackInternalResistance": 0.02,
-          "passiveBalance": {
-            "enabled": true,
-            "startSocDelta": 0.02,
-            "stopSocDelta": 0.01,
-            "balanceCRate": 0.02,
-            "idleOnly": true,
-            "idleCurrentThresholdA": 10,
-            "bleedAboveMinMargin": 0.01
-          }
-        }
-      ]
+      "pcsCount": 2
     }
   ],
   "pvUnits": [],
@@ -455,11 +461,11 @@
     "\u4E3B\u53D8 \u2192 220/35 kV",
     "\u7535\u8868\u4E00\u6B21\u4FA7 \u00B7 220 kV / 2000 A\uFF08\u4E8C\u6B21\u56FA\u5B9A 100V / 5A\uFF09",
     "\u8D1F\u8F7D\u300C\u8D1F\u8F7D\u300D\u2192 \u6982\u89C8\u7ED1\u5B9A \u00B7 P 0 kW \u00B7 Q 0 kvar\uFF08\u6709\u529F\u4EC5\u6D88\u8017\uFF09",
-    "EMU \u50A8\u80FD\u5355\u5143: BMS\u00D72\uFF08\u4E0D\u8DB3\u5219\u7528\u9ED8\u8BA4\u8865\u9F50 2 \u8DEF\uFF09",
-    "EMU \u50A8\u80FD\u5355\u5143: BMS\u00D72\uFF08\u4E0D\u8DB3\u5219\u7528\u9ED8\u8BA4\u8865\u9F50 2 \u8DEF\uFF09",
-    "EMU \u50A8\u80FD\u5355\u5143: BMS\u00D72\uFF08\u4E0D\u8DB3\u5219\u7528\u9ED8\u8BA4\u8865\u9F50 2 \u8DEF\uFF09",
-    "EMU \u50A8\u80FD\u5355\u5143: BMS\u00D72\uFF08\u4E0D\u8DB3\u5219\u7528\u9ED8\u8BA4\u8865\u9F50 2 \u8DEF\uFF09",
-    "EMU \u50A8\u80FD\u5355\u5143: BMS\u00D72\uFF08\u4E0D\u8DB3\u5219\u7528\u9ED8\u8BA4\u8865\u9F50 2 \u8DEF\uFF09",
-    "EMU \u50A8\u80FD\u5355\u5143: BMS\u00D72\uFF08\u4E0D\u8DB3\u5219\u7528\u9ED8\u8BA4\u8865\u9F50 2 \u8DEF\uFF09"
+    "EMU \u50A8\u80FD\u5355\u5143#2: PCS\u00D72 \u00B7 BMS\u00D72\uFF08\u6BCF\u53F0 PCS \u5BF9\u9F50 1 \u8DEF BMS\uFF0C\u672A\u8FDE\u7EBF\u65F6\u7528\u9ED8\u8BA4\u8865\u9F50\uFF09",
+    "EMU \u50A8\u80FD\u5355\u5143#3: PCS\u00D72 \u00B7 BMS\u00D72\uFF08\u6BCF\u53F0 PCS \u5BF9\u9F50 1 \u8DEF BMS\uFF0C\u672A\u8FDE\u7EBF\u65F6\u7528\u9ED8\u8BA4\u8865\u9F50\uFF09",
+    "EMU \u50A8\u80FD\u5355\u5143#5: PCS\u00D72 \u00B7 BMS\u00D72\uFF08\u6BCF\u53F0 PCS \u5BF9\u9F50 1 \u8DEF BMS\uFF0C\u672A\u8FDE\u7EBF\u65F6\u7528\u9ED8\u8BA4\u8865\u9F50\uFF09",
+    "EMU \u50A8\u80FD\u5355\u5143#4: PCS\u00D72 \u00B7 BMS\u00D72\uFF08\u6BCF\u53F0 PCS \u5BF9\u9F50 1 \u8DEF BMS\uFF0C\u672A\u8FDE\u7EBF\u65F6\u7528\u9ED8\u8BA4\u8865\u9F50\uFF09",
+    "EMU \u50A8\u80FD\u5355\u5143#6: PCS\u00D72 \u00B7 BMS\u00D72\uFF08\u6BCF\u53F0 PCS \u5BF9\u9F50 1 \u8DEF BMS\uFF0C\u672A\u8FDE\u7EBF\u65F6\u7528\u9ED8\u8BA4\u8865\u9F50\uFF09",
+    "EMU \u50A8\u80FD\u5355\u5143#1: PCS\u00D72 \u00B7 BMS\u00D72\uFF08\u6BCF\u53F0 PCS \u5BF9\u9F50 1 \u8DEF BMS\uFF0C\u672A\u8FDE\u7EBF\u65F6\u7528\u9ED8\u8BA4\u8865\u9F50\uFF09"
   ]
 }

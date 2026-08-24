@@ -36,10 +36,34 @@ namespace EssSimulator.Display
             }
         }
 
+        /// <summary>各储能单元下属 PCS 台数布局；ESS 未建/读取失败时返回空列表（调用方自行回退每单元 2 台）。</summary>
+        public static IReadOnlyList<int> GetPcsPerUnit()
+        {
+            try
+            {
+                if (SimServer.GetExtIfVariableVal("ess.PcsPerUnit") is IReadOnlyList<int> list && list.Count > 0)
+                    return list;
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("GetPcsPerUnit 失败，返回空布局", ex);
+            }
+            return Array.Empty<int>();
+        }
+
+        /// <summary>物理储能单元（EMU）个数；布局缺失时回退按通道数每单元 2 台推算。</summary>
+        public static int GetPhysicalUnitCount()
+        {
+            var layout = GetPcsPerUnit();
+            if (layout.Count > 0)
+                return layout.Count;
+            int channelCount = Math.Max(1, GetEssUnitCount());
+            return Math.Max(1, (int)Math.Ceiling(channelCount / 2.0));
+        }
+
         public static int GetMainLineSectionCount(int unitsPerSection)
         {
-            int channelCount = Math.Max(1, GetEssUnitCount());
-            int unitCount = Math.Max(1, (int)Math.Ceiling(channelCount / 2.0));
+            int unitCount = Math.Max(1, GetPhysicalUnitCount());
             return Math.Max(1, (int)Math.Ceiling(unitCount / (double)Math.Max(1, unitsPerSection)));
         }
 

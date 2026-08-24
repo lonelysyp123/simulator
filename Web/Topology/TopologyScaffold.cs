@@ -66,13 +66,20 @@ namespace EssSimulator.Web.Topology
             for (var i = 0; i < emuCount; i++)
             {
                 var x = startX + i * unitSpan;
-                var emu = Add(project, "emu", $"EMU-{i + 1}", x, 720);
+                // EMU 虚拟节点（画布不显示，仅供 PCS 归属）+ 2 台 PCS + DC 母线 + 2 台 BMS
+                var emu = Add(project, "emu", $"EMU-{i + 1}", x, 640);
+                var pcsA = Add(project, "pcs", $"PCS-{i + 1}A", x - 80, 720,
+                    new Dictionary<string, object?> { ["emuId"] = emu.Id });
+                var pcsB = Add(project, "pcs", $"PCS-{i + 1}B", x + 80, 720,
+                    new Dictionary<string, object?> { ["emuId"] = emu.Id });
                 var dc = Add(project, "dc_bus", $"DC母线-{i + 1}", x - 10, 880);
                 var bmsA = Add(project, "bms", $"BMS-{i + 1}A", x - 70, 1000);
                 var bmsB = Add(project, "bms", $"BMS-{i + 1}B", x + 70, 1000);
 
-                MustConnect(project, emu, "ac_a", busLv, "a2");
-                MustConnect(project, emu, "dc_pos", dc, "pos_t");
+                MustConnect(project, pcsA, "ac_a", busLv, "a2");
+                MustConnect(project, pcsB, "ac_a", busLv, "a2");
+                MustConnect(project, pcsA, "dc_pos", dc, "pos_t");
+                MustConnect(project, pcsB, "dc_pos", dc, "pos_t");
                 MustConnect(project, bmsA, "dc_pos", dc, "pos_b");
                 MustConnect(project, bmsB, "dc_pos", dc, "pos_b");
             }
