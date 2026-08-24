@@ -65,6 +65,7 @@ namespace EssSimulator.DataExchange.Catalog
             bool isBms = serverName.StartsWith("simBms", StringComparison.OrdinalIgnoreCase);
 
             var telemetry = new List<PointBinding>();
+            var pluginPoints = new List<PluginPointBinding>();
             foreach (var entry in pointMap.DataMaps)
             {
                 if (string.IsNullOrWhiteSpace(entry.ParamName))
@@ -73,6 +74,22 @@ namespace EssSimulator.DataExchange.Catalog
                     continue;
                 if (string.IsNullOrWhiteSpace(model.Arg1))
                     continue;
+
+                // model=plugin|arg1=<字键>|arg2=<设备根路径>：交给遥测插件组字，不走反射绑定
+                if (string.Equals(model.ModelType, "plugin", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrWhiteSpace(model.Arg2))
+                        continue;
+
+                    pluginPoints.Add(new PluginPointBinding
+                    {
+                        Entry = entry,
+                        ParamName = entry.ParamName,
+                        WordKey = model.Arg1,
+                        DeviceRoot = model.Arg2
+                    });
+                    continue;
+                }
 
                 var target = DataTarget.ParseBindingPath(model.Arg1);
                 if (target == null)
@@ -156,6 +173,7 @@ namespace EssSimulator.DataExchange.Catalog
                 ControlPoints = control,
                 RackTelemetryPoints = rackTelemetry,
                 RackControlPoints = rackControl,
+                PluginPoints = pluginPoints,
                 DefaultValues = new Dictionary<string, object>(pointMap.DefaultBuffer)
             };
         }

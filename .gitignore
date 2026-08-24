@@ -463,3 +463,6 @@ wwwroot/
 .restart
 # 发布技能目录（外部来源，不纳入版本管理）
 .publish/
+
+# 设备型号选型（运行期由系统配置页写入）
+configs/topology/device-models.json

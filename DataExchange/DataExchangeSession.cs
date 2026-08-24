@@ -3,6 +3,7 @@ using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Config;
 using EssSimulator.DataExchange.Effects;
 using EssSimulator.DataExchange.Pipeline;
+using EssSimulator.DataExchange.Plugins;
 using EssSimulator.Protocol.Modbus;
 using log4net;
 
@@ -58,12 +59,14 @@ namespace EssSimulator.DataExchange
             _modbusAdapter = new ModbusRegisterAdapter(slave, parser);
 
             _effects = new ControlEffectRegistry();
+            var telemetryPlugins = new TelemetryPluginRegistry();
             string serverName = deviceInfo.name ?? string.Empty;
             if (serverName.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase))
             {
                 _effects
                     .Register(new EmuPcsControlEffect(RefreshOperationStatusTelemetry))
                     .Register(new EmuUnitBreakerEffect());
+                telemetryPlugins.Register(new TrinaEmuFaultWordPlugin());
             }
             else if (serverName.StartsWith("simBms", StringComparison.OrdinalIgnoreCase))
             {
@@ -72,7 +75,7 @@ namespace EssSimulator.DataExchange
 
             bool logChanges = ShouldLogChanges(deviceInfo.name);
 
-            _telemetryPipeline = new TelemetryPipeline(catalog, _simulation, _modbusAdapter, _shadow);
+            _telemetryPipeline = new TelemetryPipeline(catalog, _simulation, _modbusAdapter, _shadow, telemetryPlugins);
             if (clusterCount > 0 && catalog.RackTelemetryPoints.Count > 0)
             {
                 _rackTelemetryPipeline = new RackTelemetryPipeline(

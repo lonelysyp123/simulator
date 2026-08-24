@@ -67,6 +67,8 @@ export async function checkTopologyProjectName(name, excludeId) {
 
 export async function getSystemConfig() { return (await api.get('/system/config')).data }
 export async function postSystemApply(body) { return (await api.post('/system/apply', body)).data }
+export async function getDeviceModels() { return (await api.get('/system/device-models')).data }
+export async function postDeviceModelsApply(body) { return (await api.post('/system/device-models/apply', body)).data }
 
 let hubPromise = null
 export function getHub() {

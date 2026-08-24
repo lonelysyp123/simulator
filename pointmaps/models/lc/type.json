@@ -1,0 +1,6 @@
+{
+  "id": "lc",
+  "name": "LocalControl",
+  "description": "LocalControl 聚合协议（LC）",
+  "files": [ "lc.csv" ]
+}

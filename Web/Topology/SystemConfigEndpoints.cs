@@ -1,4 +1,5 @@
 using EssSimulator.Configuration;
+using EssSimulator.Protocol.Modbus;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -29,6 +30,66 @@ namespace EssSimulator.Web.Topology
             var g = app.MapGroup("/api/system");
             g.AddEndpointFilter(EditionTopologyGate);
 
+            // 设备型号/点表选择独立于组态编辑功能，不受档位门拦截
+            var dm = app.MapGroup("/api/system");
+
+            dm.MapGet("/device-models", () =>
+            {
+                var selection = DeviceModelRegistry.LoadSelection();
+                return Results.Ok(new
+                {
+                    Types = DeviceModelRegistry.ListTypes(),
+                    Selection = selection.Selections,
+                    HasSelection = selection.Selections.Count > 0,
+                    Pointmaps = BuildPointmapSummary()
+                });
+            });
+
+            dm.MapPost("/device-models/apply", (
+                DeviceModelsApplyRequest req,
+                IHostApplicationLifetime lifetime) =>
+            {
+                if (req == null || req.Selections == null || req.Selections.Count == 0)
+                    return Results.BadRequest(new SystemApplyResponse { Ok = false, Message = "选型内容为空" });
+
+                var errors = DeviceModelRegistry.ValidateSelection(req.Selections);
+                if (errors.Count > 0)
+                    return Results.BadRequest(new SystemApplyResponse
+                    {
+                        Ok = false,
+                        Message = "选型校验失败",
+                        Details = errors
+                    });
+
+                DeviceModelRegistry.SaveSelection(new DeviceModelSelection
+                {
+                    Selections = new Dictionary<string, string>(req.Selections, StringComparer.OrdinalIgnoreCase)
+                });
+
+                if (req.ConfirmRestart)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(400);
+                        WriteRestartSentinel();
+                        lifetime.StopApplication();
+                    });
+                }
+
+                var names = BuildPointmapSummary()
+                    .Select(p => $"{p.TypeName}: {(p.ModelName ?? p.ModelId ?? "legacy 兜底")}");
+
+                return Results.Ok(new SystemApplyResponse
+                {
+                    Ok = true,
+                    Restarting = req.ConfirmRestart,
+                    Message = req.ConfirmRestart
+                        ? "已保存设备型号选型，模拟器即将重启"
+                        : "已保存设备型号选型（需重启后生效）",
+                    Details = names.ToList()
+                });
+            });
+
             g.MapGet("/config", (
                 TopologyStore store,
                 IOptions<SimulatorConfig> simCfg) =>
@@ -47,6 +108,7 @@ namespace EssSimulator.Web.Topology
                     RuntimeUnitCount = simCfg.Value.EffectiveEssUnitCount,
                     RuntimePvUnitCount = simCfg.Value.PvUnitCount,
                     Projects = projects.ToList(),
+                    Pointmaps = BuildPointmapSummary(),
                     OverlaySummary = overlay == null ? null : new TopologyRuntimeOverlay
                     {
                         SourceProjectId = overlay.SourceProjectId,
@@ -183,6 +245,34 @@ namespace EssSimulator.Web.Topology
             });
 
             return app;
+        }
+
+        /// <summary>汇总各设备类型当前生效的点表型号（selection / legacy）。</summary>
+        private static List<PointmapRuntimeEntry> BuildPointmapSummary()
+        {
+            var selection = DeviceModelRegistry.LoadSelection();
+            var summary = new List<PointmapRuntimeEntry>();
+            foreach (var type in DeviceModelRegistry.ListTypes())
+            {
+                var entry = new PointmapRuntimeEntry
+                {
+                    TypeId = type.Id,
+                    TypeName = type.Name,
+                    Source = "legacy"
+                };
+
+                if (selection.Selections.TryGetValue(type.Id, out var modelId) && !string.IsNullOrWhiteSpace(modelId))
+                {
+                    entry.ModelId = modelId;
+                    entry.ModelName = type.Models
+                        .FirstOrDefault(m => string.Equals(m.Id, modelId, StringComparison.OrdinalIgnoreCase))
+                        ?.Name;
+                    entry.Source = "selection";
+                }
+
+                summary.Add(entry);
+            }
+            return summary;
         }
 
         private static async ValueTask<object?> EditionTopologyGate(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
