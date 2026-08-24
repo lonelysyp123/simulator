@@ -25,21 +25,8 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,2623,int16,16,yc23,10,10MW PCS1-PCS 过温降载NTC,model=4|arg1=emu1.PcsList[0].IGBTMaxTemp|arg2=|arg3=|arg4=10
 4,2624,u16,16,yc24,1,10MW PCS1-PCS 可用容量,model=sum|arg1=emu1.PcsList[0].AvailableCapacity|arg2=emu1.PcsList[1].AvailableCapacity|arg3=|arg4=1
 4,2625,u16,16,yc25,1,10MW PCS1-PCS 额定容量,model=sum|arg1=emu1.PcsList[0].PCSRatePower|arg2=emu1.PcsList[1].PCSRatePower|arg3=|arg4=1
-4,2800,u16,16,yc187,1,10MW PCS1-系统故障字1 ①(Bit0 故障字1交流电压有效值过压;Bit1 故障字1电网频率过高;Bit2 故障字1电网频率过低;Bit3 故障字1电网电压不平衡;Bit4 故障字1电网电压瞬时过压;Bit5 故障字1交流电压有效值欠压;Bit6 故障字1防孤岛保护;Bit7 故障字1电压相位参数错误;Bit8 故障字1无功功率参数错误;Bit9 故障字1电压调节参数错误;Bit10 故障字1同步调节参数错误;Bit11 故障字1电网平均过压;Bit12 故障字1功率因数参数错误;Bit13 故障字1有功无功参数错误),0
-4,2801,u16,16,yc188,1,10MW PCS1-系统故障字2 ①(Bit0 故障字2控制电源丢失;Bit1 故障字2通信电源丢失;Bit2 故障字2IO 电源丢失;Bit3 故障字2SDSP与FPGA 间EMIF总线错误;Bit4 故障字2紧急停机;Bit5 故障字2外部输入故障1;Bit6 故障字2控制器心跳丢失;Bit7 故障字2J1 DSP 心跳丢失;Bit8 故障字2J2 DSP 心跳丢失;Bit9 故障字2烟雾故障;Bit10 故障字2主从机1通信丢失;Bit12 故障字2外部输入故障2;Bit13 故障字2PCS与EMS通信丢失),0
-4,2802,u16,16,yc189,1,10MW PCS1-系统故障字3 ①(Bit0 故障字3总零序过电流保护;Bit1 故障字3功率反馈偏差;Bit2 故障字3电网电压相序错误;Bit3 故障字3直流霍尔传感器断开;Bit5 故障字3ADC 校准错误;Bit6 故障字3控制检测到故障;Bit7 故障字3模块1 检测到故障;Bit8 故障字3模块2 检测到故障),0
-4,2803,u16,16,yc190,1,10MW PCS1-系统故障字4 ①(Bit0 故障字4BMS输入干接点故障1;Bit1 故障字4BMS输入干接点故障2),0
-4,2810,u16,16,yc191,1,10MW PCS1-系统警告字1 ①(Bit0 系统警告字1模块1 IP 地址错误;Bit1 系统警告字1模块2 IP 地址错误;Bit2 系统警告字1由于过温降额;Bit3 系统警告字1模块1 检测到警告;Bit4 系统警告字1模块2 检测到警告;Bit5 系统警告字13352 SPI 通信丢失;Bit6 系统警告字1从机1 故障;Bit8 系统警告字1从机1 警告;Bit10 系统警告字1EMS 心跳未变化;Bit11 系统警告字1Web 服务器通信丢失;Bit12 系统警告字1PCS 准备开启未满足;Bit13 系统警告字1RMU 检测到跳闸;Bit14 系统警告字1MVG3 断路器跳闸;Bit15 系统警告字1MVG3 断路器未存储能量),0
-4,2811,u16,16,yc192,1,10MW PCS1-系统警告字2 ①(Bit0 系统告警字2BMS1输入报警;Bit1 系统告警字2BMS2输入报警;Bit4 系统告警字2MV 继电器 CT 开路;Bit5 系统告警字2MV RMU 环境过温;Bit6 系统告警字2MV RMU 热交换器报警;Bit7 系统告警字2变压器油温UTP降额报警;Bit8 系统告警字2变压器油温过高报警),0
-4,2814,u16,16,yc193,1,10MW PCS1-控制器故障字1 ①(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,2815,u16,16,yc194,1,10MW PCS1-控制器故障字2 ①,0
-4,2816,u16,16,yc195,1,10MW PCS1-控制器警告字1 ①(Bit0 控制警告字1Web 服务器丢失),0
-4,2817,u16,16,yc196,1,10MW PCS1-控制器故障字1(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,2818,u16,16,yc197,1,10MW PCS1-控制器警告字1(Bit0 控制警告字1Web 服务器丢失),0
-4,2830,u16,16,yc198,1,10MW PCS1-模块1 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,2831,u16,16,yc199,1,10MW PCS1-模块1 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu1.PcsList[0]
 4,2832,u16,16,yc200,1,10MW PCS1-模块1 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu1.PcsList[0]
-4,2844,u16,16,yc201,1,10MW PCS1-模块2 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,2845,u16,16,yc202,1,10MW PCS1-模块2 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu1.PcsList[1]
 4,2846,u16,16,yc203,1,10MW PCS1-模块2 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu1.PcsList[1]
 4,2900,int16,16,yc204,1,10MW PCS2-模块1电池电压,model=4|arg1=emu2.PcsList[0].BatteryVoltage|arg2=|arg3=|arg4=1
@@ -68,21 +55,8 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,2923,int16,16,yc227,10,10MW PCS2-PCS 过温降载NTC,model=4|arg1=emu2.PcsList[0].IGBTMaxTemp|arg2=|arg3=|arg4=10
 4,2924,u16,16,yc228,1,10MW PCS2-PCS 可用容量,model=sum|arg1=emu2.PcsList[0].AvailableCapacity|arg2=emu2.PcsList[1].AvailableCapacity|arg3=|arg4=1
 4,2925,u16,16,yc229,1,10MW PCS2-PCS 额定容量,model=sum|arg1=emu2.PcsList[0].PCSRatePower|arg2=emu2.PcsList[1].PCSRatePower|arg3=|arg4=1
-4,3100,u16,16,yc391,1,10MW PCS2-系统故障字1 ①(Bit0 故障字1交流电压有效值过压;Bit1 故障字1电网频率过高;Bit2 故障字1电网频率过低;Bit3 故障字1电网电压不平衡;Bit4 故障字1电网电压瞬时过压;Bit5 故障字1交流电压有效值欠压;Bit6 故障字1防孤岛保护;Bit7 故障字1电压相位参数错误;Bit8 故障字1无功功率参数错误;Bit9 故障字1电压调节参数错误;Bit10 故障字1同步调节参数错误;Bit11 故障字1电网平均过压;Bit12 故障字1功率因数参数错误;Bit13 故障字1有功无功参数错误),0
-4,3101,u16,16,yc392,1,10MW PCS2-系统故障字2 ①(Bit0 故障字2控制电源丢失;Bit1 故障字2通信电源丢失;Bit2 故障字2IO 电源丢失;Bit3 故障字2SDSP与FPGA 间EMIF总线错误;Bit4 故障字2紧急停机;Bit5 故障字2外部输入故障1;Bit6 故障字2控制器心跳丢失;Bit7 故障字2J1 DSP 心跳丢失;Bit8 故障字2J2 DSP 心跳丢失;Bit9 故障字2烟雾故障;Bit10 故障字2主从机1通信丢失;Bit12 故障字2外部输入故障2;Bit13 故障字2PCS与EMS通信丢失),0
-4,3102,u16,16,yc393,1,10MW PCS2-系统故障字3 ①(Bit0 故障字3总零序过电流保护;Bit1 故障字3功率反馈偏差;Bit2 故障字3电网电压相序错误;Bit3 故障字3直流霍尔传感器断开;Bit5 故障字3ADC 校准错误;Bit6 故障字3控制检测到故障;Bit7 故障字3模块1 检测到故障;Bit8 故障字3模块2 检测到故障),0
-4,3103,u16,16,yc394,1,10MW PCS2-系统故障字4 ①(Bit0 故障字4BMS输入干接点故障1;Bit1 故障字4BMS输入干接点故障2),0
-4,3110,u16,16,yc395,1,10MW PCS2-系统警告字1 ①(Bit0 系统警告字1模块1 IP 地址错误;Bit1 系统警告字1模块2 IP 地址错误;Bit2 系统警告字1由于过温降额;Bit3 系统警告字1模块1 检测到警告;Bit4 系统警告字1模块2 检测到警告;Bit5 系统警告字13352 SPI 通信丢失;Bit6 系统警告字1从机1 故障;Bit8 系统警告字1从机1 警告;Bit10 系统警告字1EMS 心跳未变化;Bit11 系统警告字1Web 服务器通信丢失;Bit12 系统警告字1PCS 准备开启未满足;Bit13 系统警告字1RMU 检测到跳闸;Bit14 系统警告字1MVG3 断路器跳闸;Bit15 系统警告字1MVG3 断路器未存储能量),0
-4,3111,u16,16,yc396,1,10MW PCS2-系统警告字2 ①(Bit0 系统告警字2BMS1输入报警;Bit1 系统告警字2BMS2输入报警;Bit4 系统告警字2MV 继电器 CT 开路;Bit5 系统告警字2MV RMU 环境过温;Bit6 系统告警字2MV RMU 热交换器报警;Bit7 系统告警字2变压器油温UTP降额报警;Bit8 系统告警字2变压器油温过高报警),0
-4,3114,u16,16,yc397,1,10MW PCS2-控制器故障字1 ①(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,3115,u16,16,yc398,1,10MW PCS2-控制器故障字2 ①,0
-4,3116,u16,16,yc399,1,10MW PCS2-控制器警告字1 ①(Bit0 控制警告字1Web 服务器丢失),0
-4,3117,u16,16,yc400,1,10MW PCS2-控制器故障字1(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,3118,u16,16,yc401,1,10MW PCS2-控制器警告字1(Bit0 控制警告字1Web 服务器丢失),0
-4,3130,u16,16,yc402,1,10MW PCS2-模块1 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,3131,u16,16,yc403,1,10MW PCS2-模块1 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu2.PcsList[0]
 4,3132,u16,16,yc404,1,10MW PCS2-模块1 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu2.PcsList[0]
-4,3144,u16,16,yc405,1,10MW PCS2-模块2 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,3145,u16,16,yc406,1,10MW PCS2-模块2 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu2.PcsList[1]
 4,3146,u16,16,yc407,1,10MW PCS2-模块2 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu2.PcsList[1]
 4,3200,int16,16,yc408,1,10MW PCS3-模块1电池电压,model=4|arg1=emu3.PcsList[0].BatteryVoltage|arg2=|arg3=|arg4=1
@@ -111,21 +85,8 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,3223,int16,16,yc431,10,10MW PCS3-PCS 过温降载NTC,model=4|arg1=emu3.PcsList[0].IGBTMaxTemp|arg2=|arg3=|arg4=10
 4,3224,u16,16,yc432,1,10MW PCS3-PCS 可用容量,model=sum|arg1=emu3.PcsList[0].AvailableCapacity|arg2=emu3.PcsList[1].AvailableCapacity|arg3=|arg4=1
 4,3225,u16,16,yc433,1,10MW PCS3-PCS 额定容量,model=sum|arg1=emu3.PcsList[0].PCSRatePower|arg2=emu3.PcsList[1].PCSRatePower|arg3=|arg4=1
-4,3400,u16,16,yc595,1,10MW PCS3-系统故障字1 ①(Bit0 故障字1交流电压有效值过压;Bit1 故障字1电网频率过高;Bit2 故障字1电网频率过低;Bit3 故障字1电网电压不平衡;Bit4 故障字1电网电压瞬时过压;Bit5 故障字1交流电压有效值欠压;Bit6 故障字1防孤岛保护;Bit7 故障字1电压相位参数错误;Bit8 故障字1无功功率参数错误;Bit9 故障字1电压调节参数错误;Bit10 故障字1同步调节参数错误;Bit11 故障字1电网平均过压;Bit12 故障字1功率因数参数错误;Bit13 故障字1有功无功参数错误),0
-4,3401,u16,16,yc596,1,10MW PCS3-系统故障字2 ①(Bit0 故障字2控制电源丢失;Bit1 故障字2通信电源丢失;Bit2 故障字2IO 电源丢失;Bit3 故障字2SDSP与FPGA 间EMIF总线错误;Bit4 故障字2紧急停机;Bit5 故障字2外部输入故障1;Bit6 故障字2控制器心跳丢失;Bit7 故障字2J1 DSP 心跳丢失;Bit8 故障字2J2 DSP 心跳丢失;Bit9 故障字2烟雾故障;Bit10 故障字2主从机1通信丢失;Bit12 故障字2外部输入故障2;Bit13 故障字2PCS与EMS通信丢失),0
-4,3402,u16,16,yc597,1,10MW PCS3-系统故障字3 ①(Bit0 故障字3总零序过电流保护;Bit1 故障字3功率反馈偏差;Bit2 故障字3电网电压相序错误;Bit3 故障字3直流霍尔传感器断开;Bit5 故障字3ADC 校准错误;Bit6 故障字3控制检测到故障;Bit7 故障字3模块1 检测到故障;Bit8 故障字3模块2 检测到故障),0
-4,3403,u16,16,yc598,1,10MW PCS3-系统故障字4 ①(Bit0 故障字4BMS输入干接点故障1;Bit1 故障字4BMS输入干接点故障2),0
-4,3410,u16,16,yc599,1,10MW PCS3-系统警告字1 ①(Bit0 系统警告字1模块1 IP 地址错误;Bit1 系统警告字1模块2 IP 地址错误;Bit2 系统警告字1由于过温降额;Bit3 系统警告字1模块1 检测到警告;Bit4 系统警告字1模块2 检测到警告;Bit5 系统警告字13352 SPI 通信丢失;Bit6 系统警告字1从机1 故障;Bit8 系统警告字1从机1 警告;Bit10 系统警告字1EMS 心跳未变化;Bit11 系统警告字1Web 服务器通信丢失;Bit12 系统警告字1PCS 准备开启未满足;Bit13 系统警告字1RMU 检测到跳闸;Bit14 系统警告字1MVG3 断路器跳闸;Bit15 系统警告字1MVG3 断路器未存储能量),0
-4,3411,u16,16,yc600,1,10MW PCS3-系统警告字2 ①(Bit0 系统告警字2BMS1输入报警;Bit1 系统告警字2BMS2输入报警;Bit4 系统告警字2MV 继电器 CT 开路;Bit5 系统告警字2MV RMU 环境过温;Bit6 系统告警字2MV RMU 热交换器报警;Bit7 系统告警字2变压器油温UTP降额报警;Bit8 系统告警字2变压器油温过高报警),0
-4,3414,u16,16,yc601,1,10MW PCS3-控制器故障字1 ①(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,3415,u16,16,yc602,1,10MW PCS3-控制器故障字2 ①,0
-4,3416,u16,16,yc603,1,10MW PCS3-控制器警告字1 ①(Bit0 控制警告字1Web 服务器丢失),0
-4,3417,u16,16,yc604,1,10MW PCS3-控制器故障字1(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,3418,u16,16,yc605,1,10MW PCS3-控制器警告字1(Bit0 控制警告字1Web 服务器丢失),0
-4,3430,u16,16,yc606,1,10MW PCS3-模块1 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,3431,u16,16,yc607,1,10MW PCS3-模块1 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu3.PcsList[0]
 4,3432,u16,16,yc608,1,10MW PCS3-模块1 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu3.PcsList[0]
-4,3444,u16,16,yc609,1,10MW PCS3-模块2 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,3445,u16,16,yc610,1,10MW PCS3-模块2 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu3.PcsList[1]
 4,3446,u16,16,yc611,1,10MW PCS3-模块2 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu3.PcsList[1]
 4,3500,int16,16,yc612,1,10MW PCS4-模块1电池电压,model=4|arg1=emu4.PcsList[0].BatteryVoltage|arg2=|arg3=|arg4=1
@@ -154,20 +115,79 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,3523,int16,16,yc635,10,10MW PCS4-PCS 过温降载NTC,model=4|arg1=emu4.PcsList[0].IGBTMaxTemp|arg2=|arg3=|arg4=10
 4,3524,u16,16,yc636,1,10MW PCS4-PCS 可用容量,model=sum|arg1=emu4.PcsList[0].AvailableCapacity|arg2=emu4.PcsList[1].AvailableCapacity|arg3=|arg4=1
 4,3525,u16,16,yc637,1,10MW PCS4-PCS 额定容量,model=sum|arg1=emu4.PcsList[0].PCSRatePower|arg2=emu4.PcsList[1].PCSRatePower|arg3=|arg4=1
-4,3700,u16,16,yc799,1,10MW PCS4-系统故障字1 ①(Bit0 故障字1交流电压有效值过压;Bit1 故障字1电网频率过高;Bit2 故障字1电网频率过低;Bit3 故障字1电网电压不平衡;Bit4 故障字1电网电压瞬时过压;Bit5 故障字1交流电压有效值欠压;Bit6 故障字1防孤岛保护;Bit7 故障字1电压相位参数错误;Bit8 故障字1无功功率参数错误;Bit9 故障字1电压调节参数错误;Bit10 故障字1同步调节参数错误;Bit11 故障字1电网平均过压;Bit12 故障字1功率因数参数错误;Bit13 故障字1有功无功参数错误),0
-4,3701,u16,16,yc800,1,10MW PCS4-系统故障字2 ①(Bit0 故障字2控制电源丢失;Bit1 故障字2通信电源丢失;Bit2 故障字2IO 电源丢失;Bit3 故障字2SDSP与FPGA 间EMIF总线错误;Bit4 故障字2紧急停机;Bit5 故障字2外部输入故障1;Bit6 故障字2控制器心跳丢失;Bit7 故障字2J1 DSP 心跳丢失;Bit8 故障字2J2 DSP 心跳丢失;Bit9 故障字2烟雾故障;Bit10 故障字2主从机1通信丢失;Bit12 故障字2外部输入故障2;Bit13 故障字2PCS与EMS通信丢失),0
-4,3702,u16,16,yc801,1,10MW PCS4-系统故障字3 ①(Bit0 故障字3总零序过电流保护;Bit1 故障字3功率反馈偏差;Bit2 故障字3电网电压相序错误;Bit3 故障字3直流霍尔传感器断开;Bit5 故障字3ADC 校准错误;Bit6 故障字3控制检测到故障;Bit7 故障字3模块1 检测到故障;Bit8 故障字3模块2 检测到故障),0
-4,3703,u16,16,yc802,1,10MW PCS4-系统故障字4 ①(Bit0 故障字4BMS输入干接点故障1;Bit1 故障字4BMS输入干接点故障2),0
-4,3710,u16,16,yc803,1,10MW PCS4-系统警告字1 ①(Bit0 系统警告字1模块1 IP 地址错误;Bit1 系统警告字1模块2 IP 地址错误;Bit2 系统警告字1由于过温降额;Bit3 系统警告字1模块1 检测到警告;Bit4 系统警告字1模块2 检测到警告;Bit5 系统警告字13352 SPI 通信丢失;Bit6 系统警告字1从机1 故障;Bit8 系统警告字1从机1 警告;Bit10 系统警告字1EMS 心跳未变化;Bit11 系统警告字1Web 服务器通信丢失;Bit12 系统警告字1PCS 准备开启未满足;Bit13 系统警告字1RMU 检测到跳闸;Bit14 系统警告字1MVG3 断路器跳闸;Bit15 系统警告字1MVG3 断路器未存储能量),0
-4,3711,u16,16,yc804,1,10MW PCS4-系统警告字2 ①(Bit0 系统告警字2BMS1输入报警;Bit1 系统告警字2BMS2输入报警;Bit4 系统告警字2MV 继电器 CT 开路;Bit5 系统告警字2MV RMU 环境过温;Bit6 系统告警字2MV RMU 热交换器报警;Bit7 系统告警字2变压器油温UTP降额报警;Bit8 系统告警字2变压器油温过高报警),0
-4,3714,u16,16,yc805,1,10MW PCS4-控制器故障字1 ①(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,3715,u16,16,yc806,1,10MW PCS4-控制器故障字2 ①,0
-4,3716,u16,16,yc807,1,10MW PCS4-控制器警告字1 ①(Bit0 控制警告字1Web 服务器丢失),0
-4,3717,u16,16,yc808,1,10MW PCS4-控制器故障字1(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,3718,u16,16,yc809,1,10MW PCS4-控制器警告字1(Bit0 控制警告字1Web 服务器丢失),0
-4,3730,u16,16,yc810,1,10MW PCS4-模块1 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,3731,u16,16,yc811,1,10MW PCS4-模块1 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu4.PcsList[0]
 4,3732,u16,16,yc812,1,10MW PCS4-模块1 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu4.PcsList[0]
-4,3744,u16,16,yc813,1,10MW PCS4-模块2 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,3745,u16,16,yc814,1,10MW PCS4-模块2 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu4.PcsList[1]
 4,3746,u16,16,yc815,1,10MW PCS4-模块2 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu4.PcsList[1]
+4,1,u16,16,sysyc1,1,SYSTEM-协议版本(V0.15),0
+4,2,u16,16,sysyc2,1,SYSTEM-软件平台版本,0
+4,3,u16,16,sysyc3,1,SYSTEM-软件发布版本,0
+4,4,u16,16,sysyc4,1,SYSTEM-软件变更版本,0
+4,5,u16,16,sysyc5,1,SYSTEM-软件SPC版本,0
+4,100,u32,32,sysyc100,10,SYSTEM-标称容量(0.1kVA),model=sum|arg1=emuDeviceId.PcsList[0].PCSRatePower|arg2=emuDeviceId.PcsList[1].PCSRatePower|arg3=|arg4=10
+4,102,u32,32,sysyc102,10,SYSTEM-标称电量(0.1kWh),model=4|arg1=ess.Capacity|arg2=|arg3=|arg4=10
+4,104,u16,16,sysyc104,10,SYSTEM-系统SOC(0.001,标幺),model=4|arg1=bms1.BatteryStacks[0].SOC|arg2=|arg3=|arg4=10
+4,105,u16,16,sysyc105,10,SYSTEM-系统SOH(0.001,标幺),model=4|arg1=bms1.BatteryStacks[0].SOH|arg2=|arg3=|arg4=10
+4,106,u16,16,sysyc106,1,SYSTEM-系统总状态详细版(0初始化1停机2启动中3运行中4待机),0
+4,107,u16,16,sysyc107,1,SYSTEM-系统故障总(0正常1故障),0
+4,108,u16,16,sysyc108,1,SYSTEM-系统总状态精简版(1停机2启动中3运行中5故障6告警),0
+4,109,u32,32,sysyc109,10,SYSTEM-允许充电电量(0.1kWh),model=4|arg1=ess.AvailableChargeEnergy|arg2=|arg3=|arg4=10
+4,111,u32,32,sysyc111,10,SYSTEM-允许放电电量(0.1kWh),model=4|arg1=ess.AvailableDischargeEnergy|arg2=|arg3=|arg4=10
+4,113,u32,32,sysyc113,10,SYSTEM-允许充电功率(0.1kW),0
+4,115,u32,32,sysyc115,10,SYSTEM-允许放电功率(0.1kW),0
+4,121,u16,16,sysyc121,1,SYSTEM-PCS状态汇总(0初始1关闭2待机3运行),0
+4,122,int16,16,sysyc122,10000,SYSTEM-功率因数(0.0001),model=4|arg1=em.PowerFactor|arg2=|arg3=|arg4=10000
+4,123,int32,32,sysyc123,10,SYSTEM-视在功率(0.1kVA),model=4|arg1=em.TotalApparentPower|arg2=|arg3=|arg4=10
+4,125,int32,32,sysyc125,10,SYSTEM-有功功率(0.1kW),model=4|arg1=em.TotalActivePower|arg2=|arg3=|arg4=10
+4,127,int32,32,sysyc127,10,SYSTEM-无功功率(0.1kVar),model=4|arg1=em.TotalReactivePower|arg2=|arg3=|arg4=10
+4,129,u32,32,sysyc129,100,SYSTEM-交流侧频率(0.01Hz),model=4|arg1=em.Frequency|arg2=|arg3=|arg4=100
+4,131,int32,32,sysyc131,10,SYSTEM-直流侧功率(0.1kW),model=sum|arg1=emuDeviceId.PcsList[0].BatteryPower|arg2=emuDeviceId.PcsList[1].BatteryPower|arg3=|arg4=10
+4,133,int32,32,sysyc133,10,SYSTEM-直流侧电流(0.1A),model=4|arg1=bms1.BatteryStacks[0].Current|arg2=|arg3=|arg4=10
+4,135,u32,32,sysyc135,10,SYSTEM-直流侧平均电压(0.1V),model=4|arg1=bms1.BatteryStacks[0].TotalVoltage|arg2=|arg3=|arg4=10
+4,141,u32,32,sysyc141,10,SYSTEM-直流侧总充电电量(0.1kWh),model=4|arg1=ess.TotalChargeEnergy|arg2=|arg3=|arg4=10
+4,143,u32,32,sysyc143,10,SYSTEM-直流侧总放电电量(0.1kWh),model=4|arg1=ess.TotalDischargeEnergy|arg2=|arg3=|arg4=10
+4,149,u32,32,sysyc149,10,SYSTEM-交流侧总充电有功电量(0.1kWh),model=4|arg1=em.ForwardActiveEnergy|arg2=|arg3=|arg4=10
+4,151,u32,32,sysyc151,10,SYSTEM-交流侧总放电有功电量(0.1kWh),model=4|arg1=em.ReverseActiveEnergy|arg2=|arg3=|arg4=10
+4,153,u16,16,sysyc153,1,SYSTEM-年(0~99),0
+4,154,u16,16,sysyc154,1,SYSTEM-月(1~12),0
+4,155,u16,16,sysyc155,1,SYSTEM-日(1~31),0
+4,156,u16,16,sysyc156,1,SYSTEM-小时(0~23),0
+4,157,u16,16,sysyc157,1,SYSTEM-分(0~59),0
+4,158,u16,16,sysyc158,1,SYSTEM-秒(0~59),0
+4,159,u16,16,sysyc159,1,SYSTEM-模拟对点模式(0关1开),0
+4,165,u32,32,sysyc165,10,SYSTEM-交流侧总容性无功电量(0.1kVarh),0
+4,167,u32,32,sysyc167,10,SYSTEM-交流侧总感性无功电量(0.1kVarh),0
+4,170,u16,16,sysyc170,1,SYSTEM-黑启动模式(0非电压源1电压源),0
+4,171,u16,16,sysyc171,1,SYSTEM-高压开关状态(AA动作EE复归),0
+4,200,u16,16,sysyc200,1,SYSTEM-PCS数量,0
+4,201,u16,16,sysyc201,1,SYSTEM-运行PCS数量,0
+4,202,u16,16,sysyc202,1,SYSTEM-告警PCS数量,0
+4,203,u16,16,sysyc203,1,SYSTEM-故障PCS数量,0
+4,204,u16,16,sysyc204,1,SYSTEM-BMS数量,0
+4,205,u16,16,sysyc205,1,SYSTEM-运行BMS数量,0
+4,206,u16,16,sysyc206,1,SYSTEM-告警BMS数量,0
+4,207,u16,16,sysyc207,1,SYSTEM-故障BMS数量,0
+4,218,u16,16,sysyc218,1,SYSTEM-状态字1(一体机PCS通讯状态Bit0~15对应#1~#16PCS,1已连接),0
+4,219,u16,16,sysyc219,1,SYSTEM-状态字2(Bit8测控设备通讯;Bit9 UPS485通讯;Bit10 EMS通讯,1已连接),0
+4,220,u16,16,sysyc220,1,SYSTEM-状态字3(BMS通讯状态Bit0~9对应#1~#10BMS,1已连接),0
+4,221,u16,16,sysyc221,1,SYSTEM-状态字4(PCS组状态Bit0~15对应#1~#16组,1故障),0
+4,222,u16,16,sysyc222,1,SYSTEM-状态字5(PCS组状态Bit0~7对应#17~#24组,1故障),0
+4,223,u16,16,sysyc223,1,SYSTEM-状态字6(PCS软件版本校验字,0正常1异常),0
+4,224,u16,16,sysyc224,1,SYSTEM-状态字7(PCS安规标准校验字,0正常1异常),0
+4,225,u16,16,sysyc225,1,SYSTEM-状态字8(PCS模式校验字:总线模式/并离网/运行模式/主从机,0正常1异常),0
+4,226,u16,16,sysyc226,1,SYSTEM-状态字9(保留),0
+4,227,u16,16,sysyc227,1,SYSTEM-状态字10(保留),0
+4,228,u16,16,sysyc228,1,SYSTEM-状态字11(5.5MW一体机PCS通讯状态Bit0~1对应#1~#2PCS,1已连接),0
+6,4,u16,16,syst4,1,SYSTEM-远程&本地控制使能(0禁止1使能),0
+6,5,u16,16,syst5,1,SYSTEM-远程&本地控制模式(0本地1远程),0
+6,6,u16,16,syst6,1,SYSTEM-系统操作(3启动4停止5待机6重置),0
+6,7,u16,16,syst7,1,SYSTEM-黑启动模式写入(0关闭1开启),0
+6,1010,int16,16,syst1010,1,SYSTEM-交流侧目标有功功率(1kW,正放电负充电),0
+6,1011,int16,16,syst1011,1,SYSTEM-交流侧目标无功功率(1kVar),0
+6,1399,u16,16,syst1399,1,SYSTEM-系统重启(AA重启),0
+6,1500,u16,16,syst1500,1,SYSTEM-对时年(0~99),0
+6,1501,u16,16,syst1501,1,SYSTEM-对时月(1~12),0
+6,1502,u16,16,syst1502,1,SYSTEM-对时日(1~31),0
+6,1503,u16,16,syst1503,1,SYSTEM-对时小时(0~23),0
+6,1504,u16,16,syst1504,1,SYSTEM-对时分(0~59),0
+6,1505,u16,16,syst1505,1,SYSTEM-对时秒(0~59),0
