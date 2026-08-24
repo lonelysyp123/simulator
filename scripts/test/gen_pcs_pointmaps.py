@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """从 TRINA MV-EMS Modbus TCP 协议 V0.15 Excel 生成 10MW / 5.5MW 两份 EMU 点表。
 
+⚠ 警告: 本脚本全量重写目标 CSV，会覆盖任何手工修改（含点位增删、绑定调整、
+描述微调），且点位删除会导致 yc 序号重编号。点表 CSV 是运行期源文件，允许
+手工维护；本脚本仅用于从协议 Excel 重新引导（bootstrap）点表。日常增删点位
+请直接编辑 CSV，不要重跑本脚本。
+
 数据来源:
 - PCS System(PCS 系统) 工作表: 各型号 PCS 单元与 PCS 组的读寄存器(04)和保持寄存器(06/16)
 - PCS Status&Alarm(PCS状态和报警) 工作表: 位级定义, 并入对应故障/状态字寄存器描述
@@ -137,6 +142,8 @@ def parse_section(r1, r2):
             continue
         if SKIP_WORD_RE.search(name):
             continue  # 按要求剔除的故障字寄存器
+        if SKIP_INTEGRAL_RE.search(name):
+            continue  # 剔除时间积分类字段（每小时/每日 容量、电量、循环时间、运行时间）
         regs.append((int(m.group(3)), name, clean(c8), clean(c7)))
     regs.sort(key=lambda x: x[0])
     return regs
@@ -144,6 +151,8 @@ def parse_section(r1, r2):
 # ---------- 寄存器段 ----------
 # 剔除模块级 FPGA / IO / 采样 故障字寄存器 (仿真无对应故障源)
 SKIP_WORD_RE = re.compile(r'模块[12]\s*(FPGA|IO|采样)\s*故障字')
+# 剔除时间积分类字段: 每小时/每日的容量、电量、循环时间、运行时间 (高/低 16 位均命中)
+SKIP_INTEGRAL_RE = re.compile(r'(每小时|每日).*(容量|电量|循环时间|运行时间)')
 
 SECTIONS = {
     '10MW': {
@@ -166,10 +175,6 @@ LAYOUT = {
 # 模块1 -> emu{n}.PcsList[0], 模块2 -> emu{n}.PcsList[1]
 # 机绁级聚合优先 Emu.*, 无聚合属性的取 PcsList[0] 代表。
 UNIT_BIND = {
-    '交流电流 R': 'PcsList[0].PhaseACurrent',
-    '交流电流 S': 'PcsList[0].PhaseBCurrent',
-    '交流电流 T': 'PcsList[0].PhaseCCurrent',
-    '电池总功率': 'PcsList[0].BatteryPower',
     '电池1 功率': 'PcsList[0].BatteryPower',
     '电池2 功率': 'PcsList[1].BatteryPower',
     '电网有功功率': 'Emu.OutputActivePower',
@@ -178,10 +183,6 @@ UNIT_BIND = {
     '电网电压 ST': 'PcsList[0].LineVoltageBC',
     '电网电压 TR': 'PcsList[0].LineVoltageCA',
     'PCS 过温降载NTC': 'PcsList[0].IGBTMaxTemp',
-    'PCS 可用容量': 'PcsList[0].AvailableCapacity',
-    'PCS 额定容量': 'PcsList[0].PCSRatePower',
-    '交流每日充电有功电量低16位': 'PcsList[0].DailyChargeEnergy',
-    '交流每日放电有功电量低16位': 'PcsList[0].DailyDischargeEnergy',
     '交流总充电有功电量低16位': 'PcsList[0].TotalChargeEnergy',
     '交流总放电有功电量低16位': 'PcsList[0].TotalDischargeEnergy',
 }
@@ -191,8 +192,6 @@ MODULE_BIND = {
     '电感电流 R': 'PhaseACurrent',
     '电感电流 S': 'PhaseBCurrent',
     '电感电流 T': 'PhaseCCurrent',
-    '每日充电容量低16位': 'DailyChargeEnergy',
-    '每日放电容量低16位': 'DailyDischargeEnergy',
     '总充电容量低16位': 'TotalChargeEnergy',
     '总放电容量低16位': 'TotalDischargeEnergy',
 }
@@ -206,12 +205,25 @@ PLUGIN_BIND = {
     '模块2 警告字2': ('ModuleWarningWord2', 1),
 }
 
+# 单元级双模块求和绑定: 机绁级点位 = 模块1 + 模块2，输出 model=sum
+UNIT_SUM_BIND = {
+    '交流电流 R': ('PcsList[0].PhaseACurrent', 'PcsList[1].PhaseACurrent'),
+    '交流电流 S': ('PcsList[0].PhaseBCurrent', 'PcsList[1].PhaseBCurrent'),
+    '交流电流 T': ('PcsList[0].PhaseCCurrent', 'PcsList[1].PhaseCCurrent'),
+    '电池总功率': ('PcsList[0].BatteryPower', 'PcsList[1].BatteryPower'),
+    'PCS 可用容量': ('PcsList[0].AvailableCapacity', 'PcsList[1].AvailableCapacity'),
+    'PCS 额定容量': ('PcsList[0].PCSRatePower', 'PcsList[1].PCSRatePower'),
+}
+
 def binding_for(name, n, scale):
     """按 EMU 层级返回 ModelSim 绑定; 无对应仿真属性返回 '0'。"""
     p = PLUGIN_BIND.get(name)
     if p:
         key, slot = p
         return f'model=plugin|arg1={key}|arg2=emu{n}.PcsList[{slot}]'
+    s = UNIT_SUM_BIND.get(name)
+    if s:
+        return f'model=sum|arg1=emu{n}.{s[0]}|arg2=emu{n}.{s[1]}|arg3=|arg4={scale}'
     path = None
     m = re.match(r'^模块([12])(.+)$', name)
     if m:
