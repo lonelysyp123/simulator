@@ -66,6 +66,7 @@ namespace EssSimulator.DataExchange.Catalog
 
             var telemetry = new List<PointBinding>();
             var pluginPoints = new List<PluginPointBinding>();
+            var sumPoints = new List<SumPointBinding>();
             foreach (var entry in pointMap.DataMaps)
             {
                 if (string.IsNullOrWhiteSpace(entry.ParamName))
@@ -74,6 +75,22 @@ namespace EssSimulator.DataExchange.Catalog
                     continue;
                 if (string.IsNullOrWhiteSpace(model.Arg1))
                     continue;
+
+                // model=sum|arg1=<路径A>|arg2=<路径B>：遥测值 = A + B，不走单路径反射绑定
+                if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrWhiteSpace(model.Arg2))
+                        continue;
+
+                    sumPoints.Add(new SumPointBinding
+                    {
+                        Entry = entry,
+                        ParamName = entry.ParamName,
+                        FirstPath = model.Arg1,
+                        SecondPath = model.Arg2
+                    });
+                    continue;
+                }
 
                 // model=plugin|arg1=<字键>|arg2=<设备根路径>：交给遥测插件组字，不走反射绑定
                 if (string.Equals(model.ModelType, "plugin", StringComparison.OrdinalIgnoreCase))
@@ -113,6 +130,10 @@ namespace EssSimulator.DataExchange.Catalog
                 if (string.IsNullOrWhiteSpace(model.Arg1))
                     continue;
 
+                // sum 点位仅供遥测，不作为控制目标
+                if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 var target = DataTarget.ParseBindingPath(model.Arg1);
                 if (target == null)
                     continue;
@@ -140,6 +161,10 @@ namespace EssSimulator.DataExchange.Catalog
                     if (string.IsNullOrWhiteSpace(model.Arg1))
                         continue;
 
+                    // sum 仅支持 bank 级点位，rack 级跳过
+                    if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
                     rackTelemetry.Add(new RackPointBinding
                     {
                         Entry = entry,
@@ -155,6 +180,9 @@ namespace EssSimulator.DataExchange.Catalog
                     if (!pointMap.RackParamModelLookup.TryGetValue(entry.ParamName, out var model))
                         continue;
                     if (string.IsNullOrWhiteSpace(model.Arg1))
+                        continue;
+
+                    if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     rackControl.Add(new RackPointBinding
@@ -174,6 +202,7 @@ namespace EssSimulator.DataExchange.Catalog
                 RackTelemetryPoints = rackTelemetry,
                 RackControlPoints = rackControl,
                 PluginPoints = pluginPoints,
+                SumPoints = sumPoints,
                 DefaultValues = new Dictionary<string, object>(pointMap.DefaultBuffer)
             };
         }

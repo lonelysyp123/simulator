@@ -41,7 +41,7 @@ namespace EssSimulator.DataExchange.Pipeline
 
         public void RunOnce()
         {
-            if (_catalog.TelemetryPoints.Count == 0 && _pluginPoints.Count == 0)
+            if (_catalog.TelemetryPoints.Count == 0 && _pluginPoints.Count == 0 && _catalog.SumPoints.Count == 0)
                 return;
 
             var writeBuffer = new Dictionary<string, object>();
@@ -70,6 +70,23 @@ namespace EssSimulator.DataExchange.Pipeline
                 catch (Exception ex)
                 {
                     _log.Debug($"Telemetry plugin compute failed: {binding.ParamName}", ex);
+                }
+            }
+
+            // model=sum：读取两个仿真路径并求和，缺失操作数按 0 处理
+            foreach (var binding in _catalog.SumPoints)
+            {
+                try
+                {
+                    var value = SumPointBinding.ComputeSum(
+                        _simulation.Read(binding.FirstPath),
+                        _simulation.Read(binding.SecondPath));
+                    if (_shadow.TelemetryChanged(binding.ParamName, value))
+                        writeBuffer[binding.ParamName] = value;
+                }
+                catch (Exception ex)
+                {
+                    _log.Debug($"Telemetry sum compute failed: {binding.ParamName}", ex);
                 }
             }
 
