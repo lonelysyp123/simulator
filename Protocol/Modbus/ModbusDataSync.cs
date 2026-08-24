@@ -259,9 +259,12 @@ namespace EssSimulator.Protocol.Modbus
             if (!_map.ParamModelLookup.TryGetValue(entry.ParamName!, out var model)) return 0;
 
             if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
+            {
+                var paths = SumPointBinding.ParsePaths(model.Arg1, model.Arg2);
+                if (paths == null) return 0;
                 return SumPointBinding.ComputeSum(
-                    SimServer.GetExtIfVariableVal(model.Arg1!),
-                    string.IsNullOrWhiteSpace(model.Arg2) ? null : SimServer.GetExtIfVariableVal(model.Arg2));
+                    paths.Select(p => SimServer.GetExtIfVariableVal(p)).ToArray());
+            }
 
             if (!int.TryParse(model.ModelType, out int modelType))
             {
@@ -284,10 +287,12 @@ namespace EssSimulator.Protocol.Modbus
 
             if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
             {
-                var arg2 = model.Arg2?.Replace("rackId", rackId.ToString());
+                var paths = SumPointBinding.ParsePaths(
+                    model.Arg1?.Replace("rackId", rackId.ToString()),
+                    model.Arg2?.Replace("rackId", rackId.ToString()));
+                if (paths == null) return 0;
                 return SumPointBinding.ComputeSum(
-                    SimServer.GetExtIfVariableVal(arg1!),
-                    string.IsNullOrWhiteSpace(arg2) ? null : SimServer.GetExtIfVariableVal(arg2));
+                    paths.Select(p => SimServer.GetExtIfVariableVal(p)).ToArray());
             }
 
             if (!int.TryParse(model.ModelType, out int modelType))

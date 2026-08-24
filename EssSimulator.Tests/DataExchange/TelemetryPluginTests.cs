@@ -253,6 +253,50 @@ public class TelemetryPluginTests
         Assert.NotNull(dischargePower);
         Assert.Equal("emu1.Emu.MaxDischargePower", dischargePower!.FirstPath);
         Assert.Equal("emu2.Emu.MaxDischargePower", dischargePower.SecondPath);
+
+        // 直流侧功率为两机组四模块求和，覆盖全系统
+        var dcPower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc131");
+        Assert.NotNull(dcPower);
+        Assert.Equal(4, dcPower!.Paths.Count);
+        Assert.Contains("emu2.PcsList[1].BatteryPower", dcPower.Paths);
+    }
+
+    [Fact]
+    public void FromPointMap_Trina10MW_SystemAggregates_AllFourUnits()
+    {
+        var catalog = LoadCatalog("trina_10MW");
+
+        // 标称容量/直流侧功率：8 模块全量求和
+        var rated = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc100");
+        Assert.NotNull(rated);
+        Assert.Equal(8, rated!.Paths.Count);
+        Assert.Contains("emu4.PcsList[1].PCSRatePower", rated.Paths);
+
+        var dcPower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc131");
+        Assert.NotNull(dcPower);
+        Assert.Equal(8, dcPower!.Paths.Count);
+        Assert.Contains("emu3.PcsList[0].BatteryPower", dcPower.Paths);
+
+        // 允许充/放电功率：四机组 EMU 限值求和
+        var chargePower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc113");
+        Assert.NotNull(chargePower);
+        Assert.Equal(new[]
+        {
+            "emu1.Emu.MaxChargePower", "emu2.Emu.MaxChargePower",
+            "emu3.Emu.MaxChargePower", "emu4.Emu.MaxChargePower"
+        }, chargePower!.Paths);
+
+        var dischargePower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc115");
+        Assert.NotNull(dischargePower);
+        Assert.Equal(new[]
+        {
+            "emu1.Emu.MaxDischargePower", "emu2.Emu.MaxDischargePower",
+            "emu3.Emu.MaxDischargePower", "emu4.Emu.MaxDischargePower"
+        }, dischargePower!.Paths);
+
+        // 描述列半角逗号修复：sysyc218 等状态字点位恢复为固定默认值点
+        Assert.Contains("sysyc218", catalog.DefaultValues.Keys);
+        Assert.Contains("sysyc228", catalog.DefaultValues.Keys);
     }
 
     [Fact]

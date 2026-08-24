@@ -7,7 +7,8 @@ using EssSimulator.Protocol.Modbus;
 namespace EssSimulator.Tests.DataExchange;
 
 /// <summary>
-/// 验证 ModelSim 加法类型 model=sum|arg1=&lt;路径A&gt;|arg2=&lt;路径B&gt;：
+/// 验证 ModelSim 加法类型 model=sum：
+/// 经典两路径（arg1/arg2）与 arg1 分号分隔多路径（多机组聚合），
 /// 目录编译、遥测管道求和、缺失操作数按 0 处理，以及 sum 不作为控制目标。
 /// </summary>
 public class SumModelBindingTests
@@ -17,6 +18,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,40000,float32,32,ycsum0,1,双PCS有功合计,model=sum|arg1=emu1.PcsList[0].ActivePower|arg2=emu1.PcsList[1].ActivePower
 4,40002,float32,32,ycplain0,1,普通遥测点位,model=4|arg1=emu1.Freq
 4,40004,float32,32,ycsum1,1,缺第二操作数,model=sum|arg1=emu1.PcsList[0].ActivePower
+4,40008,float32,32,ycsummulti0,1,四机组限值多路径求和,model=sum|arg1=emu1.Emu.MaxChargePower;emu2.Emu.MaxChargePower;emu3.Emu.MaxChargePower;emu4.Emu.MaxChargePower|arg2=|arg3=|arg4=10
 6,41000,int16,16,ytsum0,1,sum误配为控制点,model=sum|arg1=emu1.X|arg2=emu1.Y
 """;
 
@@ -170,6 +172,70 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
         {
             File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void FromPointMap_ParsesMultiPathSumBinding()
+    {
+        var path = WriteTempPointMap();
+        try
+        {
+            var pointMap = new ModbusPointMap(path, "simEmu1");
+            var catalog = PointCatalogLoader.FromPointMap(pointMap, "simEmu1", new DataExchangeOptions());
+
+            var sum = Assert.Single(catalog.SumPoints, p => p.ParamName == "ycsummulti0");
+            Assert.Equal(4, sum.Paths.Count);
+            Assert.Equal("emu1.Emu.MaxChargePower", sum.FirstPath);
+            Assert.Equal("emu4.Emu.MaxChargePower", sum.Paths[3]);
+            Assert.DoesNotContain(catalog.TelemetryPoints, p => p.ParamName == "ycsummulti0");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TelemetryPipeline_WritesSumOfMultiPaths()
+    {
+        var path = WriteTempPointMap();
+        try
+        {
+            var pointMap = new ModbusPointMap(path, "simEmu1");
+            var catalog = PointCatalogLoader.FromPointMap(pointMap, "simEmu1", new DataExchangeOptions());
+
+            var simulation = new FakeSimulationAdapter();
+            simulation.Set("emu1.Emu.MaxChargePower", 1000f);
+            simulation.Set("emu2.Emu.MaxChargePower", 1000f);
+            // emu3 缺失按 0 处理
+            simulation.Set("emu4.Emu.MaxChargePower", 500f);
+
+            var modbus = new FakeModbusAdapter();
+            var pipeline = new TelemetryPipeline(catalog, simulation, modbus, new ShadowStore());
+
+            pipeline.RunOnce();
+
+            Assert.Equal(2500.0, Convert.ToDouble(modbus.Registers["ycsummulti0"]), 6);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("a.X", null, null)]              // 单路径非法
+    [InlineData("a.X", "", null)]
+    [InlineData("a.X", "b.Y", new[] { "a.X", "b.Y" })]          // 经典两路径
+    [InlineData("a.X;b.Y;c.Z", null, new[] { "a.X", "b.Y", "c.Z" })] // 分号多路径
+    [InlineData("a.X; b.Y ;;", "c.Z", new[] { "a.X", "b.Y", "c.Z" })] // 空段剔除 + arg2 补充
+    public void ParsePaths_Combinations(string? arg1, string? arg2, string[]? expected)
+    {
+        var paths = SumPointBinding.ParsePaths(arg1, arg2);
+        if (expected == null)
+            Assert.Null(paths);
+        else
+            Assert.Equal(expected, paths);
     }
 
     [Fact]

@@ -73,14 +73,13 @@ namespace EssSimulator.DataExchange.Pipeline
                 }
             }
 
-            // model=sum：读取两个仿真路径并求和，缺失操作数按 0 处理
+            // model=sum：读取各仿真路径并求和，缺失操作数按 0 处理
             foreach (var binding in _catalog.SumPoints)
             {
                 try
                 {
                     var value = SumPointBinding.ComputeSum(
-                        _simulation.Read(binding.FirstPath),
-                        _simulation.Read(binding.SecondPath));
+                        binding.Paths.Select(_simulation.Read).ToArray());
                     if (_shadow.TelemetryChanged(binding.ParamName, value))
                         writeBuffer[binding.ParamName] = value;
                 }

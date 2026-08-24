@@ -76,18 +76,18 @@ namespace EssSimulator.DataExchange.Catalog
                 if (string.IsNullOrWhiteSpace(model.Arg1))
                     continue;
 
-                // model=sum|arg1=<路径A>|arg2=<路径B>：遥测值 = A + B，不走单路径反射绑定
+                // model=sum：遥测值 = 各路径之和（arg1 支持分号分隔多路径，arg2 为经典第二路径），不走单路径反射绑定
                 if (string.Equals(model.ModelType, SumPointBinding.ModelType, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.IsNullOrWhiteSpace(model.Arg2))
+                    var paths = SumPointBinding.ParsePaths(model.Arg1, model.Arg2);
+                    if (paths == null)
                         continue;
 
                     sumPoints.Add(new SumPointBinding
                     {
                         Entry = entry,
                         ParamName = entry.ParamName,
-                        FirstPath = model.Arg1,
-                        SecondPath = model.Arg2
+                        Paths = paths
                     });
                     continue;
                 }
