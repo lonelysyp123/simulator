@@ -130,7 +130,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,105,u16,16,sysyc105,10,SYSTEM-系统SOH(0.001,标幺),model=4|arg1=bms1.BatteryStacks[0].SOH|arg2=|arg3=|arg4=10
 4,106,u16,16,sysyc106,1,SYSTEM-系统总状态详细版(0初始化1停机2启动中3运行中4待机),0
 4,107,u16,16,sysyc107,1,SYSTEM-系统故障总(0正常1故障;统计全部机组所有PCS模块告警),model=plugin|arg1=SystemFaultSummary|arg2=emu1
-4,108,u16,16,sysyc108,1,SYSTEM-系统总状态精简版(1停机2启动中3运行中5故障6告警),0
+4,108,u16,16,sysyc108,1,SYSTEM-系统总状态精简版(1停机3运行中5故障6告警;待机按运行中),model=plugin|arg1=SystemRunStateSummary|arg2=emu1
 4,109,u32,32,sysyc109,10,SYSTEM-允许充电电量(0.1kWh),model=4|arg1=ess.AvailableChargeEnergy|arg2=|arg3=|arg4=10
 4,111,u32,32,sysyc111,10,SYSTEM-允许放电电量(0.1kWh),model=4|arg1=ess.AvailableDischargeEnergy|arg2=|arg3=|arg4=10
 4,113,u32,32,sysyc113,10,SYSTEM-允许充电功率(0.1kW),0

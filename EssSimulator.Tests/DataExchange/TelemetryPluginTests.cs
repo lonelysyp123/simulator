@@ -130,6 +130,61 @@ public class TelemetryPluginTests
     }
 
     [Fact]
+    public void Compute_SystemRunStateSummary_FaultAlarmRunningStoppedPriority()
+    {
+        var plugin = new TrinaEmuFaultWordPlugin();
+
+        // 全停机（OperationStatus=1，无告警）→ 1
+        var sim = new FakeSimulation
+        {
+            ["emu1.PcsList.Count"] = 2,
+            ["emu1.PcsList[0].OperationStatus"] = 1,
+            ["emu1.PcsList[0].AlarmSummary1"] = (ushort)0,
+            ["emu1.PcsList[0].AlarmSummary2"] = (ushort)0,
+            ["emu1.PcsList[1].OperationStatus"] = 1,
+            ["emu1.PcsList[1].AlarmSummary1"] = (ushort)0,
+            ["emu1.PcsList[1].AlarmSummary2"] = (ushort)0
+        };
+        Assert.Equal(1, plugin.Compute("SystemRunStateSummary", "emu1", sim));
+
+        // 模块1 待机（仿真 2 → 协议 3 运行中）
+        sim["emu1.PcsList[0].OperationStatus"] = 2;
+        Assert.Equal(3, plugin.Compute("SystemRunStateSummary", "emu1", sim));
+
+        // 模块2 放电运行仍为 3；叠加告警 → 6
+        sim["emu1.PcsList[1].OperationStatus"] = 5;
+        Assert.Equal(3, plugin.Compute("SystemRunStateSummary", "emu1", sim));
+        sim["emu1.PcsList[1].AlarmSummary1"] = (ushort)0x0001;
+        Assert.Equal(6, plugin.Compute("SystemRunStateSummary", "emu1", sim));
+
+        // 模块1 故障（仿真 6 → 协议 5）优先级最高，覆盖告警
+        sim["emu1.PcsList[0].OperationStatus"] = 6;
+        Assert.Equal(5, plugin.Compute("SystemRunStateSummary", "emu1", sim));
+    }
+
+    [Fact]
+    public void Compute_SystemRunStateSummary_AggregatesAcrossUnits()
+    {
+        var plugin = new TrinaEmuFaultWordPlugin();
+
+        // emu1 停机，emu2 充电运行（仿真 4 → 3）
+        var sim = new FakeSimulation
+        {
+            ["emu1.PcsList.Count"] = 2,
+            ["emu1.PcsList[0].OperationStatus"] = 1,
+            ["emu1.PcsList[1].OperationStatus"] = 1,
+            ["emu2.PcsList.Count"] = 2,
+            ["emu2.PcsList[0].OperationStatus"] = 4,
+            ["emu2.PcsList[1].OperationStatus"] = 1
+        };
+        Assert.Equal(3, plugin.Compute("SystemRunStateSummary", "emu1", sim));
+
+        // 无任何机组可探测 → 停机 1
+        Assert.Equal(1, plugin.Compute("SystemRunStateSummary", "emu9", new FakeSimulation()));
+        Assert.True(plugin.CanHandle("SystemRunStateSummary"));
+    }
+
+    [Fact]
     public void Registry_ResolvesFirstMatchingPlugin()
     {
         var registry = new TelemetryPluginRegistry().Register(new TrinaEmuFaultWordPlugin());
@@ -145,12 +200,12 @@ public class TelemetryPluginTests
     {
         var catalog = LoadCatalog("trina_10MW");
 
-        // 4 机组 × (模块1/2 × 警告字1/2) = 16 个插件点 + 系统故障总 1 个
-        Assert.Equal(17, catalog.PluginPoints.Count);
+        // 4 机组 × (模块1/2 × 警告字1/2) = 16 个插件点 + 系统故障总 + 系统总状态精简版
+        Assert.Equal(18, catalog.PluginPoints.Count);
         Assert.All(catalog.PluginPoints, p =>
-            Assert.Contains(p.WordKey, new[] { "ModuleWarningWord1", "ModuleWarningWord2", "SystemFaultSummary" }));
+            Assert.Contains(p.WordKey, new[] { "ModuleWarningWord1", "ModuleWarningWord2", "SystemFaultSummary", "SystemRunStateSummary" }));
 
-        // 设备根路径与机组/模块层级一致：emu{n}.PcsList[0/1]，系统故障总为 emu1
+        // 设备根路径与机组/模块层级一致：emu{n}.PcsList[0/1]，系统级汇总为 emu1
         var roots = catalog.PluginPoints.Select(p => p.DeviceRoot).Distinct().OrderBy(r => r).ToArray();
         Assert.Equal(new[]
         {
@@ -170,7 +225,7 @@ public class TelemetryPluginTests
     {
         var catalog = LoadCatalog("trina_5.5MW");
 
-        Assert.Equal(9, catalog.PluginPoints.Count);
+        Assert.Equal(10, catalog.PluginPoints.Count);
         Assert.Contains(catalog.PluginPoints, p => p.DeviceRoot == "emu2.PcsList[1]" && p.WordKey == "ModuleWarningWord2");
     }
 

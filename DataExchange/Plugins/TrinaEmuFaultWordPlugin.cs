@@ -14,6 +14,9 @@ namespace EssSimulator.DataExchange.Plugins
         /// <summary>系统故障总字键：遍历所有机组全部 PCS 模块，任一告警汇总非零即输出 1。</summary>
         public const string SystemFaultSummaryKey = "SystemFaultSummary";
 
+        /// <summary>系统总状态（精简版）字键：聚合全部 PCS 模块运行状态，输出 1停机/3运行中/5故障/6告警。</summary>
+        public const string SystemRunStateSummaryKey = "SystemRunStateSummary";
+
         /// <summary>字键 → 位映射表：(位号, 仿真故障属性名列表，任一为 true 即置位)。</summary>
         private static readonly Dictionary<string, IReadOnlyList<(int Bit, string[] Props)>> WordMaps =
             new(StringComparer.Ordinal)
@@ -50,12 +53,14 @@ namespace EssSimulator.DataExchange.Plugins
             };
 
         public bool CanHandle(string wordKey) =>
-            wordKey == SystemFaultSummaryKey || WordMaps.ContainsKey(wordKey);
+            wordKey == SystemFaultSummaryKey || wordKey == SystemRunStateSummaryKey || WordMaps.ContainsKey(wordKey);
 
         public object? Compute(string wordKey, string deviceRoot, ISimulationDataAdapter simulation)
         {
             if (wordKey == SystemFaultSummaryKey)
                 return ComputeSystemFaultSummary(deviceRoot, simulation);
+            if (wordKey == SystemRunStateSummaryKey)
+                return ComputeSystemRunStateSummary(deviceRoot, simulation);
 
             if (!WordMaps.TryGetValue(wordKey, out var map))
                 return null;
@@ -103,6 +108,45 @@ namespace EssSimulator.DataExchange.Plugins
             }
 
             return 0;
+        }
+
+        /// <summary>
+        /// 系统总状态（精简版）：逐台探测机组并遍历全部模块，读取 OperationStatus 与
+        /// AlarmSummary1/2。优先级：任一模块故障(OperationStatus=6)→5；否则任一告警
+        /// 汇总非零→6；否则任一运行中(待机/充电/放电)→3；全停机→1。
+        /// 仿真无启动暂态，不输出 2；待机按运行中处理。
+        /// </summary>
+        private static int ComputeSystemRunStateSummary(string deviceRoot, ISimulationDataAdapter simulation)
+        {
+            string prefix = (deviceRoot ?? string.Empty).TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
+            if (prefix.Length == 0 || prefix == deviceRoot)
+                return 1;
+
+            bool anyFault = false, anyAlarm = false, anyRunning = false;
+            for (int unit = 1; unit <= 32; unit++)
+            {
+                string unitRoot = $"{prefix}{unit}";
+                if (!TryReadInt(simulation, $"{unitRoot}.PcsList.Count", out int moduleCount))
+                    break; // 首个缺失机组即停止探测（机组编号连续）
+
+                for (int m = 0; m < moduleCount; m++)
+                {
+                    string moduleRoot = $"{unitRoot}.PcsList[{m}]";
+                    if (TryReadInt(simulation, $"{moduleRoot}.OperationStatus", out int status))
+                    {
+                        if (status == 6)
+                            anyFault = true;
+                        else if (status is 2 or 4 or 5)
+                            anyRunning = true;
+                    }
+
+                    if ((TryReadInt(simulation, $"{moduleRoot}.AlarmSummary1", out int summary1) && summary1 != 0)
+                        || (TryReadInt(simulation, $"{moduleRoot}.AlarmSummary2", out int summary2) && summary2 != 0))
+                        anyAlarm = true;
+                }
+            }
+
+            return anyFault ? 5 : anyAlarm ? 6 : anyRunning ? 3 : 1;
         }
 
         /// <summary>读取整型遥测量；路径不存在/类型不符/异常均返回 false。</summary>

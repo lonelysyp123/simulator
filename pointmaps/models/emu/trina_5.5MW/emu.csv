@@ -61,7 +61,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5846,u16,16,yc389,1,5.5MW PCS2-模块2 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu2.PcsList[1]
 4,106,u16,16,sysyc106,1,SYSTEM-系统总状态详细版(0初始化1停机2启动中3运行中4待机),0
 4,107,u16,16,sysyc107,1,SYSTEM-系统故障总(0正常1故障;统计全部机组所有PCS模块告警),model=plugin|arg1=SystemFaultSummary|arg2=emu1
-4,108,u16,16,sysyc108,1,SYSTEM-系统总状态精简版(1停机2启动中3运行中5故障6告警),0
+4,108,u16,16,sysyc108,1,SYSTEM-系统总状态精简版(1停机3运行中5故障6告警;待机按运行中),model=plugin|arg1=SystemRunStateSummary|arg2=emu1
 4,109,u32,32,sysyc109,10,SYSTEM-允许充电电量(0.1kWh),0
 4,111,u32,32,sysyc111,10,SYSTEM-允许放电电量(0.1kWh),0
 4,113,u32,32,sysyc113,10,SYSTEM-允许充电功率(0.1kW),0
