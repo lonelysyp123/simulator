@@ -46,6 +46,13 @@ public class TopologyValidatorTests
             n.Y = -320;
             p.Nodes.Add(n);
         }
+
+        // 保存级校验要求至少一个含 PCS 的 EMU；补一个不参与连线的独立单元，避免干扰连线回放用例
+        if (!p.Nodes.Any(n => n.TemplateId == "emu") && !p.Nodes.Any(n => n.TemplateId == "pv_unit"))
+        {
+            p.Nodes.Add(Node("role_emu", "emu", "EMU"));
+            p.Nodes.Add(Node("role_pcs", "pcs", "PCS", new Dictionary<string, object?> { ["emuId"] = "role_emu" }));
+        }
     }
 
     private static TopologyValidationResult Save(TopologyProject p)
@@ -71,18 +78,19 @@ public class TopologyValidatorTests
     }
 
     [Fact]
-    public void Edit_allows_emu_on_bus_top_save_rejects()
+    public void Edit_allows_pcs_on_bus_top_save_rejects()
     {
         var p = new TopologyProject
         {
             Nodes =
             {
                 Node("bus1", "ac_bus", "35kV母线"),
-                Node("emu1", "emu", "EMU-1")
+                Node("emu1", "emu", "EMU-1"),
+                Node("pcs1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "emu1" })
             }
         };
 
-        var r = Connect(p, Edge("emu1", "ac_a", "bus1", "a"));
+        var r = Connect(p, Edge("pcs1", "ac_a", "bus1", "a"));
         Assert.True(r.Ok, r.Message);
         Assert.NotEmpty(p.Edges);
 
@@ -98,11 +106,11 @@ public class TopologyValidatorTests
         bus.Y = 200;
         var grid = Node("grid1", "grid", "电网");
         grid.Y = 40;
-        var emu = Node("emu1", "emu", "EMU-1");
-        emu.Y = 400;
-        var p = new TopologyProject { Nodes = { grid, bus, emu } };
+        var pcs = Node("pcs1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "emu1" });
+        pcs.Y = 400;
+        var p = new TopologyProject { Nodes = { grid, bus, Node("emu1", "emu", "EMU-1"), pcs } };
 
-        Assert.True(Connect(p, Edge("emu1", "ac_a", "bus1", "a")).Ok);
+        Assert.True(Connect(p, Edge("pcs1", "ac_a", "bus1", "a")).Ok);
         Assert.True(Connect(p, Edge("grid1", "a", "bus1", "b")).Ok);
 
         var save = Save(p);
@@ -118,11 +126,11 @@ public class TopologyValidatorTests
             Nodes =
             {
                 Node("bus1", "ac_bus", "35kV母线"),
-                Node("emu1", "emu", "EMU-1")
+                Node("pcs1", "pcs", "PCS-1")
             }
         };
 
-        var r = Connect(p, Edge("emu1", "ac_a", "bus1", "a2"));
+        var r = Connect(p, Edge("pcs1", "ac_a", "bus1", "a2"));
         Assert.True(r.Ok, r.Message);
         TopologyValidator.RefreshAcBusEnergization(p);
         var bus = p.Nodes.First(n => n.Id == "bus1");
@@ -218,17 +226,17 @@ public class TopologyValidatorTests
             {
                 Node("grid1", "grid", "35kV电源", new Dictionary<string, object?> { ["outputVoltage"] = 35000d }),
                 Node("bus1", "ac_bus", "35kV母线"),
-                Node("emu1", "emu", "EMU-1"),
-                Node("emu2", "emu", "EMU-2")
+                Node("pcs1", "pcs", "PCS-1"),
+                Node("pcs2", "pcs", "PCS-2")
             }
         };
         Assert.True(Connect(p, Edge("grid1", "a", "bus1", "a")).Ok);
         Assert.True(Connect(p, Edge("grid1", "b", "bus1", "b")).Ok);
         Assert.True(Connect(p, Edge("grid1", "c", "bus1", "c")).Ok);
 
-        // 同一母线 A' 拐角挂两台 EMU
-        Assert.True(Connect(p, Edge("emu1", "ac_a", "bus1", "a2")).Ok);
-        Assert.True(Connect(p, Edge("emu2", "ac_a", "bus1", "a2")).Ok);
+        // 同一母线 A' 拐角挂两台 PCS
+        Assert.True(Connect(p, Edge("pcs1", "ac_a", "bus1", "a2")).Ok);
+        Assert.True(Connect(p, Edge("pcs2", "ac_a", "bus1", "a2")).Ok);
         Assert.Equal(2, p.Edges.Count(e =>
             (e.FromNodeId == "bus1" && e.FromPortId == "a2") ||
             (e.ToNodeId == "bus1" && e.ToPortId == "a2")));
@@ -242,13 +250,14 @@ public class TopologyValidatorTests
             Nodes =
             {
                 Node("emu1", "emu", "EMU-1"),
+                Node("pcs1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "emu1" }),
                 Node("dc1", "dc_bus", "DC母线"),
                 Node("bms1", "bms", "BMS-1")
             }
         };
 
-        Assert.True(Connect(p, Edge("emu1", "dc_pos", "dc1", "pos_t")).Ok);
-        Assert.True(Connect(p, Edge("emu1", "dc_neg", "dc1", "neg_t")).Ok);
+        Assert.True(Connect(p, Edge("pcs1", "dc_pos", "dc1", "pos_t")).Ok);
+        Assert.True(Connect(p, Edge("pcs1", "dc_neg", "dc1", "neg_t")).Ok);
         Assert.True(Connect(p, Edge("bms1", "dc_pos", "dc1", "neg_b")).Ok);
 
         var save = Save(p);
@@ -380,11 +389,13 @@ public class TopologyValidatorTests
             {
                 Node("grid1", "grid", "电网"),
                 Node("brk1", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
-                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true })
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("emu1", "emu", "EMU-1"),
+                Node("pcs1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "emu1" })
             }
         };
         var ok = TopologyValidator.ValidateProjectForSave(p);
-        Assert.True(ok.Ok);
+        Assert.True(ok.Ok, ok.Message);
 
         p.Nodes.Add(Node("brk2", "ac_breaker", "另一断", new Dictionary<string, object?> { ["isMainBreaker"] = true }));
         var multi = TopologyValidator.ValidateProjectForSave(p);
@@ -451,7 +462,7 @@ public class TopologyValidatorTests
                 Node("bus220", "ac_bus", "220kV母线"),
                 Node("xfmr1", "transformer", "主变"),
                 Node("bus35", "ac_bus", "35kV母线"),
-                Node("emu1", "emu", "EMU-1")
+                Node("pcs1", "pcs", "PCS-1")
             }
         };
 
@@ -470,7 +481,7 @@ public class TopologyValidatorTests
         TopologyValidator.RefreshAcBusEnergization(p);
         Assert.True(TopologyParamHelper.GetDouble(p.Nodes.First(n => n.Id == "bus35").Parameters, "nominalVoltage") > 0);
 
-        Assert.True(Connect(p, Edge("emu1", "ac_a", "bus35", "a2")).Ok);
+        Assert.True(Connect(p, Edge("pcs1", "ac_a", "bus35", "a2")).Ok);
     }
 
     [Fact]
@@ -526,6 +537,48 @@ public class TopologyValidatorTests
         TopologyValidator.RefreshAcBusEnergization(p);
         Assert.True(p.Nodes.First(n => n.Id == "busUp").Parameters.TryGetValue("energized", out var upEn) && upEn is true);
         Assert.False(p.Nodes.First(n => n.Id == "busDown").Parameters.TryGetValue("energized", out var downEn) && downEn is true);
+    }
+
+    [Fact]
+    public void Save_rejects_pcs_without_valid_emu_assignment()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brk1", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("emu1", "emu", "EMU-1"),
+                Node("pcs1", "pcs", "PCS-未归属"),
+                Node("pcs2", "pcs", "PCS-悬空", new Dictionary<string, object?> { ["emuId"] = "not_exist" })
+            }
+        };
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(r.Ok);
+        Assert.Equal("PCS_EMU_UNASSIGNED", r.Code);
+        Assert.Contains("pcs1", r.ProblemNodeIds);
+        Assert.Contains("pcs2", r.ProblemNodeIds);
+    }
+
+    [Fact]
+    public void Save_rejects_plant_without_generation_unit()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brk1", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("emu1", "emu", "EMU-无PCS")
+            }
+        };
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(r.Ok);
+        Assert.Equal("NO_GENERATION_UNIT", r.Code);
     }
 
     [Fact]

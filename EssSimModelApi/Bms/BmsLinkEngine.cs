@@ -235,7 +235,7 @@ namespace EssSimulator.EssSimModelApi.Bms
                 }
 
                 // 5. 储能单元 AC 侧电压检测：须为 0
-                int unitIndex = bmsIndex / 2;
+                int unitIndex = ess.UnitIndexOfPcs(bmsIndex);
                 double acVoltage = ess.GetUnitAcBusVoltage(unitIndex);
                 if (acVoltage > VoltageEnergizedThresholdV)
                 {

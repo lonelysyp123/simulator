@@ -17,7 +17,6 @@
         <el-tag v-if="editHint" size="small" type="success" style="margin-right:6px">{{ editHint }}</el-tag>
         <el-tag size="small" type="info">节点 {{ project.nodes.length }}</el-tag>
         <el-tag size="small" type="info" style="margin-left:6px">连线 {{ project.edges.length }}</el-tag>
-        <el-tag v-if="linking" size="small" type="warning" style="margin-left:6px">连线中…再点目标拐角（Esc 取消）</el-tag>
       </div>
     </div>
 
@@ -37,6 +36,23 @@
             <div class="name">{{ t.name }}</div>
             <div class="desc">{{ t.category }}</div>
           </div>
+        </div>
+
+        <div class="card-title" style="margin-top:14px">EMU 储能单元</div>
+        <div v-if="!emuNodes.length" class="empty">拖入「EMU 储能单元」模板，PCS 通过参数下拉框归入</div>
+        <div
+          v-for="e in emuNodes"
+          :key="e.id"
+          class="palette-item"
+          :class="{ active: selectedNodeId === e.id }"
+          @click="onSelectNode(e.id)"
+        >
+          <span class="dot" :style="{ background: colorOf('emu') }" />
+          <div class="meta">
+            <div class="name">{{ e.label }}</div>
+            <div class="desc">PCS×{{ pcsCountOfEmu(e.id) }}</div>
+          </div>
+          <el-button link type="danger" size="small" @click.stop="deleteEmu(e.id)">删</el-button>
         </div>
 
         <div class="card-title" style="margin-top:14px">设备库</div>
@@ -80,6 +96,7 @@
           @move-node="onMoveNode"
           @pointer-world="w => pointerWorld = w"
         />
+        <div v-if="linking" class="linking-tip">连线中…再点目标拐角（Esc 取消）</div>
       </div>
 
       <aside class="props card">
@@ -135,6 +152,15 @@
                 :model-value="!!selectedNode.parameters[def.key]"
                 @change="v => onBoolParamChange(def.key, v)"
               />
+              <el-select
+                v-else-if="def.type === 'emu_select'"
+                :model-value="selectedNode.parameters[def.key] || ''"
+                placeholder="选择 EMU 储能单元"
+                style="width:100%"
+                @change="v => onEmuParamChange(def.key, v)"
+              >
+                <el-option v-for="e in emuNodes" :key="e.id" :label="e.label" :value="e.id" />
+              </el-select>
               <el-input
                 v-else
                 v-model="selectedNode.parameters[def.key]"
@@ -173,7 +199,7 @@
     </el-dialog>
 
     <el-dialog v-model="wizardOpen" title="标准拓扑向导" width="480px">
-      <p class="wizard-desc">生成电网→主断→220kV 母线→主变→35kV 母线→储能 EMU 和/或光伏单元的径向骨架，并自动三相/直流成组连线。EMU 与光伏单元至少填 1 个。</p>
+      <p class="wizard-desc">生成电网→主断→220kV 母线→主变→35kV 母线→储能 EMU 和/或光伏单元的径向骨架，每个 EMU 默认含 2 台 PCS，并自动三相/直流成组连线。EMU 与光伏单元至少填 1 个。</p>
       <el-form label-width="110px" size="small">
         <el-form-item label="工程名称">
           <el-input v-model="wizardName" :placeholder="wizardNamePlaceholder" />
@@ -323,6 +349,40 @@ const canDelete = computed(() => !!(selectedNodeId.value || selectedEdgeId.value
 const canUndo = computed(() => historyPast.value.length > 0)
 const canRedo = computed(() => historyFuture.value.length > 0)
 
+/** EMU 虚拟节点列表（画布不渲染，仅侧栏管理） */
+const emuNodes = computed(() => project.nodes.filter(n => n.templateId === 'emu'))
+
+function pcsCountOfEmu(emuId) {
+  return project.nodes.filter(n => n.templateId === 'pcs' && n.parameters?.emuId === emuId).length
+}
+
+function onEmuParamChange(key, value) {
+  if (!selectedNode.value) return
+  pushHistory()
+  selectedNode.value.parameters[key] = value || ''
+  clearValidation()
+}
+
+function unassignPcsFromEmu(emuId) {
+  for (const n of project.nodes) {
+    if (n.templateId === 'pcs' && n.parameters?.emuId === emuId)
+      n.parameters.emuId = ''
+  }
+}
+
+function deleteEmu(id) {
+  pushHistory()
+  // 同步清理指向该 EMU 的连线（旧工程 EMU 可能带 AC/DC 连线），避免保存回放报「连线端点设备不存在」
+  project.edges = project.edges.filter(e => e.fromNodeId !== id && e.toNodeId !== id)
+  project.nodes = project.nodes.filter(n => n.id !== id)
+  const orphans = pcsCountOfEmu(id)
+  unassignPcsFromEmu(id)
+  if (selectedNodeId.value === id) selectedNodeId.value = null
+  clearValidation()
+  if (orphans > 0)
+    ElMessage.warning(`已删除 EMU，${orphans} 台 PCS 已解除归属，请重新选择所属 EMU 后再保存`)
+}
+
 function colorOf(id) { return templateColor(id) }
 function templateName(id) { return templates.value.find(t => t.id === id)?.name || id }
 function numberStep(def) {
@@ -369,7 +429,10 @@ function applyProject(p, { resetHistory = false, clearDirty = false } = {}) {
     ...n,
     parameters: n.parameters || {}
   }))
-  project.edges = p.edges || []
+  // 剔除端点节点不存在的悬空连线（如节点删除后的残留），画布上它们不可见也无法选中，
+  // 若保留会在保存回放时报「连线端点设备不存在」
+  const nodeIds = new Set(project.nodes.map(n => n.id))
+  project.edges = (p.edges || []).filter(e => nodeIds.has(e.fromNodeId) && nodeIds.has(e.toNodeId))
   if (resetHistory) {
     historyPast.value = []
     historyFuture.value = []
@@ -600,6 +663,9 @@ function addFromTemplate(t, x = 120, y = 100) {
     y: snapToGrid(y),
     parameters: cloneParams(t.defaultParameters)
   }
+  // PCS 新增时自动归入第一个 EMU 虚拟单元（若有）
+  if (t.id === 'pcs' && emuNodes.value.length > 0)
+    node.parameters.emuId = emuNodes.value[0].id
   project.nodes.push(node)
   selectedNodeId.value = node.id
   selectedEdgeId.value = null
@@ -737,8 +803,16 @@ async function deleteSelected() {
   if (selectedNodeId.value) {
     pushHistory()
     const id = selectedNodeId.value
+    const removed = project.nodes.find(n => n.id === id)
     project.edges = project.edges.filter(e => e.fromNodeId !== id && e.toNodeId !== id)
     project.nodes = project.nodes.filter(n => n.id !== id)
+    // 删除 EMU 虚拟节点时同步解除其下 PCS 归属
+    if (removed?.templateId === 'emu') {
+      const orphans = pcsCountOfEmu(id)
+      unassignPcsFromEmu(id)
+      if (orphans > 0)
+        ElMessage.warning(`${orphans} 台 PCS 已解除归属，请重新选择所属 EMU 后再保存`)
+    }
     selectedNodeId.value = null
     clearValidation()
   }
@@ -889,7 +963,7 @@ onBeforeUnmount(() => {
 }
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; margin-bottom: 0; flex-shrink: 0; }
 .toolbar .left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.toolbar .right { display: flex; align-items: center; }
+.toolbar .right { display: flex; align-items: center; justify-content: flex-end; min-width: 240px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .workspace {
   flex: 1;
   display: grid;
@@ -900,13 +974,21 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 .palette, .props { margin-bottom: 0; min-width: 0; min-height: 0; overflow: auto; }
-.canvas-wrap { margin-bottom: 0; padding: 0; overflow: hidden; display: flex; min-width: 0; min-height: 0; }
+.canvas-wrap { margin-bottom: 0; padding: 0; overflow: hidden; display: flex; min-width: 0; min-height: 0; position: relative; }
+/* 连线提示浮层：不占工具栏空间，避免右侧状态组宽度变化引起工具栏换行、画布上下抖动 */
+.linking-tip {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10;
+  padding: 4px 12px; font-size: 12px; color: #e6a23c;
+  background: #fdf6ec; border: 1px solid #faecd8; border-radius: 4px;
+  pointer-events: none; box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+}
 .palette-item {
   display: flex; align-items: center; gap: 8px;
   padding: 8px; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 6px;
   cursor: grab; background: #fafbfc;
 }
 .palette-item:hover { border-color: #c0c4cc; background: #fff; }
+.palette-item.active { border-color: #409eff; background: #ecf5ff; }
 .palette-item .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .palette-item .meta { flex: 1; min-width: 0; }
 .palette-item .name { font-size: 13px; font-weight: 600; color: #303133; }

@@ -29,7 +29,7 @@
         </g>
 
         <g
-          v-for="node in nodes"
+          v-for="node in visibleNodes"
           :key="node.id"
           class="node"
           :class="{
@@ -179,6 +179,11 @@ const tplMap = computed(() => {
   for (const t of props.templates) m[t.id] = t
   return m
 })
+
+/** 虚拟模板（如 EMU 储能单元）不渲染到画布，仅在侧栏列表管理 */
+const visibleNodes = computed(() =>
+  props.nodes.filter(n => !(tplMap.value[n.templateId]?.isVirtual || n.templateId === 'emu'))
+)
 
 const problemSet = computed(() => new Set(props.problemNodeIds || []))
 

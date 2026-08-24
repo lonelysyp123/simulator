@@ -22,6 +22,25 @@ namespace EssSimulator.EssSimModelApi
                 // 高压断路器（单元变前）开合：0=分，1=合（由 emu.csv: poweronoff 点位写入）
                 public ushort PowerOnOff { get; set; } = 1;
 
+                // 系统级（EMU 聚合）控制目标（点表 SYSTEM 工作表 syst4~7、syst1010/1011）
+                /// <summary>远程&本地控制使能（syst4：0禁止 1使能）。</summary>
+                public int RemoteControlEnable { get; set; }
+                /// <summary>远程&本地控制模式（syst5：0本地 1远程）。</summary>
+                public int RemoteControlMode { get; set; }
+                /// <summary>系统操作（syst6：3启动 4停止 5待机 6重置），边沿生效。</summary>
+                public int SystemOperation { get; set; }
+                /// <summary>黑启动模式写入（syst7：0关闭 1开启），边沿生效并批量下发所属 PCS。</summary>
+                public int BlackStartModeWrite { get; set; }
+                /// <summary>交流侧目标有功功率（syst1010，kW，正放负充）；远程使能时按台数简单均分。</summary>
+                public float TargetActivePower { get; set; }
+                /// <summary>交流侧目标无功功率（syst1011，kvar）；远程使能时按台数简单均分。</summary>
+                public float TargetReactivePower { get; set; }
+
+                /// <summary>已应用的系统操作码（边沿检测用，不对外绑定）。</summary>
+                internal int AppliedSystemOperation { get; set; }
+                /// <summary>已应用的黑启动写入值（边沿检测用，不对外绑定）。</summary>
+                internal int AppliedBlackStartWrite { get; set; } = -1;
+
                 // 基本功率信息
                 public float OutputActivePower { get; set; }       // EMU-输出总有功功率
                 public float OutputReactivePower { get; set; }     // EMU-输出总无功功率
@@ -462,6 +481,43 @@ namespace EssSimulator.EssSimModelApi
                 {
                     return flag == true ? (UInt16)1 : (UInt16)0;
                 }
+
+                // ============ 通用告警/扩展区（适配多厂家点表） ============
+
+                /// <summary>
+                /// 自定义告警字：字编号自 7 起（0~6 由 AlarmSummary1~7 占用）。
+                /// 新厂家点表只需读写 CustomAlarmWords[n]，无需再向 PcsData 追加大量 bool 字段。
+                /// </summary>
+                public Dictionary<int, UInt16> CustomAlarmWords { get; } = new Dictionary<int, UInt16>();
+
+                /// <summary>置/清指定自定义告警字的某位（word ≥7；bit 0~15，字不存在时自动创建）。</summary>
+                public void SetAlarmBit(int word, int bit, bool value)
+                {
+                    if (word < 7 || bit < 0 || bit > 15)
+                        return;
+                    UInt16 current = CustomAlarmWords.TryGetValue(word, out var w) ? w : (UInt16)0;
+                    UInt16 mask = (UInt16)(1 << bit);
+                    CustomAlarmWords[word] = value ? (UInt16)(current | mask) : (UInt16)(current & ~mask);
+                }
+
+                /// <summary>按字编号读告警字：0~6 → AlarmSummary1~7，≥7 → CustomAlarmWords。</summary>
+                public UInt16 GetAlarmWord(int word) => word switch
+                {
+                    0 => AlarmSummary1,
+                    1 => AlarmSummary2,
+                    2 => AlarmSummary3,
+                    3 => AlarmSummary4,
+                    4 => AlarmSummary5,
+                    5 => AlarmSummary6,
+                    6 => AlarmSummary7,
+                    _ => CustomAlarmWords.TryGetValue(word, out var w) ? w : (UInt16)0
+                };
+
+                /// <summary>数值遥测扩展区（反射可绑 emuN.PcsList[i].ExtraAnalogValues[j]，供新厂家点表按槽位映射）。</summary>
+                public float[] ExtraAnalogValues { get; set; } = new float[16];
+
+                /// <summary>数值遥信扩展区（反射可绑 emuN.PcsList[i].ExtraDigitalValues[j]）。</summary>
+                public bool[] ExtraDigitalValues { get; set; } = new bool[16];
             }
 
             /// <summary>

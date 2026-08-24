@@ -12,7 +12,7 @@ namespace EssSimulator.Web
             int channelCount = ResolveEssChannelCount(
                 GuiSimDataAccess.GetEssUnitCount(),
                 GuiSimDataAccess.GetPvUnitCount());
-            int unitCount = ResolveEssUnitCount(channelCount);
+            int unitCount = channelCount <= 0 ? 0 : GuiSimDataAccess.GetPhysicalUnitCount();
             var snap = GuiElectricalReader.ReadMainLine(0, unitCount);
             return Build(snap, channelCount, topologyStore);
         }
@@ -106,8 +106,11 @@ namespace EssSimulator.Web
 
         private static MainLineUnitViewModel EnrichUnit(UnitBranchSnapshot u, int channelCount)
         {
-            int a = u.UnitIndex * 2;
+            var layout = GuiSimDataAccess.GetPcsPerUnit();
+            int a = EssDeviceSimModel.PcsUnitLayout.BaseIndexOfUnit(layout, u.UnitIndex);
             int b = a + 1;
+            // 单元仅 1 台 PCS 时不构造 B 通道，避免实时数据 / 控制命令越单元错位
+            bool hasSlotB = EssDeviceSimModel.PcsUnitLayout.CountOfUnit(layout, u.UnitIndex) > 1;
             return new MainLineUnitViewModel
             {
                 UnitIndex = u.UnitIndex,
@@ -122,7 +125,7 @@ namespace EssSimulator.Web
                 PcsA = u.PcsA,
                 PcsB = u.PcsB,
                 ChannelA = a < channelCount ? BuildChannel(a, u.UnitIndex, 0, u.PcsA) : null,
-                ChannelB = b < channelCount ? BuildChannel(b, u.UnitIndex, 1, u.PcsB) : null
+                ChannelB = hasSlotB && b < channelCount ? BuildChannel(b, u.UnitIndex, 1, u.PcsB) : null
             };
         }
 

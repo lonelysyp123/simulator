@@ -54,6 +54,34 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>光伏单元列表（组态/配置展开；纯光伏工程可无储能通道）。</summary>
         public IReadOnlyList<PvUnitDevice> PvUnits { get; }
 
+        /// <summary>各储能单元下属 PCS 台数（EMU 拓扑：每单元 = 1 个 EMU 虚拟模型聚合 N 台 PCS）。</summary>
+        public IReadOnlyList<int> PcsPerUnit => _pcsPerUnit;
+        private IReadOnlyList<int> _pcsPerUnit = Array.Empty<int>();
+
+        /// <summary>PCS 通道索引 → 所属单元索引 的映射表。</summary>
+        private IReadOnlyList<int> _unitIndexByPcs = Array.Empty<int>();
+
+        /// <summary>PCS 通道（0 基）所属储能单元索引；越界时就近钉住边界。</summary>
+        public int UnitIndexOfPcs(int pcsSimIndex)
+        {
+            if (_unitIndexByPcs.Count == 0) return 0;
+            int idx = Math.Clamp(pcsSimIndex, 0, _unitIndexByPcs.Count - 1);
+            return _unitIndexByPcs[idx];
+        }
+
+        /// <summary>指定单元第一台 PCS 的全局通道索引（0 基）。</summary>
+        public int PcsBaseIndexOfUnit(int unit)
+        {
+            int baseIdx = 0;
+            for (int u = 0; u < unit && u < _pcsPerUnit.Count; u++)
+                baseIdx += _pcsPerUnit[u];
+            return baseIdx;
+        }
+
+        /// <summary>指定单元下属 PCS 台数。</summary>
+        public int PcsCountOfUnit(int unit) =>
+            unit >= 0 && unit < _pcsPerUnit.Count ? _pcsPerUnit[unit] : 0;
+
         /// <summary>兼容旧路径：ess._batteryRack 等价于 ess._batteryRacks[0]</summary>
         [Obsolete("请使用 _batteryRacks[0]")]
         public BatteryRackSimulator _batteryRack => _batteryRacks.Count > 0 ? _batteryRacks[0] : null!;
@@ -136,15 +164,27 @@ namespace EssSimulator.EssDeviceSimModel
             var bmsDeviceConfigs = simCfg.GetBmsDeviceConfigs();
             var pcsDeviceConfigs = simCfg.GetPcsDeviceConfigs();
             int unitCount = simCfg.EffectiveEssUnitCount;
-            int channelCount = unitCount * 2;
+            // 通道总数 = 各单元 PCS 台数之和（未配置时 GetPcsCountsPerUnit 回退每单元 2 台）
+            int channelCount = Math.Max(pcsDeviceConfigs.Count, unitCount);
+
+            // 单元 → PCS 台数 / 通道 → 单元 映射（替代硬编码每单元 2 台）
+            var pcsPerUnit = simCfg.GetPcsCountsPerUnit();
+            var unitIndexByChannel = new List<int>();
+            for (int u = 0; u < pcsPerUnit.Count; u++)
+                for (int k = 0; k < pcsPerUnit[u]; k++)
+                    unitIndexByChannel.Add(u);
+            while (unitIndexByChannel.Count < channelCount)
+                unitIndexByChannel.Add(Math.Max(0, unitCount - 1));
+            _pcsPerUnit = pcsPerUnit;
+            _unitIndexByPcs = unitIndexByChannel;
 
             for (int i = 0; i < channelCount; i++)
             {
-                var bmsCfg = bmsDeviceConfigs[i];
+                var bmsCfg = i < bmsDeviceConfigs.Count ? bmsDeviceConfigs[i] : new BmsDeviceConfig();
                 var rack = BmsRackFactory.CreateRack(bmsCfg);
                 racks.Add(rack);
-                int u = i / 2;
-                int ch = i % 2;
+                int u = UnitIndexOfPcs(i);
+                int ch = i - PcsBaseIndexOfUnit(u);
                 var bmsDev = new BmsRackDevice($"bms_u{u}_ch{ch}", rack);
                 bmsDev.DisplayLabel = $"bms{i + 1}";
                 bmsRackDevices.Add(bmsDev);
@@ -155,8 +195,8 @@ namespace EssSimulator.EssDeviceSimModel
                 var pcsDeviceCfg = i < pcsDeviceConfigs.Count ? pcsDeviceConfigs[i] : new Configuration.PcsDeviceConfig();
                 var rampCfg = pcsDeviceCfg.PcsRamp ?? simCfg.Runtime.PcsRamp;
                 var cfg = PcsDeviceFactory.CreateConfig(pcsCfg, rampCfg);
-                int u = i / 2;
-                int ch = i % 2;
+                int u = UnitIndexOfPcs(i);
+                int ch = i - PcsBaseIndexOfUnit(u);
                 var pcs = PcsDeviceFactory.Create($"pcs_u{u}_ch{ch}", cfg);
                 pcs.DisplayLabel = $"pcs{i + 1}";
                 pcsList.Add(pcs);
@@ -220,7 +260,8 @@ namespace EssSimulator.EssDeviceSimModel
                 externalMainTransformer: _mainTransformer,
                 externalUnitTransformers: unitTransformers,
                 externalLoadDevice: _loadDevice,
-                legacyEss: this);
+                legacyEss: this,
+                pcsPerUnit: _pcsPerUnit);
 
             if (_useElectricalPropagation)
             {
@@ -500,7 +541,7 @@ namespace EssSimulator.EssDeviceSimModel
         /// </summary>
         internal void ApplyPcsGridWhenUnitDeenergized(int pcsSimIndex, PcsDevice pcs)
         {
-            int unit = pcsSimIndex / 2;
+            int unit = UnitIndexOfPcs(pcsSimIndex);
             double busV = GetUnitAcBusVoltage(unit);
             double energizedV = _pcsCfg.AcVoltageNominal * _pcsCfg.BlackStartBusEnergizedFraction;
             if (busV >= energizedV)
@@ -525,26 +566,30 @@ namespace EssSimulator.EssDeviceSimModel
         public double GetUnitAcBusVoltage(int unitIndex)
         {
             double v = 0;
-            int a = unitIndex * 2;
-            int b = a + 1;
             if (unitIndex >= 0 && unitIndex < _unitTransformers.Count)
                 v = Math.Max(v, _unitTransformers[unitIndex].GetCurrentState().SecondaryVoltage);
-            if (a >= 0 && a < _pcsList.Count)
-                v = Math.Max(v, _pcsList[a].GetCurrentState().AcVoltage);
-            if (b >= 0 && b < _pcsList.Count)
-                v = Math.Max(v, _pcsList[b].GetCurrentState().AcVoltage);
+            int baseIdx = PcsBaseIndexOfUnit(unitIndex);
+            int count = PcsCountOfUnit(unitIndex);
+            for (int k = 0; k < count; k++)
+            {
+                int i = baseIdx + k;
+                if (i >= 0 && i < _pcsList.Count)
+                    v = Math.Max(v, _pcsList[i].GetCurrentState().AcVoltage);
+            }
             return v;
         }
 
         private void RefreshUnitBlackStartBusContext(int unitIndex)
         {
             double busV = GetUnitAcBusVoltage(unitIndex);
-            int a = unitIndex * 2;
-            int b = a + 1;
-            if (a >= 0 && a < _pcsList.Count)
-                _pcsList[a].RefreshBlackStartBusContext(busV);
-            if (b >= 0 && b < _pcsList.Count)
-                _pcsList[b].RefreshBlackStartBusContext(busV);
+            int baseIdx = PcsBaseIndexOfUnit(unitIndex);
+            int count = PcsCountOfUnit(unitIndex);
+            for (int k = 0; k < count; k++)
+            {
+                int i = baseIdx + k;
+                if (i >= 0 && i < _pcsList.Count)
+                    _pcsList[i].RefreshBlackStartBusContext(busV);
+            }
         }
 
         /// <summary>PCS.Update 之后同步单元变与站用电分摊（见 <see cref="UnitTransformerIslandSync"/>）。</summary>
@@ -563,7 +608,7 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>刷新各单元黑启动母线上下文（供 <see cref="PlantEngine"/> 调用）。</summary>
         internal void RefreshAllUnitBlackStartBusContexts()
         {
-            int unitCount = (_pcsList.Count + 1) / 2;
+            int unitCount = _unitBreakers.Count;
             for (int u = 0; u < unitCount; u++)
                 RefreshUnitBlackStartBusContext(u);
         }

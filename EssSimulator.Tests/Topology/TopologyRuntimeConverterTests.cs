@@ -5,83 +5,109 @@ namespace EssSimulator.Tests.Topology;
 
 public class TopologyRuntimeConverterTests
 {
-    [Fact]
-    public void Convert_builds_ess_units_from_emu_and_bms()
+    private static TopologyNode Node(string id, string templateId, string label,
+        Dictionary<string, object?>? overrides = null, double x = 0, double y = 0)
     {
-        var gridTpl = TopologyTemplates.Get("grid")!;
-        var emuTpl = TopologyTemplates.Get("emu")!;
-        var bmsTpl = TopologyTemplates.Get("bms")!;
-        var dcTpl = TopologyTemplates.Get("dc_bus")!;
+        var tpl = TopologyTemplates.Get(templateId)!;
+        var p = new Dictionary<string, object?>(tpl.DefaultParameters);
+        if (overrides != null)
+        {
+            foreach (var kv in overrides)
+                p[kv.Key] = kv.Value;
+        }
 
+        return new TopologyNode { Id = id, TemplateId = templateId, Label = label, Parameters = p, X = x, Y = y };
+    }
+
+    private static TopologyEdge Edge(string id, string from, string fromPort, string to, string toPort) => new()
+    {
+        Id = id,
+        FromNodeId = from,
+        FromPortId = fromPort,
+        ToNodeId = to,
+        ToPortId = toPort
+    };
+
+    /// <summary>两台 EMU×3 台 PCS：按 emuId 分组生成单元，BMS 与 PCS 按位对齐，无 PCS 的 EMU 跳过。</summary>
+    [Fact]
+    public void Convert_builds_ess_units_grouped_by_emu_id()
+    {
         var project = new TopologyProject
         {
             Id = "p1",
             Name = "测试工程",
             Nodes =
             {
-                new TopologyNode
-                {
-                    Id = "g1", TemplateId = "grid", Label = "电网",
-                    Parameters = new Dictionary<string, object?>(gridTpl.DefaultParameters)
-                },
-                new TopologyNode
-                {
-                    Id = "e1", TemplateId = "emu", Label = "Unit-A",
-                    Parameters = new Dictionary<string, object?>(emuTpl.DefaultParameters)
-                },
-                new TopologyNode
-                {
-                    Id = "dc1", TemplateId = "dc_bus", Label = "DC",
-                    Parameters = new Dictionary<string, object?>(dcTpl.DefaultParameters)
-                },
-                new TopologyNode
-                {
-                    Id = "b1", TemplateId = "bms", Label = "BMS-A",
-                    Parameters = new Dictionary<string, object?>(bmsTpl.DefaultParameters)
-                    {
-                        ["clusterCount"] = 8d,
-                        ["name"] = "BMS-A"
-                    }
-                },
-                new TopologyNode
-                {
-                    Id = "b2", TemplateId = "bms", Label = "BMS-B",
-                    Parameters = new Dictionary<string, object?>(bmsTpl.DefaultParameters)
-                    {
-                        ["clusterCount"] = 10d,
-                        ["name"] = "BMS-B"
-                    }
-                }
+                Node("g1", "grid", "电网"),
+                Node("e1", "emu", "EMU-1", y: 600),
+                Node("e2", "emu", "EMU-2", y: 700),
+                Node("e3", "emu", "EMU-空闲", y: 800),
+                // 单元 1：3 台 PCS + DC 母线 + 3 台 BMS
+                Node("p1a", "pcs", "PCS-1A", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 100, y: 720),
+                Node("p1b", "pcs", "PCS-1B", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 200, y: 720),
+                Node("p1c", "pcs", "PCS-1C", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 300, y: 720),
+                Node("dc1", "dc_bus", "DC-1"),
+                Node("b1a", "bms", "BMS-1A", new Dictionary<string, object?> { ["clusterCount"] = 8d, ["name"] = "BMS-1A" }, x: 100, y: 900),
+                Node("b1b", "bms", "BMS-1B", new Dictionary<string, object?> { ["clusterCount"] = 10d, ["name"] = "BMS-1B" }, x: 200, y: 900),
+                Node("b1c", "bms", "BMS-1C", new Dictionary<string, object?> { ["clusterCount"] = 12d, ["name"] = "BMS-1C" }, x: 300, y: 900),
+                // 单元 2：3 台 PCS，无任何 BMS 连线（缺位用默认配置补齐）
+                Node("p2a", "pcs", null!, new Dictionary<string, object?> { ["emuId"] = "e2" }, x: 500, y: 720),
+                Node("p2b", "pcs", null!, new Dictionary<string, object?> { ["emuId"] = "e2" }, x: 600, y: 720),
+                Node("p2c", "pcs", null!, new Dictionary<string, object?> { ["emuId"] = "e2" }, x: 700, y: 720)
             },
             Edges =
             {
-                new TopologyEdge { Id = "1", FromNodeId = "e1", FromPortId = "dc_pos", ToNodeId = "dc1", ToPortId = "pos_t" },
-                new TopologyEdge { Id = "2", FromNodeId = "e1", FromPortId = "dc_neg", ToNodeId = "dc1", ToPortId = "neg_t" },
-                new TopologyEdge { Id = "3", FromNodeId = "b1", FromPortId = "dc_pos", ToNodeId = "dc1", ToPortId = "pos_b" },
-                new TopologyEdge { Id = "4", FromNodeId = "b1", FromPortId = "dc_neg", ToNodeId = "dc1", ToPortId = "neg_b" },
-                new TopologyEdge { Id = "5", FromNodeId = "b2", FromPortId = "dc_pos", ToNodeId = "dc1", ToPortId = "pos_b" },
-                new TopologyEdge { Id = "6", FromNodeId = "b2", FromPortId = "dc_neg", ToNodeId = "dc1", ToPortId = "neg_b" }
+                Edge("1", "p1a", "dc_pos", "dc1", "pos_t"), Edge("2", "p1a", "dc_neg", "dc1", "neg_t"),
+                Edge("3", "p1b", "dc_pos", "dc1", "pos_t"), Edge("4", "p1b", "dc_neg", "dc1", "neg_t"),
+                Edge("5", "p1c", "dc_pos", "dc1", "pos_t"), Edge("6", "p1c", "dc_neg", "dc1", "neg_t"),
+                Edge("7", "b1a", "dc_pos", "dc1", "pos_b"), Edge("8", "b1a", "dc_neg", "dc1", "neg_b"),
+                Edge("9", "b1b", "dc_pos", "dc1", "pos_b"), Edge("10", "b1b", "dc_neg", "dc1", "neg_b"),
+                Edge("11", "b1c", "dc_pos", "dc1", "pos_b"), Edge("12", "b1c", "dc_neg", "dc1", "neg_b")
             }
         };
 
         var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
-        Assert.True(validation.Ok);
+        Assert.True(validation.Ok, validation.Message);
         Assert.NotNull(overlay);
-        Assert.Single(overlay!.EssUnits);
-        Assert.Equal("Unit-A", overlay.EssUnits[0].Name);
-        Assert.Equal(2, overlay.EssUnits[0].Bms.Count);
-        Assert.Equal(8, overlay.EssUnits[0].Bms[0].ClusterCount);
-        Assert.Equal(10, overlay.EssUnits[0].Bms[1].ClusterCount);
+        Assert.Equal(2, overlay!.EssUnits.Count);
+
+        var u1 = overlay.EssUnits[0];
+        Assert.Equal("EMU-1", u1.Name);
+        Assert.Equal(3, u1.Pcs.Count);
+        Assert.Equal(new[] { "PCS-1A", "PCS-1B", "PCS-1C" }, u1.Pcs.Select(p => p.Name).ToArray());
+        // 共享 DC 母线时 BMS 不重复占用，按 X 顺序与 PCS 对齐
+        Assert.Equal(new[] { "BMS-1A", "BMS-1B", "BMS-1C" }, u1.Bms.Select(b => b.Name).ToArray());
+        Assert.Equal(new[] { 8, 10, 12 }, u1.Bms.Select(b => b.ClusterCount).ToArray());
+
+        var u2 = overlay.EssUnits[1];
+        Assert.Equal("EMU-2", u2.Name);
+        Assert.Equal(3, u2.Pcs.Count);
+        // 无标签 PCS 按 PCS-{单元号}{槽位} 命名；无连线 BMS 用默认配置补齐
+        Assert.Equal(new[] { "PCS-2A", "PCS-2B", "PCS-2C" }, u2.Pcs.Select(p => p.Name).ToArray());
+        Assert.Equal(3, u2.Bms.Count);
+        Assert.Equal(new[] { "BMS-2A", "BMS-2B", "BMS-2C" }, u2.Bms.Select(b => b.Name).ToArray());
+
+        // 无归属 PCS 的 EMU 跳过并提示
+        Assert.Contains(overlay.Notes, n => n.Contains("EMU-空闲") && n.Contains("已跳过"));
+
+        // 单元变取 EMU 参数，PCS 额定取首台 PCS
+        Assert.Equal(6300, overlay.UnitTransformer!.RatedPower);
+        Assert.Equal(1725, overlay.Pcs!.RatedPower);
         Assert.NotNull(overlay.Pcc);
         Assert.Equal(220000, overlay.Pcc!.NominalLineVoltage);
     }
 
     [Fact]
-    public void Convert_rejects_project_without_emu_or_pv_unit()
+    public void Convert_rejects_project_without_pcs_assigned_emu_or_pv_unit()
     {
         var project = new TopologyProject
         {
-            Nodes = { new TopologyNode { Id = "g", TemplateId = "grid", Label = "电网", Parameters = new() } }
+            Nodes =
+            {
+                Node("g", "grid", "电网"),
+                Node("e1", "emu", "EMU-无PCS"),
+                Node("p1", "pcs", "PCS-未归属")
+            }
         };
         var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
         Assert.False(validation.Ok);
@@ -92,17 +118,9 @@ public class TopologyRuntimeConverterTests
     [Fact]
     public void Convert_accepts_project_with_only_pv_unit()
     {
-        var pvTpl = TopologyTemplates.Get("pv_unit")!;
         var project = new TopologyProject
         {
-            Nodes =
-            {
-                new TopologyNode
-                {
-                    Id = "pv1", TemplateId = "pv_unit", Label = "光伏单元-1",
-                    Parameters = new Dictionary<string, object?>(pvTpl.DefaultParameters)
-                }
-            }
+            Nodes = { Node("pv1", "pv_unit", "光伏单元-1") }
         };
 
         var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
@@ -131,14 +149,9 @@ public class TopologyRuntimeConverterTests
         {
             Nodes =
             {
-                new TopologyNode { Id = "g1", TemplateId = "grid", Label = "电网", Parameters = new() },
-                new TopologyNode
-                {
-                    Id = "e1",
-                    TemplateId = "emu",
-                    Label = "Unit-A",
-                    Parameters = new Dictionary<string, object?>(TopologyTemplates.Get("emu")!.DefaultParameters)
-                }
+                Node("g1", "grid", "电网"),
+                Node("e1", "emu", "Unit-A"),
+                Node("p1", "pcs", "PCS-1A", new Dictionary<string, object?> { ["emuId"] = "e1" })
             }
         };
 
@@ -151,22 +164,13 @@ public class TopologyRuntimeConverterTests
     [Fact]
     public void Convert_keeps_ess_units_and_notes_pv_units()
     {
-        var emuTpl = TopologyTemplates.Get("emu")!;
-        var pvTpl = TopologyTemplates.Get("pv_unit")!;
         var project = new TopologyProject
         {
             Nodes =
             {
-                new TopologyNode
-                {
-                    Id = "e1", TemplateId = "emu", Label = "Unit-A",
-                    Parameters = new Dictionary<string, object?>(emuTpl.DefaultParameters)
-                },
-                new TopologyNode
-                {
-                    Id = "pv1", TemplateId = "pv_unit", Label = "光伏单元-1",
-                    Parameters = new Dictionary<string, object?>(pvTpl.DefaultParameters)
-                }
+                Node("e1", "emu", "Unit-A"),
+                Node("p1", "pcs", "PCS-1A", new Dictionary<string, object?> { ["emuId"] = "e1" }),
+                Node("pv1", "pv_unit", "光伏单元-1")
             }
         };
 
@@ -182,8 +186,7 @@ public class TopologyRuntimeConverterTests
     [Fact]
     public void Convert_reads_pv_unit_inverter_count_from_node_parameters()
     {
-        var pvTpl = TopologyTemplates.Get("pv_unit")!;
-        var parameters = new Dictionary<string, object?>(pvTpl.DefaultParameters)
+        var parameters = new Dictionary<string, object?>(TopologyTemplates.Get("pv_unit")!.DefaultParameters)
         {
             ["inverterCount"] = 20d,
             ["unitXfRatedKva"] = 6400d

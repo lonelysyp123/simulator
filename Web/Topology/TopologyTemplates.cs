@@ -1,6 +1,6 @@
 namespace EssSimulator.Web.Topology
 {
-    /// <summary>内置组态基础模板（电网 / 母线 / 断路器 / 变压器 / 电表 / 负载 / EMU / 光伏单元 / BMS / 直流母线）。</summary>
+    /// <summary>内置组态基础模板（电网 / 母线 / 断路器 / 变压器 / 电表 / 负载 / EMU 虚拟单元 / PCS / 光伏单元 / BMS / 直流母线）。</summary>
     public static class TopologyTemplates
     {
         public static IReadOnlyList<TopologyTemplate> All { get; } = BuildAll();
@@ -17,6 +17,7 @@ namespace EssSimulator.Web.Topology
             BuildAcMeter(),
             BuildLoad(),
             BuildEmu(),
+            BuildPcs(),
             BuildPvUnit(),
             BuildBms(),
             BuildDcBus()
@@ -233,12 +234,44 @@ namespace EssSimulator.Web.Topology
             }
         };
 
+        /// <summary>
+        /// EMU 储能单元（虚拟）：无图形、无端口，仅作为 PCS 的归属容器；
+        /// PCS 通过 emuId 参数下拉框归入。单元变参数属单元级，在此配置。
+        /// </summary>
         private static TopologyTemplate BuildEmu() => new()
         {
             Id = "emu",
             Name = "EMU 储能单元",
             Category = "储能",
-            Description = "内部简化为：高压断路器 + 35kV/690V 变压器 + 两台变流器 + 低压断路器。上三相 AC，下正/负两路 DC。",
+            Description = "虚拟储能单元：拖入后画布不显示图形，在左侧「EMU 储能单元」列表中管理；PCS 变流器通过其「所属 EMU 储能单元」下拉框归入本单元。",
+            IsVoltageSource = false,
+            IsVirtual = true,
+            Parameters =
+            {
+                new() { Key = "unitXfPrimaryV", Label = "单元变一次电压", Type = "number", Unit = "V" },
+                new() { Key = "unitXfSecondaryV", Label = "单元变二次电压", Type = "number", Unit = "V" },
+                new() { Key = "unitXfRatedKva", Label = "单元变额定容量", Type = "number", Unit = "kVA", Min = 1 },
+                new() { Key = "name", Label = "名称", Type = "string" }
+            },
+            DefaultParameters = new Dictionary<string, object?>
+            {
+                ["unitXfPrimaryV"] = 35000d,
+                ["unitXfSecondaryV"] = 690d,
+                ["unitXfRatedKva"] = 6300d,
+                ["name"] = "EMU储能单元"
+            }
+        };
+
+        /// <summary>
+        /// PCS 变流器：独立设备节点，上三相 AC 接集电母线，下正/负 DC 接 BMS（或直流母线）；
+        /// 通过 emuId 下拉框归入某个 EMU 虚拟储能单元。
+        /// </summary>
+        private static TopologyTemplate BuildPcs() => new()
+        {
+            Id = "pcs",
+            Name = "PCS 变流器",
+            Category = "储能",
+            Description = "单台变流器：上三相 AC 接入 35kV 集电母线，下正/负两路 DC 接 BMS 电池堆（可经直流母线）；在参数中选择所属 EMU 储能单元。",
             IsVoltageSource = false,
             Ports =
             {
@@ -250,27 +283,24 @@ namespace EssSimulator.Web.Topology
             },
             Parameters =
             {
+                new() { Key = "emuId", Label = "所属 EMU 储能单元", Type = "emu_select", Description = "选择后本 PCS 归入该 EMU 虚拟单元" },
                 new() { Key = "acVoltage", Label = "交流侧线电压", Type = "number", Unit = "V", Min = 100, Description = "接入 AC 母线侧额定，默认 35kV" },
-                new() { Key = "unitXfPrimaryV", Label = "单元变一次电压", Type = "number", Unit = "V" },
-                new() { Key = "unitXfSecondaryV", Label = "单元变二次电压", Type = "number", Unit = "V" },
-                new() { Key = "pcsRatedPowerKw", Label = "单台 PCS 额定功率", Type = "number", Unit = "kW" },
-                new() { Key = "pcsMaxPowerKw", Label = "单台 PCS 最大功率", Type = "number", Unit = "kW" },
+                new() { Key = "pcsRatedPowerKw", Label = "PCS 额定功率", Type = "number", Unit = "kW" },
+                new() { Key = "pcsMaxPowerKw", Label = "PCS 最大功率", Type = "number", Unit = "kW" },
                 new() { Key = "pcsEfficiency", Label = "PCS 效率", Type = "number", Min = 0.5, Max = 1 },
-                new() { Key = "pcsCount", Label = "变流器数量", Type = "number", Min = 1, Max = 2 },
                 new() { Key = "dcVoltageMin", Label = "直流电压下限", Type = "number", Unit = "V" },
-                new() { Key = "dcVoltageMax", Label = "直流电压上限", Type = "number", Unit = "V" }
+                new() { Key = "dcVoltageMax", Label = "直流电压上限", Type = "number", Unit = "V" },
+                new() { Key = "name", Label = "名称", Type = "string" }
             },
             DefaultParameters = new Dictionary<string, object?>
             {
                 ["acVoltage"] = 35000d,
-                ["unitXfPrimaryV"] = 35000d,
-                ["unitXfSecondaryV"] = 690d,
                 ["pcsRatedPowerKw"] = 1725d,
                 ["pcsMaxPowerKw"] = 1897.5d,
                 ["pcsEfficiency"] = 0.99d,
-                ["pcsCount"] = 2d,
                 ["dcVoltageMin"] = 1000d,
-                ["dcVoltageMax"] = 1500d
+                ["dcVoltageMax"] = 1500d,
+                ["name"] = "PCS变流器"
             }
         };
 

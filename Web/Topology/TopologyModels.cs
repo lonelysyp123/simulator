@@ -52,6 +52,8 @@ namespace EssSimulator.Web.Topology
         public string Category { get; set; } = "";
         public string Description { get; set; } = "";
         public bool IsVoltageSource { get; set; }
+        /// <summary>虚拟模板：无端口、不参与连线，画布不渲染（如 EMU 虚拟储能单元）。</summary>
+        public bool IsVirtual { get; set; }
         public List<TopologyPortDef> Ports { get; set; } = new();
         public List<TopologyParamDef> Parameters { get; set; } = new();
         public Dictionary<string, object?> DefaultParameters { get; set; } = new();

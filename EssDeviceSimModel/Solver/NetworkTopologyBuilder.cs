@@ -22,7 +22,8 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             IReadOnlyList<TransformerDevice>? externalUnitTransformers = null,
             LoadDevice? externalLoadDevice = null,
             MeterSimulator? externalPccMeter = null,
-            EnergyStorageSystem? legacyEss = null)
+            EnergyStorageSystem? legacyEss = null,
+            IReadOnlyList<int>? pcsPerUnit = null)
         {
             breakerCfg ??= new BreakerConfig();
             meterCfg ??= new MeterConfig();
@@ -49,7 +50,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             };
 
             var topology = BuildTopology(unitCount, pccCfg, unitTransCfg);
-            var dcLinks = BuildDcLinks(unitCount);
+            var dcLinks = BuildDcLinks(unitCount, pcsPerUnit);
 
             var grid = new GridSimulator("grid", gridConfig);
             var mainBreaker = new BreakerSimulator("main_breaker", breakerCfg.Main);
@@ -71,9 +72,10 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 else
                     unitTransformers.Add(TransformerDeviceFactory.Create($"unit_transformer_u{u}", unitTransDeviceCfg));
 
-                for (int ch = 0; ch < 2; ch++)
+                var (baseIdx, pcsCount) = PcsUnitLayout.RangeOfUnit(pcsPerUnit, u);
+                for (int ch = 0; ch < pcsCount; ch++)
                 {
-                    int channel = u * 2 + ch;
+                    int channel = baseIdx + ch;
                     if (externalPcsDevices != null && channel < externalPcsDevices.Count)
                         networkPcsDevices.Add(externalPcsDevices[channel]);
                     else
@@ -210,12 +212,13 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             return ElectricalTopologyFactory.FromConfig(config);
         }
 
-        private static List<DcLink> BuildDcLinks(int unitCount)
+        private static List<DcLink> BuildDcLinks(int unitCount, IReadOnlyList<int>? pcsPerUnit)
         {
             var links = new List<DcLink>();
             for (int u = 0; u < unitCount; u++)
             {
-                for (int ch = 0; ch < 2; ch++)
+                int pcsCount = PcsUnitLayout.CountOfUnit(pcsPerUnit, u);
+                for (int ch = 0; ch < pcsCount; ch++)
                 {
                     links.Add(new DcLink
                     {

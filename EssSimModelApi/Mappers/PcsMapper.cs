@@ -52,9 +52,11 @@ namespace EssSimulator.EssSimModelApi.Mappers
 
             dst.ActivePower        = (float)src.ActivePower;
             dst.ReactivePower      = (float)src.ReactivePower;
-            dst.AvailableCapacity  = 100;
+            // 可用容量（%）：从所属电池堆 SOC 推导（无 BMS 关联时回退 100）
+            dst.AvailableCapacity  = bms != null ? (float)Math.Clamp(bms.GetRackSOC() * 100.0, 0, 100) : 100f;
 
             double denom = Math.Sqrt(Math.Pow(src.ActivePower, 2) + Math.Pow(src.ReactivePower, 2));
+            dst.ApparentPower = (float)denom;
             dst.PowerFactor = denom > 0 ? (float)(src.ActivePower / denom) : 0f;
 
             dst.TotalChargeEnergy    = (float)src.TotalChargeEnergy;
@@ -75,33 +77,85 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 pcsData.pcsOnOffSwitch = false;
         }
 
-        /// <summary>更新 EMU 汇总数据（运行状态、SOC、单元总有功/无功等）。</summary>
+        /// <summary>更新 EMU 汇总数据（运行状态、SOC、单元总有功/无功与 PCS 统计）。</summary>
         public static void MapEmuState(EnergyManagementData emu, IReadOnlyList<BatteryRackSimulator> batteryRacks)
         {
-            emu.Emu.MaxChargePower    = 1250.0f;
-            emu.Emu.MaxDischargePower = 1250.0f;
-
             if (batteryRacks.Count > 0 && batteryRacks[0].GetRackState() != null)
                 emu.Emu.AverageBatterySoc = (float)batteryRacks[0].GetRackState().MinClusterSOC * 100;
 
-            // 单元总有功/无功 = PcsList 各路之和（通常为单元1+单元2）
+            // 单元总有功/无功 = PcsList 各路之和；同步统计台数/告警/故障/禁充禁放
             float sumP = 0f, sumQ = 0f;
-            bool anyRunning = false, anyDischarge = false, anyCharge = false;
+            float sumChargeLimit = 0f, sumDischargeLimit = 0f, sumRated = 0f;
+            int online = 0, gridConnected = 0, alarmed = 0, faulted = 0;
+            int chargeProhibited = 0, dischargeProhibited = 0;
+            bool anyDischarge = false, anyCharge = false;
+            bool anyStarted = false;
+            bool allShutdown = true, allAlarmed = true, allFaulted = true;
+            bool allChargeProhibited = true, allDischargeProhibited = true;
+
             foreach (var pcs in emu.PcsList)
             {
                 sumP += pcs.ActivePower;
                 sumQ += pcs.ReactivePower;
-                if (pcs.SimulatorMode == OperationMode.Off)
-                    continue;
-                anyRunning = true;
+                sumChargeLimit += pcs.ChargePowerLimit;
+                sumDischargeLimit += pcs.DischargePowerLimit;
+                sumRated += pcs.PCSRatePower;
+
+                bool off = pcs.SimulatorMode == OperationMode.Off;
+                bool fault = pcs.OperationStatus == 6;
+                bool alarm = !fault && HasAnyAlarm(pcs);
+                if (!off) { online++; allShutdown = false; }
+                if (pcs.SimulatorMode == OperationMode.Normal) { gridConnected++; anyStarted = true; }
+                if (fault) { faulted++; }
+                else { allFaulted = false; }
+                if (alarm) alarmed++;
+                if (!alarm) allAlarmed = false;
+                if (pcs.ChargeProhibited) chargeProhibited++; else allChargeProhibited = false;
+                if (pcs.DischargeProhibited) dischargeProhibited++; else allDischargeProhibited = false;
+
+                if (off) continue;
                 if (pcs.ActivePower > PcsDisplayLabels.ActivePowerThresholdKw)  anyDischarge = true;
                 if (pcs.ActivePower < -PcsDisplayLabels.ActivePowerThresholdKw) anyCharge   = true;
             }
+
+            int total = emu.PcsList.Count;
             emu.Emu.OutputActivePower = sumP;
             emu.Emu.OutputReactivePower = sumQ;
+
+            // 功率能力：优先取各 PCS 充/放电限值之和，未配置时回退额定容量之和
+            emu.Emu.MaxChargePower    = sumChargeLimit > 0 ? sumChargeLimit : sumRated;
+            emu.Emu.MaxDischargePower = sumDischargeLimit > 0 ? sumDischargeLimit : sumRated;
+            emu.Emu.MaxInductiveReactivePower = sumRated;
+            emu.Emu.MaxCapacitiveReactivePower = sumRated;
+
+            emu.Emu.TotalPcsCount = total;
+            emu.Emu.OnlinePcsCount = online;
+            emu.Emu.GridConnectedPcsCount = gridConnected;
+            emu.Emu.AlarmPcsCount = alarmed;
+            emu.Emu.FaultPcsCount = faulted;
+            emu.Emu.ChargeProhibitedPcsCount = chargeProhibited;
+            emu.Emu.DischargeProhibitedPcsCount = dischargeProhibited;
+
+            emu.Emu.AllPcsShutdown = total > 0 && allShutdown;
+            emu.Emu.AnyPcsStarted = anyStarted;
+            emu.Emu.AllPcsAlarmed = total > 0 && allAlarmed;
+            emu.Emu.AnyPcsAlarmed = alarmed > 0;
+            emu.Emu.AllPcsFaulted = total > 0 && allFaulted;
+            emu.Emu.AnyPcsFaulted = faulted > 0;
+            emu.Emu.AllPcsChargeProhibited = total > 0 && allChargeProhibited;
+            emu.Emu.AnyPcsChargeProhibited = chargeProhibited > 0;
+            emu.Emu.AllPcsDischargeProhibited = total > 0 && allDischargeProhibited;
+            emu.Emu.AnyPcsDischargeProhibited = dischargeProhibited > 0;
+
             // 运行状态（1停机 2待机 4充电 5放电 6未知；正放负充）
-            emu.Emu.OperationStatus = anyDischarge ? 5 : (anyCharge ? 4 : (anyRunning ? 2 : 1));
+            emu.Emu.OperationStatus = anyDischarge ? 5 : (anyCharge ? 4 : (online > 0 ? 2 : 1));
         }
+
+        /// <summary>PCS 是否携带任一告警字（告警 1~7 任一非 0）。</summary>
+        private static bool HasAnyAlarm(PcsData pcs) =>
+            pcs.AlarmSummary1 != 0 || pcs.AlarmSummary2 != 0 || pcs.AlarmSummary3 != 0 ||
+            pcs.AlarmSummary4 != 0 || pcs.AlarmSummary5 != 0 || pcs.AlarmSummary6 != 0 ||
+            pcs.AlarmSummary7 != 0;
 
         /// <summary>
         /// 启动完成后置位启停命令并立即 ApplyEmuCommands。
@@ -119,15 +173,16 @@ namespace EssSimulator.EssSimModelApi.Mappers
                     continue;
                 }
 
-                int baseIdx = u * 2;
-                if (baseIdx + 1 >= ess._pcsList.Count)
+                int baseIdx = ess.PcsBaseIndexOfUnit(u);
+                int pcsCount = emu.PcsList.Count;
+                if (pcsCount == 0 || baseIdx + pcsCount > ess._pcsList.Count)
                 {
                     allReady = false;
                     continue;
                 }
 
-                emu.PcsList[0].pcsOnOffSwitch = true;
-                emu.PcsList[1].pcsOnOffSwitch = true;
+                foreach (var pcsData in emu.PcsList)
+                    pcsData.pcsOnOffSwitch = true;
                 ApplyEmuCommands(emu, ess, baseIdx);
             }
 
@@ -165,7 +220,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 }
 
                 bool mainBreakerClosed = ess.IsMainBreakerClosed;
-                int unitIdx = simIdx / 2;
+                int unitIdx = ess.UnitIndexOfPcs(simIdx);
                 bool unitBreakerClosed = ess.IsUnitBreakerClosed(unitIdx);
                 bool breakersOpen = !mainBreakerClosed || !unitBreakerClosed;
 
@@ -229,7 +284,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 return;
             }
 
-            int unit = simIdx / 2;
+            int unit = ess.UnitIndexOfPcs(simIdx);
             double busV = ess.GetUnitAcBusVoltage(unit);
             pcsSim.RefreshBlackStartBusContext(busV);
 

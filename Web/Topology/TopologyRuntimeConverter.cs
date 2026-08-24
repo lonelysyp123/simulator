@@ -5,9 +5,10 @@ namespace EssSimulator.Web.Topology
 {
     /// <summary>
     /// 将组态工程映射为径向电站运行时配置（规模 + 参数）。
-    /// 电气接线仍按 NetworkTopologyBuilder 固定模板展开：储能单元数 = EMU 节点数；
+    /// 电气接线仍按 NetworkTopologyBuilder 固定模板展开：储能单元数 = 含 PCS 的 EMU 虚拟节点数，
+    /// 每单元 PCS 数 = 通过 emuId 归入该 EMU 的 PCS 节点数；
     /// 光伏单元展开为 overlay.PvUnits，运行时挂在 35 kV 母线送电。
-    /// 工程须至少包含一个 EMU 或光伏单元。
+    /// 工程须至少包含一个含 PCS 的 EMU 或光伏单元。
     /// </summary>
     public static class TopologyRuntimeConverter
     {
@@ -30,9 +31,14 @@ namespace EssSimulator.Web.Topology
             TopologyValidator.RefreshAcBusEnergization(project);
 
             var emus = project.Nodes.Where(n => n.TemplateId == "emu").OrderBy(n => n.Y).ThenBy(n => n.X).ToList();
+            var pcsNodes = project.Nodes.Where(n => n.TemplateId == "pcs").OrderBy(n => n.X).ThenBy(n => n.Y).ToList();
             var pvUnits = project.Nodes.Where(n => n.TemplateId == "pv_unit").OrderBy(n => n.Y).ThenBy(n => n.X).ToList();
-            if (emus.Count == 0 && pvUnits.Count == 0)
-                return (null, Fail("NO_GENERATION_UNIT", "工程中至少需要一个 EMU 储能单元或光伏单元"));
+            var emusWithPcs = emus
+                .Select(e => (Emu: e, Pcs: pcsNodes.Where(p => TopologyParamHelper.GetString(p.Parameters, "emuId") == e.Id).ToList()))
+                .Where(g => g.Pcs.Count > 0)
+                .ToList();
+            if (emusWithPcs.Count == 0 && pvUnits.Count == 0)
+                return (null, Fail("NO_GENERATION_UNIT", "工程中至少需要一个含 PCS 的 EMU 储能单元或光伏单元"));
 
             var overlay = new TopologyRuntimeOverlay
             {
@@ -106,36 +112,45 @@ namespace EssSimulator.Web.Topology
                 overlay.Notes.Add($"电表一次侧 · {ptPri / 1000:0.#} kV / {ctPri:0.#} A（二次固定 {PtSecondaryV:0}V / {CtSecondaryA:0}A）");
             }
 
-            // 单元变 / PCS 全局：优先取第一台 EMU；仅有光伏时用光伏箱变/逆变器参数
-            var ratingSource = emus.FirstOrDefault() ?? pvUnits.FirstOrDefault();
-            if (ratingSource != null)
+            // 单元变取首个 EMU 参数；PCS 额定取首台 PCS；仅有光伏时用光伏箱变/逆变器参数
+            var firstPcs = emusWithPcs.SelectMany(g => g.Pcs).FirstOrDefault();
+            if (emusWithPcs.Count > 0)
             {
-                bool fromPv = ratingSource.TemplateId == "pv_unit";
+                var emuSource = emusWithPcs[0].Emu;
+                var pcsSource = firstPcs!;
                 overlay.UnitTransformer = new UnitTransformerConfig
                 {
-                    PrimaryVoltage = TopologyParamHelper.GetDouble(ratingSource.Parameters, "unitXfPrimaryV", 35000),
-                    SecondaryVoltage = TopologyParamHelper.GetDouble(ratingSource.Parameters, "unitXfSecondaryV", 690),
-                    RatedPower = fromPv
-                        ? TopologyParamHelper.GetDouble(ratingSource.Parameters, "unitXfRatedKva", 5120)
-                        : 6300
+                    PrimaryVoltage = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfPrimaryV", 35000),
+                    SecondaryVoltage = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfSecondaryV", 690),
+                    RatedPower = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfRatedKva", 6300)
                 };
                 overlay.Pcs = new PcsPhysicalConfig
                 {
-                    RatedPower = TopologyParamHelper.GetDouble(
-                        ratingSource.Parameters,
-                        fromPv ? "inverterRatedPowerKw" : "pcsRatedPowerKw",
-                        fromPv ? 320 : 1250),
-                    MaxPower = TopologyParamHelper.GetDouble(
-                        ratingSource.Parameters,
-                        fromPv ? "inverterMaxPowerKw" : "pcsMaxPowerKw",
-                        fromPv ? 352 : 1250),
-                    Efficiency = TopologyParamHelper.GetDouble(
-                        ratingSource.Parameters,
-                        fromPv ? "inverterEfficiency" : "pcsEfficiency",
-                        0.99),
-                    DcVoltageRangeMin = TopologyParamHelper.GetDouble(ratingSource.Parameters, "dcVoltageMin", fromPv ? 500 : 1000),
-                    DcVoltageRangeMax = TopologyParamHelper.GetDouble(ratingSource.Parameters, "dcVoltageMax", 1500),
-                    AcVoltageNominal = TopologyParamHelper.GetDouble(ratingSource.Parameters, "unitXfSecondaryV", 690)
+                    RatedPower = TopologyParamHelper.GetDouble(pcsSource.Parameters, "pcsRatedPowerKw", 1250),
+                    MaxPower = TopologyParamHelper.GetDouble(pcsSource.Parameters, "pcsMaxPowerKw", 1250),
+                    Efficiency = TopologyParamHelper.GetDouble(pcsSource.Parameters, "pcsEfficiency", 0.99),
+                    DcVoltageRangeMin = TopologyParamHelper.GetDouble(pcsSource.Parameters, "dcVoltageMin", 1000),
+                    DcVoltageRangeMax = TopologyParamHelper.GetDouble(pcsSource.Parameters, "dcVoltageMax", 1500),
+                    AcVoltageNominal = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfSecondaryV", 690)
+                };
+            }
+            else if (pvUnits.Count > 0)
+            {
+                var pvSource = pvUnits[0];
+                overlay.UnitTransformer = new UnitTransformerConfig
+                {
+                    PrimaryVoltage = TopologyParamHelper.GetDouble(pvSource.Parameters, "unitXfPrimaryV", 35000),
+                    SecondaryVoltage = TopologyParamHelper.GetDouble(pvSource.Parameters, "unitXfSecondaryV", 690),
+                    RatedPower = TopologyParamHelper.GetDouble(pvSource.Parameters, "unitXfRatedKva", 5120)
+                };
+                overlay.Pcs = new PcsPhysicalConfig
+                {
+                    RatedPower = TopologyParamHelper.GetDouble(pvSource.Parameters, "inverterRatedPowerKw", 320),
+                    MaxPower = TopologyParamHelper.GetDouble(pvSource.Parameters, "inverterMaxPowerKw", 352),
+                    Efficiency = TopologyParamHelper.GetDouble(pvSource.Parameters, "inverterEfficiency", 0.99),
+                    DcVoltageRangeMin = TopologyParamHelper.GetDouble(pvSource.Parameters, "dcVoltageMin", 500),
+                    DcVoltageRangeMax = TopologyParamHelper.GetDouble(pvSource.Parameters, "dcVoltageMax", 1500),
+                    AcVoltageNominal = TopologyParamHelper.GetDouble(pvSource.Parameters, "unitXfSecondaryV", 690)
                 };
             }
 
@@ -170,30 +185,43 @@ namespace EssSimulator.Web.Topology
                 overlay.Notes.Add($"光伏单元×{pvCount}：已展开运行时配置");
 
             int unitIndex = 0;
-            foreach (var emu in emus)
+            foreach (var group in emusWithPcs)
             {
                 unitIndex++;
-                var bmsNodes = FindBmsForEmu(project, emu.Id);
-                while (bmsNodes.Count < 2)
-                    bmsNodes.Add(null);
-
+                var emu = group.Emu;
                 var unit = new EssUnitConfig
                 {
-                    Name = string.IsNullOrWhiteSpace(emu.Label) ? $"Unit-{unitIndex}" : emu.Label,
-                    Pcs =
-                    {
-                        new Configuration.PcsDeviceConfig { Name = $"PCS-{unitIndex}A" },
-                        new Configuration.PcsDeviceConfig { Name = $"PCS-{unitIndex}B" }
-                    },
-                    Bms =
-                    {
-                        ToBmsConfig(bmsNodes[0], $"BMS-{unitIndex}A"),
-                        ToBmsConfig(bmsNodes[1], $"BMS-{unitIndex}B")
-                    }
+                    Name = string.IsNullOrWhiteSpace(emu.Label) ? $"Unit-{unitIndex}" : emu.Label
                 };
+
+                int pcsSeq = 0;
+                int linkedBms = 0;
+                var usedBms = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var pcs in group.Pcs)
+                {
+                    pcsSeq++;
+                    char slot = (char)('A' + Math.Min(pcsSeq - 1, 25));
+                    unit.Pcs.Add(new Configuration.PcsDeviceConfig
+                    {
+                        Name = string.IsNullOrWhiteSpace(pcs.Label) ? $"PCS-{unitIndex}{slot}" : pcs.Label
+                    });
+                    // BMS 与 PCS 按位对齐：沿该 PCS 的 DC 连线找 1 台未占用的 BMS，缺位用默认配置补齐
+                    var bms = FindBmsForPcs(project, pcs.Id).FirstOrDefault(b => !usedBms.Contains(b.Id));
+                    if (bms != null)
+                    {
+                        linkedBms++;
+                        usedBms.Add(bms.Id);
+                    }
+                    unit.Bms.Add(ToBmsConfig(bms, $"BMS-{unitIndex}{slot}"));
+                }
+
                 overlay.EssUnits.Add(unit);
-                overlay.Notes.Add($"{unit.Name}: BMS×{Math.Min(2, bmsNodes.Count(x => x != null))}（不足则用默认补齐 2 路）");
+                overlay.Notes.Add($"{unit.Name}: PCS×{unit.Pcs.Count} · BMS×{linkedBms}（每台 PCS 对齐 1 路 BMS，未连线时用默认补齐）");
             }
+
+            // 无 PCS 归入的 EMU 节点不生成单元，仅提示
+            foreach (var emu in emus.Where(e => emusWithPcs.All(g => g.Emu.Id != e.Id)))
+                overlay.Notes.Add($"EMU「{(string.IsNullOrWhiteSpace(emu.Label) ? emu.Id : emu.Label)}」无归属 PCS，已跳过");
 
             string message = overlay.EssUnits.Count > 0 && pvCount > 0
                 ? $"已生成 {overlay.EssUnits.Count} 个储能单元、{pvCount} 个光伏单元配置"
@@ -208,21 +236,21 @@ namespace EssSimulator.Web.Topology
             });
         }
 
-        private static List<TopologyNode?> FindBmsForEmu(TopologyProject project, string emuId)
+        private static List<TopologyNode> FindBmsForPcs(TopologyProject project, string pcsId)
         {
-            // EMU —dc→ DC母线 —dc→ BMS，或 EMU 直接连 BMS
-            var neighborIds = Neighbors(project, emuId).ToHashSet();
+            // PCS —dc→ DC母线 —dc→ BMS，或 PCS 直接连 BMS
+            var neighborIds = Neighbors(project, pcsId).ToHashSet();
             var dcBuses = project.Nodes.Where(n => n.TemplateId == "dc_bus" && neighborIds.Contains(n.Id)).Select(n => n.Id).ToHashSet();
 
             var bms = new List<TopologyNode>();
             foreach (var n in project.Nodes.Where(n => n.TemplateId == "bms"))
             {
                 var nb = Neighbors(project, n.Id).ToHashSet();
-                if (nb.Contains(emuId) || nb.Overlaps(dcBuses))
+                if (nb.Contains(pcsId) || nb.Overlaps(dcBuses))
                     bms.Add(n);
             }
 
-            return bms.OrderBy(n => n.X).ThenBy(n => n.Y).Cast<TopologyNode?>().ToList();
+            return bms.OrderBy(n => n.X).ThenBy(n => n.Y).ToList();
         }
 
         private static IEnumerable<string> Neighbors(TopologyProject project, string nodeId)

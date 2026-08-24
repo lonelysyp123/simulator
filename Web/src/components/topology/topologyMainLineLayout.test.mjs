@@ -83,9 +83,12 @@ describe('buildTopologyMainLineLayout pv units', () => {
   })
 
   it('places emu and pv left-to-right and keeps ess snapshot on emu only', () => {
+    // 新模型：EMU 为虚拟节点，储能支路由归属它的 PCS 组展开；无 PCS 的 EMU 不生成支路
     const topology = {
       nodes: [
-        node('emu1', 'emu', 'EMU-1', 400, { pcsCount: 2 }),
+        node('emu1', 'emu', 'EMU-1', 400),
+        node('pcs1', 'pcs', 'PCS-1', 380, { emuId: 'emu1' }),
+        node('pcs2', 'pcs', 'PCS-2', 460, { emuId: 'emu1' }),
         node('pv1', 'pv_unit', '光伏单元-1', 100, { inverterCount: 16, inverterRatedPowerKw: 320 })
       ],
       edges: []
@@ -98,7 +101,33 @@ describe('buildTopologyMainLineLayout pv units', () => {
     assert.equal(layout.units[0].unitSnap, null)
     assert.equal(layout.units[1].kind, 'emu')
     assert.equal(layout.units[1].unitSnap?.unitNumber, 1)
+    assert.equal(layout.units[1].pcsNodes.length, 2)
     assert.equal(layout.omitBusLv, false)
+  })
+
+  it('assigns live units by emu node rank (Y,X), independent of draw order', () => {
+    // emu1 节点在左但其 PCS 画在右侧；运行时单元序按 EMU 节点 (Y,X)，与绘制顺序相反
+    const topology = {
+      nodes: [
+        node('emu1', 'emu', 'EMU-1', 100),
+        node('emu2', 'emu', 'EMU-2', 700),
+        node('pcs1', 'pcs', 'PCS-1', 760, { emuId: 'emu1' }),
+        node('pcs2', 'pcs', 'PCS-2', 160, { emuId: 'emu2' })
+      ],
+      edges: []
+    }
+    const units = [
+      { unitIndex: 0, unitNumber: 1, channelA: { pcsNumber: 1 } },
+      { unitIndex: 1, unitNumber: 2, channelA: { pcsNumber: 2 } }
+    ]
+    const layout = buildTopologyMainLineLayout(topology, units)
+
+    assert.equal(layout.units.length, 2)
+    // 绘制序：emu2 组（leader x=160）在左
+    assert.equal(layout.units[0].emu?.id, 'emu2')
+    assert.equal(layout.units[0].unitSnap?.unitNumber, 2)
+    assert.equal(layout.units[1].emu?.id, 'emu1')
+    assert.equal(layout.units[1].unitSnap?.unitNumber, 1)
   })
 
   it('omits lv bus when only one pv feeder hangs below', () => {

@@ -78,12 +78,12 @@ public class TopologyPhaseBundleTests
         {
             Nodes =
             {
-                Node("emu1", "emu", "EMU"),
+                Node("pcs1", "pcs", "PCS"),
                 Node("dc1", "dc_bus", "DC")
             }
         };
 
-        var edges = TopologyValidator.ExpandBundle(p, Edge("emu1", "dc_pos", "dc1", "pos_t"));
+        var edges = TopologyValidator.ExpandBundle(p, Edge("pcs1", "dc_pos", "dc1", "pos_t"));
         Assert.Equal(2, edges.Count);
         Assert.Contains(edges, e => e.FromPortId == "dc_pos" && e.ToPortId == "pos_t");
         Assert.Contains(edges, e => e.FromPortId == "dc_neg" && e.ToPortId == "neg_t");
@@ -124,12 +124,12 @@ public class TopologyPhaseBundleTests
         {
             Nodes =
             {
-                Node("emu1", "emu", "EMU"),
+                Node("pcs1", "pcs", "PCS"),
                 Node("bus1", "ac_bus", "未带电母线")
             }
         };
 
-        var r = TopologyValidator.TryConnectBundle(p, Edge("emu1", "ac_a", "bus1", "a"), out var updated);
+        var r = TopologyValidator.TryConnectBundle(p, Edge("pcs1", "ac_a", "bus1", "a"), out var updated);
         Assert.True(r.Ok, r.Message);
         Assert.NotNull(updated);
         Assert.NotEmpty(updated!.Edges);

@@ -72,13 +72,15 @@ namespace EssSimulator.Web
                 var devices = simCfg.Value.Devices ?? new List<EssUnitConfig>();
                 // 按舱号（channel / compartment，1-based）展开各 BMS 拓扑，供 3D 详情等使用
                 var bmsTopology = new List<object>();
+                var pcsPerUnit = simCfg.Value.GetPcsCountsPerUnit();
+                int channelBase = 0;
                 for (int ui = 0; ui < devices.Count; ui++)
                 {
                     var bmsList = devices[ui].Bms ?? new List<BmsDeviceConfig>();
                     for (int bi = 0; bi < bmsList.Count; bi++)
                     {
                         var b = bmsList[bi];
-                        int channelIndex0 = ui * 2 + bi;
+                        int channelIndex0 = channelBase + bi;
                         bmsTopology.Add(new
                         {
                             unitIndex = ui,
@@ -92,6 +94,7 @@ namespace EssSimulator.Web
                             cellParallelCount = Math.Max(1, b.CellParallelCount)
                         });
                     }
+                    channelBase += ui < pcsPerUnit.Count ? pcsPerUnit[ui] : 2;
                 }
 
                 return Results.Ok(new
