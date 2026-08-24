@@ -183,8 +183,6 @@ UNIT_BIND = {
     '电网电压 ST': 'PcsList[0].LineVoltageBC',
     '电网电压 TR': 'PcsList[0].LineVoltageCA',
     'PCS 过温降载NTC': 'PcsList[0].IGBTMaxTemp',
-    'PCS 可用容量': 'PcsList[0].AvailableCapacity',
-    'PCS 额定容量': 'PcsList[0].PCSRatePower',
     '交流总充电有功电量低16位': 'PcsList[0].TotalChargeEnergy',
     '交流总放电有功电量低16位': 'PcsList[0].TotalDischargeEnergy',
 }
@@ -213,6 +211,8 @@ UNIT_SUM_BIND = {
     '交流电流 S': ('PcsList[0].PhaseBCurrent', 'PcsList[1].PhaseBCurrent'),
     '交流电流 T': ('PcsList[0].PhaseCCurrent', 'PcsList[1].PhaseCCurrent'),
     '电池总功率': ('PcsList[0].BatteryPower', 'PcsList[1].BatteryPower'),
+    'PCS 可用容量': ('PcsList[0].AvailableCapacity', 'PcsList[1].AvailableCapacity'),
+    'PCS 额定容量': ('PcsList[0].PCSRatePower', 'PcsList[1].PCSRatePower'),
 }
 
 def binding_for(name, n, scale):
