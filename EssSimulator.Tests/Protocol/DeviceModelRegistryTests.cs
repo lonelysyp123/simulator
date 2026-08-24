@@ -33,9 +33,8 @@ public class DeviceModelRegistryTests
         Assert.Contains("bms_rack.csv", bms.Files);
 
         var modelIds = bms.Models.Select(m => m.Id).ToList();
-        Assert.Contains("common", modelIds);
-        Assert.Contains("lc", modelIds);
-        Assert.Contains("battery", modelIds);
+        Assert.Contains("standard", modelIds);
+        Assert.Contains("g2_pro", modelIds);
         Assert.All(bms.Models, m =>
         {
             Assert.False(string.IsNullOrWhiteSpace(m.Name));
@@ -52,7 +51,7 @@ public class DeviceModelRegistryTests
         Assert.Equal("emu", DeviceModelRegistry.FindTypeForFile("emu.csv", root));
         Assert.Equal("em", DeviceModelRegistry.FindTypeForFile("em.csv", root));
         Assert.Equal("lc", DeviceModelRegistry.FindTypeForFile("lc.csv", root));
-        Assert.Null(DeviceModelRegistry.FindTypeForFile("pv_logger.csv", root));
+        Assert.Equal("pv", DeviceModelRegistry.FindTypeForFile("pv_logger.csv", root));
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public class DeviceModelRegistryTests
         var root = FindRepoRoot();
 
         var ok = DeviceModelRegistry.ValidateSelection(
-            new Dictionary<string, string> { ["bms"] = "lc", ["emu"] = "standard" }, root);
+            new Dictionary<string, string> { ["bms"] = "g2_pro", ["emu"] = "standard" }, root);
         Assert.Empty(ok);
 
         var bad = DeviceModelRegistry.ValidateSelection(
@@ -80,14 +79,14 @@ public class DeviceModelRegistryTests
             {
                 Selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["bms"] = "lc"
+                    ["bms"] = "g2_pro"
                 }
             }, tmp);
 
             Assert.True(File.Exists(Path.Combine(tmp, DeviceModelRegistry.SelectionRelativePath)));
 
             var loaded = DeviceModelRegistry.LoadSelection(tmp);
-            Assert.Equal("lc", loaded.Selections["bms"]);
+            Assert.Equal("g2_pro", loaded.Selections["bms"]);
             Assert.Equal(saved.UpdatedAtUtc, loaded.UpdatedAtUtc);
         }
         finally

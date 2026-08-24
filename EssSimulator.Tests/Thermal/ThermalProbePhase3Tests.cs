@@ -32,7 +32,7 @@ public class BmsThermalProbeMapperTests
 {
     /// <summary>
     /// common 版点表绝对路径。根目录 bms_bank.csv 可能随交付版本切换（如 LC 版不含空调/液冷点），
-    /// 本测试固定验证 pointmaps/common 版本，不能依赖复制到 bin 的运行时点表。
+    /// 本测试固定验证 pointmaps/models/bms/standard 版本（原 pointmaps/common），不能依赖复制到 bin 的运行时点表。
     /// </summary>
     private static string CommonBankCsvPath
     {
@@ -42,7 +42,7 @@ public class BmsThermalProbeMapperTests
             while (dir != null)
             {
                 if (File.Exists(Path.Combine(dir.FullName, "EssSimulator.sln")))
-                    return Path.Combine(dir.FullName, "pointmaps", "common", "bms_bank.csv");
+                    return Path.Combine(dir.FullName, "pointmaps", "models", "bms", "standard", "bms_bank.csv");
                 dir = dir.Parent;
             }
 

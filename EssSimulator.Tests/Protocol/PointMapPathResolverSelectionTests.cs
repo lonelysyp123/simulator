@@ -34,8 +34,8 @@ public class PointMapPathResolverSelectionTests : IDisposable
     public void Resolve_WithSelection_PrefersModelDirectory()
     {
         var modelsRoot = DeviceModelRegistry.FindModelsRoot();
-        Assert.True(modelsRoot != null && Directory.Exists(Path.Combine(modelsRoot, "pointmaps", "models", "bms", "lc")),
-            "测试输出目录应包含 pointmaps/models/bms/lc（csproj 复制）");
+        Assert.True(modelsRoot != null && Directory.Exists(Path.Combine(modelsRoot, "pointmaps", "models", "bms", "standard")),
+            "测试输出目录应包含 pointmaps/models/bms/standard（csproj 复制）");
 
         try
         {
@@ -43,12 +43,12 @@ public class PointMapPathResolverSelectionTests : IDisposable
             {
                 Selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["bms"] = "lc"
+                    ["bms"] = "standard"
                 }
             });
 
             var resolved = PointMapPathResolver.Resolve("bms_bank.csv");
-            Assert.Contains(Path.Combine("pointmaps", "models", "bms", "lc"), resolved);
+            Assert.Contains(Path.Combine("pointmaps", "models", "bms", "standard"), resolved);
             Assert.EndsWith("bms_bank.csv", resolved);
 
             // rack 伴随文件与 bank 同目录（型号内配对）
@@ -62,30 +62,30 @@ public class PointMapPathResolverSelectionTests : IDisposable
     }
 
     [Fact]
-    public void Resolve_WithoutSelection_FallsBackToLegacy()
+    public void Resolve_WithoutSelection_FallsBackToStandardModel()
     {
-        // 构造器已清理选型文件
+        // 构造器已清理选型文件；未选型时兜底到 standard 型号点表（或根目录运行时副本）
         var resolved = PointMapPathResolver.Resolve("emu.csv");
-        Assert.DoesNotContain(Path.Combine("pointmaps", "models"), resolved);
+        Assert.EndsWith("emu.csv", resolved);
         Assert.True(File.Exists(resolved));
     }
 
     [Fact]
-    public void Resolve_UnselectedType_FallsBackToLegacy()
+    public void Resolve_UnselectedType_FallsBackToStandardModel()
     {
         try
         {
-            // 仅选型 BMS；未选型的设备类型（EMU）仍走兜底解析
+            // 仅选型 BMS；未选型的设备类型（EMU）仍走兜底解析（standard 型号或根目录副本）
             DeviceModelRegistry.SaveSelection(new DeviceModelSelection
             {
                 Selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["bms"] = "lc"
+                    ["bms"] = "standard"
                 }
             });
 
             var resolved = PointMapPathResolver.Resolve("emu.csv");
-            Assert.DoesNotContain(Path.Combine("pointmaps", "models"), resolved);
+            Assert.EndsWith("emu.csv", resolved);
             Assert.True(File.Exists(resolved));
         }
         finally

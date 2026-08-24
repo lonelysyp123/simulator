@@ -10,9 +10,8 @@ CONFIG="${CONFIG:-Debug}"
 OUT="$ROOT/dist/$RID"
 ARCHIVE="$ROOT/dist/EssSimulator-${RID}.tar.gz"
 
-# 用法: ./scripts/publish-linux.sh [common|lc|battery]
-# 或: POINTMAP_VERSION=lc ./scripts/publish-linux.sh
-POINTMAP_VERSION="${POINTMAP_VERSION:-${1:-$DEFAULT_DEV_POINTMAP_VERSION}}"
+# 根目录点表固定取 standard 型号；设备型号点表（pointmaps/models）随发布携带，
+# 运行期可在系统配置界面选型。
 
 RUNTIME_FILES=(
   appsettings.json
@@ -21,12 +20,12 @@ RUNTIME_FILES=(
 )
 
 copy_runtime_files() {
-  echo "==> Copying runtime config (point map: $POINTMAP_VERSION)..."
+  echo "==> Copying runtime config (point map model: $DEFAULT_ROOT_MODEL)..."
   for f in "${RUNTIME_FILES[@]}"; do
     cp -f "$ROOT/$f" "$OUT/$f"
     echo "    $f"
   done
-  copy_pointmaps_to "$OUT" "$POINTMAP_VERSION"
+  copy_pointmaps_to "$OUT"
   if [[ -d "$ROOT/docs" ]]; then
     rm -rf "$OUT/docs"
     cp -R "$ROOT/docs" "$OUT/docs"
@@ -34,7 +33,7 @@ copy_runtime_files() {
   fi
 }
 
-validate_pointmap_version "$POINTMAP_VERSION"
+validate_device_models
 
 cd "$ROOT"
 
@@ -55,7 +54,7 @@ echo "==> Cleaning previous output: $OUT"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
-echo "==> Publishing EssSimulator for Linux ($RID, $CONFIG, pointmap=$POINTMAP_VERSION, self-contained)..."
+echo "==> Publishing EssSimulator for Linux ($RID, $CONFIG, pointmap model=$DEFAULT_ROOT_MODEL, self-contained)..."
 dotnet publish EssSimulator.csproj \
   -c "$CONFIG" \
   -r "$RID" \
@@ -75,7 +74,7 @@ rm -f "$ARCHIVE"
 tar -czf "$ARCHIVE" -C "$ROOT/dist" "$(basename "$OUT")"
 
 echo "Done."
-echo "  Point map: $POINTMAP_VERSION"
+echo "  Point map model: $DEFAULT_ROOT_MODEL"
 echo "  Folder:  $OUT"
 echo "  Archive: $ARCHIVE"
 echo "  Contents:"
