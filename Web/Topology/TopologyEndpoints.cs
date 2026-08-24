@@ -37,7 +37,10 @@ namespace EssSimulator.Web.Topology
                         validation
                     });
                 }
-                return Results.Ok(store.SaveProject(project));
+                var saved = store.SaveProject(project);
+                // 按 PCS 总数自动选型 EMU 点表（随下次重启生效）
+                EmuPointMapAutoSelect.ApplyForProject(saved);
+                return Results.Ok(saved);
             });
 
             g.MapPost("/validate", (TopologyProject project) =>

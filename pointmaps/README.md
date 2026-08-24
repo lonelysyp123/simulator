@@ -13,6 +13,10 @@
 按 **设备类型 → 设备型号 → 点表文件** 组织，运行期在系统配置界面选型，
 持久化到 `configs/topology/device-models.json`，重启后生效：
 
+EMU 点表另有自动选型规则：组态工程保存/应用时按 PCS 总数自动切换
+（2 台 → `standard`，4 台 → `trina_5.5MW`，8 台 → `trina_10MW`，
+其余数量保持现有选型，见 `Web/Topology/EmuPointMapAutoSelect.cs`）。
+
 ```
 pointmaps/models/
   bms/          type.json + common/ lc/ battery/（bms_bank.csv + bms_rack.csv）
