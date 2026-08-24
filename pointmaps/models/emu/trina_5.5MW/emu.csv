@@ -11,9 +11,9 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5009,u16,16,yc9,1,5.5MW PCS1-模块2电感电流 R,model=4|arg1=emu1.PcsList[1].PhaseACurrent|arg2=|arg3=|arg4=1
 4,5010,u16,16,yc10,1,5.5MW PCS1-模块2电感电流 S,model=4|arg1=emu1.PcsList[1].PhaseBCurrent|arg2=|arg3=|arg4=1
 4,5011,u16,16,yc11,1,5.5MW PCS1-模块2电感电流 T,model=4|arg1=emu1.PcsList[1].PhaseCCurrent|arg2=|arg3=|arg4=1
-4,5012,u16,16,yc12,1,5.5MW PCS1-交流电流 R,model=4|arg1=emu1.PcsList[0].PhaseACurrent|arg2=|arg3=|arg4=1
-4,5013,u16,16,yc13,1,5.5MW PCS1-交流电流 S,model=4|arg1=emu1.PcsList[0].PhaseBCurrent|arg2=|arg3=|arg4=1
-4,5014,u16,16,yc14,1,5.5MW PCS1-交流电流 T,model=4|arg1=emu1.PcsList[0].PhaseCCurrent|arg2=|arg3=|arg4=1
+4,5012,u16,16,yc12,1,5.5MW PCS1-交流电流 R,model=sum|arg1=emu1.PcsList[0].PhaseACurrent|arg2=emu1.PcsList[1].PhaseACurrent|arg3=|arg4=1
+4,5013,u16,16,yc13,1,5.5MW PCS1-交流电流 S,model=sum|arg1=emu1.PcsList[0].PhaseBCurrent|arg2=emu1.PcsList[1].PhaseBCurrent|arg3=|arg4=1
+4,5014,u16,16,yc14,1,5.5MW PCS1-交流电流 T,model=sum|arg1=emu1.PcsList[0].PhaseCCurrent|arg2=emu1.PcsList[1].PhaseCCurrent|arg3=|arg4=1
 4,5015,int16,16,yc15,1,5.5MW PCS1-电池总功率,model=4|arg1=emu1.PcsList[0].BatteryPower|arg2=|arg3=|arg4=1
 4,5016,int16,16,yc16,1,5.5MW PCS1-电池1 功率,model=4|arg1=emu1.PcsList[0].BatteryPower|arg2=|arg3=|arg4=1
 4,5017,int16,16,yc17,1,5.5MW PCS1-电池2 功率,model=4|arg1=emu1.PcsList[1].BatteryPower|arg2=|arg3=|arg4=1
@@ -25,103 +25,8 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5023,int16,16,yc23,10,5.5MW PCS1-PCS 过温降载NTC,model=4|arg1=emu1.PcsList[0].IGBTMaxTemp|arg2=|arg3=|arg4=10
 4,5024,u16,16,yc24,1,5.5MW PCS1-PCS 可用容量,model=4|arg1=emu1.PcsList[0].AvailableCapacity|arg2=|arg3=|arg4=1
 4,5025,u16,16,yc25,1,5.5MW PCS1-PCS 额定容量,model=4|arg1=emu1.PcsList[0].PCSRatePower|arg2=|arg3=|arg4=1
-4,5042,u16,16,yc42,1,5.5MW PCS1-模块1总放电容量高16位,0
-4,5043,u16,16,yc43,1,5.5MW PCS1-模块1总放电容量低16位,model=4|arg1=emu1.PcsList[0].TotalDischargeEnergy|arg2=|arg3=|arg4=1
-4,5044,u16,16,yc44,1,5.5MW PCS1-模块1总充电容量高16位,0
-4,5045,u16,16,yc45,1,5.5MW PCS1-模块1总充电容量低16位,model=4|arg1=emu1.PcsList[0].TotalChargeEnergy|arg2=|arg3=|arg4=1
-4,5046,u16,16,yc46,1,5.5MW PCS1-模块1总放电循环时间高16位,0
-4,5047,u16,16,yc47,1,5.5MW PCS1-模块1总放电循环时间低16位,0
-4,5048,u16,16,yc48,1,5.5MW PCS1-模块1总充电循环时间高16位,0
-4,5049,u16,16,yc49,1,5.5MW PCS1-模块1总充电循环时间低16位,0
-4,5052,u16,16,yc52,1,5.5MW PCS1-模块1总运行时间高16位,0
-4,5053,u16,16,yc53,1,5.5MW PCS1-模块1总运行时间低16位,0
-4,5054,u16,16,yc54,1,5.5MW PCS1-模块1统计年份,0
-4,5055,u16,16,yc55,1,5.5MW PCS1-模块1统计月份,0
-4,5056,u16,16,yc56,1,5.5MW PCS1-模块1统计日,0
-4,5057,u16,16,yc57,1,5.5MW PCS1-模块1统计小时,0
-4,5074,u16,16,yc74,1,5.5MW PCS1-模块2总放电容量高16位,0
-4,5075,u16,16,yc75,1,5.5MW PCS1-模块2总放电容量低16位,model=4|arg1=emu1.PcsList[1].TotalDischargeEnergy|arg2=|arg3=|arg4=1
-4,5076,u16,16,yc76,1,5.5MW PCS1-模块2总充电容量高16位,0
-4,5077,u16,16,yc77,1,5.5MW PCS1-模块2总充电容量低16位,model=4|arg1=emu1.PcsList[1].TotalChargeEnergy|arg2=|arg3=|arg4=1
-4,5078,u16,16,yc78,1,5.5MW PCS1-模块2总放电循环时间高16位,0
-4,5079,u16,16,yc79,1,5.5MW PCS1-模块2总放电循环时间低16位,0
-4,5080,u16,16,yc80,1,5.5MW PCS1-模块2总充电循环时间高16位,0
-4,5081,u16,16,yc81,1,5.5MW PCS1-模块2总充电循环时间低16位,0
-4,5084,u16,16,yc84,1,5.5MW PCS1-模块2总运行时间高16位,0
-4,5085,u16,16,yc85,1,5.5MW PCS1-模块2总运行时间低16位,0
-4,5086,u16,16,yc86,1,5.5MW PCS1-模块2统计年份,0
-4,5087,u16,16,yc87,1,5.5MW PCS1-模块2统计月份,0
-4,5088,u16,16,yc88,1,5.5MW PCS1-模块2统计日,0
-4,5089,u16,16,yc89,1,5.5MW PCS1-模块2统计小时,0
-4,5106,u16,16,yc106,1,5.5MW PCS1-交流总放电有功电量高16位,0
-4,5107,u16,16,yc107,1,5.5MW PCS1-交流总放电有功电量低16位,model=4|arg1=emu1.PcsList[0].TotalDischargeEnergy|arg2=|arg3=|arg4=1
-4,5108,u16,16,yc108,1,5.5MW PCS1-交流总充电有功电量高16位,0
-4,5109,u16,16,yc109,1,5.5MW PCS1-交流总充电有功电量低16位,model=4|arg1=emu1.PcsList[0].TotalChargeEnergy|arg2=|arg3=|arg4=1
-4,5110,u16,16,yc110,1,5.5MW PCS1-交流总放电有功循环时间高16位,0
-4,5111,u16,16,yc111,1,5.5MW PCS1-交流总放电有功循环时间低16位,0
-4,5112,u16,16,yc112,1,5.5MW PCS1-交流总充电有功循环时间高16位,0
-4,5113,u16,16,yc113,1,5.5MW PCS1-交流总充电有功循环时间低16位,0
-4,5130,u16,16,yc130,1,5.5MW PCS1-交流总容性无功电量高16位,0
-4,5131,u16,16,yc131,1,5.5MW PCS1-交流总容性无功电量低16位,0
-4,5132,u16,16,yc132,1,5.5MW PCS1-交流总电感无功电量高16位,0
-4,5133,u16,16,yc133,1,5.5MW PCS1-交流总电感无功电量低16位,0
-4,5134,u16,16,yc134,1,5.5MW PCS1-交流总容性无功循环时间高16位,0
-4,5135,u16,16,yc135,1,5.5MW PCS1-交流总容性无功循环时间低16位,0
-4,5136,u16,16,yc136,1,5.5MW PCS1-交流总电感无功循环时间高16位,0
-4,5137,u16,16,yc137,1,5.5MW PCS1-交流总电感无功循环时间低16位,0
-4,5140,u16,16,yc140,1,5.5MW PCS1-交流总运行时间高16位,0
-4,5141,u16,16,yc141,1,5.5MW PCS1-交流总运行时间低16位,0
-4,5142,u16,16,yc142,1,5.5MW PCS1-交流统计年份,0
-4,5143,u16,16,yc143,1,5.5MW PCS1-交流统计月份,0
-4,5144,u16,16,yc144,1,5.5MW PCS1-交流统计日期,0
-4,5145,u16,16,yc145,1,5.5MW PCS1-交流统计小时,0
-4,5146,u16,16,yc146,1,5.5MW PCS1-软件版本字1,0
-4,5147,u16,16,yc147,1,5.5MW PCS1-软件版本字2,0
-4,5148,u16,16,yc148,1,5.5MW PCS1-软件版本字3,0
-4,5149,u16,16,yc149,1,5.5MW PCS1-软件版本字4,0
-4,5150,u16,16,yc150,1,5.5MW PCS1-软件版本字5,0
-4,5151,u16,16,yc151,1,5.5MW PCS1-软件版本字6,0
-4,5152,u16,16,yc152,1,5.5MW PCS1-控制器版本字1,0
-4,5153,u16,16,yc153,1,5.5MW PCS1-控制器版本字2,0
-4,5154,u16,16,yc154,1,5.5MW PCS1-控制器版本字3,0
-4,5155,u16,16,yc155,1,5.5MW PCS1-控制器版本字4,0
-4,5156,u16,16,yc156,1,5.5MW PCS1-控制器版本字5,0
-4,5157,u16,16,yc157,1,5.5MW PCS1-SDSP版本字1,0
-4,5158,u16,16,yc158,1,5.5MW PCS1-SDSP版本字2,0
-4,5159,u16,16,yc159,1,5.5MW PCS1-SDSP版本字3,0
-4,5160,u16,16,yc160,1,5.5MW PCS1-SDSP版本字4,0
-4,5161,u16,16,yc161,1,5.5MW PCS1-SDSP版本字5,0
-4,5162,u16,16,yc162,1,5.5MW PCS1-SFPGA版本字1,0
-4,5163,u16,16,yc163,1,5.5MW PCS1-SFPGA版本字2,0
-4,5164,u16,16,yc164,1,5.5MW PCS1-SFPGA版本字3,0
-4,5165,u16,16,yc165,1,5.5MW PCS1-CDSP版本 1,0
-4,5166,u16,16,yc166,1,5.5MW PCS1-CDSP版本 2,0
-4,5167,u16,16,yc167,1,5.5MW PCS1-CDSP版本 3,0
-4,5168,u16,16,yc168,1,5.5MW PCS1-CDSP版本 4,0
-4,5169,u16,16,yc169,1,5.5MW PCS1-CDSP版本 5,0
-4,5170,u16,16,yc170,1,5.5MW PCS1-J1DSP版本字1,0
-4,5171,u16,16,yc171,1,5.5MW PCS1-J1DSP版本字2,0
-4,5172,u16,16,yc172,1,5.5MW PCS1-J1DSP版本字3,0
-4,5173,u16,16,yc173,1,5.5MW PCS1-J1DSP版本字4,0
-4,5174,u16,16,yc174,1,5.5MW PCS1-J1DSP版本字5,0
-4,5175,u16,16,yc175,1,5.5MW PCS1-J1FPGA版本字1,0
-4,5176,u16,16,yc176,1,5.5MW PCS1-J1FPGA版本字2,0
-4,5177,u16,16,yc177,1,5.5MW PCS1-J1FPGA版本字3,0
-4,5178,u16,16,yc178,1,5.5MW PCS1-J2DSP版本字1,0
-4,5179,u16,16,yc179,1,5.5MW PCS1-J2DSP版本字2,0
-4,5180,u16,16,yc180,1,5.5MW PCS1-J2DSP版本字3,0
-4,5181,u16,16,yc181,1,5.5MW PCS1-J2DSP版本字4,0
-4,5182,u16,16,yc182,1,5.5MW PCS1-J2DSP版本字5,0
-4,5183,u16,16,yc183,1,5.5MW PCS1-J2FPGA版本字1,0
-4,5184,u16,16,yc184,1,5.5MW PCS1-J2FPGA版本字2,0
-4,5185,u16,16,yc185,1,5.5MW PCS1-J2FPGA版本字3,0
-4,5186,u16,16,yc186,1,5.5MW PCS1-认证标准,0
-4,5217,u16,16,yc187,1,5.5MW PCS1-控制器故障字1(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,5218,u16,16,yc188,1,5.5MW PCS1-控制器警告字1(Bit0 控制警告字1Web 服务器丢失),0
-4,5230,u16,16,yc189,1,5.5MW PCS1-模块1 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,5231,u16,16,yc190,1,5.5MW PCS1-模块1 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu1.PcsList[0]
 4,5232,u16,16,yc191,1,5.5MW PCS1-模块1 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu1.PcsList[0]
-4,5244,u16,16,yc192,1,5.5MW PCS1-模块2 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,5245,u16,16,yc193,1,5.5MW PCS1-模块2 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu1.PcsList[1]
 4,5246,u16,16,yc194,1,5.5MW PCS1-模块2 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu1.PcsList[1]
 4,5600,int16,16,yc195,1,5.5MW PCS2-模块1电池电压,model=4|arg1=emu2.PcsList[0].BatteryVoltage|arg2=|arg3=|arg4=1
@@ -136,9 +41,9 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5609,u16,16,yc204,1,5.5MW PCS2-模块2电感电流 R,model=4|arg1=emu2.PcsList[1].PhaseACurrent|arg2=|arg3=|arg4=1
 4,5610,u16,16,yc205,1,5.5MW PCS2-模块2电感电流 S,model=4|arg1=emu2.PcsList[1].PhaseBCurrent|arg2=|arg3=|arg4=1
 4,5611,u16,16,yc206,1,5.5MW PCS2-模块2电感电流 T,model=4|arg1=emu2.PcsList[1].PhaseCCurrent|arg2=|arg3=|arg4=1
-4,5612,u16,16,yc207,1,5.5MW PCS2-交流电流 R,model=4|arg1=emu2.PcsList[0].PhaseACurrent|arg2=|arg3=|arg4=1
-4,5613,u16,16,yc208,1,5.5MW PCS2-交流电流 S,model=4|arg1=emu2.PcsList[0].PhaseBCurrent|arg2=|arg3=|arg4=1
-4,5614,u16,16,yc209,1,5.5MW PCS2-交流电流 T,model=4|arg1=emu2.PcsList[0].PhaseCCurrent|arg2=|arg3=|arg4=1
+4,5612,u16,16,yc207,1,5.5MW PCS2-交流电流 R,model=sum|arg1=emu2.PcsList[0].PhaseACurrent|arg2=emu2.PcsList[1].PhaseACurrent|arg3=|arg4=1
+4,5613,u16,16,yc208,1,5.5MW PCS2-交流电流 S,model=sum|arg1=emu2.PcsList[0].PhaseBCurrent|arg2=emu2.PcsList[1].PhaseBCurrent|arg3=|arg4=1
+4,5614,u16,16,yc209,1,5.5MW PCS2-交流电流 T,model=sum|arg1=emu2.PcsList[0].PhaseCCurrent|arg2=emu2.PcsList[1].PhaseCCurrent|arg3=|arg4=1
 4,5615,int16,16,yc210,1,5.5MW PCS2-电池总功率,model=4|arg1=emu2.PcsList[0].BatteryPower|arg2=|arg3=|arg4=1
 4,5616,int16,16,yc211,1,5.5MW PCS2-电池1 功率,model=4|arg1=emu2.PcsList[0].BatteryPower|arg2=|arg3=|arg4=1
 4,5617,int16,16,yc212,1,5.5MW PCS2-电池2 功率,model=4|arg1=emu2.PcsList[1].BatteryPower|arg2=|arg3=|arg4=1
@@ -150,102 +55,7 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,5623,int16,16,yc218,10,5.5MW PCS2-PCS 过温降载NTC,model=4|arg1=emu2.PcsList[0].IGBTMaxTemp|arg2=|arg3=|arg4=10
 4,5624,u16,16,yc219,1,5.5MW PCS2-PCS 可用容量,model=4|arg1=emu2.PcsList[0].AvailableCapacity|arg2=|arg3=|arg4=1
 4,5625,u16,16,yc220,1,5.5MW PCS2-PCS 额定容量,model=4|arg1=emu2.PcsList[0].PCSRatePower|arg2=|arg3=|arg4=1
-4,5642,u16,16,yc237,1,5.5MW PCS2-模块1总放电容量高16位,0
-4,5643,u16,16,yc238,1,5.5MW PCS2-模块1总放电容量低16位,model=4|arg1=emu2.PcsList[0].TotalDischargeEnergy|arg2=|arg3=|arg4=1
-4,5644,u16,16,yc239,1,5.5MW PCS2-模块1总充电容量高16位,0
-4,5645,u16,16,yc240,1,5.5MW PCS2-模块1总充电容量低16位,model=4|arg1=emu2.PcsList[0].TotalChargeEnergy|arg2=|arg3=|arg4=1
-4,5646,u16,16,yc241,1,5.5MW PCS2-模块1总放电循环时间高16位,0
-4,5647,u16,16,yc242,1,5.5MW PCS2-模块1总放电循环时间低16位,0
-4,5648,u16,16,yc243,1,5.5MW PCS2-模块1总充电循环时间高16位,0
-4,5649,u16,16,yc244,1,5.5MW PCS2-模块1总充电循环时间低16位,0
-4,5652,u16,16,yc247,1,5.5MW PCS2-模块1总运行时间高16位,0
-4,5653,u16,16,yc248,1,5.5MW PCS2-模块1总运行时间低16位,0
-4,5654,u16,16,yc249,1,5.5MW PCS2-模块1统计年份,0
-4,5655,u16,16,yc250,1,5.5MW PCS2-模块1统计月份,0
-4,5656,u16,16,yc251,1,5.5MW PCS2-模块1统计日,0
-4,5657,u16,16,yc252,1,5.5MW PCS2-模块1统计小时,0
-4,5674,u16,16,yc269,1,5.5MW PCS2-模块2总放电容量高16位,0
-4,5675,u16,16,yc270,1,5.5MW PCS2-模块2总放电容量低16位,model=4|arg1=emu2.PcsList[1].TotalDischargeEnergy|arg2=|arg3=|arg4=1
-4,5676,u16,16,yc271,1,5.5MW PCS2-模块2总充电容量高16位,0
-4,5677,u16,16,yc272,1,5.5MW PCS2-模块2总充电容量低16位,model=4|arg1=emu2.PcsList[1].TotalChargeEnergy|arg2=|arg3=|arg4=1
-4,5678,u16,16,yc273,1,5.5MW PCS2-模块2总放电循环时间高16位,0
-4,5679,u16,16,yc274,1,5.5MW PCS2-模块2总放电循环时间低16位,0
-4,5680,u16,16,yc275,1,5.5MW PCS2-模块2总充电循环时间高16位,0
-4,5681,u16,16,yc276,1,5.5MW PCS2-模块2总充电循环时间低16位,0
-4,5684,u16,16,yc279,1,5.5MW PCS2-模块2总运行时间高16位,0
-4,5685,u16,16,yc280,1,5.5MW PCS2-模块2总运行时间低16位,0
-4,5686,u16,16,yc281,1,5.5MW PCS2-模块2统计年份,0
-4,5687,u16,16,yc282,1,5.5MW PCS2-模块2统计月份,0
-4,5688,u16,16,yc283,1,5.5MW PCS2-模块2统计日,0
-4,5689,u16,16,yc284,1,5.5MW PCS2-模块2统计小时,0
-4,5706,u16,16,yc301,1,5.5MW PCS2-交流总放电有功电量高16位,0
-4,5707,u16,16,yc302,1,5.5MW PCS2-交流总放电有功电量低16位,model=4|arg1=emu2.PcsList[0].TotalDischargeEnergy|arg2=|arg3=|arg4=1
-4,5708,u16,16,yc303,1,5.5MW PCS2-交流总充电有功电量高16位,0
-4,5709,u16,16,yc304,1,5.5MW PCS2-交流总充电有功电量低16位,model=4|arg1=emu2.PcsList[0].TotalChargeEnergy|arg2=|arg3=|arg4=1
-4,5710,u16,16,yc305,1,5.5MW PCS2-交流总放电有功循环时间高16位,0
-4,5711,u16,16,yc306,1,5.5MW PCS2-交流总放电有功循环时间低16位,0
-4,5712,u16,16,yc307,1,5.5MW PCS2-交流总充电有功循环时间高16位,0
-4,5713,u16,16,yc308,1,5.5MW PCS2-交流总充电有功循环时间低16位,0
-4,5730,u16,16,yc325,1,5.5MW PCS2-交流总容性无功电量高16位,0
-4,5731,u16,16,yc326,1,5.5MW PCS2-交流总容性无功电量低16位,0
-4,5732,u16,16,yc327,1,5.5MW PCS2-交流总电感无功电量高16位,0
-4,5733,u16,16,yc328,1,5.5MW PCS2-交流总电感无功电量低16位,0
-4,5734,u16,16,yc329,1,5.5MW PCS2-交流总容性无功循环时间高16位,0
-4,5735,u16,16,yc330,1,5.5MW PCS2-交流总容性无功循环时间低16位,0
-4,5736,u16,16,yc331,1,5.5MW PCS2-交流总电感无功循环时间高16位,0
-4,5737,u16,16,yc332,1,5.5MW PCS2-交流总电感无功循环时间低16位,0
-4,5740,u16,16,yc335,1,5.5MW PCS2-交流总运行时间高16位,0
-4,5741,u16,16,yc336,1,5.5MW PCS2-交流总运行时间低16位,0
-4,5742,u16,16,yc337,1,5.5MW PCS2-交流统计年份,0
-4,5743,u16,16,yc338,1,5.5MW PCS2-交流统计月份,0
-4,5744,u16,16,yc339,1,5.5MW PCS2-交流统计日期,0
-4,5745,u16,16,yc340,1,5.5MW PCS2-交流统计小时,0
-4,5746,u16,16,yc341,1,5.5MW PCS2-软件版本字1,0
-4,5747,u16,16,yc342,1,5.5MW PCS2-软件版本字2,0
-4,5748,u16,16,yc343,1,5.5MW PCS2-软件版本字3,0
-4,5749,u16,16,yc344,1,5.5MW PCS2-软件版本字4,0
-4,5750,u16,16,yc345,1,5.5MW PCS2-软件版本字5,0
-4,5751,u16,16,yc346,1,5.5MW PCS2-软件版本字6,0
-4,5752,u16,16,yc347,1,5.5MW PCS2-控制器版本字1,0
-4,5753,u16,16,yc348,1,5.5MW PCS2-控制器版本字2,0
-4,5754,u16,16,yc349,1,5.5MW PCS2-控制器版本字3,0
-4,5755,u16,16,yc350,1,5.5MW PCS2-控制器版本字4,0
-4,5756,u16,16,yc351,1,5.5MW PCS2-控制器版本字5,0
-4,5757,u16,16,yc352,1,5.5MW PCS2-SDSP版本字1,0
-4,5758,u16,16,yc353,1,5.5MW PCS2-SDSP版本字2,0
-4,5759,u16,16,yc354,1,5.5MW PCS2-SDSP版本字3,0
-4,5760,u16,16,yc355,1,5.5MW PCS2-SDSP版本字4,0
-4,5761,u16,16,yc356,1,5.5MW PCS2-SDSP版本字5,0
-4,5762,u16,16,yc357,1,5.5MW PCS2-SFPGA版本字1,0
-4,5763,u16,16,yc358,1,5.5MW PCS2-SFPGA版本字2,0
-4,5764,u16,16,yc359,1,5.5MW PCS2-SFPGA版本字3,0
-4,5765,u16,16,yc360,1,5.5MW PCS2-CDSP版本 1,0
-4,5766,u16,16,yc361,1,5.5MW PCS2-CDSP版本 2,0
-4,5767,u16,16,yc362,1,5.5MW PCS2-CDSP版本 3,0
-4,5768,u16,16,yc363,1,5.5MW PCS2-CDSP版本 4,0
-4,5769,u16,16,yc364,1,5.5MW PCS2-CDSP版本 5,0
-4,5770,u16,16,yc365,1,5.5MW PCS2-J1DSP版本字1,0
-4,5771,u16,16,yc366,1,5.5MW PCS2-J1DSP版本字2,0
-4,5772,u16,16,yc367,1,5.5MW PCS2-J1DSP版本字3,0
-4,5773,u16,16,yc368,1,5.5MW PCS2-J1DSP版本字4,0
-4,5774,u16,16,yc369,1,5.5MW PCS2-J1DSP版本字5,0
-4,5775,u16,16,yc370,1,5.5MW PCS2-J1FPGA版本字1,0
-4,5776,u16,16,yc371,1,5.5MW PCS2-J1FPGA版本字2,0
-4,5777,u16,16,yc372,1,5.5MW PCS2-J1FPGA版本字3,0
-4,5778,u16,16,yc373,1,5.5MW PCS2-J2DSP版本字1,0
-4,5779,u16,16,yc374,1,5.5MW PCS2-J2DSP版本字2,0
-4,5780,u16,16,yc375,1,5.5MW PCS2-J2DSP版本字3,0
-4,5781,u16,16,yc376,1,5.5MW PCS2-J2DSP版本字4,0
-4,5782,u16,16,yc377,1,5.5MW PCS2-J2DSP版本字5,0
-4,5783,u16,16,yc378,1,5.5MW PCS2-J2FPGA版本字1,0
-4,5784,u16,16,yc379,1,5.5MW PCS2-J2FPGA版本字2,0
-4,5785,u16,16,yc380,1,5.5MW PCS2-J2FPGA版本字3,0
-4,5786,u16,16,yc381,1,5.5MW PCS2-认证标准,0
-4,5817,u16,16,yc382,1,5.5MW PCS2-控制器故障字1(Bit0 SDSP心跳丢失;Bit1 J1 DSP心跳丢失;Bit2 J2 DSP心跳丢失;Bit5 主从1通信丢失),0
-4,5818,u16,16,yc383,1,5.5MW PCS2-控制器警告字1(Bit0 控制警告字1Web 服务器丢失),0
-4,5830,u16,16,yc384,1,5.5MW PCS2-模块1 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,5831,u16,16,yc385,1,5.5MW PCS2-模块1 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu2.PcsList[0]
 4,5832,u16,16,yc386,1,5.5MW PCS2-模块1 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu2.PcsList[0]
-4,5844,u16,16,yc387,1,5.5MW PCS2-模块2 通信故障字1(Bit0 通信故障字1SDSP心跳丢失;Bit1 通信故障字1控制心跳丢失;Bit4 通信故障字1J板ID错误),0
 4,5845,u16,16,yc388,1,5.5MW PCS2-模块2 警告字1(Bit0 模块警告字1总线1绝缘低;Bit1 模块警告字1总线2绝缘低;Bit2 模块警告字1湿度过高;Bit3 模块警告字1除湿机故障;Bit4 模块警告字1UPS电池电压低;Bit5 模块警告字1J板过温;Bit6 模块警告字1相R驱动线松动;Bit7 模块警告字1相S驱动线松动;Bit8 模块警告字1相T驱动线松动;Bit9 模块警告字1UPS交流电源丢失;Bit10 模块警告字1DC SPD;Bit11 模块警告字1辅助变压器SW馈电;Bit12 模块警告字1AC SPD;Bit13 模块警告字1辅助SPD;Bit14 模块警告字13352通信丢失;Bit15 模块警告字1IMD通信丢失),model=plugin|arg1=ModuleWarningWord1|arg2=emu2.PcsList[1]
 4,5846,u16,16,yc389,1,5.5MW PCS2-模块2 警告字2(Bit0 模块警告字2CBC警告R;Bit1 模块警告字2CBC警告S;Bit2 模块警告字2CBC警告T;Bit3 模块警告字2电池欠压保护;Bit4 模块警告字2外部风扇欠流保护),model=plugin|arg1=ModuleWarningWord2|arg2=emu2.PcsList[1]

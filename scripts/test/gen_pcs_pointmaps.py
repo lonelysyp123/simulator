@@ -175,9 +175,6 @@ LAYOUT = {
 # 模块1 -> emu{n}.PcsList[0], 模块2 -> emu{n}.PcsList[1]
 # 机绁级聚合优先 Emu.*, 无聚合属性的取 PcsList[0] 代表。
 UNIT_BIND = {
-    '交流电流 R': 'PcsList[0].PhaseACurrent',
-    '交流电流 S': 'PcsList[0].PhaseBCurrent',
-    '交流电流 T': 'PcsList[0].PhaseCCurrent',
     '电池总功率': 'PcsList[0].BatteryPower',
     '电池1 功率': 'PcsList[0].BatteryPower',
     '电池2 功率': 'PcsList[1].BatteryPower',
@@ -211,12 +208,22 @@ PLUGIN_BIND = {
     '模块2 警告字2': ('ModuleWarningWord2', 1),
 }
 
+# 单元级双模块求和绑定: 机绁级点位 = 模块1 + 模块2，输出 model=sum
+UNIT_SUM_BIND = {
+    '交流电流 R': ('PcsList[0].PhaseACurrent', 'PcsList[1].PhaseACurrent'),
+    '交流电流 S': ('PcsList[0].PhaseBCurrent', 'PcsList[1].PhaseBCurrent'),
+    '交流电流 T': ('PcsList[0].PhaseCCurrent', 'PcsList[1].PhaseCCurrent'),
+}
+
 def binding_for(name, n, scale):
     """按 EMU 层级返回 ModelSim 绑定; 无对应仿真属性返回 '0'。"""
     p = PLUGIN_BIND.get(name)
     if p:
         key, slot = p
         return f'model=plugin|arg1={key}|arg2=emu{n}.PcsList[{slot}]'
+    s = UNIT_SUM_BIND.get(name)
+    if s:
+        return f'model=sum|arg1=emu{n}.{s[0]}|arg2=emu{n}.{s[1]}|arg3=|arg4={scale}'
     path = None
     m = re.match(r'^模块([12])(.+)$', name)
     if m:
