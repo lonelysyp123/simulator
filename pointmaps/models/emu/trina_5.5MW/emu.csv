@@ -62,10 +62,10 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 4,106,u16,16,sysyc106,1,SYSTEM-系统总状态详细版(0初始化1停机2启动中3运行中4待机),0
 4,107,u16,16,sysyc107,1,SYSTEM-系统故障总(0正常1故障;统计全部机组所有PCS模块告警),model=plugin|arg1=SystemFaultSummary|arg2=emu1
 4,108,u16,16,sysyc108,1,SYSTEM-系统总状态精简版(1停机3运行中5故障6告警;待机按运行中),model=plugin|arg1=SystemRunStateSummary|arg2=emu1
-4,109,u32,32,sysyc109,10,SYSTEM-允许充电电量(0.1kWh),0
-4,111,u32,32,sysyc111,10,SYSTEM-允许放电电量(0.1kWh),0
-4,113,u32,32,sysyc113,10,SYSTEM-允许充电功率(0.1kW),0
-4,115,u32,32,sysyc115,10,SYSTEM-允许放电功率(0.1kW),0
+4,109,u32,32,sysyc109,10,SYSTEM-允许充电电量(0.1kWh),model=4|arg1=ess.AvailableChargeEnergy|arg2=|arg3=|arg4=10
+4,111,u32,32,sysyc111,10,SYSTEM-允许放电电量(0.1kWh),model=4|arg1=ess.AvailableDischargeEnergy|arg2=|arg3=|arg4=10
+4,113,u32,32,sysyc113,10,SYSTEM-允许充电功率(0.1kW),model=sum|arg1=emu1.Emu.MaxChargePower|arg2=emu2.Emu.MaxChargePower|arg3=|arg4=10
+4,115,u32,32,sysyc115,10,SYSTEM-允许放电功率(0.1kW),model=sum|arg1=emu1.Emu.MaxDischargePower|arg2=emu2.Emu.MaxDischargePower|arg3=|arg4=10
 4,121,u16,16,sysyc121,1,SYSTEM-PCS状态汇总(0初始1关闭2待机3运行),0
 4,122,int16,16,sysyc122,10000,SYSTEM-功率因数(0.0001),model=4|arg1=em.PowerFactor|arg2=|arg3=|arg4=10000
 4,123,int32,32,sysyc123,10,SYSTEM-视在功率(0.1kVA),model=4|arg1=em.TotalApparentPower|arg2=|arg3=|arg4=10
