@@ -85,11 +85,12 @@ namespace EssSimulator.Display
 
         public static string BuildBlackStartSwitchSummary(int channelStart, int channelEndExclusive)
         {
+            var layout = GuiSimDataAccess.GetPcsPerUnit();
             var parts = new List<string>();
             for (int i = channelStart; i < channelEndExclusive; i++)
             {
-                int u = i / 2;
-                int slot = i % 2;
+                int u = PcsUnitLayout.UnitIndexOf(layout, i);
+                int slot = PcsUnitLayout.SlotOfChannel(layout, i);
                 string st = FormatBlackStartSwitchStatus(u, slot, i);
                 parts.Add($"PCS{i + 1}:{st}");
             }

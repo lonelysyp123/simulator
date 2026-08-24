@@ -27,7 +27,10 @@ namespace EssSimulator.DataExchange.Effects
             if (ess == null || emu == null)
                 return;
 
-            int pcsBase = (unit1Based - 1) * 2;
+            int pcsBase = ess.PcsBaseIndexOfUnit(unit1Based - 1);
+            // 先跑 EMU 级系统操作/黑启动写入与功率均分，再下发到各 PCS
+            EmuSystemOperationApplier.Apply(emu);
+            EmuPowerDispatcher.Dispatch(emu);
             PcsMapper.ApplyEmuCommands(emu, ess, pcsBase);
             PcsEmuSynchronizer.SyncPcsStateFromModel(ess, emu, pcsBase);
             _refreshTelemetry?.Invoke();

@@ -238,10 +238,13 @@ namespace EssSimulator.Configuration
     public class EssUnitConfig
     {
         public string Name { get; set; } = "Unit";
-        /// <summary>固定 2 路 PCS 配置</summary>
+        /// <summary>本单元 PCS 配置；为空时默认 2 台（向后兼容）。</summary>
         public List<PcsDeviceConfig> Pcs { get; set; } = new();
-        /// <summary>固定 2 路 BMS 配置</summary>
+        /// <summary>本单元 BMS 配置；与 PCS 通道 1:1，为空时默认 2 台。</summary>
         public List<BmsDeviceConfig> Bms { get; set; } = new();
+
+        /// <summary>本单元下属 PCS 台数；未配置 Pcs 时回退 2。</summary>
+        public int PcsCount => Pcs is { Count: > 0 } ? Pcs.Count : 2;
     }
 
     /// <summary>储能单元列表（对应 appsettings.json: EssUnits 节，绑定到 <see cref="SimulatorConfig.Devices"/>）</summary>
@@ -298,12 +301,22 @@ namespace EssSimulator.Configuration
         }
 
         // 兼容旧代码的便捷属性（由新结构推导）
-        public int UnitCount => EffectiveEssUnitCount * 2; // 每单元固定 2 路 PCS/BMS
+        /// <summary>PCS/BMS 通道总数 = 各储能单元 PCS 台数之和。</summary>
+        public int UnitCount => GetPcsDeviceConfigs().Count;
         public int BaseModbusPort => Protocol.BaseBmsModbusPort;
         public int PcsModbusPort => Protocol.BaseEmuModbusPort;
         public int EmModbusPort => Protocol.EmModbusPort;
         public double IntegrationStepMultiplier => Runtime.IntegrationStepMultiplier;
         public bool NoGui => Runtime.NoGui;
+
+        /// <summary>各储能单元下属 PCS 台数（未配置单元回退 2）。</summary>
+        public IReadOnlyList<int> GetPcsCountsPerUnit()
+        {
+            var list = new List<int>();
+            foreach (var unit in ResolveEssUnitsOrFallback())
+                list.Add(unit.PcsCount);
+            return list;
+        }
 
         public IReadOnlyList<BmsDeviceConfig> GetBmsDeviceConfigs()
         {
@@ -311,10 +324,10 @@ namespace EssSimulator.Configuration
             var units = ResolveEssUnitsOrFallback();
             foreach (var unit in units)
             {
+                int n = unit.PcsCount;
                 var bms = unit.Bms ?? new List<BmsDeviceConfig>();
-                while (bms.Count < 2) bms.Add(new BmsDeviceConfig());
-                list.Add(bms[0]);
-                list.Add(bms[1]);
+                for (int i = 0; i < n; i++)
+                    list.Add(i < bms.Count ? bms[i] : new BmsDeviceConfig());
             }
             return list;
         }
@@ -325,10 +338,10 @@ namespace EssSimulator.Configuration
             var units = ResolveEssUnitsOrFallback();
             foreach (var unit in units)
             {
+                int n = unit.PcsCount;
                 var pcs = unit.Pcs ?? new List<PcsDeviceConfig>();
-                while (pcs.Count < 2) pcs.Add(new PcsDeviceConfig());
-                list.Add(pcs[0]);
-                list.Add(pcs[1]);
+                for (int i = 0; i < n; i++)
+                    list.Add(i < pcs.Count ? pcs[i] : new PcsDeviceConfig());
             }
             return list;
         }

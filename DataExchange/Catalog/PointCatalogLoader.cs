@@ -258,6 +258,15 @@ namespace EssSimulator.DataExchange.Catalog
                     target.PropertyPath.Contains("PCSReactivePowerSetting", StringComparison.Ordinal))
                     return ControlEffectId.PcsApplyCommands;
 
+                // EMU 级（虚拟模型）系统控制：目标 P/Q 均分、系统操作、黑启动写入、远程使能/模式
+                if (target.PropertyPath.Contains("Emu.TargetActivePower", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("Emu.TargetReactivePower", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("Emu.SystemOperation", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("Emu.BlackStartModeWrite", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("Emu.RemoteControlEnable", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("Emu.RemoteControlMode", StringComparison.Ordinal))
+                    return ControlEffectId.PcsApplyCommands;
+
                 if (target.PropertyPath.EndsWith(".PowerOnOff", StringComparison.Ordinal))
                     return ControlEffectId.UnitHighVoltageBreaker;
             }

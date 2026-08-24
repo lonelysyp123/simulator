@@ -294,8 +294,10 @@ namespace EssSimulator.Display
             if (start == null)
                 return CommandResult.Fail("请使用 start|stop");
 
-            int emuUnit = (pcs1Based - 1) / 2 + 1;
-            string point = pcs1Based % 2 == 1 ? "yx3" : "yx5";
+            var layout = GuiSimDataAccess.GetPcsPerUnit();
+            int emuUnit = PcsUnitLayout.UnitIndexOf(layout, pcs1Based - 1) + 1;
+            int slot = PcsUnitLayout.SlotOfChannel(layout, pcs1Based - 1);
+            string point = slot == 0 ? "yx3" : "yx5";
             string[] dpcArgs = { $"simEmu{emuUnit}.{point}", "set", start.Value ? "1" : "0" };
 
             if (!DataPointChangeCommand.TryExecuteDpcOperation(dpcArgs, out var message))
@@ -457,8 +459,9 @@ namespace EssSimulator.Display
                 int.TryParse(target.AsSpan(3), out int pcsIdx) &&
                 pcsIdx >= 1)
             {
-                int emuUnit = (pcsIdx - 1) / 2 + 1;
-                int pcsPeer = (emuUnit - 1) * 2 + 1;
+                var layout = GuiSimDataAccess.GetPcsPerUnit();
+                int emuUnit = PcsUnitLayout.UnitIndexOf(layout, pcsIdx - 1) + 1;
+                int pcsPeer = PcsUnitLayout.BaseIndexOfUnit(layout, emuUnit - 1) + 1;
                 serverName = $"simEmu{emuUnit}";
                 server = store.Get<ModbusSimServer>(serverName);
                 if (server == null)
@@ -509,12 +512,16 @@ namespace EssSimulator.Display
             }
 
             int emu = 1;
+            var layout = GuiSimDataAccess.GetPcsPerUnit();
             while (store.Contains($"simEmu{emu}"))
             {
                 var server = store.Get<ModbusSimServer>($"simEmu{emu}");
-                int pcsA = (emu - 1) * 2 + 1;
-                int pcsB = pcsA + 1;
-                list.Add(BuildLinkStatusDto($"pcs{pcsA}/pcs{pcsB}", $"simEmu{emu}", server!, $"emu 单元 {emu}", $"pcs{pcsA}"));
+                int pcsA = PcsUnitLayout.BaseIndexOfUnit(layout, emu - 1) + 1;
+                int pcsCount = PcsUnitLayout.CountOfUnit(layout, emu - 1);
+                string pcsLabel = pcsCount == 2
+                    ? $"pcs{pcsA}/pcs{pcsA + 1}"
+                    : $"pcs{pcsA}~pcs{pcsA + Math.Max(0, pcsCount - 1)}";
+                list.Add(BuildLinkStatusDto(pcsLabel, $"simEmu{emu}", server!, $"emu 单元 {emu}", $"pcs{pcsA}"));
                 emu++;
             }
 

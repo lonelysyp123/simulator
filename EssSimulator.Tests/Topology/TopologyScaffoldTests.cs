@@ -11,7 +11,18 @@ public class TopologyScaffoldTests
         var p = TopologyScaffold.BuildRadial(emuCount: 2, name: "测试径向", includeLoad: true);
         Assert.Equal("测试径向", p.Name);
         Assert.Equal(2, p.Nodes.Count(n => n.TemplateId == "emu"));
+        Assert.Equal(4, p.Nodes.Count(n => n.TemplateId == "pcs"));
         Assert.Equal(4, p.Nodes.Count(n => n.TemplateId == "bms"));
+        // 每台 PCS 均归属一个有效 EMU，且每个 EMU 各有 2 台 PCS
+        var emuIds = p.Nodes.Where(n => n.TemplateId == "emu").Select(n => n.Id).ToHashSet();
+        Assert.All(p.Nodes.Where(n => n.TemplateId == "pcs"),
+            n => Assert.Contains(TopologyParamHelper.GetString(n.Parameters, "emuId"), emuIds));
+        Assert.All(p.Nodes.Where(n => n.TemplateId == "emu"),
+            e => Assert.Equal(2, p.Nodes.Count(n => n.TemplateId == "pcs" &&
+                TopologyParamHelper.GetString(n.Parameters, "emuId") == e.Id)));
+        // PCS AC 侧接 35kV 母线，DC 侧经 DC 母线接 BMS；EMU 虚拟节点无任何连线
+        Assert.All(p.Nodes.Where(n => n.TemplateId == "emu"),
+            e => Assert.DoesNotContain(p.Edges, x => x.FromNodeId == e.Id || x.ToNodeId == e.Id));
         Assert.Contains(p.Nodes, n => n.TemplateId == "load");
         Assert.Contains(p.Nodes, n => n.TemplateId == "ac_breaker" &&
                                       TopologyParamHelper.GetBool(n.Parameters, "isMainBreaker"));

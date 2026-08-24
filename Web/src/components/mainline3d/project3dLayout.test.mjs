@@ -112,15 +112,17 @@ describe('buildStation3dLayout from topology', () => {
     assert.equal(arrays[0].modulesPerString, 20)
   })
 
-  it('draws pcsCount cabinets and only topology-connected bms containers', () => {
+  it('draws one cabinet per pcs node and only topology-connected bms containers', () => {
+    // 新模型：EMU 虚拟不连线；PCS 经 emuId 归属，DC 侧由 PCS 连 BMS
     const snap = {
       topology: {
         nodes: [
-          node('emu1', 'emu', 'EMU-1', 0, { pcsCount: 1 }),
+          node('emu1', 'emu', 'EMU-1', 0),
+          node('pcs1', 'pcs', 'PCS-1', 0, { emuId: 'emu1' }),
           node('bms1', 'bms', 'BMS-1', 0, { clusterCount: 8 })
         ],
         edges: [
-          { fromNodeId: 'emu1', toNodeId: 'bms1', fromPortId: 'dc_pos', toPortId: 'dc_pos' }
+          { fromNodeId: 'pcs1', toNodeId: 'bms1', fromPortId: 'dc_pos', toPortId: 'dc_pos' }
         ]
       },
       units: [{ unitIndex: 0, unitNumber: 1, channelA: { pcsNumber: 1 } }]
@@ -150,10 +152,15 @@ describe('buildStation3dLayout from topology', () => {
     assert.equal(byTemplate(layout, 'pv_array').length, 0)
   })
 
-  it('draws pcsCount cabinets beyond two when the node says so', () => {
+  it('draws every pcs node as a cabinet beyond two', () => {
     const snap = {
       topology: {
-        nodes: [node('emu1', 'emu', 'EMU-1', 0, { pcsCount: 3 })],
+        nodes: [
+          node('emu1', 'emu', 'EMU-1', 0),
+          node('pcs1', 'pcs', 'PCS-1', -80, { emuId: 'emu1' }),
+          node('pcs2', 'pcs', 'PCS-2', 0, { emuId: 'emu1' }),
+          node('pcs3', 'pcs', 'PCS-3', 80, { emuId: 'emu1' })
+        ],
         edges: []
       },
       units: []
@@ -426,14 +433,16 @@ describe('bus is drawn as a node (star wiring rule)', () => {
         nodes: [
           node('grid', 'grid', '电网', 0, { outputVoltage: 35000 }),
           node('bus', 'ac_bus', '35kV', 0, { nominalVoltage: 35000 }),
-          node('emu1', 'emu', 'EMU-1', 300, { pcsCount: 2 }),
-          node('emu2', 'emu', 'EMU-2', 500, { pcsCount: 2 }),
+          node('emu1', 'emu', 'EMU-1', 300),
+          node('pcs1', 'pcs', 'PCS-1', 300, { emuId: 'emu1' }),
+          node('emu2', 'emu', 'EMU-2', 500),
+          node('pcs2', 'pcs', 'PCS-2', 500, { emuId: 'emu2' }),
           node('pv1', 'pv_unit', 'PV-1', 700, { inverterCount: 4 })
         ],
         edges: [
           edge('grid', 'bus'),
-          edge('emu1', 'bus'),
-          edge('emu2', 'bus'),
+          edge('pcs1', 'bus'),
+          edge('pcs2', 'bus'),
           edge('pv1', 'bus')
         ]
       },
@@ -468,13 +477,15 @@ describe('bus is drawn as a node (star wiring rule)', () => {
 
 describe('TOPOLOGY_TEMPLATE_3D', () => {
   it('covers every topology editor template as primitive or composite', () => {
+    // EMU 为虚拟节点：不进 3D 布局映射
     assert.deepEqual(Object.keys(TOPOLOGY_TEMPLATE_3D).sort(), [
       'ac_breaker', 'ac_bus', 'ac_meter', 'bms', 'dc_bus',
-      'emu', 'grid', 'load', 'pv_unit', 'transformer'
+      'grid', 'load', 'pcs', 'pv_unit', 'transformer'
     ].sort())
-    assert.equal(TOPOLOGY_TEMPLATE_3D.emu, 'composite')
+    assert.equal(TOPOLOGY_TEMPLATE_3D.pcs, 'primitive')
     assert.equal(TOPOLOGY_TEMPLATE_3D.pv_unit, 'composite')
     assert.equal(TOPOLOGY_TEMPLATE_3D.dc_bus, 'primitive')
+    assert.equal(TOPOLOGY_TEMPLATE_3D.emu, undefined)
   })
 })
 

@@ -1,7 +1,8 @@
 /**
  * 由组态工程图（节点 + 连线）推导电气主接线单线图。
  * 站侧结构随工程变化：母线、变压器、电表、负载按连通递归布局；
- * EMU / 光伏单元仅按设备类型展开内部图例，不按某个具体工程写死站侧骨架。
+ * 储能支路以「同一 emuId 的 PCS 组」为单元展开（EMU 为虚拟节点不参与连线），
+ * 光伏单元按设备类型展开内部图例，不按某个具体工程写死站侧骨架。
  */
 
 function truthy(v) {
@@ -117,7 +118,7 @@ function classifyXfmr(graph, xf) {
   return { pri: null, sec: null }
 }
 
-const STEM_SKIP = new Set(['transformer', 'emu', 'pv_unit', 'load', 'ac_meter', 'bms', 'dc_bus'])
+const STEM_SKIP = new Set(['transformer', 'pcs', 'pv_unit', 'load', 'ac_meter', 'bms', 'dc_bus'])
 
 function pathToFirstBus(graph, startId) {
   const q = [{ id: startId, breakers: [] }]
@@ -141,7 +142,7 @@ function pathToFirstBus(graph, startId) {
 }
 
 function hangKind(node) {
-  if (node.templateId === 'emu' || node.templateId === 'pv_unit') return 'feeder'
+  if (node.templateId === 'pcs' || node.templateId === 'pv_unit') return 'feeder'
   return node.templateId
 }
 
@@ -166,7 +167,7 @@ function buildBusFrame(graph, bus, incomingXfmrId, visitedBuses, visitedXfmrs) {
       xfmrs.push({ xfmr: n, downstream })
       continue
     }
-    if (n.templateId === 'emu' || n.templateId === 'pv_unit' || n.templateId === 'load' || n.templateId === 'ac_meter') {
+    if (n.templateId === 'pcs' || n.templateId === 'pv_unit' || n.templateId === 'load' || n.templateId === 'ac_meter') {
       hangs.push({ node: n })
     }
   }
@@ -180,8 +181,8 @@ function walkFrames(frame, visit) {
   }
 }
 
-function findBmsForEmu(graph, emuId) {
-  const neighborIds = new Set(neighborsOf(graph.adj, emuId))
+function findBmsForPcs(graph, pcsId) {
+  const neighborIds = new Set(neighborsOf(graph.adj, pcsId))
   const dcBuses = graph.nodes
     .filter(n => n.templateId === 'dc_bus' && neighborIds.has(n.id))
     .map(n => n.id)
@@ -190,14 +191,54 @@ function findBmsForEmu(graph, emuId) {
     .filter(n => {
       if (n.templateId !== 'bms') return false
       const nb = new Set(neighborsOf(graph.adj, n.id))
-      return nb.has(emuId) || [...nb].some(id => dcSet.has(id))
+      return nb.has(pcsId) || [...nb].some(id => dcSet.has(id))
     })
     .sort((a, b) => (a.x - b.x) || (a.y - b.y))
 }
 
-function findDcBusForEmu(graph, emuId) {
-  const neighborIds = new Set(neighborsOf(graph.adj, emuId))
-  return graph.nodes.find(n => n.templateId === 'dc_bus' && neighborIds.has(n.id)) || null
+function findDcBusForPcs(graph, pcsNodes) {
+  for (const p of pcsNodes || []) {
+    const neighborIds = new Set(neighborsOf(graph.adj, p.id))
+    const bus = graph.nodes.find(n => n.templateId === 'dc_bus' && neighborIds.has(n.id))
+    if (bus) return bus
+  }
+  return null
+}
+
+/** 同一 emuId 的 PCS 归为一个储能支路；未归属的各自成组 */
+function groupOfPcs(graph, pcsNode) {
+  const emuId = paramStr(pcsNode, 'emuId') || '__unassigned__'
+  const list = graph.nodes
+    .filter(n => n.templateId === 'pcs' && (paramStr(n, 'emuId') || '__unassigned__') === emuId)
+    .sort((a, b) => (a.x - b.x) || (a.y - b.y))
+  return {
+    key: emuId,
+    leader: list[0] || pcsNode,
+    list,
+    emuNode: graph.byId.get(paramStr(pcsNode, 'emuId')) || null
+  }
+}
+
+function pcsHang(graph, pcsNode) {
+  const g = groupOfPcs(graph, pcsNode)
+  return { node: g.leader, pcsGroup: g.list, emuNode: g.emuNode, groupKey: g.key }
+}
+
+/** 帧内多台 PCS 按 emuId 合并为一个支路挂点 */
+function groupFramePcsHangs(graph, frame) {
+  if (!frame.hangs.some(h => h.node.templateId === 'pcs')) return
+  const others = []
+  const merged = new Map()
+  for (const h of frame.hangs) {
+    if (h.node.templateId !== 'pcs') { others.push(h); continue }
+    const hang = pcsHang(graph, h.node)
+    if (!merged.has(hang.groupKey)) {
+      merged.set(hang.groupKey, hang)
+      others.push(hang)
+    }
+  }
+  frame.hangs = others.sort((a, b) =>
+    (a.node.x - b.node.x) || String(a.node.id).localeCompare(String(b.node.id)))
 }
 
 function canvasX(slotItem) {
@@ -213,30 +254,42 @@ function busLabel(bus, fallbackV = 0) {
 
 function expandFeederUnit(opts) {
   const {
-    feeder, cx, xfmrId, originY, index, emuOrdinal, pvOrdinal, unitsSnap, graph,
-    busCx, UNIT_W, LINK_STUB, BRK_SPAN
+    feeder, cx, xfmrId, originY, index, emuRank, pvRank, unitsSnap, graph,
+    busCx, UNIT_W, LINK_STUB, BRK_SPAN, pcsGroup, emuNode
   } = opts
   const kind = feeder?.templateId === 'pv_unit' ? 'pv' : 'emu'
-  const emu = kind === 'emu' ? feeder : null
+  // 储能支路：同一 EMU 的 PCS 组；EMU 为虚拟节点，仅承载单元变参数与标签
+  const pcsNodes = kind === 'emu'
+    ? (pcsGroup?.length ? pcsGroup : (feeder?.templateId === 'pcs' ? [feeder] : []))
+    : []
+  const emu = kind === 'emu' ? (emuNode || null) : null
   const pv = kind === 'pv' ? feeder : null
-  let unitSnap = null
-  if (kind === 'emu') {
-    unitSnap = emu
-      ? (unitsSnap[emuOrdinal.value++] || null)
-      : (unitsSnap[index] || unitsSnap.find(u => (u.unitIndex ?? 0) === index) || null)
+  // 实时编号与运行时转换器同序（含 PCS 的 EMU 按 (Y,X)、PV 按 (Y,X)），
+  // 与画布绘制顺序解耦，保证实时数据 / 控制命令落在与运行时一致的单元上
+  const unitSnap = kind === 'emu' && emu
+    ? (unitsSnap[emuRank.get(emu.id)] || null)
+    : null
+  const pvIndex = kind === 'pv' ? (pvRank.get(feeder.id) ?? -1) : -1
+  const bmsNodes = []
+  const bmsSeen = new Set()
+  for (const p of pcsNodes) {
+    for (const b of findBmsForPcs(graph, p.id)) {
+      if (bmsSeen.has(b.id)) continue
+      bmsSeen.add(b.id)
+      bmsNodes.push(b)
+    }
   }
-  const pvIndex = kind === 'pv' ? pvOrdinal.value++ : -1
-  const bmsNodes = emu ? findBmsForEmu(graph, emu.id) : []
-  const dcBus = emu ? findDcBusForEmu(graph, emu.id) : null
+  const dcBus = findDcBusForPcs(graph, pcsNodes)
   const pcsA = unitSnap?.channelA || null
   const pcsB = unitSnap?.channelB || null
   const pcsHangCount = (pcsA ? 1 : 0) + (pcsB ? 1 : 0)
-  const expectPcs = Math.min(2, Math.max(1, paramNum(emu, 'pcsCount', 2) || 2))
+  // 单线图每单元最多展示 2 台（channelA/channelB 视图模型）
+  const expectPcs = Math.min(2, Math.max(1, pcsNodes.length || 2))
   const drawPcsSlots = kind === 'pv'
     ? 0
     : (pcsHangCount > 0 ? pcsHangCount : expectPcs)
   const omitBus690 = kind === 'pv' || drawPcsSlots <= 1
-  const runtimeMissing = kind === 'emu' && !!emu && !unitSnap
+  const runtimeMissing = kind === 'emu' && pcsNodes.length > 0 && !unitSnap
   const dcParallel = kind === 'emu' && !!dcBus
   const bmsHangCount = dcParallel ? Math.max(bmsNodes.length, drawPcsSlots) : 0
   const omitDcBus = dcParallel && bmsHangCount <= 1
@@ -297,6 +350,7 @@ function expandFeederUnit(opts) {
     xfmrId,
     emu,
     pv,
+    pcsNodes,
     dcBus,
     bmsNodes,
     unitSnap,
@@ -319,7 +373,7 @@ function expandFeederUnit(opts) {
     bmsTop,
     bmsH,
     bottom: unitBottom,
-    label: (pv || emu)?.label || (unitSnap?.unitNumber != null
+    label: (emu || pv)?.label || (unitSnap?.unitNumber != null
       ? `UNIT ${unitSnap.unitNumber}`
       : `UNIT ${index + 1}`),
     unitXfLabel: `${fmtKv(xfPrimary)}/${fmtKv(xfSecondary)}`,
@@ -349,7 +403,7 @@ function expandFeederUnit(opts) {
     dcParallel
   }
 
-  const group = emu
+  const group = kind === 'emu'
     ? {
       id: `${kind}-${index}`,
       kind,
@@ -390,8 +444,21 @@ export function buildTopologyMainLineLayout(topology, units = []) {
     paramNum(b, 'nominalVoltage') - paramNum(a, 'nominalVoltage') || (a.x - b.x)
   )
   const feeders = nodes
-    .filter(n => n.templateId === 'emu' || n.templateId === 'pv_unit')
+    .filter(n => n.templateId === 'pcs' || n.templateId === 'pv_unit')
     .sort((a, b) => (a.x - b.x) || (a.y - b.y))
+
+  // 实时单元编号秩：与 TopologyRuntimeConverter 的排序规则保持一致
+  const emuRank = new Map()
+  nodes
+    .filter(n => n.templateId === 'emu')
+    .sort((a, b) => (a.y - b.y) || (a.x - b.x))
+    .filter(e => nodes.some(p => p.templateId === 'pcs' && paramStr(p, 'emuId') === e.id))
+    .forEach((e, i) => emuRank.set(e.id, i))
+  const pvRank = new Map()
+  nodes
+    .filter(n => n.templateId === 'pv_unit')
+    .sort((a, b) => (a.y - b.y) || (a.x - b.x))
+    .forEach((n, i) => pvRank.set(n.id, i))
 
   const visitedBuses = new Set()
   const visitedXfmrs = new Set()
@@ -405,33 +472,52 @@ export function buildTopologyMainLineLayout(topology, units = []) {
     }
   }
 
+  for (const root of roots) walkFrames(root, fr => groupFramePcsHangs(graph, fr))
   const hangingIds = new Set()
   for (const root of roots) walkFrames(root, fr => {
-    for (const h of fr.hangs) hangingIds.add(h.node.id)
+    for (const h of fr.hangs) {
+      hangingIds.add(h.node.id)
+      for (const p of h.pcsGroup || []) hangingIds.add(p.id)
+    }
   })
   const frames = []
   for (const root of roots) walkFrames(root, fr => frames.push(fr))
   for (const f of feeders) {
     if (hangingIds.has(f.id)) continue
+    // 同一 emuId 的 PCS 组只挂一次，整组标记为已挂
+    const hang = f.templateId === 'pcs' ? pcsHang(graph, f) : { node: f }
     let best = frames[0] || null
     let bestDist = Infinity
     for (const fr of frames) {
-      const d = Math.abs((f.x || 0) - (fr.node?.x || 0))
+      const d = Math.abs((hang.node.x || 0) - (fr.node?.x || 0))
       if (d < bestDist) {
         best = fr
         bestDist = d
       }
     }
     if (best) {
-      best.hangs.push({ node: f })
-      hangingIds.add(f.id)
+      best.hangs.push(hang)
+      hangingIds.add(hang.node.id)
+      for (const p of hang.pcsGroup || []) hangingIds.add(p.id)
     }
   }
   if (!roots.length && feeders.length) {
+    const hangs = []
+    const seenGroups = new Set()
+    for (const f of feeders) {
+      if (f.templateId === 'pcs') {
+        const hang = pcsHang(graph, f)
+        if (seenGroups.has(hang.groupKey)) continue
+        seenGroups.add(hang.groupKey)
+        hangs.push(hang)
+      } else {
+        hangs.push({ node: f })
+      }
+    }
     roots.push({
       node: null,
       incomingXfmrId: null,
-      hangs: feeders.map(n => ({ node: n })),
+      hangs,
       xfmrs: [],
       synthetic: true
     })
@@ -561,7 +647,9 @@ export function buildTopologyMainLineLayout(topology, units = []) {
           cx,
           xfmrId: frame.incomingXfmrId || null,
           originY: yBus,
-          busCx: frame.cx
+          busCx: frame.cx,
+          pcsGroup: item.hang.pcsGroup || null,
+          emuNode: item.hang.emuNode || null
         })
       }
       x += slot.w + BAY_GAP
@@ -662,8 +750,6 @@ export function buildTopologyMainLineLayout(topology, units = []) {
   }
   for (const b of stemBreakers) b.x = gridX
 
-  const emuOrdinal = { value: 0 }
-  const pvOrdinal = { value: 0 }
   const unitLayouts = []
   const groups = []
   let unitBottom = 400
@@ -675,13 +761,15 @@ export function buildTopologyMainLineLayout(topology, units = []) {
       xfmrId: p.xfmrId,
       originY: p.originY,
       index: i,
-      emuOrdinal,
-      pvOrdinal,
+      emuRank,
+      pvRank,
       unitsSnap,
       graph,
       UNIT_W,
       LINK_STUB,
-      BRK_SPAN
+      BRK_SPAN,
+      pcsGroup: p.pcsGroup,
+      emuNode: p.emuNode
     })
     unitLayouts.push(built.unit)
     if (built.group) groups.push(built.group)
