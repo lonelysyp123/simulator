@@ -221,12 +221,107 @@ public class TelemetryPluginTests
     }
 
     [Fact]
-    public void FromPointMap_Trina55MW_HasEightPluginPoints()
+    public void FromPointMap_Trina55MW_HasUnitPluginPoints()
     {
         var catalog = LoadCatalog("trina_5.5MW");
 
-        Assert.Equal(10, catalog.PluginPoints.Count);
+        // 模块警告字 8 点 + 系统故障总/总状态 2 点 + 黑启动状态 1 点 + PCS 台数 4 点
+        Assert.Equal(15, catalog.PluginPoints.Count);
         Assert.Contains(catalog.PluginPoints, p => p.DeviceRoot == "emu2.PcsList[1]" && p.WordKey == "ModuleWarningWord2");
+
+        // 单元级插件点经 emuDeviceId 占位符替换为本机组根路径（simEmu1 → emu1）
+        Assert.Contains(catalog.PluginPoints, p => p.ParamName == "sysyc170" && p.WordKey == "UnitBlackStartStatus" && p.DeviceRoot == "emu1");
+        Assert.Contains(catalog.PluginPoints, p => p.ParamName == "sysyc200" && p.WordKey == "UnitPcsTotalCount" && p.DeviceRoot == "emu1");
+        Assert.Contains(catalog.PluginPoints, p => p.ParamName == "sysyc203" && p.WordKey == "UnitPcsFaultCount" && p.DeviceRoot == "emu1");
+    }
+
+    [Fact]
+    public void FromPointMap_Trina55MW_SystemControls_BoundToEmuVirtualModel()
+    {
+        var catalog = LoadCatalog("trina_5.5MW");
+
+        // 远程使能/模式、系统操作、黑启动写入、目标 P/Q 均绑定本机组 EMU 虚拟模型，
+        // 并自动路由 PcsApplyCommands 副作用（占位符 emuDeviceId → emu1）
+        var expected = new Dictionary<string, string>
+        {
+            ["syst4"] = "emu1.Emu.RemoteControlEnable",
+            ["syst5"] = "emu1.Emu.RemoteControlMode",
+            ["syst6"] = "emu1.Emu.SystemOperation",
+            ["syst7"] = "emu1.Emu.BlackStartModeWrite",
+            ["syst1010"] = "emu1.Emu.TargetActivePower",
+            ["syst1011"] = "emu1.Emu.TargetReactivePower"
+        };
+
+        foreach (var (paramName, fullPath) in expected)
+        {
+            var binding = catalog.FindControl(paramName);
+            Assert.NotNull(binding);
+            Assert.Equal(fullPath, binding!.Target.FullPath);
+            Assert.Equal(ControlEffectId.PcsApplyCommands, binding.Effect);
+        }
+    }
+
+    [Fact]
+    public void Compute_UnitPcsCounts_ByOperationStatusAndAlarms()
+    {
+        var plugin = new TrinaEmuFaultWordPlugin();
+        var sim = new FakeSimulation
+        {
+            ["emu1.PcsList.Count"] = 2,
+            ["emu1.PcsList[0].OperationStatus"] = 5,   // 放电运行
+            ["emu1.PcsList[0].AlarmSummary1"] = (ushort)0,
+            ["emu1.PcsList[0].AlarmSummary2"] = (ushort)0,
+            ["emu1.PcsList[1].OperationStatus"] = 1,   // 停机
+            ["emu1.PcsList[1].AlarmSummary1"] = (ushort)0x0001,
+            ["emu1.PcsList[1].AlarmSummary2"] = (ushort)0
+        };
+
+        Assert.Equal(2, plugin.Compute("UnitPcsTotalCount", "emu1", sim));
+        Assert.Equal(1, plugin.Compute("UnitPcsRunningCount", "emu1", sim));
+        Assert.Equal(1, plugin.Compute("UnitPcsAlarmCount", "emu1", sim));
+        Assert.Equal(0, plugin.Compute("UnitPcsFaultCount", "emu1", sim));
+
+        // 模块1 故障：不计运行/告警，计入故障
+        sim["emu1.PcsList[0].OperationStatus"] = 6;
+        sim["emu1.PcsList[0].AlarmSummary1"] = (ushort)0x0002;
+        Assert.Equal(0, plugin.Compute("UnitPcsRunningCount", "emu1", sim));
+        Assert.Equal(1, plugin.Compute("UnitPcsAlarmCount", "emu1", sim)); // 仅模块2
+        Assert.Equal(1, plugin.Compute("UnitPcsFaultCount", "emu1", sim));
+
+        // 待机（2）按运行计入（模块2 仍停机，运行台数为 1）
+        sim["emu1.PcsList[0].OperationStatus"] = 2;
+        sim["emu1.PcsList[0].AlarmSummary1"] = (ushort)0;
+        Assert.Equal(1, plugin.Compute("UnitPcsRunningCount", "emu1", sim));
+
+        // 机组缺失：全部输出 0
+        Assert.Equal(0, plugin.Compute("UnitPcsTotalCount", "emu9", new FakeSimulation()));
+        Assert.True(plugin.CanHandle("UnitPcsTotalCount"));
+        Assert.True(plugin.CanHandle("UnitPcsRunningCount"));
+        Assert.True(plugin.CanHandle("UnitPcsAlarmCount"));
+        Assert.True(plugin.CanHandle("UnitPcsFaultCount"));
+    }
+
+    [Fact]
+    public void Compute_UnitBlackStartStatus_AllModulesEnabledOnly()
+    {
+        var plugin = new TrinaEmuFaultWordPlugin();
+        var sim = new FakeSimulation
+        {
+            ["emu1.PcsList.Count"] = 2,
+            ["emu1.PcsList[0].BlackStartEnabled"] = true,
+            ["emu1.PcsList[1].BlackStartEnabled"] = false
+        };
+
+        // 任一模块未开启 → 0
+        Assert.Equal(0, plugin.Compute("UnitBlackStartStatus", "emu1", sim));
+
+        // 全部开启 → 1
+        sim["emu1.PcsList[1].BlackStartEnabled"] = true;
+        Assert.Equal(1, plugin.Compute("UnitBlackStartStatus", "emu1", sim));
+
+        // 机组缺失或无 PCS → 0
+        Assert.Equal(0, plugin.Compute("UnitBlackStartStatus", "emu9", new FakeSimulation()));
+        Assert.True(plugin.CanHandle("UnitBlackStartStatus"));
     }
 
     [Fact]
