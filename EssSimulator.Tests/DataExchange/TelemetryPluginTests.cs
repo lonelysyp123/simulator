@@ -200,16 +200,16 @@ public class TelemetryPluginTests
     {
         var catalog = LoadCatalog("trina_10MW");
 
-        // 4 机组 × (模块1/2 × 警告字1/2) = 16 个插件点 + 系统故障总 + 系统总状态精简版
-        Assert.Equal(18, catalog.PluginPoints.Count);
+        // SYSTEM 系统级点位已剥离至 LC 点表，EMU 表仅保留 4 机组 × (模块1/2 × 警告字1/2) = 16 个插件点
+        Assert.Equal(16, catalog.PluginPoints.Count);
         Assert.All(catalog.PluginPoints, p =>
-            Assert.Contains(p.WordKey, new[] { "ModuleWarningWord1", "ModuleWarningWord2", "SystemFaultSummary", "SystemRunStateSummary" }));
+            Assert.Contains(p.WordKey, new[] { "ModuleWarningWord1", "ModuleWarningWord2" }));
 
-        // 设备根路径与机组/模块层级一致：emu{n}.PcsList[0/1]，系统级汇总为 emu1
+        // 设备根路径与机组/模块层级一致：emu{n}.PcsList[0/1]
         var roots = catalog.PluginPoints.Select(p => p.DeviceRoot).Distinct().OrderBy(r => r).ToArray();
         Assert.Equal(new[]
         {
-            "emu1", "emu1.PcsList[0]", "emu1.PcsList[1]",
+            "emu1.PcsList[0]", "emu1.PcsList[1]",
             "emu2.PcsList[0]", "emu2.PcsList[1]",
             "emu3.PcsList[0]", "emu3.PcsList[1]",
             "emu4.PcsList[0]", "emu4.PcsList[1]"
@@ -340,21 +340,27 @@ public class TelemetryPluginTests
         Assert.NotNull(dischargeEnergy);
         Assert.Equal("ess.AvailableDischargeEnergy", dischargeEnergy!.Target.FullPath);
 
-        // 允许充/放电功率为两机组 EMU 限值求和，覆盖全系统
+        // 允许充/放电功率按 4 机组最大口径求和（2 机组场景缺失机组自动按 0 计入）
         var chargePower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc113");
         Assert.NotNull(chargePower);
-        Assert.Equal("emu1.Emu.MaxChargePower", chargePower!.FirstPath);
-        Assert.Equal("emu2.Emu.MaxChargePower", chargePower.SecondPath);
+        Assert.Equal(new[]
+        {
+            "emu1.Emu.MaxChargePower", "emu2.Emu.MaxChargePower",
+            "emu3.Emu.MaxChargePower", "emu4.Emu.MaxChargePower"
+        }, chargePower!.Paths);
 
         var dischargePower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc115");
         Assert.NotNull(dischargePower);
-        Assert.Equal("emu1.Emu.MaxDischargePower", dischargePower!.FirstPath);
-        Assert.Equal("emu2.Emu.MaxDischargePower", dischargePower.SecondPath);
+        Assert.Equal(new[]
+        {
+            "emu1.Emu.MaxDischargePower", "emu2.Emu.MaxDischargePower",
+            "emu3.Emu.MaxDischargePower", "emu4.Emu.MaxDischargePower"
+        }, dischargePower!.Paths);
 
-        // 直流侧功率为两机组四模块求和，覆盖全系统
+        // 直流侧功率按 4 机组 8 模块求和，覆盖全系统
         var dcPower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc131");
         Assert.NotNull(dcPower);
-        Assert.Equal(4, dcPower!.Paths.Count);
+        Assert.Equal(8, dcPower!.Paths.Count);
         Assert.Contains("emu2.PcsList[1].BatteryPower", dcPower.Paths);
 
         // 单元级过温降载 NTC：两模块 IGBT 温度取大（仍留在 EMU 表）
@@ -373,19 +379,22 @@ public class TelemetryPluginTests
     {
         var catalog = LoadCatalog("trina_10MW");
 
+        // 系统级求和点已剥离至 LC 并集点表，按 4 机组最大口径绑定
+        var lcCatalog = LoadLcCatalog();
+
         // 标称容量/直流侧功率：8 模块全量求和
-        var rated = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc100");
+        var rated = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc100");
         Assert.NotNull(rated);
         Assert.Equal(8, rated!.Paths.Count);
         Assert.Contains("emu4.PcsList[1].PCSRatePower", rated.Paths);
 
-        var dcPower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc131");
+        var dcPower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc131");
         Assert.NotNull(dcPower);
         Assert.Equal(8, dcPower!.Paths.Count);
         Assert.Contains("emu3.PcsList[0].BatteryPower", dcPower.Paths);
 
         // 允许充/放电功率：四机组 EMU 限值求和
-        var chargePower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc113");
+        var chargePower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc113");
         Assert.NotNull(chargePower);
         Assert.Equal(new[]
         {
@@ -393,7 +402,7 @@ public class TelemetryPluginTests
             "emu3.Emu.MaxChargePower", "emu4.Emu.MaxChargePower"
         }, chargePower!.Paths);
 
-        var dischargePower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc115");
+        var dischargePower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc115");
         Assert.NotNull(dischargePower);
         Assert.Equal(new[]
         {
@@ -401,15 +410,15 @@ public class TelemetryPluginTests
             "emu3.Emu.MaxDischargePower", "emu4.Emu.MaxDischargePower"
         }, dischargePower!.Paths);
 
-        // 单元级过温降载 NTC：各单元两模块 IGBT 温度取大
+        // 单元级过温降载 NTC：各单元两模块 IGBT 温度取大（仍留在 EMU 表）
         Assert.Equal(4, catalog.MaxPoints.Count);
         var ntc4 = catalog.MaxPoints.FirstOrDefault(p => p.ParamName == "yc635");
         Assert.NotNull(ntc4);
         Assert.Equal(new[] { "emu4.PcsList[0].IGBTMaxTemp", "emu4.PcsList[1].IGBTMaxTemp" }, ntc4!.Paths);
 
-        // 描述列半角逗号修复：sysyc218 等状态字点位恢复为固定默认值点
-        Assert.Contains("sysyc218", catalog.DefaultValues.Keys);
-        Assert.Contains("sysyc228", catalog.DefaultValues.Keys);
+        // 描述列半角逗号修复：sysyc218 等状态字点位恢复为固定默认值点（随剥离迁入 LC 表）
+        Assert.Contains("sysyc218", lcCatalog.DefaultValues.Keys);
+        Assert.Contains("sysyc228", lcCatalog.DefaultValues.Keys);
     }
 
     [Fact]

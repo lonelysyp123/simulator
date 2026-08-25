@@ -63,6 +63,29 @@ public class LcDataExchangeCatalogTests
     }
 
     [Fact]
+    public void UnionTable_TenMwOnlyPoints_BoundOrFixedDefault()
+    {
+        // 并集点表：10MW 专有 23 点迁入后，绑定口径与固定默认值划分正确
+        var pointMap = new ModbusPointMap(LcCsvPath, "simLc1", clusterCount: 0, emuDeviceIdOverride: 1);
+        var catalog = PointCatalogLoader.FromPointMap(pointMap, "simLc1");
+
+        // 标称容量：8 模块全量求和；允许充电功率：4 机组最大口径
+        var rated = Assert.Single(catalog.SumPoints, p => p.ParamName == "sysyc100");
+        Assert.Equal(8, rated.Paths.Count);
+        var chargePower = Assert.Single(catalog.SumPoints, p => p.ParamName == "sysyc113");
+        Assert.Equal(4, chargePower.Paths.Count);
+
+        // 容量/电量/SOC/SOH 绑定仿真模型
+        Assert.Equal("ess.Capacity", Assert.Single(catalog.TelemetryPoints, t => t.ParamName == "sysyc102").Target.FullPath);
+        Assert.Equal("bms1.BatteryStacks[0].SOC", Assert.Single(catalog.TelemetryPoints, t => t.ParamName == "sysyc104").Target.FullPath);
+
+        // 版本/时间/对时/重启点位无绑定：固定默认值，不进控制管道
+        foreach (var paramName in new[] { "sysyc1", "sysyc153", "sysyc159", "syst1399", "syst1500", "syst1505" })
+            Assert.Contains(paramName, catalog.DefaultValues.Keys);
+        Assert.Equal(6, catalog.ControlPoints.Count);
+    }
+
+    [Fact]
     public void EmuDeviceIdOverride_SubstitutesPlaceholder_ForNonEmuDevice()
     {
         // simLc2 聚合组首机组为 emu3（emuPerGroup=2 场景）
