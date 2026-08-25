@@ -70,6 +70,14 @@ export async function postSystemApply(body) { return (await api.post('/system/ap
 export async function getDeviceModels() { return (await api.get('/system/device-models')).data }
 export async function postDeviceModelsApply(body) { return (await api.post('/system/device-models/apply', body)).data }
 
+// 协议端口配置
+export async function getProtocolPorts() { return (await api.get('/protocol-ports')).data }
+export async function putProtocolPorts(entries) { return (await api.put('/protocol-ports', { entries })).data }
+export async function postProtocolPortsApply() { return (await api.post('/protocol-ports/apply')).data }
+export async function postProtocolPortsReset(rebuild = false) {
+  return (await api.post('/protocol-ports/reset', { rebuild })).data
+}
+
 let hubPromise = null
 export function getHub() {
   if (!hubPromise) {

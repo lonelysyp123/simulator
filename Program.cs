@@ -181,34 +181,15 @@ namespace EssSimulator
         {
             var log = LogManager.GetLogger(typeof(Program));
             log.Info("==== 协议模拟器创建 ====");
-            log.Info($"电表   simEm  : Modbus TCP 端口 {cfg.Protocol.EmModbusPort}");
-            int unitCount = cfg.EffectiveEssUnitCount;
-            for (int i = 0; i < unitCount; i++)
+            // 端口计划：appsettings 默认值 + protocol-ports.json 手动覆盖
+            var plan = EssSimulator.Protocol.Modbus.ProtocolPortPlan.Load(cfg, out var overridesError);
+            if (overridesError != null)
+                log.Warn(overridesError);
+            foreach (var entry in plan.Entries)
             {
-                int emuPort = cfg.Protocol.BaseEmuModbusPort + i * cfg.Protocol.EmuPortStep;
-                log.Info($"EMU 单元{i + 1} simEmu{i + 1}: Modbus TCP 端口 {emuPort}（承载 emu{i + 1}.PcsList[0..1]）");
-            }
-            if (cfg.Protocol.EnableLocalControl && unitCount > 0)
-            {
-                int emuPerGroup = Math.Max(1, cfg.Protocol.LocalControlEmuPerGroup);
-                int lcCount = (int)Math.Ceiling(unitCount / (double)emuPerGroup);
-                for (int i = 0; i < lcCount; i++)
-                {
-                    int lcPort = cfg.Protocol.BaseLocalControlModbusPort + i * cfg.Protocol.LocalControlPortStep;
-                    log.Info($"LC 聚合{i + 1} simLc{i + 1}: Modbus TCP 端口 {lcPort}（聚合 {emuPerGroup} 个 EMU / {emuPerGroup * 2} 台 PCS）");
-                }
-            }
-            for (int i = 0; i < cfg.UnitCount; i++)
-            {
-                int port = cfg.Protocol.BaseBmsModbusPort + i * cfg.Protocol.BmsPortStep;
-                log.Info($"BMS 路{i + 1} simBms{i + 1}: Modbus TCP 端口 {port}");
-            }
-            for (int i = 0; i < cfg.PvUnitCount; i++)
-            {
-                int loggerPort = cfg.Protocol.BasePvLoggerModbusPort + i * cfg.Protocol.PvLoggerPortStep;
-                int meterPort = cfg.Protocol.BasePvMeterModbusPort + i * cfg.Protocol.PvMeterPortStep;
-                log.Info($"光伏 Logger{i + 1} simPv{i + 1}: Modbus TCP 端口 {loggerPort}（承载 pv{i + 1}.Logger）");
-                log.Info($"光伏电表{i + 1} simPvMeter{i + 1}: Modbus TCP 端口 {meterPort}（承载 pv{i + 1}.MeterLv）");
+                string overrideMark = entry.IsDefault ? string.Empty : "（手动覆盖）";
+                string rackMark = entry.RackCount > 0 ? $"，簇从站号 {entry.SlaveId + 1}-{entry.SlaveId + entry.RackCount}" : string.Empty;
+                log.Info($"{entry.Name,-12}: Modbus TCP 端口 {entry.Port}，从站号 {entry.SlaveId}{rackMark}{overrideMark}");
             }
             log.Info("=======================");
         }

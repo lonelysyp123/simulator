@@ -5,8 +5,9 @@ namespace EssSimulator.LocalControl
 {
     /// <summary>
     /// LocalControl 专用 Modbus TCP 从站：只维护 lc.csv 寄存器镜像，不参与仿真数据交换。
+    /// 传输层由 <see cref="ModbusPortHub"/> 统一提供，可与其它设备共享端口/从站号。
     /// </summary>
-    public sealed class LocalControlModbusServer : IModbusRegisterServer
+    public sealed class LocalControlModbusServer : IModbusRegisterServer, IProtocolLayerServer
     {
         private readonly ILog _log = LogManager.GetLogger(typeof(LocalControlModbusServer));
         private readonly IModbusSlave _slave;
@@ -28,8 +29,7 @@ namespace EssSimulator.LocalControl
                 name = serverName
             };
 
-            var tcpComm = new TCPCommunicator(_deviceInfo);
-            _slave = new ModbusTCPSlave(_deviceInfo, _pointMap.RawMaps, tcpComm, rackCount: 0);
+            _slave = new ModbusTCPSlave(_deviceInfo, _pointMap.RawMaps, rackCount: 0);
             _parser = new ModbusParser(_pointMap.RawMaps);
             _backend = new RegisterOnlyBackend(_slave, _parser, _pointMap);
         }
@@ -37,6 +37,27 @@ namespace EssSimulator.LocalControl
         public string ServerName => _deviceInfo.name ?? string.Empty;
 
         public bool IsOnline => _slave.GetCommunicatorState();
+
+        public int Port => _deviceInfo.port;
+
+        public byte SlaveId => _deviceInfo.slaveId;
+
+        public int RackCount => 0;
+
+        /// <summary>已加载的点表，供协议层地址查重使用。</summary>
+        public ModbusPointMap PointMap => _pointMap;
+
+        /// <summary>调整端口/从站号：要求先离线，由协议层管理器在重建时调用。</summary>
+        public void Reconfigure(int port, byte slaveId)
+        {
+            if (IsOnline)
+            {
+                _log.Warn($"{ServerName} 在线时调整端口/从站号被忽略，请先停止服务");
+                return;
+            }
+            _deviceInfo.port = port;
+            _deviceInfo.slaveId = slaveId;
+        }
 
         public IReadOnlyList<MapEntry> DataMaps => _pointMap.DataMaps;
 

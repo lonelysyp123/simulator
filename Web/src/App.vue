@@ -67,6 +67,10 @@
             <el-icon><Link /></el-icon>
             <span>连接信息</span>
           </el-menu-item>
+          <el-menu-item index="/protocol-ports">
+            <el-icon><Operation /></el-icon>
+            <span>协议端口</span>
+          </el-menu-item>
         </el-menu>
       </aside>
       <main class="app-main">
