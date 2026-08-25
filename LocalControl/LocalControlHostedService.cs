@@ -95,7 +95,7 @@ namespace EssSimulator.LocalControl
                 string name = $"simLc{i + 1}";
                 // LC 控制点作用于聚合组首机组 EMU 虚拟模型（trina 单机场景即 emu1）
                 int firstEmuId = i * emuPerGroup + 1;
-                var server = new LocalControlModbusServer("lc.csv", 0, name, firstEmuId);
+                var server = new LocalControlModbusServer("lc.csv", 0, name, firstEmuId, essUnits: _cfg.Devices);
                 store.Register(name, server);
                 // 由协议层管理器按端口计划分配端口/从站号并启动（可与其它设备共享端口）
                 var report = ProtocolLayerManager.Instance.RegisterAndStart(server, ProtocolDeviceType.Lc, "lc.csv");

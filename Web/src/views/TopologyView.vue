@@ -51,6 +51,8 @@
           <div class="meta">
             <div class="name">{{ e.label }}</div>
             <div class="desc">PCS×{{ pcsCountOfEmu(e.id) }}</div>
+            <div class="desc">断路器：{{ boundDeviceLabel(e.id, 'ac_breaker') || '未绑定' }}</div>
+            <div class="desc">电表：{{ boundDeviceLabel(e.id, 'ac_meter') || '未绑定' }}</div>
           </div>
           <el-button link type="danger" size="small" @click.stop="deleteEmu(e.id)">删</el-button>
         </div>
@@ -356,6 +358,18 @@ function pcsCountOfEmu(emuId) {
   return project.nodes.filter(n => n.templateId === 'pcs' && n.parameters?.emuId === emuId).length
 }
 
+/** 归入某 EMU 的设备节点（PCS / 断路器 / 电表） */
+function devicesOfEmu(emuId) {
+  return project.nodes.filter(n => ['pcs', 'ac_breaker', 'ac_meter'].includes(n.templateId) && n.parameters?.emuId === emuId)
+}
+
+/** EMU 绑定的断路器/电表展示名（未绑定返回空串） */
+function boundDeviceLabel(emuId, templateId) {
+  const n = project.nodes.find(x => x.templateId === templateId && x.parameters?.emuId === emuId)
+  if (!n) return ''
+  return n.label || n.parameters?.name || n.id
+}
+
 function onEmuParamChange(key, value) {
   if (!selectedNode.value) return
   pushHistory()
@@ -363,11 +377,10 @@ function onEmuParamChange(key, value) {
   clearValidation()
 }
 
-function unassignPcsFromEmu(emuId) {
-  for (const n of project.nodes) {
-    if (n.templateId === 'pcs' && n.parameters?.emuId === emuId)
-      n.parameters.emuId = ''
-  }
+/** 解除该 EMU 下全部设备（pcs/ac_breaker/ac_meter）的 emuId 归属 */
+function unassignDevicesFromEmu(emuId) {
+  for (const n of devicesOfEmu(emuId))
+    n.parameters.emuId = ''
 }
 
 function deleteEmu(id) {
@@ -375,12 +388,13 @@ function deleteEmu(id) {
   // 同步清理指向该 EMU 的连线（旧工程 EMU 可能带 AC/DC 连线），避免保存回放报「连线端点设备不存在」
   project.edges = project.edges.filter(e => e.fromNodeId !== id && e.toNodeId !== id)
   project.nodes = project.nodes.filter(n => n.id !== id)
-  const orphans = pcsCountOfEmu(id)
-  unassignPcsFromEmu(id)
+  const bound = devicesOfEmu(id)
+  const pcsOrphans = bound.filter(n => n.templateId === 'pcs').length
+  unassignDevicesFromEmu(id)
   if (selectedNodeId.value === id) selectedNodeId.value = null
   clearValidation()
-  if (orphans > 0)
-    ElMessage.warning(`已删除 EMU，${orphans} 台 PCS 已解除归属，请重新选择所属 EMU 后再保存`)
+  if (bound.length > 0)
+    ElMessage.warning(`已删除 EMU，${pcsOrphans} 台 PCS、${bound.length - pcsOrphans} 台断路器/电表已解除归属，请重新选择所属 EMU 后再保存`)
 }
 
 function colorOf(id) { return templateColor(id) }
@@ -806,12 +820,13 @@ async function deleteSelected() {
     const removed = project.nodes.find(n => n.id === id)
     project.edges = project.edges.filter(e => e.fromNodeId !== id && e.toNodeId !== id)
     project.nodes = project.nodes.filter(n => n.id !== id)
-    // 删除 EMU 虚拟节点时同步解除其下 PCS 归属
+    // 删除 EMU 虚拟节点时同步解除其下设备（PCS/断路器/电表）归属
     if (removed?.templateId === 'emu') {
-      const orphans = pcsCountOfEmu(id)
-      unassignPcsFromEmu(id)
-      if (orphans > 0)
-        ElMessage.warning(`${orphans} 台 PCS 已解除归属，请重新选择所属 EMU 后再保存`)
+      const bound = devicesOfEmu(id)
+      const pcsOrphans = bound.filter(n => n.templateId === 'pcs').length
+      unassignDevicesFromEmu(id)
+      if (bound.length > 0)
+        ElMessage.warning(`${pcsOrphans} 台 PCS、${bound.length - pcsOrphans} 台断路器/电表已解除归属，请重新选择所属 EMU 后再保存`)
     }
     selectedNodeId.value = null
     clearValidation()

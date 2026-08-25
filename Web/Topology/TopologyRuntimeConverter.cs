@@ -194,6 +194,16 @@ namespace EssSimulator.Web.Topology
                     Name = string.IsNullOrWhiteSpace(emu.Label) ? $"Unit-{unitIndex}" : emu.Label
                 };
 
+                // 单元断路器/电表：按 emuId 归入本单元的组态节点（各至多 1 台，保存校验已保证）
+                var unitBreaker = project.Nodes.FirstOrDefault(n =>
+                    n.TemplateId == "ac_breaker" && TopologyParamHelper.GetString(n.Parameters, "emuId") == emu.Id);
+                var unitMeter = project.Nodes.FirstOrDefault(n =>
+                    n.TemplateId == "ac_meter" && TopologyParamHelper.GetString(n.Parameters, "emuId") == emu.Id);
+                unit.HasUnitBreaker = unitBreaker != null;
+                unit.UnitBreakerName = NodeDisplayName(unitBreaker);
+                unit.HasUnitMeter = unitMeter != null;
+                unit.UnitMeterName = NodeDisplayName(unitMeter);
+
                 int pcsSeq = 0;
                 int linkedBms = 0;
                 var usedBms = new HashSet<string>(StringComparer.Ordinal);
@@ -216,7 +226,8 @@ namespace EssSimulator.Web.Topology
                 }
 
                 overlay.EssUnits.Add(unit);
-                overlay.Notes.Add($"{unit.Name}: PCS×{unit.Pcs.Count} · BMS×{linkedBms}（每台 PCS 对齐 1 路 BMS，未连线时用默认补齐）");
+                overlay.Notes.Add($"{unit.Name}: PCS×{unit.Pcs.Count} · BMS×{linkedBms}（每台 PCS 对齐 1 路 BMS，未连线时用默认补齐）"
+                    + $" · 单元断路器：{unit.UnitBreakerName ?? "未绑定"} · 单元电表：{unit.UnitMeterName ?? "未绑定"}");
             }
 
             // 无 PCS 归入的 EMU 节点不生成单元，仅提示
@@ -234,6 +245,15 @@ namespace EssSimulator.Web.Topology
                 Message = message,
                 Details = overlay.Notes.ToList()
             });
+        }
+
+        private static string? NodeDisplayName(TopologyNode? node)
+        {
+            if (node == null) return null;
+            var name = TopologyParamHelper.GetString(node.Parameters, "name");
+            return !string.IsNullOrWhiteSpace(node.Label) ? node.Label
+                : !string.IsNullOrWhiteSpace(name) ? name
+                : node.Id;
         }
 
         private static List<TopologyNode> FindBmsForPcs(TopologyProject project, string pcsId)

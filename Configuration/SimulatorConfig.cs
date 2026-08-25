@@ -243,6 +243,15 @@ namespace EssSimulator.Configuration
         /// <summary>本单元 BMS 配置；与 PCS 通道 1:1，为空时默认 2 台。</summary>
         public List<BmsDeviceConfig> Bms { get; set; } = new();
 
+        /// <summary>本单元是否绑定单元高压断路器（组态断路器节点归入 EMU）；缺省 true 兼容既有配置。</summary>
+        public bool HasUnitBreaker { get; set; } = true;
+        /// <summary>组态绑定到本单元的断路器节点名称（未绑定时为 null）。</summary>
+        public string? UnitBreakerName { get; set; }
+        /// <summary>本单元是否绑定单元电表（组态电表节点归入 EMU）；缺省 true 兼容既有配置。</summary>
+        public bool HasUnitMeter { get; set; } = true;
+        /// <summary>组态绑定到本单元的电表节点名称（未绑定时为 null）。</summary>
+        public string? UnitMeterName { get; set; }
+
         /// <summary>本单元下属 PCS 台数；未配置 Pcs 时回退 2。</summary>
         public int PcsCount => Pcs is { Count: > 0 } ? Pcs.Count : 2;
     }

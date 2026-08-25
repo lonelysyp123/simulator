@@ -2,7 +2,7 @@
  * 由组态工程图推导 3D 场站布局。
  * 站侧结构、设备台数、电压/容量全部来自节点与连线，不写死主变台数或单元内部路数。
  */
-import { buildTopologyMainLineLayout } from '../topology/topologyMainLineLayout.js'
+import { buildTopologyMainLineLayout, makeGraph, findBmsForPcs } from '../topology/topologyMainLineLayout.js'
 import { pvArrayFieldSize } from './pvArrayLayout.js'
 
 /** 单线图像素 → 3D 米 */
@@ -154,7 +154,7 @@ function countFromParam(node, key, liveCount = 0) {
   return Math.max(0, liveCount | 0)
 }
 
-function expandEmu(unit, origin, items, cables, ctx) {
+function expandEmu(unit, origin, items, cables, ctx, graph = null) {
   const cx = toX(unit.cx, origin)
   const busCx = unit.busCx != null ? toX(unit.busCx, origin) : cx
   const zBus = toZ(unit.originY, origin)
@@ -163,132 +163,182 @@ function expandEmu(unit, origin, items, cables, ctx) {
   const z690 = toZ(unit.originY + unit.unitBus690Y, origin)
   const zPcs = toZ(unit.originY + unit.pcsTop, origin)
   const zBms = toZ(unit.originY + unit.bmsTop, origin)
-  // 方阵区需在 z 方向避开所有单元（含储能 BMS/直流母线深度），记录单元底边；
-  // 同时记录储能单元列的 x 范围，供方阵区在 x 方向避让
-  if (ctx) {
-    ctx.maxUnitBottomZ = Math.max(ctx.maxUnitBottomZ, toZ(unit.originY + unit.bottom, origin))
-    const halfW = 6
-    ctx.emuMinX = ctx.emuMinX == null ? cx - halfW : Math.min(ctx.emuMinX, cx - halfW)
-    ctx.emuMaxX = ctx.emuMaxX == null ? cx + halfW : Math.max(ctx.emuMaxX, cx + halfW)
-  }
+  const unitIndex = unit.unitSnap?.unitIndex ?? unit.index
+  const pcsNodes = unit.pcsNodes || []
+  // 组态模式（有 pcs 节点）逐设备展开：不合成单元标题/单元断/单元变/690 母线；
+  // 运行时兑底单元（无组态节点）保留原合成表示
+  const deviceLevel = pcsNodes.length > 0
+  const unitBreakerNode = deviceLevel ? (unit.unitBreakerNode || null) : null
+  const unitMeterNode = deviceLevel ? (unit.unitMeterNode || null) : null
   const node = unit.emu
   const livePcs = [unit.pcsA, unit.pcsB].filter(Boolean).length
-  // 新模型 PCS 台数取组态 pcsNodes；运行时兜底单元仍走 pcsCount 参数
-  const pcsCount = unit.pcsNodes?.length
-    ? unit.pcsNodes.length
+  // 新模型 PCS 台数取组态 pcsNodes；运行时兑底单元仍走 pcsCount 参数
+  const pcsCount = pcsNodes.length
+    ? pcsNodes.length
     : countFromParam(node, 'pcsCount', livePcs)
-  const firstPcs = unit.pcsNodes?.[0] || null
+  const firstPcs = pcsNodes[0] || null
   const bmsNodes = unit.bmsNodes || []
   const pcsXs = slotXs(cx, pcsCount, 5.5)
   const bmsCount = bmsNodes.length
   const bmsXs = slotXs(cx, bmsCount, 5.5)
 
-  addItem(items, {
-    key: `emu-title-${unit.index}`,
-    templateId: 'label',
-    kind: 'unit-title',
-    x: cx - 3,
-    z: zBus + 0.4,
-    y: LABEL_Y,
-    text: [unit.label],
-    title: true,
-    unitIndex: unit.unitSnap?.unitIndex ?? unit.index
-  })
-
-  addItem(items, {
-    key: `emu-br-${unit.index}`,
-    templateId: 'ac_breaker',
-    kind: 'unit-breaker',
-    x: cx,
-    z: zBr,
-    node,
-    pickId: `unit-${unit.unitSnap?.unitIndex ?? unit.index}`,
-    unitIndex: unit.unitSnap?.unitIndex ?? unit.index,
-    label: '单元断',
-    labelOffset: { x: 2.4, y: 3.4, z: 0 }
-  })
-  // 支路电缆：单元断路器 → 母线汇流点（星型接线，先南北到母线带再东西汇入，y 分层避免重合）
-  addCable(cables, { x: cx, y: 0.5, z: zBr }, { x: busCx, y: 0.5, z: zBus }, {
-    role: 'unit-drop',
-    unitIndex: unit.unitSnap?.unitIndex ?? unit.index,
-    static: true,
-    midY: 0.35 + (unit.index % 8) * 0.05
-  })
-
-  const xfNode = {
-    parameters: {
-      primaryVoltage: paramNum(node, 'unitXfPrimaryV', paramNum(firstPcs, 'acVoltage')),
-      secondaryVoltage: paramNum(node, 'unitXfSecondaryV'),
-      ratedPowerKva: paramNum(node, 'unitXfRatedKva', 0)
-        || paramNum(firstPcs, 'pcsRatedPowerKw', 0) * Math.max(0, pcsCount)
-    },
-    label: node?.label
+  // 方阵区需在 z 方向避开所有单元（含储能 BMS/直流母线深度），记录单元底边；
+  // 同时记录储能设备列的 x 范围（按设备实际占地），供方阵区在 x 方向避让
+  if (ctx) {
+    ctx.maxUnitBottomZ = Math.max(ctx.maxUnitBottomZ, toZ(unit.originY + unit.bottom, origin))
+    const devXs = [...pcsXs, ...bmsXs]
+    if (!deviceLevel || unitBreakerNode) devXs.push(cx)
+    if (unitMeterNode && unit.unitMeterX != null) devXs.push(toX(unit.cx + unit.unitMeterX, origin))
+    if (devXs.length) {
+      const pad = 3
+      const lo = Math.min(...devXs) - pad
+      const hi = Math.max(...devXs) + pad
+      ctx.emuMinX = ctx.emuMinX == null ? lo : Math.min(ctx.emuMinX, lo)
+      ctx.emuMaxX = ctx.emuMaxX == null ? hi : Math.max(ctx.emuMaxX, hi)
+    }
   }
-  addItem(items, {
-    key: `emu-xf-${unit.index}`,
-    templateId: 'transformer',
-    kind: 'unit-xf',
-    x: cx,
-    z: zXf,
-    node: xfNode,
-    boxType: true,
-    scale: xfScale(xfNode),
-    label: `单元变 ${unit.unitXfLabel || ''}`.trim(),
-    labelOffset: { x: 2.8, y: 3.8, z: 0 },
-    unitIndex: unit.unitSnap?.unitIndex ?? unit.index
-  })
-  addCable(cables, { x: cx, y: 0.5, z: zBr }, { x: cx, y: 0.5, z: zXf }, {
-    role: 'unit-xf',
-    unitIndex: unit.unitSnap?.unitIndex ?? unit.index,
-    static: true
-  })
 
   let busX = cx
   let busZ = z690
-  if (!unit.omitBus690) {
-    const lvV = paramNum(node, 'unitXfSecondaryV')
-    const bus = addItem(items, {
-      key: `emu-lv-${unit.index}`,
-      templateId: 'ac_bus',
-      kind: 'bus-node',
+  // 为 true 时每台 PCS 馈线直接接上游供电点（绑定断路器或母线汇流点）
+  let feedAllFromBus = false
+
+  if (!deviceLevel) {
+    // —— 运行时兑底单元：保持原合成单元显示（标题/单元断/单元变/690 母线）——
+    addItem(items, {
+      key: `emu-title-${unit.index}`,
+      templateId: 'label',
+      kind: 'unit-title',
+      x: cx - 3,
+      z: zBus + 0.4,
+      y: LABEL_Y,
+      text: [unit.label],
+      title: true,
+      unitIndex
+    })
+
+    addItem(items, {
+      key: `emu-br-${unit.index}`,
+      templateId: 'ac_breaker',
+      kind: 'unit-breaker',
       x: cx,
-      z: z690,
-      y: CABLE_Y,
-      node: {
-        label: lvV != null ? fmtVolt(lvV) : '低压母线',
-        parameters: { nominalVoltage: lvV }
+      z: zBr,
+      node,
+      pickId: `unit-${unitIndex}`,
+      unitIndex,
+      label: '单元断',
+      labelOffset: { x: 2.4, y: 3.4, z: 0 }
+    })
+    // 支路电缆：单元断路器 → 母线汇流点（星型接线，先南北到母线带再东西汇入，y 分层避免重合）
+    addCable(cables, { x: cx, y: 0.5, z: zBr }, { x: busCx, y: 0.5, z: zBus }, {
+      role: 'unit-drop',
+      unitIndex,
+      static: true,
+      midY: 0.35 + (unit.index % 8) * 0.05
+    })
+
+    const xfNode = {
+      parameters: {
+        primaryVoltage: paramNum(node, 'unitXfPrimaryV', paramNum(firstPcs, 'acVoltage')),
+        secondaryVoltage: paramNum(node, 'unitXfSecondaryV'),
+        ratedPowerKva: paramNum(node, 'unitXfRatedKva', 0)
+          || paramNum(firstPcs, 'pcsRatedPowerKw', 0) * Math.max(0, pcsCount)
       },
-      radius: 0.22,
-      busRole: 'unit-lv-bus',
-      unitIndex: unit.unitSnap?.unitIndex ?? unit.index
+      label: node?.label
+    }
+    addItem(items, {
+      key: `emu-xf-${unit.index}`,
+      templateId: 'transformer',
+      kind: 'unit-xf',
+      x: cx,
+      z: zXf,
+      node: xfNode,
+      boxType: true,
+      scale: xfScale(xfNode),
+      label: `单元变 ${unit.unitXfLabel || ''}`.trim(),
+      labelOffset: { x: 2.8, y: 3.8, z: 0 },
+      unitIndex
     })
-    busX = bus.x
-    busZ = bus.z
-    addCable(cables, { x: cx, y: 0.5, z: zXf }, { x: busX, y: 0.5, z: busZ }, {
-      role: 'unit-690',
-      unitIndex: unit.unitSnap?.unitIndex ?? unit.index,
+    addCable(cables, { x: cx, y: 0.5, z: zBr }, { x: cx, y: 0.5, z: zXf }, {
+      role: 'unit-xf',
+      unitIndex,
       static: true
     })
+
+    if (!unit.omitBus690) {
+      const lvV = paramNum(node, 'unitXfSecondaryV')
+      const bus = addItem(items, {
+        key: `emu-lv-${unit.index}`,
+        templateId: 'ac_bus',
+        kind: 'bus-node',
+        x: cx,
+        z: z690,
+        y: CABLE_Y,
+        node: {
+          label: lvV != null ? fmtVolt(lvV) : '低压母线',
+          parameters: { nominalVoltage: lvV }
+        },
+        radius: 0.22,
+        busRole: 'unit-lv-bus',
+        unitIndex
+      })
+      busX = bus.x
+      busZ = bus.z
+      addCable(cables, { x: cx, y: 0.5, z: zXf }, { x: busX, y: 0.5, z: busZ }, {
+        role: 'unit-690',
+        unitIndex,
+        static: true
+      })
+    } else {
+      busZ = zXf
+      addCable(cables, { x: cx, y: 0.5, z: zXf }, { x: pcsXs[0] ?? cx, y: 0.5, z: zPcs }, {
+        role: 'unit-690',
+        unitIndex,
+        static: true
+      })
+    }
   } else {
-    busZ = zXf
-    addCable(cables, { x: cx, y: 0.5, z: zXf }, { x: pcsXs[0] ?? cx, y: 0.5, z: zPcs }, {
-      role: 'unit-690',
-      unitIndex: unit.unitSnap?.unitIndex ?? unit.index,
-      static: true
-    })
+    // —— 组态模式：逐设备展开 ——
+    // 绑定的断路器 → 独立断路器 item（支路馈线处）；未绑定不画断路器，PCS 直连母线汇流点
+    if (unitBreakerNode) {
+      addItem(items, {
+        key: `node-${unitBreakerNode.id}`,
+        templateId: 'ac_breaker',
+        kind: 'unit-breaker',
+        x: cx,
+        z: zBr,
+        node: unitBreakerNode,
+        pickId: `brk-${unitBreakerNode.id}`,
+        unitIndex,
+        label: unitBreakerNode.label || unitBreakerNode.parameters?.name || '断路器',
+        labelOffset: { x: 2.4, y: 3.4, z: 0 }
+      })
+      addCable(cables, { x: cx, y: 0.5, z: zBr }, { x: busCx, y: 0.5, z: zBus }, {
+        role: 'unit-drop',
+        unitIndex,
+        static: true,
+        midY: 0.35 + (unit.index % 8) * 0.05
+      })
+      busX = cx
+      busZ = zBr
+    } else {
+      busX = busCx
+      busZ = zBus
+    }
+    feedAllFromBus = true
   }
 
   const channels = [unit.pcsA, unit.pcsB].filter(Boolean)
   pcsXs.forEach((x, i) => {
     const ch = channels[i] || null
     const side = i === 0 ? 'A' : String.fromCharCode(65 + i)
-    const unitIndex = unit.unitSnap?.unitIndex ?? unit.index
     addItem(items, {
       key: `pcs-${unitIndex}-${side}`,
       templateId: 'pcs',
       kind: 'pcs',
       x,
       z: zPcs,
+      node: pcsNodes[i] || null,
       panelKey: `pcs-${unitIndex}-${side}`,
       panelType: 'pcs',
       unitIndex,
@@ -296,7 +346,7 @@ function expandEmu(unit, origin, items, cables, ctx) {
       channel: ch,
       labelOffset: { x: 0, y: 4.4, z: 0.3 }
     })
-    if (!unit.omitBus690 || i > 0) {
+    if (feedAllFromBus || !unit.omitBus690 || i > 0) {
       addCable(cables, { x: busX, y: 0.5, z: busZ }, { x, y: 0.5, z: zPcs }, {
         role: 'pcs-feed',
         unitIndex,
@@ -306,11 +356,23 @@ function expandEmu(unit, origin, items, cables, ctx) {
     }
   })
 
+  // BMS 配对：组态模式按组态 edges 连通关系（PCS—DC—BMS）；兑底按顺序配对
+  const pcsIndexOfBms = new Map()
+  if (deviceLevel && graph) {
+    pcsNodes.forEach((p, pi) => {
+      for (const b of findBmsForPcs(graph, p.id)) {
+        if (!pcsIndexOfBms.has(b.id)) pcsIndexOfBms.set(b.id, pi)
+      }
+    })
+  }
+
   bmsXs.forEach((x, i) => {
     const bmsNode = bmsNodes[i] || null
     const side = i === 0 ? 'A' : String.fromCharCode(65 + i)
-    const unitIndex = unit.unitSnap?.unitIndex ?? unit.index
-    const pcsX = pcsXs[Math.min(i, pcsXs.length - 1)] ?? x
+    const pairedIdx = deviceLevel && bmsNode && pcsIndexOfBms.has(bmsNode.id)
+      ? pcsIndexOfBms.get(bmsNode.id)
+      : Math.min(i, Math.max(0, pcsXs.length - 1))
+    const pcsX = pcsXs[pairedIdx] ?? x
     addItem(items, {
       key: `bms-${unitIndex}-${side}`,
       templateId: 'bms',
@@ -353,6 +415,21 @@ function expandEmu(unit, origin, items, cables, ctx) {
       voltage: paramNum(unit.dcBus, 'nominalVoltage'),
       label: unit.dcBus.label,
       labelOffset: { x: 1.2, y: 1.1, z: -0.8 }
+    })
+  }
+
+  // 绑定的电表 → 电表 item（单元区域内侧，与单线图挂点同位）；未绑定不画
+  if (unitMeterNode && unit.unitMeterX != null) {
+    addItem(items, {
+      key: `node-${unitMeterNode.id}`,
+      templateId: 'ac_meter',
+      kind: 'meter',
+      x: toX(unit.cx + unit.unitMeterX, origin),
+      z: toZ(unit.originY + (unit.unitMeterTopY ?? unit.unitBus690Y), origin),
+      node: unitMeterNode,
+      unitIndex,
+      label: unitMeterNode.label || unitMeterNode.parameters?.name || '电表',
+      labelOffset: { x: 1.8, y: 2.4, z: 0 }
     })
   }
 }
@@ -637,6 +714,8 @@ function collectSldNodeIds(sld) {
     for (const p of u.pcsNodes || []) add(p.id)
     for (const b of u.bmsNodes || []) add(b.id)
     add(u.dcBus?.id)
+    add(u.unitBreakerNode?.id)
+    add(u.unitMeterNode?.id)
   }
   return ids
 }
@@ -700,6 +779,7 @@ function fromTopology(topology, unitsSnap, pvSnap) {
   const items = []
   const cables = []
   const ctx = makePvCtx()
+  const graph = makeGraph(topology?.nodes, topology?.edges)
 
   if (sld.grid) {
     const x = toX(sld.gridX, origin)
@@ -827,7 +907,7 @@ function fromTopology(topology, unitsSnap, pvSnap) {
 
   for (const unit of sld.units || []) {
     if (unit.kind === 'pv') expandPv(unit, origin, items, cables, pvSnap, ctx)
-    else expandEmu(unit, origin, items, cables, ctx)
+    else expandEmu(unit, origin, items, cables, ctx, graph)
   }
 
   // 方阵区统一排布（每台逆变器一块方阵）

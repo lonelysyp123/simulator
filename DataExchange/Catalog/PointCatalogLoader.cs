@@ -1,3 +1,4 @@
+using EssSimulator.Configuration;
 using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Config;
 using EssSimulator.Protocol.Modbus;
@@ -58,12 +59,15 @@ namespace EssSimulator.DataExchange.Catalog
         public static PointCatalog FromPointMap(
             ModbusPointMap pointMap,
             string serverName,
-            DataExchangeOptions? options = null)
+            DataExchangeOptions? options = null,
+            IReadOnlyList<EssUnitConfig>? essUnits = null)
         {
             options ??= new DataExchangeOptions();
             // simLc 系统级点表与 simEmu 同构：控制点绑定 emu{n}.Emu.*，复用 EMU 默认效果解析
             bool isEmu = DataExchangeSession.IsEmuLikeDevice(serverName);
             bool isBms = serverName.StartsWith("simBms", StringComparison.OrdinalIgnoreCase);
+            // EMU 点表绑定门控：只能指向机组内实际存在的设备（PCS/电表/断路器），缺失即按未绑定处理
+            var emuFilter = EmuDeviceCatalogFilter.Create(serverName, essUnits);
 
             var telemetry = new List<PointBinding>();
             var pluginPoints = new List<PluginPointBinding>();
@@ -85,6 +89,13 @@ namespace EssSimulator.DataExchange.Catalog
                     if (paths == null)
                         continue;
 
+                    if (emuFilter != null)
+                    {
+                        paths = emuFilter.FilterPaths(paths);
+                        if (paths == null)
+                            continue;
+                    }
+
                     sumPoints.Add(new SumPointBinding
                     {
                         Entry = entry,
@@ -100,6 +111,13 @@ namespace EssSimulator.DataExchange.Catalog
                     var paths = SumPointBinding.ParsePaths(model.Arg1, model.Arg2);
                     if (paths == null)
                         continue;
+
+                    if (emuFilter != null)
+                    {
+                        paths = emuFilter.FilterPaths(paths);
+                        if (paths == null)
+                            continue;
+                    }
 
                     maxPoints.Add(new MaxPointBinding
                     {
@@ -130,6 +148,9 @@ namespace EssSimulator.DataExchange.Catalog
                 if (target == null)
                     continue;
 
+                if (emuFilter != null && !emuFilter.Allows(target.FullPath))
+                    continue;
+
                 telemetry.Add(new PointBinding
                 {
                     Entry = entry,
@@ -155,6 +176,9 @@ namespace EssSimulator.DataExchange.Catalog
 
                 var target = DataTarget.ParseBindingPath(model.Arg1);
                 if (target == null)
+                    continue;
+
+                if (emuFilter != null && !emuFilter.Allows(target.FullPath))
                     continue;
 
                 control.Add(new PointBinding

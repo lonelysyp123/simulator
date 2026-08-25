@@ -103,6 +103,7 @@ namespace EssSimulator.Web.Topology
                 new() { Key = "ratedVoltage", Label = "额定线电压", Type = "number", Unit = "V", Min = 100 },
                 new() { Key = "closed", Label = "合闸", Type = "boolean", Description = "三相联动；分闸时下游母线视为未带电（非主断时仅组态显示）" },
                 new() { Key = "isMainBreaker", Label = "作为主断路器", Type = "boolean", Description = "勾选后与电站概览主断路器状态绑定；全工程有且仅能指定一个" },
+                new() { Key = "emuId", Label = "所属 EMU 储能单元", Type = "emu_select", Description = "可选；选择后本断路器归入该 EMU 虚拟单元，作为其单元高压断路器；每个 EMU 至多 1 台" },
                 new() { Key = "name", Label = "名称", Type = "string" }
             },
             DefaultParameters = new Dictionary<string, object?>
@@ -175,7 +176,8 @@ namespace EssSimulator.Web.Topology
                 new() { Key = "ptPrimaryVoltage", Label = "额定线电压（一次）", Type = "number", Unit = "V", Min = 100, Description = "被测母线一次线电压，须与母线匹配" },
                 new() { Key = "ctPrimaryCurrent", Label = "额定电流（一次）", Type = "number", Unit = "A", Min = 1, Description = "CT 一次额定电流" },
                 new() { Key = "accuracyClass", Label = "精度等级", Type = "string" },
-                new() { Key = "isPccMeter", Label = "作为并网点电表", Type = "boolean", Description = "勾选后与电站概览电表数据绑定；全工程有且仅能指定一个" }
+                new() { Key = "isPccMeter", Label = "作为并网点电表", Type = "boolean", Description = "勾选后与电站概览电表数据绑定；全工程有且仅能指定一个" },
+                new() { Key = "emuId", Label = "所属 EMU 储能单元", Type = "emu_select", Description = "可选；选择后本电表归入该 EMU 虚拟单元，作为其单元电表；每个 EMU 至多 1 台" }
             },
             DefaultParameters = new Dictionary<string, object?>
             {
@@ -235,15 +237,15 @@ namespace EssSimulator.Web.Topology
         };
 
         /// <summary>
-        /// EMU 储能单元（虚拟）：无图形、无端口，仅作为 PCS 的归属容器；
-        /// PCS 通过 emuId 参数下拉框归入。单元变参数属单元级，在此配置。
+        /// EMU 储能单元（虚拟）：无图形、无端口，作为 PCS / 断路器 / 电表的归属容器；
+        /// 设备通过 emuId 参数下拉框归入。单元变参数属单元级，在此配置。
         /// </summary>
         private static TopologyTemplate BuildEmu() => new()
         {
             Id = "emu",
             Name = "EMU 储能单元",
             Category = "储能",
-            Description = "虚拟储能单元：拖入后画布不显示图形，在左侧「EMU 储能单元」列表中管理；PCS 变流器通过其「所属 EMU 储能单元」下拉框归入本单元。",
+            Description = "虚拟储能单元：拖入后画布不显示图形，在左侧「EMU 储能单元」列表中管理；PCS 变流器、断路器、电表通过其「所属 EMU 储能单元」下拉框归入本单元（断路器/电表各至多 1 台）。",
             IsVoltageSource = false,
             IsVirtual = true,
             Parameters =

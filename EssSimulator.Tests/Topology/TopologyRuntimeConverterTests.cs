@@ -98,6 +98,46 @@ public class TopologyRuntimeConverterTests
     }
 
     [Fact]
+    public void Convert_records_unit_breaker_and_meter_binding()
+    {
+        var project = new TopologyProject
+        {
+            Id = "p-bind",
+            Name = "绑定测试",
+            Nodes =
+            {
+                Node("g1", "grid", "电网"),
+                Node("e1", "emu", "EMU-1", y: 600),
+                Node("e2", "emu", "EMU-2", y: 700),
+                Node("p1", "pcs", "PCS-1A", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 100, y: 720),
+                Node("p2", "pcs", "PCS-2A", new Dictionary<string, object?> { ["emuId"] = "e2" }, x: 500, y: 720),
+                Node("ub1", "ac_breaker", "单元断", new Dictionary<string, object?> { ["emuId"] = "e1" }),
+                Node("um1", "ac_meter", "单元电表", new Dictionary<string, object?> { ["emuId"] = "e1" })
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        Assert.NotNull(overlay);
+        Assert.Equal(2, overlay!.EssUnits.Count);
+
+        var u1 = overlay.EssUnits[0];
+        Assert.True(u1.HasUnitBreaker);
+        Assert.Equal("单元断", u1.UnitBreakerName);
+        Assert.True(u1.HasUnitMeter);
+        Assert.Equal("单元电表", u1.UnitMeterName);
+
+        // 未绑定设备的单元：Has*=false、名称为 null
+        var u2 = overlay.EssUnits[1];
+        Assert.False(u2.HasUnitBreaker);
+        Assert.Null(u2.UnitBreakerName);
+        Assert.False(u2.HasUnitMeter);
+        Assert.Null(u2.UnitMeterName);
+
+        Assert.Contains(overlay.Notes, n => n.Contains("单元断") && n.Contains("单元电表"));
+    }
+
+    [Fact]
     public void Convert_rejects_project_without_pcs_assigned_emu_or_pv_unit()
     {
         var project = new TopologyProject

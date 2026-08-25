@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using EssSimulator.Configuration;
 using EssSimulator.DataExchange;
 using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Config;
@@ -41,7 +42,8 @@ namespace EssSimulator
             int modbusPort,
             string serverName,
             int clusterCount = 0,
-            DataExchangeOptions? dataExchangeOptions = null)
+            DataExchangeOptions? dataExchangeOptions = null,
+            IReadOnlyList<EssUnitConfig>? essUnits = null)
         {
             RackCount = clusterCount;
             _pointMap = new EssSimulator.Protocol.Modbus.ModbusPointMap(mapFilePath, serverName, clusterCount);
@@ -61,7 +63,7 @@ namespace EssSimulator
             if (RequiresDataExchange(serverName))
             {
                 var options = dataExchangeOptions ?? new DataExchangeOptions();
-                var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName, options);
+                var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName, options, essUnits);
                 _dataSync = new DataExchangeSession(
                     _slave, _parser, catalog, _deviceInfo, options, clusterCount);
             }
