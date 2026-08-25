@@ -17,6 +17,21 @@ namespace EssSimulator.DataExchange.Plugins
         /// <summary>系统总状态（精简版）字键：聚合全部 PCS 模块运行状态，输出 1停机/3运行中/5故障/6告警。</summary>
         public const string SystemRunStateSummaryKey = "SystemRunStateSummary";
 
+        /// <summary>单元 PCS 总数字键：deviceRoot 单元（如 emu1）PcsList 台数。</summary>
+        public const string UnitPcsTotalCountKey = "UnitPcsTotalCount";
+
+        /// <summary>单元运行 PCS 台数字键：OperationStatus 2/4/5（待机/充电/放电）计入运行。</summary>
+        public const string UnitPcsRunningCountKey = "UnitPcsRunningCount";
+
+        /// <summary>单元告警 PCS 台数字键：非故障且告警汇总 1/2 任一非零。</summary>
+        public const string UnitPcsAlarmCountKey = "UnitPcsAlarmCount";
+
+        /// <summary>单元故障 PCS 台数字键：OperationStatus=6（故障）。</summary>
+        public const string UnitPcsFaultCountKey = "UnitPcsFaultCount";
+
+        /// <summary>单元黑启动状态字键：单元内全部 PCS 模块 BlackStartEnabled 均为真才输出 1。</summary>
+        public const string UnitBlackStartStatusKey = "UnitBlackStartStatus";
+
         /// <summary>字键 → 位映射表：(位号, 仿真故障属性名列表，任一为 true 即置位)。</summary>
         private static readonly Dictionary<string, IReadOnlyList<(int Bit, string[] Props)>> WordMaps =
             new(StringComparer.Ordinal)
@@ -52,8 +67,15 @@ namespace EssSimulator.DataExchange.Plugins
                 }
             };
 
+        private static readonly HashSet<string> UnitCountKeys = new(StringComparer.Ordinal)
+        {
+            UnitPcsTotalCountKey, UnitPcsRunningCountKey, UnitPcsAlarmCountKey, UnitPcsFaultCountKey
+        };
+
         public bool CanHandle(string wordKey) =>
-            wordKey == SystemFaultSummaryKey || wordKey == SystemRunStateSummaryKey || WordMaps.ContainsKey(wordKey);
+            wordKey == SystemFaultSummaryKey || wordKey == SystemRunStateSummaryKey ||
+            wordKey == UnitBlackStartStatusKey || UnitCountKeys.Contains(wordKey) ||
+            WordMaps.ContainsKey(wordKey);
 
         public object? Compute(string wordKey, string deviceRoot, ISimulationDataAdapter simulation)
         {
@@ -61,6 +83,10 @@ namespace EssSimulator.DataExchange.Plugins
                 return ComputeSystemFaultSummary(deviceRoot, simulation);
             if (wordKey == SystemRunStateSummaryKey)
                 return ComputeSystemRunStateSummary(deviceRoot, simulation);
+            if (UnitCountKeys.Contains(wordKey))
+                return ComputeUnitPcsCount(wordKey, deviceRoot, simulation);
+            if (wordKey == UnitBlackStartStatusKey)
+                return ComputeUnitBlackStartStatus(deviceRoot, simulation);
 
             if (!WordMaps.TryGetValue(wordKey, out var map))
                 return null;
@@ -147,6 +173,62 @@ namespace EssSimulator.DataExchange.Plugins
             }
 
             return anyFault ? 5 : anyAlarm ? 6 : anyRunning ? 3 : 1;
+        }
+
+        /// <summary>
+        /// 单元 PCS 台数统计：deviceRoot 为单个机组根路径（如 emuDeviceId 替换后的 emu1），
+        /// 总数=PcsList 台数；运行=OperationStatus 2/4/5（待机按运行）；
+        /// 故障=OperationStatus=6；告警=非故障且告警汇总 1/2 任一非零。
+        /// </summary>
+        private static int ComputeUnitPcsCount(string wordKey, string deviceRoot, ISimulationDataAdapter simulation)
+        {
+            if (!TryReadInt(simulation, $"{deviceRoot}.PcsList.Count", out int count))
+                return 0;
+            if (wordKey == UnitPcsTotalCountKey)
+                return count;
+
+            int matched = 0;
+            for (int m = 0; m < count; m++)
+            {
+                string moduleRoot = $"{deviceRoot}.PcsList[{m}]";
+                TryReadInt(simulation, $"{moduleRoot}.OperationStatus", out int status);
+                TryReadInt(simulation, $"{moduleRoot}.AlarmSummary1", out int summary1);
+                TryReadInt(simulation, $"{moduleRoot}.AlarmSummary2", out int summary2);
+
+                bool fault = status == 6;
+                bool running = status is 2 or 4 or 5;
+                bool alarm = !fault && (summary1 != 0 || summary2 != 0);
+
+                bool hit = wordKey switch
+                {
+                    UnitPcsRunningCountKey => running,
+                    UnitPcsFaultCountKey => fault,
+                    UnitPcsAlarmCountKey => alarm,
+                    _ => false
+                };
+                if (hit)
+                    matched++;
+            }
+
+            return matched;
+        }
+
+        /// <summary>
+        /// 单元黑启动状态：读取单元内全部 PCS 模块 BlackStartEnabled，
+        /// 台数为 0 或任一模块未开启输出 0，全部开启才输出 1。
+        /// </summary>
+        private static int ComputeUnitBlackStartStatus(string deviceRoot, ISimulationDataAdapter simulation)
+        {
+            if (!TryReadInt(simulation, $"{deviceRoot}.PcsList.Count", out int count) || count == 0)
+                return 0;
+
+            for (int m = 0; m < count; m++)
+            {
+                if (!ReadBool(simulation, $"{deviceRoot}.PcsList[{m}].BlackStartEnabled"))
+                    return 0;
+            }
+
+            return 1;
         }
 
         /// <summary>读取整型遥测量；路径不存在/类型不符/异常均返回 false。</summary>

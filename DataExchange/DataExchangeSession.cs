@@ -61,8 +61,10 @@ namespace EssSimulator.DataExchange
             _effects = new ControlEffectRegistry();
             var telemetryPlugins = new TelemetryPluginRegistry();
             string serverName = deviceInfo.name ?? string.Empty;
-            if (serverName.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase))
+            if (IsEmuLikeDevice(serverName))
             {
+                // simLc（LC 系统级点表）与 simEmu 同构：控制点作用于首机组 EMU 虚拟模型，
+                // 插件/效果注册保持一致，联动链路相同。
                 _effects
                     .Register(new EmuPcsControlEffect(RefreshOperationStatusTelemetry))
                     .Register(new EmuUnitBreakerEffect());
@@ -229,12 +231,17 @@ namespace EssSimulator.DataExchange
             }
         }
 
-        private static bool ShouldLogChanges(string? serverName) =>
+        /// <summary>EMU 及与 EMU 同构的 LC 系统级设备。</summary>
+        internal static bool IsEmuLikeDevice(string? serverName) =>
             serverName?.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase) == true
+            || serverName?.StartsWith("simLc", StringComparison.OrdinalIgnoreCase) == true;
+
+        private static bool ShouldLogChanges(string? serverName) =>
+            IsEmuLikeDevice(serverName)
             || serverName?.StartsWith("simBms", StringComparison.OrdinalIgnoreCase) == true;
 
         private int TelemetryIntervalForDevice =>
-            _deviceInfo.name?.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase) == true
+            IsEmuLikeDevice(_deviceInfo.name)
                 ? Math.Max(10, _options.EmuTelemetryIntervalMs)
                 : Math.Max(10, _options.TelemetryIntervalMs);
 

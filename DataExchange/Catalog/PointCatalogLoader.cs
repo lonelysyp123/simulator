@@ -61,7 +61,8 @@ namespace EssSimulator.DataExchange.Catalog
             DataExchangeOptions? options = null)
         {
             options ??= new DataExchangeOptions();
-            bool isEmu = serverName.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase);
+            // simLc 系统级点表与 simEmu 同构：控制点绑定 emu{n}.Emu.*，复用 EMU 默认效果解析
+            bool isEmu = DataExchangeSession.IsEmuLikeDevice(serverName);
             bool isBms = serverName.StartsWith("simBms", StringComparison.OrdinalIgnoreCase);
 
             var telemetry = new List<PointBinding>();

@@ -28,7 +28,11 @@ namespace EssSimulator.Protocol.Modbus
         /// <summary>所有点位原始数组，按 [bank, rack, ...] 顺序，供 ModbusTCPSlave 使用</summary>
         public List<MapEntry[]> RawMaps { get; } = new();
 
-        public ModbusPointMap(string mapFilePath, string serverName, int clusterCount = 0)
+        public ModbusPointMap(
+            string mapFilePath,
+            string serverName,
+            int clusterCount = 0,
+            int? emuDeviceIdOverride = null)
         {
             var resolvedPath = PointMapPathResolver.Resolve(mapFilePath);
             var entries = CSVUtil.CSV2Class<MapEntry>(resolvedPath)?.ToArray()
@@ -37,7 +41,8 @@ namespace EssSimulator.Protocol.Modbus
             ApplyDeviceIdSubstitution(
                 entries,
                 serverName,
-                isEmu: serverName.Contains("Emu", StringComparison.OrdinalIgnoreCase));
+                isEmu: serverName.Contains("Emu", StringComparison.OrdinalIgnoreCase),
+                emuDeviceIdOverride);
 
             IndexBankEntries(entries);
             RawMaps.Add(entries);
@@ -101,7 +106,11 @@ namespace EssSimulator.Protocol.Modbus
             RackControlMaps.AddRange(entries.Where(m => m.FunctionCode is 5 or 6 or 16));
         }
 
-        private static void ApplyDeviceIdSubstitution(MapEntry[] entries, string name, bool isEmu)
+        /// <summary>
+        /// 设备号占位符替换。<paramref name="emuDeviceIdOverride"/> 非空时（LC 聚合组首机组语义），
+        /// 无论设备本身是否为 EMU，都把 emuDeviceId 替换为指定机组根路径。
+        /// </summary>
+        private static void ApplyDeviceIdSubstitution(MapEntry[] entries, string name, bool isEmu, int? emuDeviceIdOverride = null)
         {
             if (!int.TryParse(new string(name.Where(char.IsDigit).ToArray()), out int deviceId))
                 return;
@@ -116,7 +125,9 @@ namespace EssSimulator.Protocol.Modbus
                     e.ModelSim = e.ModelSim.Replace("pvDeviceId", $"pv{deviceId}", StringComparison.Ordinal);
                     e.ModelSim = e.ModelSim.Replace("deviceId", deviceId.ToString(), StringComparison.Ordinal);
 
-                    if (isEmu)
+                    if (emuDeviceIdOverride is int emuId)
+                        e.ModelSim = e.ModelSim.Replace("emuDeviceId", $"emu{emuId}", StringComparison.Ordinal);
+                    else if (isEmu)
                         e.ModelSim = e.ModelSim.Replace("emuDeviceId", $"emu{deviceId}", StringComparison.Ordinal);
                 }
             }
