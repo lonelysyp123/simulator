@@ -33,7 +33,8 @@ namespace EssSimulator.DataExchange.Catalog
         /// <summary>
         /// 判断单条模型绑定路径是否指向机组内实际存在的设备。
         /// 路径根须为 emuK 机组根路径；PcsList[i] 要求 i 小于该机组 PCS 台数；
-        /// ElectricityMeter 要求该机组绑定电表；Emu.PowerOnOff（单元高压断路器开合）要求该机组绑定断路器，
+        /// ElectricityMeter 要求该机组绑定电表；Emu.PowerOnOff / Breaker.*（单元高压断路器）要求该机组绑定断路器；
+        /// Groups[g].PcsList[i] / Groups[g].Breaker 按分组构成校验；Transformers[k] 本期仅 k=0（单元变）；
         /// 其余 Emu.* 为单元虚拟模型，恒允许。
         /// </summary>
         public bool Allows(string? bindingPath)
@@ -53,6 +54,20 @@ namespace EssSimulator.DataExchange.Catalog
             var unit = _units[unitIndex];
             string path = target.PropertyPath;
 
+            if (path.StartsWith("Groups[", StringComparison.OrdinalIgnoreCase))
+                return AllowsGroupPath(unit, path);
+
+            if (path.StartsWith("Transformers[", StringComparison.OrdinalIgnoreCase))
+            {
+                // 本期仅建模 Transformers[0]（电气层单元变）
+                int close = path.IndexOf(']', 13);
+                return close > 13 && int.TryParse(path[13..close], out int k) && k == 0;
+            }
+
+            if (path.Equals("Breaker", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("Breaker.", StringComparison.OrdinalIgnoreCase))
+                return unit.HasUnitBreaker;
+
             if (path.StartsWith("PcsList[", StringComparison.OrdinalIgnoreCase))
             {
                 int close = path.IndexOf(']', 8);
@@ -70,6 +85,38 @@ namespace EssSimulator.DataExchange.Catalog
 
             // 其余路径（Emu.* 单元虚拟模型、BMS/直流母线等）恒允许
             return true;
+        }
+
+        /// <summary>
+        /// 分组路径门控：Groups[g] 索引须有效；组内 PcsList[i] 要求 i 小于组内 PCS 台数；
+        /// Groups[g].Breaker 要求该组绑定断路器；其余组聚合遥测恒允许。
+        /// </summary>
+        private static bool AllowsGroupPath(EssUnitConfig unit, string path)
+        {
+            int close = path.IndexOf(']', 7);
+            if (close <= 7 ||
+                !int.TryParse(path[7..close], out int groupIndex) ||
+                groupIndex < 0 || groupIndex >= unit.Groups.Count)
+                return false;
+
+            var group = unit.Groups[groupIndex];
+            string rest = path[(close + 1)..];
+
+            if (rest.StartsWith(".PcsList[", StringComparison.OrdinalIgnoreCase))
+            {
+                int indexOpen = rest.IndexOf('[', 8);
+                int indexClose = indexOpen > 0 ? rest.IndexOf(']', indexOpen + 1) : -1;
+                return indexClose > indexOpen
+                    && int.TryParse(rest[(indexOpen + 1)..indexClose], out int pcsIndex)
+                    && pcsIndex >= 0 && pcsIndex < group.PcsCount;
+            }
+
+            if (rest.Equals(".Breaker", StringComparison.OrdinalIgnoreCase) ||
+                rest.StartsWith(".Breaker.", StringComparison.OrdinalIgnoreCase))
+                return !string.IsNullOrWhiteSpace(group.BreakerName);
+
+            // 组聚合遥测（TotalActivePower 等）：索引有效即允许
+            return rest.Length == 0 || rest.StartsWith(".", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

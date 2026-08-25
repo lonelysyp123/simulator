@@ -14,6 +14,20 @@ public class EmuDeviceCatalogFilterTests
         return u;
     }
 
+    /// <summary>分组机组：组0 含 2 台 PCS + 组断路器；组1 含 1 台 PCS 无断路器。</summary>
+    private static EssUnitConfig GroupedUnit()
+    {
+        var u = new EssUnitConfig { HasUnitBreaker = false, HasUnitMeter = false };
+        u.Groups.Add(new EmuGroupConfig
+        {
+            Name = "G1",
+            Pcs = { new PcsDeviceConfig(), new PcsDeviceConfig() },
+            BreakerName = "组断路器-1"
+        });
+        u.Groups.Add(new EmuGroupConfig { Name = "G2", Pcs = { new PcsDeviceConfig() } });
+        return u;
+    }
+
     [Fact]
     public void Create_ActivatesOnlyForEmuLikeDevicesWithUnits()
     {
@@ -59,6 +73,44 @@ public class EmuDeviceCatalogFilterTests
         // 其余 Emu.* 为单元虚拟模型，恒允许
         Assert.True(filter.Allows("emu2.Emu.TargetActivePower"));
         Assert.True(filter.Allows("emu1.Emu.SystemOperation"));
+    }
+
+    [Fact]
+    public void Allows_GatesGroupAndMirrorPathsByComposition()
+    {
+        // 机组1：分组构成（2 组）；机组2：扁平构成（无 Groups）
+        var filter = EmuDeviceCatalogFilter.Create("simEmu1", new[] { GroupedUnit(), Unit(2, breaker: true, meter: true) })!;
+
+        // Groups[g].PcsList[i]：g 须有效且 i 小于组内 PCS 台数；与扁平视图互不影响
+        Assert.True(filter.Allows("emu1.Groups[0].PcsList[0].pcsOnOffSwitch"));
+        Assert.True(filter.Allows("emu1.Groups[0].PcsList[1].P"));
+        Assert.False(filter.Allows("emu1.Groups[0].PcsList[2].P"));
+        Assert.True(filter.Allows("emu1.Groups[1].PcsList[0].P"));
+        Assert.False(filter.Allows("emu1.Groups[1].PcsList[1].P"));
+        Assert.False(filter.Allows("emu1.Groups[2].PcsList[0].P"));
+        Assert.True(filter.Allows("emu1.PcsList[2].P")); // 扁平视图按机组总数 3 门控
+
+        // Groups[g].Breaker：仅绑定组断路器的组允许
+        Assert.True(filter.Allows("emu1.Groups[0].Breaker.Closed"));
+        Assert.False(filter.Allows("emu1.Groups[1].Breaker.Closed"));
+
+        // 组聚合遥测：组索引有效即允许
+        Assert.True(filter.Allows("emu1.Groups[0].TotalActivePower"));
+        Assert.True(filter.Allows("emu1.Groups[1].TotalActivePower"));
+        Assert.False(filter.Allows("emu1.Groups[2].TotalActivePower"));
+
+        // Transformers[k]：本期仅 k=0（单元变）
+        Assert.True(filter.Allows("emu1.Transformers[0].LoadFraction"));
+        Assert.False(filter.Allows("emu1.Transformers[1].LoadFraction"));
+        Assert.True(filter.Allows("emu2.Transformers[0].OilTemperatureC"));
+
+        // EMU 级 Breaker.*：按机组 HasUnitBreaker 门控
+        Assert.False(filter.Allows("emu1.Breaker.Closed"));
+        Assert.True(filter.Allows("emu2.Breaker.Closed"));
+
+        // 扁平机组无 Groups 构成：Groups 路径自然拒绝
+        Assert.False(filter.Allows("emu2.Groups[0].PcsList[0].P"));
+        Assert.False(filter.Allows("emu2.Groups[0].TotalActivePower"));
     }
 
     [Fact]

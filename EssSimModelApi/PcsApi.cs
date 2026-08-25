@@ -650,6 +650,66 @@ namespace EssSimulator.EssSimModelApi
             }
 
             /// <summary>
+            /// 断路器协议镜像（EMU/组级）：纯采集镜像，不产生电气动作。
+            /// </summary>
+            public class BreakerMirrorData
+            {
+                /// <summary>开合状态：0=分，1=合。</summary>
+                public ushort Closed { get; set; } = 1;
+                /// <summary>跳闸信号（本期恒 0）。</summary>
+                public ushort Trip { get; set; }
+                /// <summary>故障字（本期恒 0）。</summary>
+                public ushort Fault { get; set; }
+            }
+
+            /// <summary>
+            /// 变压器协议镜像（EMU 单元变）：负载率/功率由组内 PCS 求和合成，
+            /// 油温为一阶 RC 简化热模型，不依赖电气层内部结构。
+            /// </summary>
+            public class TransformerMirrorData
+            {
+                /// <summary>投退状态：0=退出，1=投入（跟随单元高压断路器）。</summary>
+                public ushort Closed { get; set; } = 1;
+                /// <summary>负载率（0~1，单元 PCS 总有功 / 额定容量）。</summary>
+                public float LoadFraction { get; set; }
+                /// <summary>有功功率（kW）。</summary>
+                public float ActivePowerKw { get; set; }
+                /// <summary>无功功率（kvar）。</summary>
+                public float ReactivePowerKvar { get; set; }
+                /// <summary>油温（°C，一阶 RC 趋向 环境温 + 额定温升×负载率²）。</summary>
+                public float OilTemperatureC { get; set; } = 25f;
+                /// <summary>运行状态：1=停运，2=空载，3=负载运行。</summary>
+                public ushort OperationStatus { get; set; } = 2;
+            }
+
+            /// <summary>
+            /// EMU 内协议分组镜像（EMU → group → PCS 支路）：
+            /// PcsList 与单元扁平 PcsList 持有同一 PcsData 实例引用，
+            /// 两条路径读写同一对象；组级断路器为协议镜像（无电气动作）。
+            /// </summary>
+            public class EmuGroupData
+            {
+                public string Name { get; set; } = "Group";
+                /// <summary>组内 PCS（与单元扁平 PcsList 共享实例引用）。</summary>
+                public List<PcsData> PcsList { get; set; } = new List<PcsData>();
+                /// <summary>组级断路器协议镜像；组未绑定断路器时为 null。</summary>
+                public BreakerMirrorData? Breaker { get; set; }
+
+                /// <summary>组总有功功率（kW，组内 PCS 求和）。</summary>
+                public float TotalActivePower { get; set; }
+                /// <summary>组总无功功率（kvar）。</summary>
+                public float TotalReactivePower { get; set; }
+                /// <summary>组内 PCS 总台数。</summary>
+                public int TotalPcsCount { get; set; }
+                /// <summary>组内在线（非停机）PCS 台数。</summary>
+                public int OnlinePcsCount { get; set; }
+                /// <summary>组内告警 PCS 台数。</summary>
+                public int AlarmPcsCount { get; set; }
+                /// <summary>组内故障 PCS 台数。</summary>
+                public int FaultPcsCount { get; set; }
+            }
+
+            /// <summary>
             /// 完整的能量管理系统数据模型
             /// </summary>
             public class EnergyManagementData
@@ -662,6 +722,13 @@ namespace EssSimulator.EssSimModelApi
                 public List<GbwkData> GbwkList { get; set; } = new List<GbwkData>();
                 public GyzbData Gyzb { get; set; } = new GyzbData();
                 public ElectricityMeterData ElectricityMeter { get; set; } = new ElectricityMeterData();
+
+                /// <summary>EMU 内协议分组（EMU → group → PCS 支路）；扁平构成时为空。</summary>
+                public List<EmuGroupData> Groups { get; set; } = new List<EmuGroupData>();
+                /// <summary>单元变镜像（本期仅 Transformers[0]，对应电气层单元变）。</summary>
+                public List<TransformerMirrorData> Transformers { get; set; } = new List<TransformerMirrorData>();
+                /// <summary>EMU 级高压断路器镜像（状态跟随 Emu.PowerOnOff）。</summary>
+                public BreakerMirrorData Breaker { get; set; } = new BreakerMirrorData();
             }
     }
 }

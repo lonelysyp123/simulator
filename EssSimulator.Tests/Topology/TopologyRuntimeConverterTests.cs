@@ -137,6 +137,82 @@ public class TopologyRuntimeConverterTests
         Assert.Contains(overlay.Notes, n => n.Contains("单元断") && n.Contains("单元电表"));
     }
 
+    /// <summary>EMU 内含 emu_group 节点：按 groupId 归集 PCS/断路器/电表生成 unit.Groups；组级绑定不占 EMU 级槽位。</summary>
+    [Fact]
+    public void Convert_builds_groups_when_emu_has_emu_group_nodes()
+    {
+        var project = new TopologyProject
+        {
+            Id = "p-group",
+            Name = "分组测试",
+            Nodes =
+            {
+                Node("g1", "grid", "电网"),
+                Node("e1", "emu", "EMU-1", y: 600),
+                Node("grpA", "emu_group", "分组A", new Dictionary<string, object?> { ["emuId"] = "e1" }, y: 700),
+                Node("grpB", "emu_group", "分组B", new Dictionary<string, object?> { ["emuId"] = "e1" }, y: 750),
+                Node("pA1", "pcs", "PCS-A1", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" }, x: 100, y: 720),
+                Node("pA2", "pcs", "PCS-A2", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" }, x: 200, y: 720),
+                Node("pB1", "pcs", "PCS-B1", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpB" }, x: 300, y: 720),
+                Node("gb1", "ac_breaker", "组断A", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" }),
+                Node("gm1", "ac_meter", "组表A", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" })
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        Assert.NotNull(overlay);
+        var u1 = Assert.Single(overlay!.EssUnits);
+
+        // 组顺序按节点 Y 排序；组内 PCS 按 groupId 归集，扁平列表不重复持有
+        Assert.Equal(2, u1.Groups.Count);
+        Assert.Equal(new[] { "分组A", "分组B" }, u1.Groups.Select(g => g.Name).ToArray());
+        Assert.Equal(new[] { "PCS-A1", "PCS-A2" }, u1.Groups[0].Pcs.Select(p => p.Name).ToArray());
+        Assert.Single(u1.Groups[1].Pcs);
+        Assert.Equal("PCS-B1", u1.Groups[1].Pcs[0].Name);
+        Assert.Empty(u1.Pcs);
+        Assert.Equal(3, u1.PcsCount);
+
+        // 组级断路器/电表写入组配置，不占 EMU 级槽位
+        Assert.Equal("组断A", u1.Groups[0].BreakerName);
+        Assert.Equal("组表A", u1.Groups[0].MeterName);
+        Assert.Null(u1.Groups[1].BreakerName);
+        Assert.Null(u1.Groups[1].MeterName);
+        Assert.False(u1.HasUnitBreaker);
+        Assert.False(u1.HasUnitMeter);
+
+        // Notes 输出组结构摘要
+        Assert.Contains(overlay.Notes, n => n.Contains("分组×2") && n.Contains("分组A: PCS×2") && n.Contains("分组B: PCS×1"));
+    }
+
+    /// <summary>EMU 有分组时，未选组的 PCS 归入合成「直挂」组，保证扁平展开不丢 PCS。</summary>
+    [Fact]
+    public void Convert_puts_ungrouped_pcs_into_direct_group_when_groups_present()
+    {
+        var project = new TopologyProject
+        {
+            Id = "p-direct",
+            Name = "直挂测试",
+            Nodes =
+            {
+                Node("g1", "grid", "电网"),
+                Node("e1", "emu", "EMU-1", y: 600),
+                Node("grpA", "emu_group", "分组A", new Dictionary<string, object?> { ["emuId"] = "e1" }, y: 700),
+                Node("pA1", "pcs", "PCS-A1", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" }, x: 100, y: 720),
+                Node("pD1", "pcs", "PCS-D1", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 300, y: 720)
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        var u1 = Assert.Single(overlay!.EssUnits);
+
+        Assert.Equal(2, u1.Groups.Count);
+        Assert.Equal("直挂", u1.Groups[1].Name);
+        Assert.Equal("PCS-D1", u1.Groups[1].Pcs[0].Name);
+        Assert.Equal(2, u1.PcsCount);
+    }
+
     [Fact]
     public void Convert_rejects_project_without_pcs_assigned_emu_or_pv_unit()
     {

@@ -266,12 +266,12 @@ function expandFeederUnit(opts) {
     : []
   const emu = kind === 'emu' ? (emuNode || null) : null
   const pv = kind === 'pv' ? feeder : null
-  // EMU 绑定的单元断路器 / 电表（组态中通过 emuId 归入本单元，各至多 1 台；未绑定为 null）
+  // EMU 绑定的单元断路器 / 电表（组态中通过 emuId 归入本单元，各至多 1 台；未绑定为 null；组级绑定不参与单元级绘制）
   const unitBreakerNode = kind === 'emu' && emu
-    ? (graph.nodes.find(n => n.templateId === 'ac_breaker' && paramStr(n, 'emuId') === emu.id) || null)
+    ? (graph.nodes.find(n => n.templateId === 'ac_breaker' && paramStr(n, 'emuId') === emu.id && !paramStr(n, 'groupId')) || null)
     : null
   const unitMeterNode = kind === 'emu' && emu
-    ? (graph.nodes.find(n => n.templateId === 'ac_meter' && paramStr(n, 'emuId') === emu.id) || null)
+    ? (graph.nodes.find(n => n.templateId === 'ac_meter' && paramStr(n, 'emuId') === emu.id && !paramStr(n, 'groupId')) || null)
     : null
   // 实时编号与运行时转换器同序（含 PCS 的 EMU 按 (Y,X)、PV 按 (Y,X)），
   // 与画布绘制顺序解耦，保证实时数据 / 控制命令落在与运行时一致的单元上

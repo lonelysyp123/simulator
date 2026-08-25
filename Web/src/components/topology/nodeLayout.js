@@ -66,6 +66,7 @@ export function templateColor(templateId) {
     case 'ac_meter': return '#8e44ad'
     case 'load': return '#c0392b'
     case 'emu': return '#16a085'
+    case 'emu_group': return '#0f8a9d'
     case 'pcs': return '#0e7a6a'
     case 'pv_unit': return '#e6a817'
     case 'bms': return '#27ae60'

@@ -151,6 +151,43 @@ namespace EssSimulator.EssSimModelApi.Mappers
             emu.Emu.OperationStatus = anyDischarge ? 5 : (anyCharge ? 4 : (online > 0 ? 2 : 1));
         }
 
+        /// <summary>
+        /// 组级聚合遥测刷新：组内 PCS 求和与台数统计；组级断路器为协议镜像，恒合闸。
+        /// 扁平构成（无 Groups）时为空操作。
+        /// </summary>
+        public static void MapGroupState(EnergyManagementData emu)
+        {
+            if (emu.Groups.Count == 0)
+                return;
+
+            foreach (var group in emu.Groups)
+            {
+                float sumP = 0f, sumQ = 0f;
+                int online = 0, alarmed = 0, faulted = 0;
+                foreach (var pcs in group.PcsList)
+                {
+                    sumP += pcs.ActivePower;
+                    sumQ += pcs.ReactivePower;
+
+                    bool off = pcs.SimulatorMode == OperationMode.Off;
+                    bool fault = pcs.OperationStatus == 6;
+                    if (!off) online++;
+                    if (fault) faulted++;
+                    else if (HasAnyAlarm(pcs)) alarmed++;
+                }
+
+                group.TotalActivePower = sumP;
+                group.TotalReactivePower = sumQ;
+                group.TotalPcsCount = group.PcsList.Count;
+                group.OnlinePcsCount = online;
+                group.AlarmPcsCount = alarmed;
+                group.FaultPcsCount = faulted;
+
+                if (group.Breaker != null)
+                    group.Breaker.Closed = 1;
+            }
+        }
+
         /// <summary>PCS 是否携带任一告警字（告警 1~7 任一非 0）。</summary>
         private static bool HasAnyAlarm(PcsData pcs) =>
             pcs.AlarmSummary1 != 0 || pcs.AlarmSummary2 != 0 || pcs.AlarmSummary3 != 0 ||
