@@ -37,7 +37,7 @@ function neighborsOf(adj, nodeId) {
   return adj.get(nodeId) || []
 }
 
-function makeGraph(nodes, edges) {
+export function makeGraph(nodes, edges) {
   const byId = new Map((nodes || []).map(n => [n.id, n]))
   const adj = new Map()
   for (const n of nodes || []) adj.set(n.id, new Set())
@@ -168,6 +168,8 @@ function buildBusFrame(graph, bus, incomingXfmrId, visitedBuses, visitedXfmrs) {
       continue
     }
     if (n.templateId === 'pcs' || n.templateId === 'pv_unit' || n.templateId === 'load' || n.templateId === 'ac_meter') {
+      // 已归入 EMU 的电表在单元框内绘制，不再作为母线挂件重复入图
+      if (n.templateId === 'ac_meter' && paramStr(n, 'emuId')) continue
       hangs.push({ node: n })
     }
   }
@@ -181,7 +183,7 @@ function walkFrames(frame, visit) {
   }
 }
 
-function findBmsForPcs(graph, pcsId) {
+export function findBmsForPcs(graph, pcsId) {
   const neighborIds = new Set(neighborsOf(graph.adj, pcsId))
   const dcBuses = graph.nodes
     .filter(n => n.templateId === 'dc_bus' && neighborIds.has(n.id))
@@ -264,6 +266,13 @@ function expandFeederUnit(opts) {
     : []
   const emu = kind === 'emu' ? (emuNode || null) : null
   const pv = kind === 'pv' ? feeder : null
+  // EMU 绑定的单元断路器 / 电表（组态中通过 emuId 归入本单元，各至多 1 台；未绑定为 null；组级绑定不参与单元级绘制）
+  const unitBreakerNode = kind === 'emu' && emu
+    ? (graph.nodes.find(n => n.templateId === 'ac_breaker' && paramStr(n, 'emuId') === emu.id && !paramStr(n, 'groupId')) || null)
+    : null
+  const unitMeterNode = kind === 'emu' && emu
+    ? (graph.nodes.find(n => n.templateId === 'ac_meter' && paramStr(n, 'emuId') === emu.id && !paramStr(n, 'groupId')) || null)
+    : null
   // 实时编号与运行时转换器同序（含 PCS 的 EMU 按 (Y,X)、PV 按 (Y,X)），
   // 与画布绘制顺序解耦，保证实时数据 / 控制命令落在与运行时一致的单元上
   const unitSnap = kind === 'emu' && emu
@@ -288,7 +297,8 @@ function expandFeederUnit(opts) {
   const drawPcsSlots = kind === 'pv'
     ? 0
     : (pcsHangCount > 0 ? pcsHangCount : expectPcs)
-  const omitBus690 = kind === 'pv' || drawPcsSlots <= 1
+  // 绑定单元电表时强制画出 690 母线，作为电表取电挂点
+  const omitBus690 = kind === 'pv' || (drawPcsSlots <= 1 && !unitMeterNode)
   const runtimeMissing = kind === 'emu' && pcsNodes.length > 0 && !unitSnap
   const dcParallel = kind === 'emu' && !!dcBus
   const bmsHangCount = dcParallel ? Math.max(bmsNodes.length, drawPcsSlots) : 0
@@ -311,7 +321,13 @@ function expandFeederUnit(opts) {
   const arraySplitY = kind === 'pv' ? (xfmrCardTop + xfmrCardH + LINK_STUB) : 0
   const unitBottom = bmsTop + bmsH + 16
   const boxTop = 4
-  const boxBottom = pcsTop + pcsH + 8
+  // 虚线框覆盖完整单元内容：上含单元断路器，下含 BMS / 直流母线
+  const boxBottom = unitBottom
+  // 单元电表挂点：690 母线右侧（PCS-B 卡片外侧）；未绑定不画
+  const UNIT_METER_HALF_W = 32
+  const UNIT_METER_H = 72
+  const unitMeterX = 196
+  const unitMeterTopY = unitBus690Y + LINK_STUB
 
   const inverterCount = Math.max(1, Math.round(paramNum(pv, 'inverterCount', 16)))
   const inverterRatedKw = paramNum(pv, 'inverterRatedPowerKw', 320)
@@ -400,16 +416,27 @@ function expandFeederUnit(opts) {
     pvLvBottomY: unitXfmrTop + unitXfmrSpan / 2 + 17,
     pvSplitY: arraySplitY,
     dcVoltageLabel: fmtKv(paramNum(dcBus, 'nominalVoltage', 1200)),
-    dcParallel
+    dcParallel,
+    unitBreakerNode,
+    unitMeterNode,
+    unitMeterX,
+    unitMeterTopY,
+    unitMeterHalfW: UNIT_METER_HALF_W,
+    unitMeterH: UNIT_METER_H
   }
 
+  // 虚线框：默认贴单元两侧；绑定电表时向右扩出电表位
+  const boxLeftOffset = -UNIT_W / 2 + 12
+  const boxRightOffset = unitMeterNode
+    ? Math.max(UNIT_W / 2 - 12, unitMeterX + UNIT_METER_HALF_W + 8)
+    : (UNIT_W / 2 - 12)
   const group = kind === 'emu'
     ? {
       id: `${kind}-${index}`,
       kind,
-      x: cx - UNIT_W / 2 + 12,
+      x: cx + boxLeftOffset,
       y: originY + boxTop,
-      w: UNIT_W - 24,
+      w: boxRightOffset - boxLeftOffset,
       h: boxBottom - boxTop
     }
     : null

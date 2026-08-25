@@ -1,4 +1,5 @@
 using System.Linq;
+using EssSimulator.Configuration;
 using EssSimulator.DataExchange;
 using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Config;
@@ -25,7 +26,12 @@ namespace EssSimulator.LocalControl
         /// 构造 LC 从站。<paramref name="firstEmuId"/> 为聚合组首机组号（非空时把点表中的
         /// emuDeviceId 占位符替换为该机组根路径，LC 控制点作用于首机组 EMU 虚拟模型）。
         /// </summary>
-        public LocalControlModbusServer(string mapFilePath, int modbusPort, string serverName, int? firstEmuId = null)
+        public LocalControlModbusServer(
+            string mapFilePath,
+            int modbusPort,
+            string serverName,
+            int? firstEmuId = null,
+            IReadOnlyList<EssUnitConfig>? essUnits = null)
         {
             _pointMap = new ModbusPointMap(mapFilePath, serverName, clusterCount: 0, emuDeviceIdOverride: firstEmuId);
             _deviceInfo = new DeviceInfoDto
@@ -44,7 +50,7 @@ namespace EssSimulator.LocalControl
             if (RequiresDataExchange(_pointMap))
             {
                 UsesDataExchange = true;
-                var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName);
+                var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName, essUnits: essUnits);
                 _backend = new DataExchangeSession(
                     _slave, _parser, catalog, _deviceInfo, new DataExchangeOptions(), clusterCount: 0);
                 var emuHint = firstEmuId is int id ? $"（首机组 emu{id}）" : string.Empty;

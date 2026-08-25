@@ -136,6 +136,19 @@
             </g>
           </g>
 
+          <!-- EMU 虚线框（容器）：先绘制，单元内容叠加在框内 -->
+          <g class="emu-overlay" pointer-events="none">
+            <rect
+              v-for="g in layout.groups"
+              :key="g.id"
+              :x="g.x"
+              :y="g.y"
+              :width="g.w"
+              :height="g.h"
+              class="group-box"
+            />
+          </g>
+
           <!-- 各发电单元：EMU / 光伏；支路原点在 LV 母线上 -->
           <g
             v-for="u in layout.units"
@@ -158,7 +171,7 @@
               <rect x="-22" :y="u.unitBrkTop" width="44" :height="u.unitBrkBottom - u.unitBrkTop" rx="3" fill="transparent" />
               <BreakerSymbol :x="0" :y="u.unitBrkMid" :closed="!!u.unitSnap?.unitBreakerClosed" :tripped="!!u.unitSnap?.unitBreakerTripped" />
               <text x="26" :y="u.unitBrkMid + 4" class="label-text breaker-label">
-                单元断 {{ u.unitSnap?.unitBreakerLabel || fmtBreaker(u.unitSnap?.unitBreakerClosed, u.unitSnap?.unitBreakerTripped) }}
+                单元断 {{ u.unitBreakerNode?.label || u.unitSnap?.unitBreakerLabel || fmtBreaker(u.unitSnap?.unitBreakerClosed, u.unitSnap?.unitBreakerTripped) }}
               </text>
             </g>
 
@@ -279,6 +292,22 @@
               :h="u.pcsH"
             />
 
+            <!-- 单元电表（EMU 绑定）：自 690 母线右侧取电；未绑定不画 -->
+            <template v-if="u.unitMeterNode">
+              <line class="bus-line" :x1="u.channelX" :y1="u.unitBus690Y" :x2="u.unitMeterX" :y2="u.unitBus690Y" />
+              <line class="bus-line" :x1="u.unitMeterX" :y1="u.unitBus690Y" :x2="u.unitMeterX" :y2="u.unitMeterTopY" />
+              <rect
+                :x="u.unitMeterX - u.unitMeterHalfW"
+                :y="u.unitMeterTopY"
+                :width="u.unitMeterHalfW * 2"
+                :height="u.unitMeterH"
+                rx="4"
+                class="meter-box"
+              />
+              <text :x="u.unitMeterX" :y="u.unitMeterTopY + 18" text-anchor="middle" class="label-text">{{ u.unitMeterNode.label || '电表' }}</text>
+              <text :x="u.unitMeterX" :y="u.unitMeterTopY + 34" text-anchor="middle" class="value-text">PT/CT</text>
+            </template>
+
             <!-- DC：并联共母线；下方仅 1 路 BMS 时省略直流母线直连 -->
             <template v-if="u.dcParallel && !u.omitDcBus">
               <line class="bus-line" :x1="-u.channelX" :y1="u.pcsTop + u.pcsH" :x2="-u.channelX" :y2="u.dcBusY" />
@@ -346,19 +375,6 @@
               class="runtime-missing-hint"
             >请在「系统配置」应用组态并重启</text>
             </template>
-          </g>
-
-          <!-- 储能单元虚线遮罩：仅框线，无文字；不拦截点击 -->
-          <g class="emu-overlay" pointer-events="none">
-            <rect
-              v-for="g in layout.groups"
-              :key="g.id"
-              :x="g.x"
-              :y="g.y"
-              :width="g.w"
-              :height="g.h"
-              class="group-box"
-            />
           </g>
         </svg>
       </div>

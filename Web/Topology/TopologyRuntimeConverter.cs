@@ -194,29 +194,85 @@ namespace EssSimulator.Web.Topology
                     Name = string.IsNullOrWhiteSpace(emu.Label) ? $"Unit-{unitIndex}" : emu.Label
                 };
 
-                int pcsSeq = 0;
-                int linkedBms = 0;
+                // 单元断路器/电表：按 emuId 归入本单元的组态节点（排除组级绑定；各至多 1 台，保存校验已保证）
+                var unitBreaker = project.Nodes.FirstOrDefault(n =>
+                    n.TemplateId == "ac_breaker" &&
+                    TopologyParamHelper.GetString(n.Parameters, "emuId") == emu.Id &&
+                    string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(n.Parameters, "groupId")));
+                var unitMeter = project.Nodes.FirstOrDefault(n =>
+                    n.TemplateId == "ac_meter" &&
+                    TopologyParamHelper.GetString(n.Parameters, "emuId") == emu.Id &&
+                    string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(n.Parameters, "groupId")));
+                unit.HasUnitBreaker = unitBreaker != null;
+                unit.UnitBreakerName = NodeDisplayName(unitBreaker);
+                unit.HasUnitMeter = unitMeter != null;
+                unit.UnitMeterName = NodeDisplayName(unitMeter);
+
                 var usedBms = new HashSet<string>(StringComparer.Ordinal);
-                foreach (var pcs in group.Pcs)
+                int linkedBms = 0;
+                int pcsSeq = 0;
+
+                var unitGroups = project.Nodes
+                    .Where(n => n.TemplateId == "emu_group" && TopologyParamHelper.GetString(n.Parameters, "emuId") == emu.Id)
+                    .OrderBy(n => n.Y).ThenBy(n => n.X)
+                    .ToList();
+
+                if (unitGroups.Count > 0)
                 {
-                    pcsSeq++;
-                    char slot = (char)('A' + Math.Min(pcsSeq - 1, 25));
-                    unit.Pcs.Add(new Configuration.PcsDeviceConfig
+                    // 分组成配置：PCS 按 groupId 归组，组顺序即扁平 PcsList 展开顺序
+                    foreach (var groupNode in unitGroups)
                     {
-                        Name = string.IsNullOrWhiteSpace(pcs.Label) ? $"PCS-{unitIndex}{slot}" : pcs.Label
-                    });
-                    // BMS 与 PCS 按位对齐：沿该 PCS 的 DC 连线找 1 台未占用的 BMS，缺位用默认配置补齐
-                    var bms = FindBmsForPcs(project, pcs.Id).FirstOrDefault(b => !usedBms.Contains(b.Id));
-                    if (bms != null)
-                    {
-                        linkedBms++;
-                        usedBms.Add(bms.Id);
+                        var groupCfg = new EmuGroupConfig
+                        {
+                            Name = !string.IsNullOrWhiteSpace(groupNode.Label) ? groupNode.Label
+                                : TopologyParamHelper.GetString(groupNode.Parameters, "name", groupNode.Id)
+                        };
+                        var groupBreaker = project.Nodes.FirstOrDefault(n =>
+                            n.TemplateId == "ac_breaker" && TopologyParamHelper.GetString(n.Parameters, "groupId") == groupNode.Id);
+                        var groupMeter = project.Nodes.FirstOrDefault(n =>
+                            n.TemplateId == "ac_meter" && TopologyParamHelper.GetString(n.Parameters, "groupId") == groupNode.Id);
+                        groupCfg.BreakerName = NodeDisplayName(groupBreaker);
+                        groupCfg.MeterName = NodeDisplayName(groupMeter);
+
+                        foreach (var pcs in group.Pcs.Where(p =>
+                            TopologyParamHelper.GetString(p.Parameters, "groupId") == groupNode.Id))
+                        {
+                            pcsSeq++;
+                            AddPcsWithBms(project, groupCfg.Pcs, groupCfg.Bms, pcs, unitIndex, pcsSeq, usedBms, ref linkedBms);
+                        }
+                        unit.Groups.Add(groupCfg);
                     }
-                    unit.Bms.Add(ToBmsConfig(bms, $"BMS-{unitIndex}{slot}"));
+
+                    // 未选分组的 PCS 归入合成「直挂」组，保证扁平展开不丢 PCS
+                    var ungrouped = group.Pcs
+                        .Where(p => string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(p.Parameters, "groupId")))
+                        .ToList();
+                    if (ungrouped.Count > 0)
+                    {
+                        var direct = new EmuGroupConfig { Name = "直挂" };
+                        foreach (var pcs in ungrouped)
+                        {
+                            pcsSeq++;
+                            AddPcsWithBms(project, direct.Pcs, direct.Bms, pcs, unitIndex, pcsSeq, usedBms, ref linkedBms);
+                        }
+                        unit.Groups.Add(direct);
+                    }
+                }
+                else
+                {
+                    foreach (var pcs in group.Pcs)
+                    {
+                        pcsSeq++;
+                        AddPcsWithBms(project, unit.Pcs, unit.Bms, pcs, unitIndex, pcsSeq, usedBms, ref linkedBms);
+                    }
                 }
 
                 overlay.EssUnits.Add(unit);
-                overlay.Notes.Add($"{unit.Name}: PCS×{unit.Pcs.Count} · BMS×{linkedBms}（每台 PCS 对齐 1 路 BMS，未连线时用默认补齐）");
+                string groupSummary = unit.HasGroups
+                    ? $" · 分组×{unit.Groups.Count}（{string.Join("、", unit.Groups.Select(g => $"{g.Name}: PCS×{g.PcsCount}"))}）"
+                    : string.Empty;
+                overlay.Notes.Add($"{unit.Name}: PCS×{unit.Pcs.Count + unit.Groups.Sum(g => g.Pcs.Count)} · BMS×{linkedBms}（每台 PCS 对齐 1 路 BMS，未连线时用默认补齐）"
+                    + $" · 单元断路器：{unit.UnitBreakerName ?? "未绑定"} · 单元电表：{unit.UnitMeterName ?? "未绑定"}{groupSummary}");
             }
 
             // 无 PCS 归入的 EMU 节点不生成单元，仅提示
@@ -234,6 +290,43 @@ namespace EssSimulator.Web.Topology
                 Message = message,
                 Details = overlay.Notes.ToList()
             });
+        }
+
+        /// <summary>
+        /// 添加 1 台 PCS 及其对齐 BMS：槽位名按单元内全局序号生成，BMS 沿 DC 连线查找且全单元不重复占用。
+        /// </summary>
+        private static void AddPcsWithBms(
+            TopologyProject project,
+            List<Configuration.PcsDeviceConfig> pcsList,
+            List<BmsDeviceConfig> bmsList,
+            TopologyNode pcs,
+            int unitIndex,
+            int pcsSeq,
+            HashSet<string> usedBms,
+            ref int linkedBms)
+        {
+            char slot = (char)('A' + Math.Min(pcsSeq - 1, 25));
+            pcsList.Add(new Configuration.PcsDeviceConfig
+            {
+                Name = string.IsNullOrWhiteSpace(pcs.Label) ? $"PCS-{unitIndex}{slot}" : pcs.Label
+            });
+            // BMS 与 PCS 按位对齐：沿该 PCS 的 DC 连线找 1 台未占用的 BMS，缺位用默认配置补齐
+            var bms = FindBmsForPcs(project, pcs.Id).FirstOrDefault(b => !usedBms.Contains(b.Id));
+            if (bms != null)
+            {
+                linkedBms++;
+                usedBms.Add(bms.Id);
+            }
+            bmsList.Add(ToBmsConfig(bms, $"BMS-{unitIndex}{slot}"));
+        }
+
+        private static string? NodeDisplayName(TopologyNode? node)
+        {
+            if (node == null) return null;
+            var name = TopologyParamHelper.GetString(node.Parameters, "name");
+            return !string.IsNullOrWhiteSpace(node.Label) ? node.Label
+                : !string.IsNullOrWhiteSpace(name) ? name
+                : node.Id;
         }
 
         private static List<TopologyNode> FindBmsForPcs(TopologyProject project, string pcsId)

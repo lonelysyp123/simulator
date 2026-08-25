@@ -428,6 +428,7 @@ describe('fallback drawing for every placed base template node', () => {
 
 describe('bus is drawn as a node (star wiring rule)', () => {
   it('draws main bus as bus-node and routes feeder drops into the hub', () => {
+    // 组态模式：EMU 绑定断路器时支路馈线由真实断路器节点接入母线汇流点
     const snap = {
       topology: {
         nodes: [
@@ -435,14 +436,16 @@ describe('bus is drawn as a node (star wiring rule)', () => {
           node('bus', 'ac_bus', '35kV', 0, { nominalVoltage: 35000 }),
           node('emu1', 'emu', 'EMU-1', 300),
           node('pcs1', 'pcs', 'PCS-1', 300, { emuId: 'emu1' }),
+          node('brk1', 'ac_breaker', '单元断-1', 300, { emuId: 'emu1' }),
           node('emu2', 'emu', 'EMU-2', 500),
           node('pcs2', 'pcs', 'PCS-2', 500, { emuId: 'emu2' }),
+          node('brk2', 'ac_breaker', '单元断-2', 500, { emuId: 'emu2' }),
           node('pv1', 'pv_unit', 'PV-1', 700, { inverterCount: 4 })
         ],
         edges: [
           edge('grid', 'bus'),
-          edge('pcs1', 'bus'),
-          edge('pcs2', 'bus'),
+          edge('brk1', 'bus'),
+          edge('brk2', 'bus'),
           edge('pv1', 'bus')
         ]
       },
@@ -462,6 +465,68 @@ describe('bus is drawn as a node (star wiring rule)', () => {
       assert.ok(d.midY >= 0.35, `layered midY: ${d.midY}`)
     }
     assert.equal(new Set(drops.map(d => d.midY)).size, drops.length, 'per-drop y layers')
+  })
+
+  it('expands emu units device by device without synthetic unit title / xf / 690 bus', () => {
+    const snap = {
+      topology: {
+        nodes: [
+          node('grid', 'grid', '电网', 0, { outputVoltage: 35000 }),
+          node('bus', 'ac_bus', '35kV', 0, { nominalVoltage: 35000 }),
+          node('emu1', 'emu', 'EMU-1', 300),
+          node('pcs1', 'pcs', 'PCS-1', 260, { emuId: 'emu1' }),
+          node('pcs2', 'pcs', 'PCS-2', 340, { emuId: 'emu1' }),
+          node('brk1', 'ac_breaker', '单元断-1', 300, { emuId: 'emu1' }),
+          node('meter1', 'ac_meter', '单元电表', 300, { emuId: 'emu1' }),
+          node('bms1', 'bms', 'BMS-1', 260, { clusterCount: 8 }),
+          node('bms2', 'bms', 'BMS-2', 340, { clusterCount: 8 })
+        ],
+        edges: [
+          edge('grid', 'bus'),
+          edge('brk1', 'bus'),
+          { fromNodeId: 'pcs1', toNodeId: 'bms1', fromPortId: 'dc_pos', toPortId: 'dc_pos' },
+          { fromNodeId: 'pcs2', toNodeId: 'bms2', fromPortId: 'dc_pos', toPortId: 'dc_pos' }
+        ]
+      },
+      units: [],
+      pvUnits: []
+    }
+    const layout = buildStation3dLayout(snap)
+    // 组态模式不再合成 EMU 概念（单元标题/单元变/690 母线）
+    for (const kind of ['unit-title', 'unit-xf']) {
+      assert.ok(!layout.items.some(i => i.kind === kind), `no synthetic ${kind}`)
+    }
+    assert.ok(!layout.items.some(i => i.busRole === 'unit-lv-bus'), 'no synthetic 690 bus')
+    // 逐设备出 item：断路器/电表用真实组态节点身份
+    const brk = layout.items.find(i => i.templateId === 'ac_breaker' && i.kind === 'unit-breaker')
+    assert.ok(brk, 'bound breaker drawn')
+    assert.equal(brk.node?.id, 'brk1', 'breaker identity from topology node')
+    const meter = layout.items.find(i => i.templateId === 'ac_meter' && i.kind === 'meter')
+    assert.ok(meter, 'bound meter drawn')
+    assert.equal(meter.node?.id, 'meter1', 'meter identity from topology node')
+    assert.equal(byTemplate(layout, 'pcs').length, 2, 'one item per pcs node')
+    assert.equal(byTemplate(layout, 'bms').length, 2, 'one item per bms node')
+  })
+
+  it('omits breaker / meter items and unit-drop when the emu has no bound device', () => {
+    const snap = {
+      topology: {
+        nodes: [
+          node('grid', 'grid', '电网', 0, { outputVoltage: 35000 }),
+          node('bus', 'ac_bus', '35kV', 0, { nominalVoltage: 35000 }),
+          node('emu1', 'emu', 'EMU-1', 300),
+          node('pcs1', 'pcs', 'PCS-1', 300, { emuId: 'emu1' })
+        ],
+        edges: [edge('grid', 'bus')]
+      },
+      units: [],
+      pvUnits: []
+    }
+    const layout = buildStation3dLayout(snap)
+    assert.ok(!layout.items.some(i => i.kind === 'unit-breaker'), 'no breaker drawn')
+    assert.ok(!layout.items.some(i => i.kind === 'meter'), 'no meter drawn')
+    assert.equal(layout.cables.filter(c => c.role === 'unit-drop').length, 0, 'no unit-drop without breaker')
+    assert.equal(layout.cables.filter(c => c.role === 'pcs-feed').length, 1, 'pcs fed directly from bus hub')
   })
 
   it('fallback layout also draws the bus as a node', () => {

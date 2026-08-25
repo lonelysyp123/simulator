@@ -59,7 +59,7 @@ namespace EssSimulator
                     for (int u = 0; u < unitCount; u++)
                     {
                         string name = $"simEmu{u + 1}";
-                        var pcs = new ModbusSimServer("emu.csv", 0, name, dataExchangeOptions: _dataExchange);
+                        var pcs = new ModbusSimServer("emu.csv", 0, name, dataExchangeOptions: _dataExchange, essUnits: _cfg.Devices);
                         store.Register(name, pcs);
                         _manager.RegisterDevice(pcs, ProtocolDeviceType.Emu, "emu.csv");
                     }

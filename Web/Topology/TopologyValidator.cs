@@ -801,6 +801,16 @@ namespace EssSimulator.Web.Topology
                     details: details, problemNodeIds: orphanPcs.Select(n => n.Id).ToList());
             }
 
+            // 断路器/电表归属（可选）：已选 emuId 时须指向存在的 EMU，且每个 EMU 至多各 1 台
+            var emuBindingCheck = ValidateEmuDeviceBindings(project, emuIds, details);
+            if (emuBindingCheck != null)
+                return emuBindingCheck;
+
+            // EMU 分组归属（可选）：已选 groupId 时须指向存在的分组，且分组与设备所属 EMU 一致；组级断路器/电表各至多 1 台
+            var groupBindingCheck = ValidateEmuGroupBindings(project, emuIds, details);
+            if (groupBindingCheck != null)
+                return groupBindingCheck;
+
             // 至少一个含 PCS 的 EMU 或光伏单元
             var emusWithPcs = project.Nodes
                 .Where(n => n.TemplateId == "emu")
@@ -852,6 +862,129 @@ namespace EssSimulator.Web.Topology
                     $"并网点电表：{pccMeters[0].Label}"
                 }
             };
+        }
+
+        /// <summary>
+        /// 断路器/电表绑定 EMU 校验：绑定可选，但已选 emuId 必须有效，且同一 EMU 下断路器/电表各至多 1 台。
+        /// 已选 groupId 的设备属组级绑定，不参与 EMU 级计数。校验通过返回 null。
+        /// </summary>
+        private static TopologyValidationResult? ValidateEmuDeviceBindings(
+            TopologyProject project, HashSet<string> emuIds, List<string> details)
+        {
+            foreach (var (templateId, deviceLabel, dupCode) in new[]
+            {
+                ("ac_breaker", "断路器", "EMU_BREAKER_DUPLICATE"),
+                ("ac_meter", "电表", "EMU_METER_DUPLICATE")
+            })
+            {
+                var bound = project.Nodes
+                    .Where(n => n.TemplateId == templateId)
+                    .Where(n => !string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(n.Parameters, "emuId")))
+                    .Where(n => string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(n.Parameters, "groupId")))
+                    .ToList();
+
+                var orphan = bound.Where(n => !emuIds.Contains(TopologyParamHelper.GetString(n.Parameters, "emuId"))).ToList();
+                if (orphan.Count > 0)
+                {
+                    details.Add($"以下{deviceLabel}选择了不存在的所属 EMU 储能单元：{string.Join("、", orphan.Select(n => n.Label))}");
+                    return Fail("EMU_DEVICE_UNASSIGNED", $"{deviceLabel}选择的所属 EMU 储能单元须为工程内存在的 EMU",
+                        details: details, problemNodeIds: orphan.Select(n => n.Id).ToList());
+                }
+
+                var dupGroups = bound
+                    .GroupBy(n => TopologyParamHelper.GetString(n.Parameters, "emuId"))
+                    .Where(g => g.Count() > 1)
+                    .ToList();
+                if (dupGroups.Count > 0)
+                {
+                    var emuLabel = project.Nodes.Where(n => n.TemplateId == "emu").ToDictionary(n => n.Id, n => n.Label);
+                    foreach (var g in dupGroups)
+                    {
+                        var name = emuLabel.TryGetValue(g.Key, out var l) && !string.IsNullOrWhiteSpace(l) ? l : g.Key;
+                        details.Add($"EMU「{name}」绑定了 {g.Count()} 台{deviceLabel}：{string.Join("、", g.Select(n => n.Label))}");
+                    }
+                    return Fail(dupCode, $"每个 EMU 储能单元至多绑定 1 台{deviceLabel}",
+                        details: details, problemNodeIds: dupGroups.SelectMany(g => g.Select(n => n.Id)).ToList());
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// EMU 分组绑定校验：已选 groupId 的设备须指向存在的分组（GROUP_UNASSIGNED），
+        /// 分组所属 EMU 须有效且与设备自身 emuId 一致（GROUP_EMU_MISMATCH），
+        /// 每个分组下断路器/电表各至多 1 台（EMU_GROUP_BREAKER_DUPLICATE / EMU_GROUP_METER_DUPLICATE）。
+        /// 无分组的工程全部规则退化通过。校验通过返回 null。
+        /// </summary>
+        private static TopologyValidationResult? ValidateEmuGroupBindings(
+            TopologyProject project, HashSet<string> emuIds, List<string> details)
+        {
+            var groups = project.Nodes.Where(n => n.TemplateId == "emu_group").ToList();
+            var groupIds = groups.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+            var groupEmuId = groups.ToDictionary(
+                n => n.Id,
+                n => TopologyParamHelper.GetString(n.Parameters, "emuId"),
+                StringComparer.Ordinal);
+
+            var bound = project.Nodes
+                .Where(n => n.TemplateId is "pcs" or "ac_breaker" or "ac_meter")
+                .Where(n => !string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(n.Parameters, "groupId")))
+                .ToList();
+            if (bound.Count == 0)
+                return null;
+
+            var orphan = bound
+                .Where(n => !groupIds.Contains(TopologyParamHelper.GetString(n.Parameters, "groupId")))
+                .ToList();
+            if (orphan.Count > 0)
+            {
+                details.Add($"以下设备选择了不存在的所属 EMU 分组：{string.Join("、", orphan.Select(n => n.Label))}");
+                return Fail("GROUP_UNASSIGNED", "设备选择的所属 EMU 分组须为工程内存在的 EMU 分组",
+                    details: details, problemNodeIds: orphan.Select(n => n.Id).ToList());
+            }
+
+            var mismatch = bound.Where(n =>
+            {
+                string gid = TopologyParamHelper.GetString(n.Parameters, "groupId");
+                string devEmu = TopologyParamHelper.GetString(n.Parameters, "emuId");
+                return !groupEmuId.TryGetValue(gid, out string? gEmu) ||
+                       string.IsNullOrWhiteSpace(gEmu) ||
+                       !emuIds.Contains(gEmu) ||
+                       !string.Equals(gEmu, devEmu, StringComparison.Ordinal);
+            }).ToList();
+            if (mismatch.Count > 0)
+            {
+                details.Add($"以下设备所属 EMU 分组与其所属 EMU 储能单元不一致（或分组未选择有效 EMU）：{string.Join("、", mismatch.Select(n => n.Label))}");
+                return Fail("GROUP_EMU_MISMATCH", "EMU 分组所属的 EMU 储能单元须有效且与设备所属 EMU 一致",
+                    details: details, problemNodeIds: mismatch.Select(n => n.Id).ToList());
+            }
+
+            var groupLabel = groups.ToDictionary(n => n.Id, n => n.Label, StringComparer.Ordinal);
+            foreach (var (templateId, deviceLabel, dupCode) in new[]
+            {
+                ("ac_breaker", "断路器", "EMU_GROUP_BREAKER_DUPLICATE"),
+                ("ac_meter", "电表", "EMU_GROUP_METER_DUPLICATE")
+            })
+            {
+                var dupGroups = bound
+                    .Where(n => n.TemplateId == templateId)
+                    .GroupBy(n => TopologyParamHelper.GetString(n.Parameters, "groupId"))
+                    .Where(g => g.Count() > 1)
+                    .ToList();
+                if (dupGroups.Count > 0)
+                {
+                    foreach (var g in dupGroups)
+                    {
+                        var name = groupLabel.TryGetValue(g.Key, out var l) && !string.IsNullOrWhiteSpace(l) ? l : g.Key;
+                        details.Add($"EMU 分组「{name}」绑定了 {g.Count()} 台{deviceLabel}：{string.Join("、", g.Select(n => n.Label))}");
+                    }
+                    return Fail(dupCode, $"每个 EMU 分组至多绑定 1 台{deviceLabel}",
+                        details: details, problemNodeIds: dupGroups.SelectMany(g => g.Select(n => n.Id)).ToList());
+                }
+            }
+
+            return null;
         }
 
         private static IEnumerable<TopologyEdge> OrderEdgesTopToBottom(TopologyProject project)

@@ -282,3 +282,63 @@ describe('buildTopologyMainLineLayout follows topology graph', () => {
     assert.equal(layout.loads[0].busY, lv.y)
   })
 })
+
+describe('buildTopologyMainLineLayout emu device binding', () => {
+  function emuTopology(extraNodes = [], extraEdges = []) {
+    return {
+      nodes: [
+        node('bus', 'ac_bus', '35kV', 400, { nominalVoltage: 35000 }),
+        node('emu1', 'emu', 'EMU-1', 400),
+        node('pcs1', 'pcs', 'PCS-1', 360, { emuId: 'emu1' }),
+        node('pcs2', 'pcs', 'PCS-2', 440, { emuId: 'emu1' }),
+        ...extraNodes
+      ],
+      edges: [edge('emu1', 'bus'), ...extraEdges]
+    }
+  }
+
+  it('dashed frame wraps the whole unit content down to the bms bottom', () => {
+    const layout = buildTopologyMainLineLayout(emuTopology(), [{ unitIndex: 0, unitNumber: 1 }])
+    const u = layout.units.find(x => x.kind === 'emu')
+    const g = layout.groups.find(x => x.kind === 'emu')
+    assert.ok(u && g, 'emu unit and dashed group exist')
+    // 框纵向覆盖完整单元：顶部到 BMS 底边，而非只到 PCS 卡片底部
+    assert.ok(g.y <= u.originY + u.pcsTop, 'frame starts above pcs cards')
+    assert.ok(g.y + g.h >= u.originY + u.bottom, 'frame covers down to bms bottom')
+    assert.ok(g.y + g.h > u.originY + u.pcsTop + 60, 'frame extends far below pcs cards')
+  })
+
+  it('picks bound breaker / meter nodes into the unit and keeps meter off the bus pendants', () => {
+    const topology = emuTopology([
+      node('brk1', 'ac_breaker', '单元断-1', 400, { emuId: 'emu1' }),
+      node('meter1', 'ac_meter', '单元电表', 520, { emuId: 'emu1' })
+    ])
+    const layout = buildTopologyMainLineLayout(topology, [{ unitIndex: 0, unitNumber: 1 }])
+    const u = layout.units.find(x => x.kind === 'emu')
+    assert.equal(u.unitBreakerNode?.id, 'brk1', 'bound breaker node picked')
+    assert.equal(u.unitMeterNode?.id, 'meter1', 'bound meter node picked')
+    // 绑电表强制画 690 母线；电表挂 690 母线右侧，虚线框右扩包住电表
+    assert.equal(u.omitBus690, false)
+    assert.ok(Number.isFinite(u.unitMeterX))
+    const g = layout.groups.find(x => x.kind === 'emu')
+    assert.ok(g.x + g.w >= u.cx + u.unitMeterX + u.unitMeterHalfW, 'frame widened to cover the meter')
+    // EMU 电表不作母线挂件
+    assert.ok(!layout.meters.some(m => m.node?.id === 'meter1'), 'emu meter is not a bus pendant')
+  })
+
+  it('leaves breaker / meter unbound without error and keeps default frame width', () => {
+    const bound = buildTopologyMainLineLayout(
+      emuTopology([node('meter1', 'ac_meter', '单元电表', 520, { emuId: 'emu1' })]),
+      [{ unitIndex: 0, unitNumber: 1 }]
+    )
+    const unbound = buildTopologyMainLineLayout(emuTopology(), [{ unitIndex: 0, unitNumber: 1 }])
+    const uBound = bound.units.find(x => x.kind === 'emu')
+    const uFree = unbound.units.find(x => x.kind === 'emu')
+    assert.equal(uBound.unitBreakerNode, null, 'no breaker bound')
+    assert.equal(uFree.unitBreakerNode, null)
+    assert.equal(uFree.unitMeterNode, null)
+    const gBound = bound.groups.find(x => x.kind === 'emu')
+    const gFree = unbound.groups.find(x => x.kind === 'emu')
+    assert.ok(gFree.w < gBound.w, 'frame without meter is narrower than with meter')
+  })
+})

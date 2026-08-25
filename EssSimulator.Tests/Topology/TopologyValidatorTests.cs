@@ -563,6 +563,213 @@ public class TopologyValidatorTests
     }
 
     [Fact]
+    public void Save_rejects_two_breakers_bound_to_the_same_emu()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brkMain", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("emu1", "emu", "EMU-1"),
+                Node("pcs1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "emu1" }),
+                Node("ub1", "ac_breaker", "单元断1", new Dictionary<string, object?> { ["emuId"] = "emu1" }),
+                Node("ub2", "ac_breaker", "单元断2", new Dictionary<string, object?> { ["emuId"] = "emu1" })
+            }
+        };
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(r.Ok);
+        Assert.Equal("EMU_BREAKER_DUPLICATE", r.Code);
+        Assert.Contains("ub1", r.ProblemNodeIds);
+        Assert.Contains("ub2", r.ProblemNodeIds);
+    }
+
+    [Fact]
+    public void Save_rejects_two_meters_bound_to_the_same_emu()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brkMain", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("emu1", "emu", "EMU-1"),
+                Node("pcs1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "emu1" }),
+                Node("um1", "ac_meter", "单元表 1"),
+                Node("um2", "ac_meter", "单元表 2")
+            }
+        };
+        p.Nodes.First(n => n.Id == "um1").Parameters["emuId"] = "emu1";
+        p.Nodes.First(n => n.Id == "um2").Parameters["emuId"] = "emu1";
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(r.Ok);
+        Assert.Equal("EMU_METER_DUPLICATE", r.Code);
+        Assert.Contains("um1", r.ProblemNodeIds);
+        Assert.Contains("um2", r.ProblemNodeIds);
+    }
+
+    private static TopologyProject GroupBindingProject()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brkMain", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("e1", "emu", "EMU-1"),
+                Node("g1", "emu_group", "分组-1", new Dictionary<string, object?> { ["emuId"] = "e1" })
+            }
+        };
+        return p;
+    }
+
+    [Fact]
+    public void Save_rejects_device_bound_to_missing_group()
+    {
+        var p = GroupBindingProject();
+        p.Nodes.Add(Node("pcs1", "pcs", "PCS-1",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g-not-exist" }));
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(r.Ok);
+        Assert.Equal("GROUP_UNASSIGNED", r.Code);
+        Assert.Contains("pcs1", r.ProblemNodeIds);
+    }
+
+    [Fact]
+    public void Save_rejects_group_emu_mismatch()
+    {
+        var p = GroupBindingProject();
+        p.Nodes.Add(Node("e2", "emu", "EMU-2"));
+        // 分组属于 e1，但设备自身 emuId 为 e2
+        p.Nodes.Add(Node("pcs1", "pcs", "PCS-1",
+            new Dictionary<string, object?> { ["emuId"] = "e2", ["groupId"] = "g1" }));
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(r.Ok);
+        Assert.Equal("GROUP_EMU_MISMATCH", r.Code);
+        Assert.Contains("pcs1", r.ProblemNodeIds);
+    }
+
+    [Fact]
+    public void Save_rejects_two_breakers_in_one_group()
+    {
+        var p = GroupBindingProject();
+        p.Nodes.Add(Node("pcs1", "pcs", "PCS-1",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
+        p.Nodes.Add(Node("gb1", "ac_breaker", "组断 1",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
+        p.Nodes.Add(Node("gb2", "ac_breaker", "组断 2",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(r.Ok);
+        Assert.Equal("EMU_GROUP_BREAKER_DUPLICATE", r.Code);
+        Assert.Contains("gb1", r.ProblemNodeIds);
+        Assert.Contains("gb2", r.ProblemNodeIds);
+    }
+
+    [Fact]
+    public void Save_rejects_two_meters_in_one_group()
+    {
+        var p = GroupBindingProject();
+        p.Nodes.Add(Node("pcs1", "pcs", "PCS-1",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
+        p.Nodes.Add(Node("gm1", "ac_meter", "组表 1",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
+        p.Nodes.Add(Node("gm2", "ac_meter", "组表 2",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(r.Ok);
+        Assert.Equal("EMU_GROUP_METER_DUPLICATE", r.Code);
+        Assert.Contains("gm1", r.ProblemNodeIds);
+        Assert.Contains("gm2", r.ProblemNodeIds);
+    }
+
+    [Fact]
+    public void Save_accepts_valid_group_bindings()
+    {
+        var p = GroupBindingProject();
+        p.Nodes.Add(Node("pcs1", "pcs", "PCS-1",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
+        p.Nodes.Add(Node("gb1", "ac_breaker", "组断",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
+        p.Nodes.Add(Node("gm1", "ac_meter", "组表",
+            new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.True(r.Ok, r.Message);
+    }
+
+    [Fact]
+    public void Save_rejects_device_bound_to_missing_emu()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brkMain", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("emu1", "emu", "EMU-1"),
+                Node("pcs1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "emu1" }),
+                Node("ub1", "ac_breaker", "单元断-悬空", new Dictionary<string, object?> { ["emuId"] = "ghost" })
+            }
+        };
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.False(r.Ok);
+        Assert.Equal("EMU_DEVICE_UNASSIGNED", r.Code);
+        Assert.Contains("ub1", r.ProblemNodeIds);
+    }
+
+    [Fact]
+    public void Save_accepts_optional_single_breaker_and_meter_binding()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brkMain", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("emu1", "emu", "EMU-1"),
+                Node("pcs1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "emu1" }),
+                Node("ub1", "ac_breaker", "单元断", new Dictionary<string, object?> { ["emuId"] = "emu1" }),
+                Node("um1", "ac_meter", "单元表", new Dictionary<string, object?> { ["emuId"] = "emu1" })
+            }
+        };
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.True(r.Ok, r.Message);
+    }
+
+    [Fact]
+    public void Save_accepts_emu_without_any_bound_device()
+    {
+        var p = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("grid1", "grid", "电网"),
+                Node("brkMain", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("m1", "ac_meter", "PCC表", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("emu1", "emu", "EMU-1"),
+                Node("pcs1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "emu1" })
+            }
+        };
+
+        var r = TopologyValidator.ValidateProjectForSave(p);
+        Assert.True(r.Ok, r.Message);
+    }
+
+    [Fact]
     public void Save_rejects_plant_without_generation_unit()
     {
         var p = new TopologyProject

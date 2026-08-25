@@ -235,6 +235,26 @@ namespace EssSimulator.Configuration
         public double BleedAboveMinMargin { get; set; } = 0.01;
     }
 
+    /// <summary>
+    /// EMU 内协议分组（EMU → group → PCS 支路）：纯协议聚合层，不产生电气动作。
+    /// 组内 PCS/BMS 按位对齐；组级断路器/电表仅作为协议镜像存在。
+    /// </summary>
+    public class EmuGroupConfig
+    {
+        public string Name { get; set; } = "Group";
+        /// <summary>本组 PCS 配置。</summary>
+        public List<PcsDeviceConfig> Pcs { get; set; } = new();
+        /// <summary>本组 BMS 配置；与组内 PCS 按位对齐，缺位用默认配置补齐。</summary>
+        public List<BmsDeviceConfig> Bms { get; set; } = new();
+        /// <summary>组态绑定到本组的断路器节点名称（可选，协议镜像）。</summary>
+        public string? BreakerName { get; set; }
+        /// <summary>组态绑定到本组的电表节点名称（可选，协议镜像）。</summary>
+        public string? MeterName { get; set; }
+
+        /// <summary>本组 PCS 台数。</summary>
+        public int PcsCount => Pcs?.Count ?? 0;
+    }
+
     public class EssUnitConfig
     {
         public string Name { get; set; } = "Unit";
@@ -243,8 +263,36 @@ namespace EssSimulator.Configuration
         /// <summary>本单元 BMS 配置；与 PCS 通道 1:1，为空时默认 2 台。</summary>
         public List<BmsDeviceConfig> Bms { get; set; } = new();
 
-        /// <summary>本单元下属 PCS 台数；未配置 Pcs 时回退 2。</summary>
-        public int PcsCount => Pcs is { Count: > 0 } ? Pcs.Count : 2;
+        /// <summary>本单元是否绑定单元高压断路器（组态断路器节点归入 EMU）；缺省 true 兼容既有配置。</summary>
+        public bool HasUnitBreaker { get; set; } = true;
+        /// <summary>组态绑定到本单元的断路器节点名称（未绑定时为 null）。</summary>
+        public string? UnitBreakerName { get; set; }
+        /// <summary>本单元是否绑定单元电表（组态电表节点归入 EMU）；缺省 true 兼容既有配置。</summary>
+        public bool HasUnitMeter { get; set; } = true;
+        /// <summary>组态绑定到本单元的电表节点名称（未绑定时为 null）。</summary>
+        public string? UnitMeterName { get; set; }
+        /// <summary>组态绑定到本单元的单元变节点名称（可选，仅镜像展示）。</summary>
+        public string? UnitTransformerName { get; set; }
+
+        /// <summary>本单元下属 EMU 分组（EMU → group → PCS 支路）；为空时保持扁平构成（向后兼容）。</summary>
+        public List<EmuGroupConfig> Groups { get; set; } = new();
+
+        /// <summary>本单元是否按 group 分层构成。</summary>
+        public bool HasGroups => Groups is { Count: > 0 };
+
+        /// <summary>本单元下属 PCS 台数；分组构成时为各组之和，未配置 Pcs 时回退 2。</summary>
+        public int PcsCount
+        {
+            get
+            {
+                if (HasGroups)
+                {
+                    int sum = Groups.Sum(g => g.PcsCount);
+                    if (sum > 0) return sum;
+                }
+                return Pcs is { Count: > 0 } ? Pcs.Count : 2;
+            }
+        }
     }
 
     /// <summary>储能单元列表（对应 appsettings.json: EssUnits 节，绑定到 <see cref="SimulatorConfig.Devices"/>）</summary>
@@ -324,10 +372,22 @@ namespace EssSimulator.Configuration
             var units = ResolveEssUnitsOrFallback();
             foreach (var unit in units)
             {
+                if (unit.HasGroups)
+                {
+                    // 分组构成：BMS 在组内与 PCS 按位对齐
+                    foreach (var group in unit.Groups)
+                    {
+                        var bms = group.Bms ?? new List<BmsDeviceConfig>();
+                        for (int i = 0; i < group.PcsCount; i++)
+                            list.Add(i < bms.Count ? bms[i] : new BmsDeviceConfig());
+                    }
+                    continue;
+                }
+
                 int n = unit.PcsCount;
-                var bms = unit.Bms ?? new List<BmsDeviceConfig>();
+                var unitBms = unit.Bms ?? new List<BmsDeviceConfig>();
                 for (int i = 0; i < n; i++)
-                    list.Add(i < bms.Count ? bms[i] : new BmsDeviceConfig());
+                    list.Add(i < unitBms.Count ? unitBms[i] : new BmsDeviceConfig());
             }
             return list;
         }
@@ -338,6 +398,14 @@ namespace EssSimulator.Configuration
             var units = ResolveEssUnitsOrFallback();
             foreach (var unit in units)
             {
+                if (unit.HasGroups)
+                {
+                    // 分组构成：按 group 顺序展平
+                    foreach (var group in unit.Groups)
+                        list.AddRange(group.Pcs ?? new List<PcsDeviceConfig>());
+                    continue;
+                }
+
                 int n = unit.PcsCount;
                 var pcs = unit.Pcs ?? new List<PcsDeviceConfig>();
                 for (int i = 0; i < n; i++)
@@ -346,7 +414,8 @@ namespace EssSimulator.Configuration
             return list;
         }
 
-        private IReadOnlyList<EssUnitConfig> ResolveEssUnitsOrFallback()
+        /// <summary>储能单元构成（含分组）；空配置时回退默认单机组，纯光伏工程为空。</summary>
+        public IReadOnlyList<EssUnitConfig> ResolveEssUnitsOrFallback()
         {
             if (Devices is { Count: > 0 })
                 return Devices;

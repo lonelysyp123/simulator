@@ -51,6 +51,15 @@
           <div class="meta">
             <div class="name">{{ e.label }}</div>
             <div class="desc">PCS×{{ pcsCountOfEmu(e.id) }}</div>
+            <div class="desc">断路器：{{ boundDeviceLabel(e.id, 'ac_breaker') || '未绑定' }}</div>
+            <div class="desc">电表：{{ boundDeviceLabel(e.id, 'ac_meter') || '未绑定' }}</div>
+            <div
+              v-for="g in groupsOfEmu(e.id)"
+              :key="g.id"
+              class="desc emu-group-row"
+              :class="{ active: selectedNodeId === g.id }"
+              @click.stop="onSelectNode(g.id)"
+            >└ {{ g.label }} · PCS×{{ pcsCountOfGroup(g.id) }}</div>
           </div>
           <el-button link type="danger" size="small" @click.stop="deleteEmu(e.id)">删</el-button>
         </div>
@@ -160,6 +169,16 @@
                 @change="v => onEmuParamChange(def.key, v)"
               >
                 <el-option v-for="e in emuNodes" :key="e.id" :label="e.label" :value="e.id" />
+              </el-select>
+              <el-select
+                v-else-if="def.type === 'group_select'"
+                :model-value="selectedNode.parameters[def.key] || ''"
+                placeholder="选择 EMU 分组（可选）"
+                clearable
+                style="width:100%"
+                @change="v => onGroupParamChange(def.key, v)"
+              >
+                <el-option v-for="g in groupOptionsForSelected" :key="g.id" :label="g.label" :value="g.id" />
               </el-select>
               <el-input
                 v-else
@@ -356,17 +375,56 @@ function pcsCountOfEmu(emuId) {
   return project.nodes.filter(n => n.templateId === 'pcs' && n.parameters?.emuId === emuId).length
 }
 
+/** 某 EMU 下的分组虚拟节点（画布不渲染，仅侧栏管理） */
+function groupsOfEmu(emuId) {
+  return project.nodes.filter(n => n.templateId === 'emu_group' && n.parameters?.emuId === emuId)
+}
+
+function pcsCountOfGroup(groupId) {
+  return project.nodes.filter(n => n.templateId === 'pcs' && n.parameters?.groupId === groupId).length
+}
+
+/** 当前选中节点的 EMU 分组候选：仅列其所属 EMU 下的分组（未选 EMU 时无候选） */
+const groupOptionsForSelected = computed(() => {
+  const n = selectedNode.value
+  if (!n || n.templateId === 'emu_group') return []
+  return groupsOfEmu(n.parameters?.emuId || '')
+})
+
+/** 归入某 EMU 的设备节点（PCS / 断路器 / 电表） */
+function devicesOfEmu(emuId) {
+  return project.nodes.filter(n => ['pcs', 'ac_breaker', 'ac_meter'].includes(n.templateId) && n.parameters?.emuId === emuId)
+}
+
+/** EMU 绑定的断路器/电表展示名（排除组级绑定；未绑定返回空串） */
+function boundDeviceLabel(emuId, templateId) {
+  const n = project.nodes.find(x => x.templateId === templateId && x.parameters?.emuId === emuId && !x.parameters?.groupId)
+  if (!n) return ''
+  return n.label || n.parameters?.name || n.id
+}
+
 function onEmuParamChange(key, value) {
+  if (!selectedNode.value) return
+  pushHistory()
+  selectedNode.value.parameters[key] = value || ''
+  // 切换所属 EMU 后原分组必然失效，同步清空 groupId
+  if (key === 'emuId' && 'groupId' in selectedNode.value.parameters)
+    selectedNode.value.parameters.groupId = ''
+  clearValidation()
+}
+
+function onGroupParamChange(key, value) {
   if (!selectedNode.value) return
   pushHistory()
   selectedNode.value.parameters[key] = value || ''
   clearValidation()
 }
 
-function unassignPcsFromEmu(emuId) {
-  for (const n of project.nodes) {
-    if (n.templateId === 'pcs' && n.parameters?.emuId === emuId)
-      n.parameters.emuId = ''
+/** 解除该 EMU 下全部设备（pcs/ac_breaker/ac_meter）的 emuId/groupId 归属 */
+function unassignDevicesFromEmu(emuId) {
+  for (const n of devicesOfEmu(emuId)) {
+    n.parameters.emuId = ''
+    if ('groupId' in n.parameters) n.parameters.groupId = ''
   }
 }
 
@@ -374,13 +432,16 @@ function deleteEmu(id) {
   pushHistory()
   // 同步清理指向该 EMU 的连线（旧工程 EMU 可能带 AC/DC 连线），避免保存回放报「连线端点设备不存在」
   project.edges = project.edges.filter(e => e.fromNodeId !== id && e.toNodeId !== id)
-  project.nodes = project.nodes.filter(n => n.id !== id)
-  const orphans = pcsCountOfEmu(id)
-  unassignPcsFromEmu(id)
+  // 一并删除该 EMU 下的分组虚拟节点，并解除设备归属（含 groupId）
+  const removedGroupIds = new Set(groupsOfEmu(id).map(g => g.id))
+  project.nodes = project.nodes.filter(n => n.id !== id && !removedGroupIds.has(n.id))
+  const bound = devicesOfEmu(id)
+  const pcsOrphans = bound.filter(n => n.templateId === 'pcs').length
+  unassignDevicesFromEmu(id)
   if (selectedNodeId.value === id) selectedNodeId.value = null
   clearValidation()
-  if (orphans > 0)
-    ElMessage.warning(`已删除 EMU，${orphans} 台 PCS 已解除归属，请重新选择所属 EMU 后再保存`)
+  if (bound.length > 0)
+    ElMessage.warning(`已删除 EMU，${pcsOrphans} 台 PCS、${bound.length - pcsOrphans} 台断路器/电表已解除归属，请重新选择所属 EMU 后再保存`)
 }
 
 function colorOf(id) { return templateColor(id) }
@@ -663,8 +724,8 @@ function addFromTemplate(t, x = 120, y = 100) {
     y: snapToGrid(y),
     parameters: cloneParams(t.defaultParameters)
   }
-  // PCS 新增时自动归入第一个 EMU 虚拟单元（若有）
-  if (t.id === 'pcs' && emuNodes.value.length > 0)
+  // PCS 新增时自动归入第一个 EMU 虚拟单元（若有）；分组自动归入第一个 EMU
+  if ((t.id === 'pcs' || t.id === 'emu_group') && emuNodes.value.length > 0)
     node.parameters.emuId = emuNodes.value[0].id
   project.nodes.push(node)
   selectedNodeId.value = node.id
@@ -806,12 +867,18 @@ async function deleteSelected() {
     const removed = project.nodes.find(n => n.id === id)
     project.edges = project.edges.filter(e => e.fromNodeId !== id && e.toNodeId !== id)
     project.nodes = project.nodes.filter(n => n.id !== id)
-    // 删除 EMU 虚拟节点时同步解除其下 PCS 归属
+    // 删除 EMU 分组虚拟节点时解除设备的 groupId 引用
+    if (removed?.templateId === 'emu_group') {
+      for (const n of project.nodes)
+        if (n.parameters?.groupId === id) n.parameters.groupId = ''
+    }
+    // 删除 EMU 虚拟节点时同步解除其下设备（PCS/断路器/电表）归属
     if (removed?.templateId === 'emu') {
-      const orphans = pcsCountOfEmu(id)
-      unassignPcsFromEmu(id)
-      if (orphans > 0)
-        ElMessage.warning(`${orphans} 台 PCS 已解除归属，请重新选择所属 EMU 后再保存`)
+      const bound = devicesOfEmu(id)
+      const pcsOrphans = bound.filter(n => n.templateId === 'pcs').length
+      unassignDevicesFromEmu(id)
+      if (bound.length > 0)
+        ElMessage.warning(`${pcsOrphans} 台 PCS、${bound.length - pcsOrphans} 台断路器/电表已解除归属，请重新选择所属 EMU 后再保存`)
     }
     selectedNodeId.value = null
     clearValidation()
@@ -993,6 +1060,9 @@ onBeforeUnmount(() => {
 .palette-item .meta { flex: 1; min-width: 0; }
 .palette-item .name { font-size: 13px; font-weight: 600; color: #303133; }
 .palette-item .desc { font-size: 11px; color: #909399; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emu-group-row { cursor: pointer; padding-left: 10px; border-radius: 3px; }
+.emu-group-row:hover { color: #0f8a9d; }
+.emu-group-row.active { color: #0f8a9d; font-weight: 600; }
 .empty { font-size: 12px; color: #909399; line-height: 1.5; }
 .param-hint { font-size: 11px; color: #909399; margin-top: 2px; line-height: 1.3; }
 .validation-box { margin-bottom: 12px; }
