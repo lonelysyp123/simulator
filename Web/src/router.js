@@ -15,7 +15,8 @@ const routes = [
   { path: '/alarms', name: 'alarms', component: () => import('./views/AlarmsView.vue'), meta: { title: '设备告警' } },
   { path: '/command', name: 'command', component: () => import('./views/CommandView.vue'), meta: { title: '命令输入' } },
   { path: '/droop-slices', name: 'droop-slices', component: () => import('./views/DroopSlicesView.vue'), meta: { title: '白盒切片' } },
-  { path: '/connections', name: 'connections', component: () => import('./views/ConnectionsView.vue'), meta: { title: '连接信息' } }
+  { path: '/connections', name: 'connections', component: () => import('./views/ConnectionsView.vue'), meta: { title: '连接信息' } },
+  { path: '/protocol-ports', name: 'protocol-ports', component: () => import('./views/ProtocolPortsView.vue'), meta: { title: '协议端口' } }
 ]
 
 const router = createRouter({

@@ -134,6 +134,26 @@ namespace EssSimulator.Web
 
             app.MapGet("/api/protocol", (IOptions<SimulatorConfig> cfg) =>
             {
+                // 优先从协议层管理器读取实际生效端口（含手动覆盖与 LC）；未就绪时退回配置默认值
+                var snapshot = EssSimulator.Protocol.Modbus.ProtocolLayerManager.Instance.GetSnapshot();
+                if (snapshot.Count > 0)
+                {
+                    return Results.Ok(new
+                    {
+                        em = snapshot.Where(d => d.Type == EssSimulator.Protocol.Modbus.ProtocolDeviceType.Em)
+                            .Select(d => new { name = d.Name, port = d.Port, slaveId = d.SlaveId }).ToArray(),
+                        bms = snapshot.Where(d => d.Type == EssSimulator.Protocol.Modbus.ProtocolDeviceType.Bms)
+                            .Select(d => new { name = d.Name, port = d.Port, slaveId = d.SlaveId }).ToArray(),
+                        emu = snapshot.Where(d => d.Type == EssSimulator.Protocol.Modbus.ProtocolDeviceType.Emu)
+                            .Select(d => new { name = d.Name, port = d.Port, slaveId = d.SlaveId }).ToArray(),
+                        lc = snapshot.Where(d => d.Type == EssSimulator.Protocol.Modbus.ProtocolDeviceType.Lc)
+                            .Select(d => new { name = d.Name, port = d.Port, slaveId = d.SlaveId }).ToArray(),
+                        pv = snapshot.Where(d => d.Type is EssSimulator.Protocol.Modbus.ProtocolDeviceType.PvLogger
+                                or EssSimulator.Protocol.Modbus.ProtocolDeviceType.PvMeter)
+                            .Select(d => new { name = d.Name, port = d.Port, slaveId = d.SlaveId }).ToArray()
+                    });
+                }
+
                 var c = cfg.Value;
                 var info = new
                 {
@@ -317,6 +337,8 @@ namespace EssSimulator.Web
             app.MapTopologyEndpoints();
             // 系统配置：工程模式 / 应用到仿真
             app.MapSystemConfigEndpoints();
+            // 协议端口：设备端口/从站号配置、热重建
+            app.MapProtocolPortEndpoints();
 
             return app;
         }
