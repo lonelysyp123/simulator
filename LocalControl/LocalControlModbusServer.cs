@@ -1,10 +1,15 @@
+using System.Linq;
+using EssSimulator.DataExchange;
+using EssSimulator.DataExchange.Catalog;
+using EssSimulator.DataExchange.Config;
 using EssSimulator.Protocol.Modbus;
 using log4net;
 
 namespace EssSimulator.LocalControl
 {
     /// <summary>
-    /// LocalControl 专用 Modbus TCP 从站：只维护 lc.csv 寄存器镜像，不参与仿真数据交换。
+    /// LocalControl 专用 Modbus TCP 从站：默认只维护 lc.csv 寄存器镜像（纯转发场景）；
+    /// 点表含模型绑定时（如 trina 系统级点表）自动升级为 <see cref="DataExchangeSession"/> 驱动。
     /// 传输层由 <see cref="ModbusPortHub"/> 统一提供，可与其它设备共享端口/从站号。
     /// </summary>
     public sealed class LocalControlModbusServer : IModbusRegisterServer, IProtocolLayerServer
@@ -14,11 +19,15 @@ namespace EssSimulator.LocalControl
         private readonly ModbusParser _parser;
         private readonly DeviceInfoDto _deviceInfo;
         private readonly ModbusPointMap _pointMap;
-        private readonly RegisterOnlyBackend _backend;
+        private readonly IModbusSyncBackend _backend;
 
-        public LocalControlModbusServer(string mapFilePath, int modbusPort, string serverName)
+        /// <summary>
+        /// 构造 LC 从站。<paramref name="firstEmuId"/> 为聚合组首机组号（非空时把点表中的
+        /// emuDeviceId 占位符替换为该机组根路径，LC 控制点作用于首机组 EMU 虚拟模型）。
+        /// </summary>
+        public LocalControlModbusServer(string mapFilePath, int modbusPort, string serverName, int? firstEmuId = null)
         {
-            _pointMap = new ModbusPointMap(mapFilePath, serverName, clusterCount: 0);
+            _pointMap = new ModbusPointMap(mapFilePath, serverName, clusterCount: 0, emuDeviceIdOverride: firstEmuId);
             _deviceInfo = new DeviceInfoDto
             {
                 ip = "0.0.0.0",
@@ -31,8 +40,37 @@ namespace EssSimulator.LocalControl
 
             _slave = new ModbusTCPSlave(_deviceInfo, _pointMap.RawMaps, rackCount: 0);
             _parser = new ModbusParser(_pointMap.RawMaps);
-            _backend = new RegisterOnlyBackend(_slave, _parser, _pointMap);
+
+            if (RequiresDataExchange(_pointMap))
+            {
+                UsesDataExchange = true;
+                var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName);
+                _backend = new DataExchangeSession(
+                    _slave, _parser, catalog, _deviceInfo, new DataExchangeOptions(), clusterCount: 0);
+                var emuHint = firstEmuId is int id ? $"（首机组 emu{id}）" : string.Empty;
+                _log.Info($"{serverName} 点表含模型绑定，启用 DataExchange 管道{emuHint}");
+            }
+            else
+            {
+                _backend = new RegisterOnlyBackend(_slave, _parser, _pointMap);
+            }
         }
+
+        /// <summary>点表含模型绑定、由 DataExchange 管道驱动（桥接引擎应跳过此类设备）。</summary>
+        public bool UsesDataExchange { get; }
+
+        /// <summary>点表存在遥测模型绑定或控制模型绑定时需要 DataExchange 驱动。</summary>
+        private static bool RequiresDataExchange(ModbusPointMap pointMap) =>
+            pointMap.DataMaps.Any(m =>
+            {
+                var model = ModbusSimServer.GetModelParam(m.ModelSim);
+                return model != null && !string.IsNullOrWhiteSpace(model.ModelType);
+            })
+            || pointMap.ControlMaps.Any(m =>
+            {
+                var model = ModbusSimServer.GetModelParam(m.ModelSim);
+                return model != null && !string.IsNullOrWhiteSpace(model.Arg1);
+            });
 
         public string ServerName => _deviceInfo.name ?? string.Empty;
 

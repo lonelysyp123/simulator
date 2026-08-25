@@ -19,7 +19,7 @@ namespace EssSimulator.DataExchange.Effects
 
         public void OnControlChanged(ControlEffectContext context)
         {
-            if (!TryParseEmuUnit(context.ServerName, out int unit1Based))
+            if (!TryResolveEmuUnit(context, out int unit1Based))
                 return;
 
             var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
@@ -35,6 +35,28 @@ namespace EssSimulator.DataExchange.Effects
             PcsEmuSynchronizer.SyncPcsStateFromModel(ess, emu, pcsBase);
             _refreshTelemetry?.Invoke();
             SnapshotService.RequestImmediatePush();
+        }
+
+        /// <summary>
+        /// 解析控制点作用的机组号：simEmu{n} 直接取设备号；
+        /// simLc{n} 等其它设备从绑定目标根路径（emu{n}）取首机组号。
+        /// </summary>
+        internal static bool TryResolveEmuUnit(ControlEffectContext context, out int unit1Based)
+        {
+            if (TryParseEmuUnit(context.ServerName, out unit1Based))
+                return true;
+
+            return TryParseEmuRoot(context.Binding.Target.RootKey, out unit1Based);
+        }
+
+        internal static bool TryParseEmuRoot(string? rootKey, out int unit1Based)
+        {
+            unit1Based = 0;
+            if (string.IsNullOrWhiteSpace(rootKey) ||
+                !rootKey.StartsWith("emu", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return int.TryParse(rootKey.AsSpan(3), out unit1Based) && unit1Based >= 1;
         }
 
         internal static bool TryParseEmuUnit(string serverName, out int unit1Based)
@@ -55,7 +77,7 @@ namespace EssSimulator.DataExchange.Effects
 
         public void OnControlChanged(ControlEffectContext context)
         {
-            if (!EmuPcsControlEffect.TryParseEmuUnit(context.ServerName, out int unit1Based))
+            if (!EmuPcsControlEffect.TryResolveEmuUnit(context, out int unit1Based))
                 return;
 
             var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");

@@ -51,6 +51,10 @@ namespace EssSimulator.LocalControl
             if (!lc.IsOnline)
                 return;
 
+            // 含模型绑定的点表（如 trina 系统级点表）由 DataExchange 管道驱动，无需桥接转发
+            if (lc.UsesDataExchange)
+                return;
+
             string lcName = lc.ServerName;
             SyncTelemetry(resolveEmu, lc, lcIdx, emuPerGroup, emuCount);
             ApplyControls(resolveEmu, lc, lcName, lcIdx, emuPerGroup, emuCount);

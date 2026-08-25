@@ -1,5 +1,5 @@
 {
   "id": "trina",
   "name": "天合中压版-5.5MW",
-  "description": "TRINA MV-EMS Modbus TCP 协议 V0.15 EMU 点表（5.5MW 一体机）：109 点，5.5MW PCS×2 遥测/遥信读寄存器；协议 PCS↔仿真 EMU（emu1~emu2），模块1/模块2↔PcsList[0]/[1]；故障/状态字描述并入 PCS Status&Alarm 位定义（已剔除模块 FPGA/IO/采样故障字），模块警告字1/2 经插件层组字；SYSTEM 控制点（远程使能/模式、系统操作、黑启动写入、目标P/Q 均分）绑定本机组 EMU 虚拟模型，单元 PCS 台数与黑启动状态经插件层聚合，绑定 85 点（含 15 个插件点）"
+  "description": "TRINA MV-EMS Modbus TCP 协议 V0.15 LC 系统级点表（5.5MW 一体机）：49 点，自 EMU 点表剥离的 SYSTEM 点位（sysyc* 遥测 + syst* 控制）；系统故障总/精简状态/PCS 台数/黑启动状态经插件层组字聚合，系统功率/电量遥测绑定 ess/em/bms 仿真模型，控制点（远程使能/模式、系统操作、黑启动写入、目标P/Q 均分）绑定聚合组首机组 EMU 虚拟模型（emuDeviceId 占位符运行期替换）"
 }
