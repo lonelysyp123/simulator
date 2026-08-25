@@ -1,5 +1,6 @@
 using EssSimulator.Configuration;
 using EssSimulator.Core;
+using EssSimulator.Protocol.Modbus;
 using log4net;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -58,7 +59,11 @@ namespace EssSimulator.LocalControl
         {
             foreach (var server in _servers)
             {
-                try { server.Stop(); }
+                try
+                {
+                    if (server.IsOnline)
+                        server.Stop();
+                }
                 catch (Exception ex) { Log.Warn("关闭 LocalControl Modbus 服务时异常", ex); }
             }
 
@@ -87,14 +92,16 @@ namespace EssSimulator.LocalControl
 
             for (int i = 0; i < lcCount; i++)
             {
-                int port = _cfg.Protocol.BaseLocalControlModbusPort + i * _cfg.Protocol.LocalControlPortStep;
                 string name = $"simLc{i + 1}";
-                var server = new LocalControlModbusServer("lc.csv", port, name);
+                var server = new LocalControlModbusServer("lc.csv", 0, name);
                 store.Register(name, server);
-                server.Start();
-                SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}（LC 转发）";
+                // 由协议层管理器按端口计划分配端口/从站号并启动（可与其它设备共享端口）
+                var report = ProtocolLayerManager.Instance.RegisterAndStart(server, ProtocolDeviceType.Lc, "lc.csv");
                 _servers.Add(server);
-                Log.Info($"[LocalControl] {name} 已启动，端口 {port}");
+                if (server.IsOnline)
+                    Log.Info($"[LocalControl] {name} 已启动，端口 {server.Port}（从站号 {server.SlaveId}）");
+                else
+                    Log.Error($"[LocalControl] {name} 启动失败：{string.Join("；", report.Errors)}");
             }
         }
     }

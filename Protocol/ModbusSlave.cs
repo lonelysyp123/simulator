@@ -29,7 +29,7 @@ namespace EssSimulator
         #region ReadOnly
         protected readonly MapEntry[]? rackPointMap;
         protected readonly MapEntry[] pointMap;
-        protected readonly CommunicatorBase communicator;
+        protected readonly CommunicatorBase? communicator;
         protected readonly DeviceInfoDto deviceInfoDto;
         #endregion
 
@@ -41,7 +41,7 @@ namespace EssSimulator
 
         /// <summary>外部 Modbus 主站写入控制区（FC5/FC6/FC16）后触发，slaveId 为 NModbus 从站号。</summary>
         public event Action<byte>? ExternalControlWrite;
-        public ModbusSlave(DeviceInfoDto deviceInfoDto, List<MapEntry[]> pointMaps, CommunicatorBase communicator, int rackCount = 0)
+        public ModbusSlave(DeviceInfoDto deviceInfoDto, List<MapEntry[]> pointMaps, CommunicatorBase? communicator = null, int rackCount = 0)
         {
             this.communicator = communicator;
             this.deviceInfoDto = deviceInfoDto;
@@ -110,6 +110,8 @@ namespace EssSimulator
 
         public virtual bool GetCommunicatorState()
         {
+            if (communicator == null)
+                return false;
             return communicator.GetCommunicatorStatus() != 0;
         }
 
@@ -150,9 +152,9 @@ namespace EssSimulator
         // 优化读取方法，只读取外部能够修改的部分，也就是function code为3的
         public Dictionary<string, object>? Read(byte slaveId = 1)
         {
-            // 如果slaveid为1，则读取的是pointMap，否则读取rackPointMap
-            var pointMapToUse = slaveId == 1 ? pointMap : rackPointMap;
-            var ctrlContinuerAddressGroup = slaveId == 1 ? CtrlContinuerAddressGroup : CtrlContinuerAddressGroupForRack;
+            // 传入的从站号与 bank 从站号一致时读 pointMap，否则读 rackPointMap
+            var pointMapToUse = slaveId == deviceInfoDto.slaveId ? pointMap : rackPointMap;
+            var ctrlContinuerAddressGroup = slaveId == deviceInfoDto.slaveId ? CtrlContinuerAddressGroup : CtrlContinuerAddressGroupForRack;
 
             if (pointMapToUse == null || ctrlContinuerAddressGroup == null)
             {
@@ -230,15 +232,15 @@ namespace EssSimulator
             // 预筛功能码，避免内层重复 LINQ 分配
             ushort num = (ushort)(entry.Size / ADDRESS_LENGTH);
             if (num == 0) num = 1;
-            List<byte[]> data = ReadFunc((ushort)entry.Address, num, entry.FunctionCode, 1);
+            List<byte[]> data = ReadFunc((ushort)entry.Address, num, entry.FunctionCode, deviceInfoDto.slaveId);
             if (data == null || data.Count == 0) return Array.Empty<byte>();
             return data.SelectMany(x => x).ToArray();
         }
 
         public bool Write(Dictionary<string, object> data, byte slaveId = 1, bool applyScale = true)
         {
-            // 如果slaveid为1，则写入的是pointMap，否则写入rackPointMap
-            var pointMapToUse = slaveId == 1 ? pointMap : rackPointMap;
+            // 传入的从站号与 bank 从站号一致时写 pointMap，否则写 rackPointMap
+            var pointMapToUse = slaveId == deviceInfoDto.slaveId ? pointMap : rackPointMap;
             if (pointMapToUse == null)
             {
                 log.Error("Modbus Slave 写入数据失败，点表为空");

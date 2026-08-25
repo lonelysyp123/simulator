@@ -4,6 +4,7 @@ using EssSimulator.DataExchange;
 using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Config;
 using EssSimulator.EssSimModelApi;
+using EssSimulator.Protocol.Modbus;
 using log4net;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -13,13 +14,14 @@ namespace EssSimulator
     /// <summary>
     /// 将所有 Modbus 从站的创建与启动封装为 IHostedService，
     /// 替代 Program.cs 中的 for 循环硬编码启动逻辑。
+    /// 端口/从站号分配与启动由 <see cref="ProtocolLayerManager"/> 统一编排（支持同端口共享）。
     /// </summary>
     public class ModbusHostedService : IHostedService
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(ModbusHostedService));
         private readonly SimulatorConfig _cfg;
         private readonly DataExchangeOptions _dataExchange;
-        private readonly List<ModbusSimServer> _servers = new();
+        private readonly ProtocolLayerManager _manager = ProtocolLayerManager.Instance;
 
         public ModbusHostedService(
             IOptions<SimulatorConfig> opts,
@@ -43,59 +45,52 @@ namespace EssSimulator
                     // BMS Modbus 服务（每个储能通道一个）
                     for (int i = 0; i < _cfg.UnitCount; i++)
                     {
-                        int port    = _cfg.Protocol.BaseBmsModbusPort + i * _cfg.Protocol.BmsPortStep;
                         string name = $"simBms{i + 1}";
                         int clusterCount = i < bmsCfg.Count
                             ? bmsCfg[i].ClusterCount
                             : new BmsDeviceConfig().ClusterCount;
-                        var server  = new ModbusSimServer("bms_bank.csv", port, name, clusterCount, _dataExchange);
+                        var server = new ModbusSimServer("bms_bank.csv", 0, name, clusterCount, _dataExchange);
                         store.Register(name, server);
-                        server.Start();
-                        SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
-                        _servers.Add(server);
+                        _manager.RegisterDevice(server, ProtocolDeviceType.Bms, "bms_bank.csv");
                     }
 
                     // PCS (EMU) Modbus 服务
                     int unitCount = _cfg.EffectiveEssUnitCount;
                     for (int u = 0; u < unitCount; u++)
                     {
-                        int port = _cfg.Protocol.BaseEmuModbusPort + u * _cfg.Protocol.EmuPortStep;
                         string name = $"simEmu{u + 1}";
-                        var pcs = new ModbusSimServer("emu.csv", port, name, dataExchangeOptions: _dataExchange);
+                        var pcs = new ModbusSimServer("emu.csv", 0, name, dataExchangeOptions: _dataExchange);
                         store.Register(name, pcs);
-                        pcs.Start();
-                        SimServer.serverListenInfo[name] = $"Modbus TCP 端口 {port}";
-                        _servers.Add(pcs);
+                        _manager.RegisterDevice(pcs, ProtocolDeviceType.Emu, "emu.csv");
                     }
 
                     // 光伏 Logger / 低压电表
                     for (int i = 0; i < _cfg.PvUnitCount; i++)
                     {
-                        int loggerPort = _cfg.Protocol.BasePvLoggerModbusPort + i * _cfg.Protocol.PvLoggerPortStep;
                         string loggerName = $"simPv{i + 1}";
-                        var logger = new ModbusSimServer("pv_logger.csv", loggerPort, loggerName, dataExchangeOptions: _dataExchange);
+                        var logger = new ModbusSimServer("pv_logger.csv", 0, loggerName, dataExchangeOptions: _dataExchange);
                         store.Register(loggerName, logger);
-                        logger.Start();
-                        SimServer.serverListenInfo[loggerName] = $"Modbus TCP 端口 {loggerPort}";
-                        _servers.Add(logger);
+                        _manager.RegisterDevice(logger, ProtocolDeviceType.PvLogger, "pv_logger.csv");
 
-                        int meterPort = _cfg.Protocol.BasePvMeterModbusPort + i * _cfg.Protocol.PvMeterPortStep;
                         string meterName = $"simPvMeter{i + 1}";
-                        var meter = new ModbusSimServer("pv_apm810.csv", meterPort, meterName, dataExchangeOptions: _dataExchange);
+                        var meter = new ModbusSimServer("pv_apm810.csv", 0, meterName, dataExchangeOptions: _dataExchange);
                         store.Register(meterName, meter);
-                        meter.Start();
-                        SimServer.serverListenInfo[meterName] = $"Modbus TCP 端口 {meterPort}";
-                        _servers.Add(meter);
+                        _manager.RegisterDevice(meter, ProtocolDeviceType.PvMeter, "pv_apm810.csv");
                     }
 
                     // 电表 Modbus 服务
-                    var em = new ModbusSimServer("em.csv", _cfg.Protocol.EmModbusPort, "simEm");
+                    var em = new ModbusSimServer("em.csv", 0, "simEm");
                     store.Register("simEm", em);
-                    em.Start();
-                    SimServer.serverListenInfo["simEm"] = $"Modbus TCP 端口 {_cfg.Protocol.EmModbusPort}";
-                    _servers.Add(em);
+                    _manager.RegisterDevice(em, ProtocolDeviceType.Em, "em.csv");
 
-                    Log.Info($"Modbus 从站注册完成，共 {_servers.Count} 个设备");
+                    // 按端口计划（默认配置 + protocol-ports.json 覆盖）统一分配端口并启动
+                    var result = _manager.StartAll(_cfg);
+                    Log.Info($"Modbus 从站注册完成，共 {result.Devices.Count} 个设备，成功启动 {result.Devices.Count(d => d.Started)} 个");
+                    foreach (var device in result.Devices.Where(d => d.Errors.Count > 0))
+                    {
+                        foreach (var error in device.Errors)
+                            Log.Error($"{device.Name}: {error}");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -108,11 +103,8 @@ namespace EssSimulator
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            foreach (var server in _servers)
-            {
-                try { server.Stop(); }
-                catch (Exception ex) { Log.Warn("关闭 Modbus 服务时异常", ex); }
-            }
+            try { _manager.StopAll(); }
+            catch (Exception ex) { Log.Warn("关闭 Modbus 服务时异常", ex); }
             return Task.CompletedTask;
         }
     }

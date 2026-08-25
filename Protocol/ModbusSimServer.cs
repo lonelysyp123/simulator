@@ -25,8 +25,9 @@ namespace EssSimulator
     /// <summary>
     /// Modbus TCP 从站门面类（仿真设备：simEmu / simBms / simEm）。
     /// 走 <see cref="DataExchangeSession"/> 与内部仿真模型绑定；LocalControl 见 <c>LocalControl/</c> 模块。
+    /// 传输层（端口监听/从站网络）由 <see cref="ModbusPortHub"/> 统一提供，支持同端口多设备共享。
     /// </summary>
-    public class ModbusSimServer : IModbusRegisterServer
+    public class ModbusSimServer : IModbusRegisterServer, IProtocolLayerServer
     {
         private readonly ILog              _log = LogManager.GetLogger(typeof(ModbusSimServer));
         private readonly IModbusSlave      _slave;
@@ -42,6 +43,7 @@ namespace EssSimulator
             int clusterCount = 0,
             DataExchangeOptions? dataExchangeOptions = null)
         {
+            RackCount = clusterCount;
             _pointMap = new EssSimulator.Protocol.Modbus.ModbusPointMap(mapFilePath, serverName, clusterCount);
 
             _deviceInfo = new DeviceInfoDto
@@ -53,8 +55,7 @@ namespace EssSimulator
                 collectionCycle = 1000,
                 name           = serverName
             };
-            var tcpComm = new TCPCommunicator(_deviceInfo);
-            _slave  = new ModbusTCPSlave(_deviceInfo, _pointMap.RawMaps, tcpComm, clusterCount);
+            _slave  = new ModbusTCPSlave(_deviceInfo, _pointMap.RawMaps, clusterCount);
             _parser = new ModbusParser(_pointMap.RawMaps);
 
             if (RequiresDataExchange(serverName))
@@ -109,6 +110,28 @@ namespace EssSimulator
             try { _dataSync.Stop(); }
             catch (Exception ex) { _log.Error("Stop error", ex); }
             _slave.DeviceDisconnect();
+        }
+
+        // ── 协议层编排接口（IProtocolLayerServer）────────────────
+
+        public string ServerName => _deviceInfo.name ?? string.Empty;
+        public int Port => _deviceInfo.port;
+        public byte SlaveId => _deviceInfo.slaveId;
+        public int RackCount { get; }
+
+        /// <summary>已加载的点表（bank + 可选 rack），供协议层地址查重使用。</summary>
+        public EssSimulator.Protocol.Modbus.ModbusPointMap PointMap => _pointMap;
+
+        /// <summary>调整端口/从站号：要求先离线，由协议层管理器在重建时调用。</summary>
+        public void Reconfigure(int port, byte slaveId)
+        {
+            if (IsOnline)
+            {
+                _log.Warn($"{ServerName} 在线时调整端口/从站号被忽略，请先停止服务");
+                return;
+            }
+            _deviceInfo.port = port;
+            _deviceInfo.slaveId = slaveId;
         }
 
         /// <summary>Modbus TCP 监听是否处于活动状态（端口已绑定）。</summary>
