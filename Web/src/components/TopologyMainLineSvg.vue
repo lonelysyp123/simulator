@@ -202,18 +202,43 @@
               />
             </template>
             <template v-else>
-              <!-- 储能支路：PCS → 直流母线 → BMS，全量设备静态参数卡片（暂不绑定实时数据） -->
-              <g v-for="c in u.cards" :key="`card-${c.id}`" :transform="`translate(${c.x}, 0)`">
-                <foreignObject :x="-c.w / 2" :y="c.y" :width="c.w" :height="c.h">
-                  <div
-                    xmlns="http://www.w3.org/1999/xhtml"
-                    :class="['svg-device-box', c.tone === 'bms' ? 'bms-box' : 'pcs-box']"
-                  >
-                    <div class="box-title">{{ c.title }}</div>
-                    <div v-for="(ln, li) in c.lines" :key="li" class="box-line">{{ ln }}</div>
-                  </div>
-                </foreignObject>
-              </g>
+              <!-- 储能支路：PCS → 直流母线 → BMS；命中运行时通道时渲染实时数据+控制卡片，否则回退静态参数卡 -->
+              <template v-for="c in u.cards" :key="`card-${c.id}`">
+                <PcsCard
+                  v-if="c.tone === 'pcs' && pcsChannelOf(c)"
+                  :channel="pcsChannelOf(c)"
+                  :x="c.x"
+                  :y="c.y"
+                  :h="c.h"
+                  @pcs-start="n => $emit('pcs-start', n)"
+                  @pcs-stop="n => $emit('pcs-stop', n)"
+                  @pcs-set-power="p => $emit('pcs-set-power', p)"
+                  @pcs-set-reactive="p => $emit('pcs-set-reactive', p)"
+                />
+                <BmsCard
+                  v-else-if="c.tone === 'bms' && bmsChannelOf(c)"
+                  :channel="bmsChannelOf(c)"
+                  :x="c.x"
+                  :y="c.y"
+                  :h="c.h"
+                  @bms-power-on="n => $emit('bms-power-on', n)"
+                  @bms-power-off="n => $emit('bms-power-off', n)"
+                  @bms-fault-clear="n => $emit('bms-fault-clear', n)"
+                  @bms-set-soc="p => $emit('bms-set-soc', p)"
+                />
+                <g v-else :transform="`translate(${c.x}, 0)`">
+                  <foreignObject :x="-c.w / 2" :y="c.y" :width="c.w" :height="c.h">
+                    <div
+                      xmlns="http://www.w3.org/1999/xhtml"
+                      :class="['svg-device-box', c.tone === 'bms' ? 'bms-box' : 'pcs-box']"
+                    >
+                      <div class="box-title">{{ c.title }}</div>
+                      <div v-for="(ln, li) in c.lines" :key="li" class="box-line">{{ ln }}</div>
+                      <div class="box-line muted">运行时未加载</div>
+                    </div>
+                  </foreignObject>
+                </g>
+              </template>
               <text
                 v-for="(lb, lbi) in u.labels"
                 :key="`unit-lb-${lbi}`"
@@ -275,7 +300,15 @@ defineEmits([
   'pv-set-power',
   'pv-set-reactive',
   'pv-set-temp',
-  'pv-set-angle'
+  'pv-set-angle',
+  'pcs-start',
+  'pcs-stop',
+  'pcs-set-power',
+  'pcs-set-reactive',
+  'bms-power-on',
+  'bms-power-off',
+  'bms-fault-clear',
+  'bms-set-soc'
 ])
 
 const zoom = ref(DEFAULT_ZOOM)
@@ -375,6 +408,21 @@ function pvArrayLive(u, side) {
   const live = pvLive(u) || {}
   return side === 'B' ? (live.arrayB || null) : (live.arrayA || null)
 }
+/** 运行时通道索引：卡片编号 N ↔ channel.pcsNumber / compartmentNumber == N */
+const runtimeChannelMaps = computed(() => {
+  const pcsMap = new Map()
+  const bmsMap = new Map()
+  for (const u of props.snap.units || []) {
+    for (const ch of [u.channelA, u.channelB]) {
+      if (!ch) continue
+      if (ch.pcsNumber != null) pcsMap.set(ch.pcsNumber, ch)
+      if (ch.compartmentNumber != null) bmsMap.set(ch.compartmentNumber, ch)
+    }
+  }
+  return { pcsMap, bmsMap }
+})
+function pcsChannelOf(card) { return runtimeChannelMaps.value.pcsMap.get(card?.num) || null }
+function bmsChannelOf(card) { return runtimeChannelMaps.value.bmsMap.get(card?.num) || null }
 function fmtBreaker(closed, tripped) { return tripped ? '跳闸' : closed ? '合' : '分' }
 function breakerClosed(node) {
   const v = node?.parameters?.closed
@@ -605,6 +653,132 @@ const PvArrayCard = defineComponent({
                     emit('pv-set-angle', { pvNumber, side, angleDeg })
                   }
                 }, '设定')
+              ])
+            ])
+          ])
+        ])
+      ])
+    }
+  }
+})
+
+const PcsCard = defineComponent({
+  props: { channel: Object, x: Number, y: Number, h: Number },
+  emits: ['pcs-start', 'pcs-stop', 'pcs-set-power', 'pcs-set-reactive'],
+  setup(p, { emit }) {
+    return () => {
+      const ch = p.channel
+      const halfW = BOX_W / 2
+      const side = ch.slotInUnit === 1 ? 'B' : 'A'
+      const lines = [
+        ch.pcsDeviceState, ch.pcsStartStop, ch.pcsTargetP, ch.pcsActualP,
+        ch.pcsTargetQ, ch.pcsActualQ, ch.pcsBlackStart,
+        ch.pcsGridMode !== '—' ? `模式:${ch.pcsGridMode}` : null
+      ].filter(Boolean)
+      return h('g', { transform: `translate(${p.x}, 0)` }, [
+        h('foreignObject', { x: -halfW, y: p.y, width: BOX_W, height: p.h }, [
+          h('div', { xmlns: 'http://www.w3.org/1999/xhtml', class: 'svg-device-box pcs-box' }, [
+            h('div', { class: 'box-title' }, `PCS-${side} (PCS${ch.pcsNumber})`),
+            ...lines.map(t => h('div', { class: 'box-line' }, t)),
+            h('div', { class: 'box-controls' }, [
+              h('div', { class: 'power-row' }, [
+                h('label', { class: 'power-label' }, 'P设(kW)'),
+                h('input', {
+                  type: 'text', inputMode: 'decimal', class: 'power-input',
+                  value: getDraft(ch, 'p', ch.targetActivePowerKw),
+                  onInput: (e) => setDraft(ch, 'p', e.target.value)
+                }),
+                h('button', {
+                  type: 'button', class: 'act-btn act-set',
+                  onClick: (e) => {
+                    e.stopPropagation()
+                    const kw = Number(getDraft(ch, 'p', ch.targetActivePowerKw))
+                    if (!Number.isFinite(kw)) return
+                    emit('pcs-set-power', { pcsNumber: ch.pcsNumber, emuUnit: ch.emuUnitNumber, ytPoint: ch.activePowerYtPoint, powerKw: kw })
+                  }
+                }, '设定')
+              ]),
+              h('div', { class: 'power-row' }, [
+                h('label', { class: 'power-label' }, 'Q设(kvar)'),
+                h('input', {
+                  type: 'text', inputMode: 'decimal', class: 'power-input',
+                  value: getDraft(ch, 'q', ch.targetReactivePowerKvar),
+                  onInput: (e) => setDraft(ch, 'q', e.target.value)
+                }),
+                h('button', {
+                  type: 'button', class: 'act-btn act-set',
+                  onClick: (e) => {
+                    e.stopPropagation()
+                    const kvar = Number(getDraft(ch, 'q', ch.targetReactivePowerKvar))
+                    if (!Number.isFinite(kvar)) return
+                    emit('pcs-set-reactive', { pcsNumber: ch.pcsNumber, emuUnit: ch.emuUnitNumber, ytPoint: ch.reactivePowerYtPoint, reactiveKvar: kvar })
+                  }
+                }, '设定')
+              ]),
+              h('div', { class: 'box-actions' }, [
+                h('button', { type: 'button', class: 'act-btn act-on', onClick: (e) => { e.stopPropagation(); emit('pcs-start', ch.pcsNumber) } }, '启动'),
+                h('button', { type: 'button', class: 'act-btn act-off', onClick: (e) => { e.stopPropagation(); emit('pcs-stop', ch.pcsNumber) } }, '停机')
+              ])
+            ])
+          ])
+        ])
+      ])
+    }
+  }
+})
+
+const BmsCard = defineComponent({
+  props: { channel: Object, x: Number, y: Number, h: Number },
+  emits: ['bms-power-on', 'bms-power-off', 'bms-fault-clear', 'bms-set-soc'],
+  setup(p, { emit }) {
+    return () => {
+      const ch = p.channel
+      const halfW = BOX_W / 2
+      const lines = [
+        ch.bmsCompact,
+        ch.bmsRunStatus || '运行:—',
+        ch.bmsAirConditioner,
+        ch.bmsEnergy || `累计充 ${(ch.cumulativeChargeEnergyKwh ?? 0).toFixed(1)} / 放 ${(ch.cumulativeDischargeEnergyKwh ?? 0).toFixed(1)} kWh`,
+        `并网:${ch.gridConnect}`,
+        ch.bmsBlackStart
+      ].filter(Boolean)
+      return h('g', { transform: `translate(${p.x}, 0)` }, [
+        h('foreignObject', { x: -halfW, y: p.y, width: BOX_W, height: p.h }, [
+          h('div', { xmlns: 'http://www.w3.org/1999/xhtml', class: 'svg-device-box bms-box' }, [
+            h('div', { class: 'box-title' }, `BMS${ch.compartmentNumber} 电池堆`),
+            ...lines.map(t => h('div', { class: 'box-line' }, t)),
+            h('div', { class: 'box-controls' }, [
+              h('div', { class: 'power-row' }, [
+                h('label', { class: 'power-label' }, 'SOC(%)'),
+                h('input', {
+                  type: 'text', inputMode: 'decimal', class: 'power-input',
+                  value: getDraft(ch, 'soc', ch.socPercent),
+                  onInput: (e) => setDraft(ch, 'soc', e.target.value),
+                  onKeydown: (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      const pct = Number(getDraft(ch, 'soc', ch.socPercent))
+                      if (!Number.isFinite(pct)) return
+                      emit('bms-set-soc', { bmsNumber: ch.compartmentNumber, socPercent: pct })
+                    }
+                  }
+                }),
+                h('button', {
+                  type: 'button', class: 'act-btn act-set',
+                  onClick: (e) => {
+                    e.stopPropagation()
+                    const pct = Number(getDraft(ch, 'soc', ch.socPercent))
+                    if (!Number.isFinite(pct)) return
+                    emit('bms-set-soc', { bmsNumber: ch.compartmentNumber, socPercent: pct })
+                  }
+                }, '设定')
+              ]),
+              h('div', { class: 'box-actions' }, [
+                h('button', { type: 'button', class: 'act-btn act-on', onClick: (e) => { e.stopPropagation(); emit('bms-power-on', ch.compartmentNumber) } }, '上电'),
+                h('button', { type: 'button', class: 'act-btn act-off', onClick: (e) => { e.stopPropagation(); emit('bms-power-off', ch.compartmentNumber) } }, '下电')
+              ]),
+              h('div', { class: 'box-actions' }, [
+                h('button', { type: 'button', class: 'act-btn act-clear', onClick: (e) => { e.stopPropagation(); emit('bms-fault-clear', ch.compartmentNumber) } }, '故障清除')
               ])
             ])
           ])
