@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "id": "f0f5c528153545168e6ae959dab94003",
   "name": "\u5E38\u7528\u50A8\u80FD\u7535\u7AD9#1",
-  "updatedAtUtc": "2026-08-26T01:38:42.047449Z",
+  "updatedAtUtc": "2026-08-26T02:53:45.905502Z",
   "nodes": [
     {
       "id": "4a575f073f4ed1a037e5a2c9",
@@ -642,6 +642,19 @@
         "isPccMeter": false,
         "emuId": "3541efc02497e1a037e8e641",
         "groupId": "447f24c15d13581a037e8f112"
+      }
+    },
+    {
+      "id": "9e080b78199ce81a03bfcb2fa",
+      "templateId": "ac_meter",
+      "label": "\u4E09\u76F8\u7535\u8868",
+      "x": 1620,
+      "y": 900,
+      "parameters": {
+        "ptPrimaryVoltage": 35000,
+        "ctPrimaryCurrent": 2000,
+        "accuracyClass": "0.2S",
+        "isPccMeter": false
       }
     }
   ],
@@ -1415,6 +1428,27 @@
       "fromPortId": "pt_c",
       "toNodeId": "0f63830db1e61a037ec92c6",
       "toPortId": "c2"
+    },
+    {
+      "id": "4b9ea5f96ebd435c849a982058fe3ff8",
+      "fromNodeId": "37bbaf101758f1a03ba22421",
+      "fromPortId": "a2",
+      "toNodeId": "9e080b78199ce81a03bfcb2fa",
+      "toPortId": "pt_a"
+    },
+    {
+      "id": "bde05be739dd47aebaccd8848cf00029",
+      "fromNodeId": "37bbaf101758f1a03ba22421",
+      "fromPortId": "b2",
+      "toNodeId": "9e080b78199ce81a03bfcb2fa",
+      "toPortId": "pt_b"
+    },
+    {
+      "id": "172bf6d92a9b43b8855c59fac849e7f5",
+      "fromNodeId": "37bbaf101758f1a03ba22421",
+      "fromPortId": "c2",
+      "toNodeId": "9e080b78199ce81a03bfcb2fa",
+      "toPortId": "pt_c"
     }
   ]
 }
