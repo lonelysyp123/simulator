@@ -60,6 +60,7 @@ export async function getTopologyProjects() { return (await api.get('/topology/p
 export async function getTopologyProjectById(id) { return (await api.get(`/topology/projects/${id}`)).data }
 export async function postTopologyProjectNew(body = {}) { return (await api.post('/topology/projects/new', body)).data }
 export async function postTopologyProjectOpen(id) { return (await api.post(`/topology/projects/${id}/open`)).data }
+export async function postTopologyProjectCopy(id, name) { return (await api.post(`/topology/projects/${id}/copy`, { name: name || undefined })).data }
 export async function deleteTopologyProject(id) { return (await api.delete(`/topology/projects/${id}`)).data }
 export async function checkTopologyProjectName(name, excludeId) {
   return (await api.get('/topology/projects/check-name', { params: { name, excludeId: excludeId || undefined } })).data
