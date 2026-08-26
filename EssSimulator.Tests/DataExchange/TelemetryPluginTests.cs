@@ -229,9 +229,21 @@ public class TelemetryPluginTests
     {
         var catalog = LoadCatalog("trina_5.5MW");
 
-        // 5.5MW 表仅含模块警告字 8 点（2 机组 × 模块1/2 × 警告字1/2），无 SYSTEM 级插件点
-        Assert.Equal(8, catalog.PluginPoints.Count);
-        Assert.Contains(catalog.PluginPoints, p => p.DeviceRoot == "emu2.PcsList[1]" && p.WordKey == "ModuleWarningWord2");
+        // 5.5MW 表含 15 个插件点：模块警告字 8 点（PCS1/2 × 模块1/2 × 警告字1/2）+ SYSTEM 级 7 点
+        Assert.Equal(15, catalog.PluginPoints.Count);
+        Assert.Contains(catalog.PluginPoints, p => p.DeviceRoot == "emu1.PcsList[3]" && p.WordKey == "ModuleWarningWord2");
+
+        var systemKeys = new[]
+        {
+            "SystemFaultSummary", "SystemRunStateSummary", "UnitBlackStartStatus",
+            "UnitPcsTotalCount", "UnitPcsRunningCount", "UnitPcsAlarmCount", "UnitPcsFaultCount"
+        };
+        Assert.All(systemKeys, k => Assert.Contains(catalog.PluginPoints, p => p.WordKey == k));
+
+        // 组电表绑定：PCS1/2 块交流电流与电网电压绑定所属分组电表（单机组 emu1 扁平口径）
+        Assert.Equal("emu1.Groups[0].Meters[0].LineVoltageAB", catalog.FindTelemetry("yc20")!.Target.FullPath);
+        Assert.Equal("emu1.Groups[1].Meters[0].PhaseACurrent", catalog.FindTelemetry("yc207")!.Target.FullPath);
+        Assert.Equal("emu1.Groups[1].Meters[0].LineVoltageCA", catalog.FindTelemetry("yc217")!.Target.FullPath);
     }
 
     [Fact]
@@ -363,7 +375,7 @@ public class TelemetryPluginTests
         Assert.Equal(8, dcPower!.Paths.Count);
         Assert.Contains("emu1.PcsList[7].BatteryPower", dcPower.Paths);
 
-        // 单元级过温降载 NTC：两模块 IGBT 温度取大（5.5MW 表保持两机组口径）
+        // 单元级过温降载 NTC：两模块 IGBT 温度取大（5.5MW 表单机组扁平口径，PCS2 = PcsList[2]/[3]）
         var catalog55 = LoadCatalog("trina_5.5MW");
         var ntc1 = catalog55.MaxPoints.FirstOrDefault(p => p.ParamName == "yc23");
         Assert.NotNull(ntc1);
@@ -371,7 +383,7 @@ public class TelemetryPluginTests
 
         var ntc2 = catalog55.MaxPoints.FirstOrDefault(p => p.ParamName == "yc218");
         Assert.NotNull(ntc2);
-        Assert.Equal(new[] { "emu2.PcsList[0].IGBTMaxTemp", "emu2.PcsList[1].IGBTMaxTemp" }, ntc2!.Paths);
+        Assert.Equal(new[] { "emu1.PcsList[2].IGBTMaxTemp", "emu1.PcsList[3].IGBTMaxTemp" }, ntc2!.Paths);
     }
 
     [Fact]
