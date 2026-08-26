@@ -69,6 +69,9 @@ namespace EssSimulator.EssSimModelApi
                     flatIndex += group.PcsCount;
                     if (!string.IsNullOrWhiteSpace(group.BreakerName))
                         gd.Breaker = new BreakerMirrorData { Closed = 1 };
+                    // 组级电表镜像：按组态绑定顺序逐台建镜像（同组多表共母线，数值相同）
+                    for (int i = 0; i < group.MeterNames.Count; i++)
+                        gd.Meters.Add(new ElectricityMeterData());
                     emu.Groups.Add(gd);
                 }
             }

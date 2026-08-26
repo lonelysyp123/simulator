@@ -229,10 +229,14 @@ namespace EssSimulator.Web.Topology
                         };
                         var groupBreaker = project.Nodes.FirstOrDefault(n =>
                             n.TemplateId == "ac_breaker" && TopologyParamHelper.GetString(n.Parameters, "groupId") == groupNode.Id);
-                        var groupMeter = project.Nodes.FirstOrDefault(n =>
-                            n.TemplateId == "ac_meter" && TopologyParamHelper.GetString(n.Parameters, "groupId") == groupNode.Id);
+                        var groupMeters = project.Nodes
+                            .Where(n => n.TemplateId == "ac_meter" && TopologyParamHelper.GetString(n.Parameters, "groupId") == groupNode.Id)
+                            .Select(n => NodeDisplayName(n))
+                            .Where(name => !string.IsNullOrWhiteSpace(name))
+                            .Cast<string>()
+                            .ToList();
                         groupCfg.BreakerName = NodeDisplayName(groupBreaker);
-                        groupCfg.MeterName = NodeDisplayName(groupMeter);
+                        groupCfg.MeterNames = groupMeters;
 
                         foreach (var pcs in group.Pcs.Where(p =>
                             TopologyParamHelper.GetString(p.Parameters, "groupId") == groupNode.Id))

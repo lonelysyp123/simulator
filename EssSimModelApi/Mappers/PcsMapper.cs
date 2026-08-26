@@ -152,6 +152,42 @@ namespace EssSimulator.EssSimModelApi.Mappers
         }
 
         /// <summary>
+        /// 单元电表镜像刷新：线/相电压与频率跟随单元 PCS 交流母线（同母线共量），
+        /// 相电流按 PCS 求和，功率取 EMU 单元聚合值；电能字段无积分模型，不刷新。
+        /// </summary>
+        public static void MapElectricityMeterState(EnergyManagementData emu) =>
+            FillMeterFromPcs(emu.ElectricityMeter, emu.PcsList, emu.Emu.OutputActivePower, emu.Emu.OutputReactivePower);
+
+        /// <summary>
+        /// 电表镜像通用填充：电压/频率/相电流来自指定 PCS 集合的交流母线，
+        /// 功率取给定的聚合值；电能字段无积分模型，不刷新。
+        /// </summary>
+        private static void FillMeterFromPcs(EnergyManagementSystem.ElectricityMeterData meter, IReadOnlyList<PcsData> pcsList, float totalP, float totalQ)
+        {
+            if (pcsList.Count > 0)
+            {
+                float lineV = pcsList.Average(p => p.LineVoltageAB);
+                meter.LineVoltageAB = lineV;
+                meter.LineVoltageBC = lineV;
+                meter.LineVoltageCA = lineV;
+                float phaseV = lineV / MathF.Sqrt(3);
+                meter.PhaseAVoltage = phaseV;
+                meter.PhaseBVoltage = phaseV;
+                meter.PhaseCVoltage = phaseV;
+                meter.Frequency = pcsList.Average(p => p.Frequency);
+                meter.PhaseACurrent = pcsList.Sum(p => p.PhaseACurrent);
+                meter.PhaseBCurrent = pcsList.Sum(p => p.PhaseBCurrent);
+                meter.PhaseCCurrent = pcsList.Sum(p => p.PhaseCCurrent);
+            }
+
+            meter.TotalActivePower = totalP;
+            meter.TotalReactivePower = totalQ;
+            float apparent = MathF.Sqrt(totalP * totalP + totalQ * totalQ);
+            meter.TotalApparentPower = apparent;
+            meter.PowerFactor = apparent > 0 ? totalP / apparent : 0f;
+        }
+
+        /// <summary>
         /// 组级聚合遥测刷新：组内 PCS 求和与台数统计；组级断路器为协议镜像，恒合闸。
         /// 扁平构成（无 Groups）时为空操作。
         /// </summary>
@@ -185,6 +221,10 @@ namespace EssSimulator.EssSimModelApi.Mappers
 
                 if (group.Breaker != null)
                     group.Breaker.Closed = 1;
+
+                // 组级电表镜像：同组各表共母线，数值均按组内 PCS 合成
+                foreach (var meter in group.Meters)
+                    FillMeterFromPcs(meter, group.PcsList, sumP, sumQ);
             }
         }
 

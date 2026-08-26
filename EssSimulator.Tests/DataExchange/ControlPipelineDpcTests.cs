@@ -71,8 +71,22 @@ public class ControlPipelineDpcTests
 
     private static ModbusParser CreateParser()
     {
-        var pointMap = new ModbusPointMap("emu.csv", "simEmu1");
+        // 固定加载 standard 型号 EMU 点表（含 yx3），避免受运行期设备型号选型劫持
+        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "emu", "standard", "emu.csv");
+        var pointMap = new ModbusPointMap(path, "simEmu1");
         return new ModbusParser(pointMap.RawMaps);
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "EssSimulator.csproj")))
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+        throw new DirectoryNotFoundException("未找到仓库根目录");
     }
 
     [Fact]

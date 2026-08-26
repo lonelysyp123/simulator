@@ -7,10 +7,33 @@ namespace EssSimulator.Tests.DataExchange;
 
 public class EmuPointCatalogLoaderTests
 {
+    /// <summary>固定加载 standard 型号 EMU 点表，避免受运行期设备型号选型（device-models.json）劫持。</summary>
+    private static ModbusPointMap LoadStandardEmuMap() =>
+        new(StandardEmuMapPath(), "simEmu1");
+
+    private static string StandardEmuMapPath()
+    {
+        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "emu", "standard", "emu.csv");
+        Assert.True(File.Exists(path), path);
+        return path;
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "EssSimulator.csproj")))
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+        throw new DirectoryNotFoundException("未找到仓库根目录");
+    }
+
     [Fact]
     public void FromPointMap_simEmu1_HasTelemetryAndControlBindings()
     {
-        var pointMap = new ModbusPointMap("emu.csv", "simEmu1");
+        var pointMap = LoadStandardEmuMap();
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simEmu1", new DataExchangeOptions());
 
         Assert.True(catalog.TelemetryPoints.Count > 40);
@@ -28,7 +51,7 @@ public class EmuPointCatalogLoaderTests
     [Fact]
     public void FromPointMap_AppliesConfiguredSemanticsOverride()
     {
-        var pointMap = new ModbusPointMap("emu.csv", "simEmu1");
+        var pointMap = LoadStandardEmuMap();
         var options = new DataExchangeOptions
         {
             ControlSemantics = { ["yx3"] = "Hold" }
@@ -42,7 +65,7 @@ public class EmuPointCatalogLoaderTests
     [Fact]
     public void FromPointMap_GatesEmuBindingsByUnitComposition()
     {
-        var pointMap = new ModbusPointMap("emu.csv", "simEmu1");
+        var pointMap = LoadStandardEmuMap();
         // 机组构成：1 台 PCS、无断路器、无电表
         var units = new List<EssUnitConfig>
         {

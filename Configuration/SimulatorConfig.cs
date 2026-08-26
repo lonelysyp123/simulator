@@ -248,8 +248,8 @@ namespace EssSimulator.Configuration
         public List<BmsDeviceConfig> Bms { get; set; } = new();
         /// <summary>组态绑定到本组的断路器节点名称（可选，协议镜像）。</summary>
         public string? BreakerName { get; set; }
-        /// <summary>组态绑定到本组的电表节点名称（可选，协议镜像）。</summary>
-        public string? MeterName { get; set; }
+        /// <summary>组态绑定到本组的电表节点名称列表（可选，协议镜像；允许多台）。</summary>
+        public List<string> MeterNames { get; set; } = new();
 
         /// <summary>本组 PCS 台数。</summary>
         public int PcsCount => Pcs?.Count ?? 0;

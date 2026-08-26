@@ -38,7 +38,8 @@ namespace EssSimulator.EssSimModelApi.Mappers
 
         /// <summary>
         /// 设备镜像刷新：EMU 级断路器状态跟随 Emu.PowerOnOff；
-        /// 单元变镜像优先抄电气层真实状态，缺失时用 PCS 求和合成。
+        /// 单元变镜像优先抄电气层真实状态，缺失时用 PCS 求和合成；
+        /// 单元电表镜像电压/频率跟随 PCS 交流母线，功率取 EMU 聚合值。
         /// </summary>
         private static void SyncDeviceMirrors(
             EnergyStorageSystem ess,
@@ -47,6 +48,8 @@ namespace EssSimulator.EssSimModelApi.Mappers
             double unitXfRatedKw)
         {
             emu.Breaker.Closed = (ushort)(emu.Emu.PowerOnOff != 0 ? 1 : 0);
+
+            PcsMapper.MapElectricityMeterState(emu);
 
             if (emu.Transformers.Count == 0)
                 return;

@@ -182,7 +182,7 @@ namespace EssSimulator.Web.Topology
                 new() { Key = "accuracyClass", Label = "精度等级", Type = "string" },
                 new() { Key = "isPccMeter", Label = "作为并网点电表", Type = "boolean", Description = "勾选后与电站概览电表数据绑定；全工程有且仅能指定一个" },
                 new() { Key = "emuId", Label = "所属 EMU 储能单元", Type = "emu_select", Description = "可选；选择后本电表归入该 EMU 虚拟单元，作为其单元电表；每个 EMU 至多 1 台" },
-                new() { Key = "groupId", Label = "所属 EMU 分组", Type = "group_select", Description = "可选；选择后本电表归入该 EMU 分组（须先选所属 EMU），作为组级电表协议镜像；每个分组至多 1 台" }
+                new() { Key = "groupId", Label = "所属 EMU 分组", Type = "group_select", Description = "可选；选择后本电表归入该 EMU 分组（须先选所属 EMU），作为组级电表协议镜像；每个分组可绑定多台" }
             },
             DefaultParameters = new Dictionary<string, object?>
             {
@@ -278,7 +278,7 @@ namespace EssSimulator.Web.Topology
             Id = "emu_group",
             Name = "EMU 分组",
             Category = "储能",
-            Description = "EMU 内协议分组（虚拟）：拖入后画布不显示图形，在左侧「EMU 储能单元」列表中管理；PCS 变流器、断路器、电表通过其「所属 EMU 分组」下拉框归入本组（组级断路器/电表各至多 1 台）。",
+            Description = "EMU 内协议分组（虚拟）：拖入后画布不显示图形，在左侧「EMU 储能单元」列表中管理；PCS 变流器、断路器、电表通过其「所属 EMU 分组」下拉框归入本组（组级断路器至多 1 台，电表可多台）。",
             IsVoltageSource = false,
             IsVirtual = true,
             Parameters =

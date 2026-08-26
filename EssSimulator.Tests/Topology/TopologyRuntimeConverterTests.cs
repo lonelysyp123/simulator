@@ -155,7 +155,8 @@ public class TopologyRuntimeConverterTests
                 Node("pA2", "pcs", "PCS-A2", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" }, x: 200, y: 720),
                 Node("pB1", "pcs", "PCS-B1", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpB" }, x: 300, y: 720),
                 Node("gb1", "ac_breaker", "组断A", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" }),
-                Node("gm1", "ac_meter", "组表A", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" })
+                Node("gm1", "ac_meter", "组表A", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" }),
+                Node("gm2", "ac_meter", "组表A2", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grpA" })
             }
         };
 
@@ -173,11 +174,11 @@ public class TopologyRuntimeConverterTests
         Assert.Empty(u1.Pcs);
         Assert.Equal(3, u1.PcsCount);
 
-        // 组级断路器/电表写入组配置，不占 EMU 级槽位
+        // 组级断路器/电表写入组配置，不占 EMU 级槽位；同组电表允许多台
         Assert.Equal("组断A", u1.Groups[0].BreakerName);
-        Assert.Equal("组表A", u1.Groups[0].MeterName);
+        Assert.Equal(new[] { "组表A", "组表A2" }, u1.Groups[0].MeterNames.ToArray());
         Assert.Null(u1.Groups[1].BreakerName);
-        Assert.Null(u1.Groups[1].MeterName);
+        Assert.Empty(u1.Groups[1].MeterNames);
         Assert.False(u1.HasUnitBreaker);
         Assert.False(u1.HasUnitMeter);
 

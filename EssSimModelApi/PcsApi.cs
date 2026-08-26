@@ -656,6 +656,8 @@ namespace EssSimulator.EssSimModelApi
             {
                 /// <summary>开合状态：0=分，1=合。</summary>
                 public ushort Closed { get; set; } = 1;
+                /// <summary>协议状态码：0xAA=合（动作），0xEE=分（复归）。</summary>
+                public ushort ClosedAaEe => Closed != 0 ? (ushort)0xAA : (ushort)0xEE;
                 /// <summary>跳闸信号（本期恒 0）。</summary>
                 public ushort Trip { get; set; }
                 /// <summary>故障字（本期恒 0）。</summary>
@@ -694,6 +696,8 @@ namespace EssSimulator.EssSimModelApi
                 public List<PcsData> PcsList { get; set; } = new List<PcsData>();
                 /// <summary>组级断路器协议镜像；组未绑定断路器时为 null。</summary>
                 public BreakerMirrorData? Breaker { get; set; }
+                /// <summary>组级电表协议镜像列表；按组态绑定顺序与组配置 MeterNames 索引对齐。</summary>
+                public List<ElectricityMeterData> Meters { get; set; } = new List<ElectricityMeterData>();
 
                 /// <summary>组总有功功率（kW，组内 PCS 求和）。</summary>
                 public float TotalActivePower { get; set; }

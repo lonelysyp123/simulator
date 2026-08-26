@@ -33,7 +33,7 @@ namespace EssSimulator.DataExchange.Catalog
         /// <summary>
         /// 判断单条模型绑定路径是否指向机组内实际存在的设备。
         /// 路径根须为 emuK 机组根路径；PcsList[i] 要求 i 小于该机组 PCS 台数；
-        /// ElectricityMeter 要求该机组绑定电表；Emu.PowerOnOff / Breaker.*（单元高压断路器）要求该机组绑定断路器；
+        /// ElectricityMeter 要求该机组下属存在电表（直绑单元或任一分组绑定）；Breaker.*（断路器状态镜像）要求该机组下属存在断路器；Emu.PowerOnOff（单元高压断路器控制）要求该机组直绑断路器；
         /// Groups[g].PcsList[i] / Groups[g].Breaker 按分组构成校验；Transformers[k] 本期仅 k=0（单元变）；
         /// 其余 Emu.* 为单元虚拟模型，恒允许。
         /// </summary>
@@ -66,7 +66,7 @@ namespace EssSimulator.DataExchange.Catalog
 
             if (path.Equals("Breaker", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("Breaker.", StringComparison.OrdinalIgnoreCase))
-                return unit.HasUnitBreaker;
+                return HasAnyBreaker(unit);
 
             if (path.StartsWith("PcsList[", StringComparison.OrdinalIgnoreCase))
             {
@@ -78,7 +78,7 @@ namespace EssSimulator.DataExchange.Catalog
             }
 
             if (path.StartsWith("ElectricityMeter", StringComparison.OrdinalIgnoreCase))
-                return unit.HasUnitMeter;
+                return HasAnyMeter(unit);
 
             if (path.StartsWith("Emu.PowerOnOff", StringComparison.OrdinalIgnoreCase))
                 return unit.HasUnitBreaker;
@@ -88,8 +88,21 @@ namespace EssSimulator.DataExchange.Catalog
         }
 
         /// <summary>
+        /// 机组下属是否存在电表：直绑单元电表，或任一分组绑定了组电表。
+        /// </summary>
+        private static bool HasAnyMeter(EssUnitConfig unit) =>
+            unit.HasUnitMeter || unit.Groups.Any(g => g.MeterNames.Count > 0);
+
+        /// <summary>
+        /// 机组下属是否存在断路器：直绑单元断路器，或任一分组绑定了组断路器。
+        /// </summary>
+        private static bool HasAnyBreaker(EssUnitConfig unit) =>
+            unit.HasUnitBreaker || unit.Groups.Any(g => !string.IsNullOrWhiteSpace(g.BreakerName));
+
+        /// <summary>
         /// 分组路径门控：Groups[g] 索引须有效；组内 PcsList[i] 要求 i 小于组内 PCS 台数；
-        /// Groups[g].Breaker 要求该组绑定断路器；其余组聚合遥测恒允许。
+        /// Groups[g].Meters[k] 要求 k 小于该组绑定电表台数；Groups[g].Breaker 要求该组绑定断路器；
+        /// 其余组聚合遥测恒允许。
         /// </summary>
         private static bool AllowsGroupPath(EssUnitConfig unit, string path)
         {
@@ -114,6 +127,14 @@ namespace EssSimulator.DataExchange.Catalog
             if (rest.Equals(".Breaker", StringComparison.OrdinalIgnoreCase) ||
                 rest.StartsWith(".Breaker.", StringComparison.OrdinalIgnoreCase))
                 return !string.IsNullOrWhiteSpace(group.BreakerName);
+
+            if (rest.StartsWith(".Meters[", StringComparison.OrdinalIgnoreCase))
+            {
+                int indexClose = rest.IndexOf(']', 8);
+                return indexClose > 8
+                    && int.TryParse(rest[8..indexClose], out int meterIndex)
+                    && meterIndex >= 0 && meterIndex < group.MeterNames.Count;
+            }
 
             // 组聚合遥测（TotalActivePower 等）：索引有效即允许
             return rest.Length == 0 || rest.StartsWith(".", StringComparison.OrdinalIgnoreCase);

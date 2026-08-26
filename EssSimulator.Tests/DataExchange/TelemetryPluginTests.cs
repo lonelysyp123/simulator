@@ -200,20 +200,24 @@ public class TelemetryPluginTests
     {
         var catalog = LoadCatalog("trina_10MW");
 
-        // SYSTEM 系统级点位已剥离至 LC 点表，EMU 表仅保留 4 机组 × (模块1/2 × 警告字1/2) = 16 个插件点
-        Assert.Equal(16, catalog.PluginPoints.Count);
-        Assert.All(catalog.PluginPoints, p =>
-            Assert.Contains(p.WordKey, new[] { "ModuleWarningWord1", "ModuleWarningWord2" }));
+        // 模块警告字：8 台 PCS × 警告字1/2 = 16；另点表新增 SYSTEM 级插件点 7 个（故障/运行汇总、黑启动、PCS 台数统计）
+        Assert.Equal(23, catalog.PluginPoints.Count);
+        var warningPoints = catalog.PluginPoints
+            .Where(p => p.WordKey is "ModuleWarningWord1" or "ModuleWarningWord2")
+            .ToList();
+        Assert.Equal(16, warningPoints.Count);
 
-        // 设备根路径与机组/模块层级一致：emu{n}.PcsList[0/1]
-        var roots = catalog.PluginPoints.Select(p => p.DeviceRoot).Distinct().OrderBy(r => r).ToArray();
-        Assert.Equal(new[]
+        // 设备根路径与机组/模块层级一致：单机组 emu1 内 8 台 PCS 按扁平序 PcsList[0..7]
+        var roots = warningPoints.Select(p => p.DeviceRoot).Distinct().OrderBy(r => r).ToArray();
+        Assert.Equal(Enumerable.Range(0, 8).Select(i => $"emu1.PcsList[{i}]").ToArray(), roots);
+
+        // SYSTEM 级插件点：按单元替换 emuDeviceId 根或固定 emu1 根
+        var systemKeys = new[]
         {
-            "emu1.PcsList[0]", "emu1.PcsList[1]",
-            "emu2.PcsList[0]", "emu2.PcsList[1]",
-            "emu3.PcsList[0]", "emu3.PcsList[1]",
-            "emu4.PcsList[0]", "emu4.PcsList[1]"
-        }, roots);
+            "SystemFaultSummary", "SystemRunStateSummary", "UnitBlackStartStatus",
+            "UnitPcsTotalCount", "UnitPcsRunningCount", "UnitPcsAlarmCount", "UnitPcsFaultCount"
+        };
+        Assert.All(systemKeys, k => Assert.Contains(catalog.PluginPoints, p => p.WordKey == k));
 
         // 插件点不进普通反射遥测绑定
         var pluginParams = catalog.PluginPoints.Select(p => p.ParamName).ToHashSet();
@@ -225,23 +229,17 @@ public class TelemetryPluginTests
     {
         var catalog = LoadCatalog("trina_5.5MW");
 
-        // SYSTEM 系统级点位已剥离至 LC 点表，EMU 表仅保留模块警告字 8 点（2 机组 × 模块1/2 × 警告字1/2）
+        // 5.5MW 表仅含模块警告字 8 点（2 机组 × 模块1/2 × 警告字1/2），无 SYSTEM 级插件点
         Assert.Equal(8, catalog.PluginPoints.Count);
         Assert.Contains(catalog.PluginPoints, p => p.DeviceRoot == "emu2.PcsList[1]" && p.WordKey == "ModuleWarningWord2");
-
-        // 单元级插件点（黑启动状态/PCS 台数）随剥离迁移至 LC 点表，经首机组占位符替换为 emu1
-        var lcCatalog = LoadLcCatalog();
-        Assert.Contains(lcCatalog.PluginPoints, p => p.ParamName == "sysyc170" && p.WordKey == "UnitBlackStartStatus" && p.DeviceRoot == "emu1");
-        Assert.Contains(lcCatalog.PluginPoints, p => p.ParamName == "sysyc200" && p.WordKey == "UnitPcsTotalCount" && p.DeviceRoot == "emu1");
-        Assert.Contains(lcCatalog.PluginPoints, p => p.ParamName == "sysyc203" && p.WordKey == "UnitPcsFaultCount" && p.DeviceRoot == "emu1");
     }
 
     [Fact]
-    public void FromPointMap_Trina55MW_SystemControls_BoundToEmuVirtualModel()
+    public void FromPointMap_Trina10MW_SystemControls_BoundToEmuVirtualModel()
     {
-        // SYSTEM 控制点已剥离至 LC 点表：绑定聚合组首机组 EMU 虚拟模型，
+        // SYSTEM 控制点随撤销剥离回到 10MW EMU 点表：绑定 emu1 虚拟模型，
         // 并自动路由 PcsApplyCommands 副作用（占位符 emuDeviceId → emu1）
-        var catalog = LoadLcCatalog();
+        var catalog = LoadCatalog("trina_10MW");
 
         var expected = new Dictionary<string, string>
         {
@@ -326,99 +324,92 @@ public class TelemetryPluginTests
     }
 
     [Fact]
-    public void FromPointMap_Trina55MW_SystemLimits_BoundToModel()
+    public void FromPointMap_Trina10MW_SystemLimits_BoundToModel()
     {
-        // 系统级遥测（允许能量/功率、直流侧功率）已剥离至 LC 点表
-        var lcCatalog = LoadLcCatalog();
+        // 系统级遥测随撤销剥离回到 10MW EMU 点表，绑定全部收敛至单元内部设备（不再映射 ess/em/bms）
+        var catalog = LoadCatalog("trina_10MW");
 
-        // 允许充/放电量绑定 ess 可用能量（与 10MW 表口径一致）
-        var chargeEnergy = lcCatalog.FindTelemetry("sysyc109");
-        Assert.NotNull(chargeEnergy);
-        Assert.Equal("ess.AvailableChargeEnergy", chargeEnergy!.Target.FullPath);
+        // 系统 SOC 绑定 EMU 虚拟模型平均 SOC
+        var soc = catalog.FindTelemetry("sysyc104");
+        Assert.NotNull(soc);
+        Assert.Equal("emu1.Emu.AverageBatterySoc", soc!.Target.FullPath);
 
-        var dischargeEnergy = lcCatalog.FindTelemetry("sysyc111");
-        Assert.NotNull(dischargeEnergy);
-        Assert.Equal("ess.AvailableDischargeEnergy", dischargeEnergy!.Target.FullPath);
+        // 容量/SOH/允许能量/累计电量类无单元内部模型：解绑为固定默认值
+        foreach (var paramName in new[] { "sysyc105", "sysyc109", "sysyc111", "sysyc141", "sysyc143", "sysyc149", "sysyc151" })
+            Assert.Contains(paramName, catalog.DefaultValues.Keys);
 
-        // 允许充/放电功率按 4 机组最大口径求和（2 机组场景缺失机组自动按 0 计入）
-        var chargePower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc113");
+        // 交流侧聚合：有功/无功绑定 EMU 单元聚合，视在功率按 8 模块求和
+        Assert.Equal("emu1.Emu.OutputActivePower", catalog.FindTelemetry("sysyc125")!.Target.FullPath);
+        Assert.Equal("emu1.Emu.OutputReactivePower", catalog.FindTelemetry("sysyc127")!.Target.FullPath);
+
+        // 高压开关状态绑定断路器协议状态码（0xAA 合 / 0xEE 分）
+        Assert.Equal("emu1.Breaker.ClosedAaEe", catalog.FindTelemetry("sysyc171")!.Target.FullPath);
+        var apparent = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc123");
+        Assert.NotNull(apparent);
+        Assert.Equal(8, apparent!.Paths.Count);
+
+        // 允许充/放电功率：单机组直接绑定 EMU 虚拟模型限值（EMU 聚合已含全部 8 台 PCS）
+        var chargePower = catalog.FindTelemetry("sysyc113");
         Assert.NotNull(chargePower);
-        Assert.Equal(new[]
-        {
-            "emu1.Emu.MaxChargePower", "emu2.Emu.MaxChargePower",
-            "emu3.Emu.MaxChargePower", "emu4.Emu.MaxChargePower"
-        }, chargePower!.Paths);
+        Assert.Equal("emu1.Emu.MaxChargePower", chargePower!.Target.FullPath);
 
-        var dischargePower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc115");
+        var dischargePower = catalog.FindTelemetry("sysyc115");
         Assert.NotNull(dischargePower);
-        Assert.Equal(new[]
-        {
-            "emu1.Emu.MaxDischargePower", "emu2.Emu.MaxDischargePower",
-            "emu3.Emu.MaxDischargePower", "emu4.Emu.MaxDischargePower"
-        }, dischargePower!.Paths);
+        Assert.Equal("emu1.Emu.MaxDischargePower", dischargePower!.Target.FullPath);
 
-        // 直流侧功率按 4 机组 8 模块求和，覆盖全系统
-        var dcPower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc131");
+        // 直流侧功率按单机组 8 模块求和，覆盖全系统
+        var dcPower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc131");
         Assert.NotNull(dcPower);
         Assert.Equal(8, dcPower!.Paths.Count);
-        Assert.Contains("emu2.PcsList[1].BatteryPower", dcPower.Paths);
+        Assert.Contains("emu1.PcsList[7].BatteryPower", dcPower.Paths);
 
-        // 单元级过温降载 NTC：两模块 IGBT 温度取大（仍留在 EMU 表）
-        var catalog = LoadCatalog("trina_5.5MW");
-        var ntc1 = catalog.MaxPoints.FirstOrDefault(p => p.ParamName == "yc23");
+        // 单元级过温降载 NTC：两模块 IGBT 温度取大（5.5MW 表保持两机组口径）
+        var catalog55 = LoadCatalog("trina_5.5MW");
+        var ntc1 = catalog55.MaxPoints.FirstOrDefault(p => p.ParamName == "yc23");
         Assert.NotNull(ntc1);
         Assert.Equal(new[] { "emu1.PcsList[0].IGBTMaxTemp", "emu1.PcsList[1].IGBTMaxTemp" }, ntc1!.Paths);
 
-        var ntc2 = catalog.MaxPoints.FirstOrDefault(p => p.ParamName == "yc218");
+        var ntc2 = catalog55.MaxPoints.FirstOrDefault(p => p.ParamName == "yc218");
         Assert.NotNull(ntc2);
         Assert.Equal(new[] { "emu2.PcsList[0].IGBTMaxTemp", "emu2.PcsList[1].IGBTMaxTemp" }, ntc2!.Paths);
     }
 
     [Fact]
-    public void FromPointMap_Trina10MW_SystemAggregates_AllFourUnits()
+    public void FromPointMap_Trina10MW_SystemAggregates_SingleUnitEightPcs()
     {
         var catalog = LoadCatalog("trina_10MW");
 
-        // 系统级求和点已剥离至 LC 并集点表，按 4 机组最大口径绑定
-        var lcCatalog = LoadLcCatalog();
+        // 系统级求和点按单机组 8 台 PCS 扁平结构绑定
 
-        // 标称容量/直流侧功率：8 模块全量求和
-        var rated = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc100");
-        Assert.NotNull(rated);
-        Assert.Equal(8, rated!.Paths.Count);
-        Assert.Contains("emu4.PcsList[1].PCSRatePower", rated.Paths);
-
-        var dcPower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc131");
+        // 直流侧总功率：8 模块全量求和
+        var dcPower = catalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc131");
         Assert.NotNull(dcPower);
         Assert.Equal(8, dcPower!.Paths.Count);
-        Assert.Contains("emu3.PcsList[0].BatteryPower", dcPower.Paths);
+        Assert.Contains("emu1.PcsList[3].BatteryPower", dcPower.Paths);
 
-        // 允许充/放电功率：四机组 EMU 限值求和
-        var chargePower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc113");
+        // 电网电压（各 PCS 块 RS/ST/TR）绑定所属分组的组电表线电压
+        Assert.Equal("emu1.Groups[0].Meters[0].LineVoltageAB", catalog.FindTelemetry("yc20")!.Target.FullPath);
+        Assert.Equal("emu1.Groups[0].Meters[0].LineVoltageBC", catalog.FindTelemetry("yc225")!.Target.FullPath);
+        Assert.Equal("emu1.Groups[1].Meters[0].LineVoltageCA", catalog.FindTelemetry("yc634")!.Target.FullPath);
+
+        // 允许充/放电功率：单机组直接绑定 EMU 限值
+        var chargePower = catalog.FindTelemetry("sysyc113");
         Assert.NotNull(chargePower);
-        Assert.Equal(new[]
-        {
-            "emu1.Emu.MaxChargePower", "emu2.Emu.MaxChargePower",
-            "emu3.Emu.MaxChargePower", "emu4.Emu.MaxChargePower"
-        }, chargePower!.Paths);
+        Assert.Equal("emu1.Emu.MaxChargePower", chargePower!.Target.FullPath);
 
-        var dischargePower = lcCatalog.SumPoints.FirstOrDefault(p => p.ParamName == "sysyc115");
+        var dischargePower = catalog.FindTelemetry("sysyc115");
         Assert.NotNull(dischargePower);
-        Assert.Equal(new[]
-        {
-            "emu1.Emu.MaxDischargePower", "emu2.Emu.MaxDischargePower",
-            "emu3.Emu.MaxDischargePower", "emu4.Emu.MaxDischargePower"
-        }, dischargePower!.Paths);
+        Assert.Equal("emu1.Emu.MaxDischargePower", dischargePower!.Target.FullPath);
 
-        // 单元级过温降载 NTC：各单元两模块 IGBT 温度取大（仍留在 EMU 表）
+        // 过温降载 NTC：按 10MW 一体机两模块配对取大（PCS4 = PcsList[6]/[7]）
         Assert.Equal(4, catalog.MaxPoints.Count);
         var ntc4 = catalog.MaxPoints.FirstOrDefault(p => p.ParamName == "yc635");
         Assert.NotNull(ntc4);
-        Assert.Equal(new[] { "emu4.PcsList[0].IGBTMaxTemp", "emu4.PcsList[1].IGBTMaxTemp" }, ntc4!.Paths);
+        Assert.Equal(new[] { "emu1.PcsList[6].IGBTMaxTemp", "emu1.PcsList[7].IGBTMaxTemp" }, ntc4!.Paths);
 
-        // 描述列半角逗号修复：sysyc218 等状态字点位恢复为固定默认值点（随剥离迁入 LC 表）
-        Assert.Contains("sysyc218", lcCatalog.DefaultValues.Keys);
-        Assert.Contains("sysyc228", lcCatalog.DefaultValues.Keys);
+        // 状态字点位无绑定：固定默认值
+        Assert.Contains("sysyc218", catalog.DefaultValues.Keys);
+        Assert.Contains("sysyc228", catalog.DefaultValues.Keys);
     }
 
     [Fact]
@@ -486,15 +477,6 @@ public class TelemetryPluginTests
         Assert.True(File.Exists(path), path);
         var pointMap = new ModbusPointMap(path, "simEmu1");
         return PointCatalogLoader.FromPointMap(pointMap, "simEmu1", new DataExchangeOptions());
-    }
-
-    /// <summary>加载剥离后的 LC 系统级点表（trina），按 simLc1 首机组 emu1 语义解析。</summary>
-    private static PointCatalog LoadLcCatalog()
-    {
-        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "lc", "trina", "lc.csv");
-        Assert.True(File.Exists(path), path);
-        var pointMap = new ModbusPointMap(path, "simLc1", clusterCount: 0, emuDeviceIdOverride: 1);
-        return PointCatalogLoader.FromPointMap(pointMap, "simLc1", new DataExchangeOptions());
     }
 
     private static string FindRepoRoot()

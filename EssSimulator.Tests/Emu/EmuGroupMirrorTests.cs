@@ -23,7 +23,8 @@ public class EmuGroupMirrorTests
             {
                 Name = "G1",
                 Pcs = { new PcsDeviceConfig(), new PcsDeviceConfig() },
-                BreakerName = "组断路器-1"
+                BreakerName = "组断路器-1",
+                MeterNames = { "组电表-1", "组电表-2" }
             },
             new EmuGroupConfig
             {
@@ -56,6 +57,10 @@ public class EmuGroupMirrorTests
         Assert.NotNull(emu.Groups[0].Breaker);
         Assert.Equal(1, emu.Groups[0].Breaker!.Closed);
         Assert.Null(emu.Groups[1].Breaker);
+
+        // 组级电表镜像：按 MeterNames 台数建镜像，未绑定组为空
+        Assert.Equal(2, emu.Groups[0].Meters.Count);
+        Assert.Empty(emu.Groups[1].Meters);
 
         // 单元变镜像固定 1 台（对应电气层单元变，本期仅 k=0）
         Assert.Single(emu.Transformers);
@@ -124,6 +129,33 @@ public class EmuGroupMirrorTests
 
         Assert.Equal(1, emu.Groups[0].AlarmPcsCount);
         Assert.Equal(1, emu.Groups[0].FaultPcsCount);
+    }
+
+    [Fact]
+    public void MapGroupState_FillsGroupMeters_FromGroupPcs()
+    {
+        var emu = PcsDataServer.BuildEmuMirror(GroupedUnit(), new PcsPhysicalConfig());
+        emu.PcsList[0].LineVoltageAB = 690f;
+        emu.PcsList[0].Frequency = 50f;
+        emu.PcsList[0].PhaseACurrent = 100f;
+        emu.PcsList[0].ActivePower = 100f;
+        emu.PcsList[1].LineVoltageAB = 690f;
+        emu.PcsList[1].Frequency = 50f;
+        emu.PcsList[1].PhaseACurrent = 90f;
+        emu.PcsList[1].ActivePower = 90f;
+
+        PcsMapper.MapGroupState(emu);
+
+        // G1 两台电表同母线：数值相同，电流按组内 PCS 求和、功率取组聚合
+        foreach (var meter in emu.Groups[0].Meters)
+        {
+            Assert.Equal(690f, meter.LineVoltageAB, 0.1f);
+            Assert.Equal(190f, meter.PhaseACurrent);
+            Assert.Equal(190f, meter.TotalActivePower);
+            Assert.Equal(50f, meter.Frequency);
+        }
+        // G2 无电表镜像：不刷新、不抛异常
+        Assert.Empty(emu.Groups[1].Meters);
     }
 
     [Fact]
