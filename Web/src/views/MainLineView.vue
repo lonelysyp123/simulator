@@ -96,21 +96,12 @@
         v-if="useTopologyMainLine"
         :snap="snap"
         @toggle-main-breaker="onToggleMainBreaker"
-        @toggle-unit-breaker="onToggleUnitBreaker"
-        @pcs-start="onPcsStart"
-        @pcs-stop="onPcsStop"
-        @pcs-set-power="onPcsSetPower"
-        @pcs-set-reactive="onPcsSetReactive"
         @pv-start="onPvStart"
         @pv-stop="onPvStop"
         @pv-set-power="onPvSetPower"
         @pv-set-reactive="onPvSetReactive"
         @pv-set-temp="onPvSetTemp"
         @pv-set-angle="onPvSetAngle"
-        @bms-power-on="onBmsPowerOn"
-        @bms-power-off="onBmsPowerOff"
-        @bms-fault-clear="onBmsFaultClear"
-        @bms-set-soc="onBmsSetSoc"
       />
       <MainLineSvg
         v-else

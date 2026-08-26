@@ -42,6 +42,7 @@
               v-for="(w, wi) in layout.wires"
               :key="`wire-${wi}`"
               class="bus-line"
+              :class="{ 'bus-thick': w.thick }"
               :x1="w.x1"
               :y1="w.y1"
               :x2="w.x2"
@@ -145,72 +146,31 @@
             </g>
           </g>
 
-          <!-- EMU 虚线框（容器）：先绘制，单元内容叠加在框内 -->
-          <g class="emu-overlay" pointer-events="none">
-            <rect
-              v-for="g in layout.groups"
-              :key="g.id"
-              :x="g.x"
-              :y="g.y"
-              :width="g.w"
-              :height="g.h"
-              class="group-box"
-            />
-          </g>
-
-          <!-- 各发电单元：EMU / 光伏；支路原点在 LV 母线上 -->
+          <!-- 各发电支路：光伏按设备类型图例展开；储能按物理拓扑全量绘制 -->
           <g
             v-for="u in layout.units"
             :key="u.index"
             :transform="`translate(${u.cx}, ${u.originY ?? layout.yBusLv})`"
           >
-            <!-- LV 母线 —引线— 单元断 —引线— 单元变 —引线— 690 母线（连线一律黑色） -->
-            <line class="bus-line" x1="0" y1="0" x2="0" :y2="u.unitBrkTop" />
-
-            <g v-if="u.kind === 'pv'">
-              <rect x="-22" :y="u.unitBrkTop" width="44" :height="u.unitBrkBottom - u.unitBrkTop" rx="3" fill="transparent" />
-              <BreakerSymbol :x="0" :y="u.unitBrkMid" :closed="true" :tripped="false" />
-              <text x="26" :y="u.unitBrkMid + 4" class="label-text breaker-label">单元断 —</text>
-            </g>
-            <g
-              v-else
-              class="breaker-hit"
-              @click="$emit('toggle-unit-breaker', u.unitSnap?.unitIndex ?? u.index)"
-            >
-              <rect x="-22" :y="u.unitBrkTop" width="44" :height="u.unitBrkBottom - u.unitBrkTop" rx="3" fill="transparent" />
-              <BreakerSymbol :x="0" :y="u.unitBrkMid" :closed="!!u.unitSnap?.unitBreakerClosed" :tripped="!!u.unitSnap?.unitBreakerTripped" />
-              <text x="26" :y="u.unitBrkMid + 4" class="label-text breaker-label">
-                单元断 {{ u.unitBreakerNode?.label || u.unitSnap?.unitBreakerLabel || fmtBreaker(u.unitSnap?.unitBreakerClosed, u.unitSnap?.unitBreakerTripped) }}
-              </text>
-            </g>
-
-            <line class="bus-line" x1="0" :y1="u.unitBrkBottom" x2="0" :y2="u.kind === 'pv' ? u.xfmrCardTop : u.unitXfmrTop" />
-            <PvXfmrCard
-              v-if="u.kind === 'pv'"
-              :unit="u"
-              :live="pvLive(u)"
-              :x="0"
-              :y="u.xfmrCardTop"
-              :h="u.xfmrCardH"
-              @pv-start="n => $emit('pv-start', n)"
-              @pv-stop="n => $emit('pv-stop', n)"
-              @pv-set-power="p => $emit('pv-set-power', p)"
-              @pv-set-reactive="p => $emit('pv-set-reactive', p)"
-            />
-            <TransformerSymbol
-              v-else
-              :x="0"
-              :y="u.unitXfmrTop + u.unitXfmrSpan / 2"
-              :scale="0.85"
-            />
-            <template v-if="u.kind !== 'pv'">
-              <text x="22" :y="u.unitXfmrTop + 14" class="label-text">
-                单元变 {{ u.unitXfLabel }}
-              </text>
-            </template>
-
-            <!-- 光伏：箱变模块 → 光伏方阵A/B -->
             <template v-if="u.kind === 'pv'">
+              <line class="bus-line" x1="0" y1="0" x2="0" :y2="u.unitBrkTop" />
+              <g>
+                <rect x="-22" :y="u.unitBrkTop" width="44" :height="u.unitBrkBottom - u.unitBrkTop" rx="3" fill="transparent" />
+                <BreakerSymbol :x="0" :y="u.unitBrkMid" :closed="true" :tripped="false" />
+                <text x="26" :y="u.unitBrkMid + 4" class="label-text breaker-label">单元断 —</text>
+              </g>
+              <line class="bus-line" x1="0" :y1="u.unitBrkBottom" x2="0" :y2="u.xfmrCardTop" />
+              <PvXfmrCard
+                :unit="u"
+                :live="pvLive(u)"
+                :x="0"
+                :y="u.xfmrCardTop"
+                :h="u.xfmrCardH"
+                @pv-start="n => $emit('pv-start', n)"
+                @pv-stop="n => $emit('pv-stop', n)"
+                @pv-set-power="p => $emit('pv-set-power', p)"
+                @pv-set-reactive="p => $emit('pv-set-reactive', p)"
+              />
               <line class="bus-line" x1="0" :y1="u.xfmrCardTop + u.xfmrCardH" x2="0" :y2="u.arraySplitY" />
               <polyline
                 class="bus-line"
@@ -241,148 +201,26 @@
                 @pv-set-angle="p => $emit('pv-set-angle', p)"
               />
             </template>
-
-            <!-- EMU：单元变 —引线— [690母线|PCS]：仅 1 路 PCS 时省略 690 母线 -->
             <template v-else>
-            <template v-if="u.omitBus690">
-              <line
-                class="bus-line"
-                x1="0"
-                :y1="u.unitXfmrTop + u.unitXfmrSpan"
-                :x2="u.pcsA ? -u.channelX : u.channelX"
-                :y2="u.pcsTop"
-              />
-            </template>
-            <template v-else>
-              <line class="bus-line" x1="0" :y1="u.unitXfmrTop + u.unitXfmrSpan" x2="0" :y2="u.unitBus690Y" />
-              <line class="bus-line" :x1="-u.channelX" :y1="u.unitBus690Y" :x2="u.channelX" :y2="u.unitBus690Y" />
-            </template>
-
-            <PcsCard
-              v-if="u.pcsA"
-              :channel="u.pcsA"
-              side="A"
-              :x="-u.channelX"
-              :bus-y="u.omitBus690 ? u.pcsTop : u.unitBus690Y"
-              :y="u.pcsTop"
-              :h="u.pcsH"
-              @pcs-start="n => $emit('pcs-start', n)"
-              @pcs-stop="n => $emit('pcs-stop', n)"
-              @pcs-set-power="p => $emit('pcs-set-power', p)"
-              @pcs-set-reactive="p => $emit('pcs-set-reactive', p)"
-            />
-            <DevicePlaceholder
-              v-else-if="u.runtimeMissing && u.drawPcsSlots >= 1"
-              title="PCS-A"
-              hint="运行时未加载"
-              :x="-u.channelX"
-              :y="u.pcsTop"
-              :h="u.pcsH"
-            />
-            <PcsCard
-              v-if="u.pcsB"
-              :channel="u.pcsB"
-              side="B"
-              :x="u.channelX"
-              :bus-y="u.omitBus690 ? u.pcsTop : u.unitBus690Y"
-              :y="u.pcsTop"
-              :h="u.pcsH"
-              @pcs-start="n => $emit('pcs-start', n)"
-              @pcs-stop="n => $emit('pcs-stop', n)"
-              @pcs-set-power="p => $emit('pcs-set-power', p)"
-              @pcs-set-reactive="p => $emit('pcs-set-reactive', p)"
-            />
-            <DevicePlaceholder
-              v-else-if="u.runtimeMissing && u.drawPcsSlots >= 2"
-              title="PCS-B"
-              hint="运行时未加载"
-              :x="u.channelX"
-              :y="u.pcsTop"
-              :h="u.pcsH"
-            />
-
-            <!-- 单元电表（EMU 绑定）：自 690 母线右侧取电；未绑定不画 -->
-            <template v-if="u.unitMeterNode">
-              <line class="bus-line" :x1="u.channelX" :y1="u.unitBus690Y" :x2="u.unitMeterX" :y2="u.unitBus690Y" />
-              <line class="bus-line" :x1="u.unitMeterX" :y1="u.unitBus690Y" :x2="u.unitMeterX" :y2="u.unitMeterTopY" />
-              <rect
-                :x="u.unitMeterX - u.unitMeterHalfW"
-                :y="u.unitMeterTopY"
-                :width="u.unitMeterHalfW * 2"
-                :height="u.unitMeterH"
-                rx="4"
-                class="meter-box"
-              />
-              <text :x="u.unitMeterX" :y="u.unitMeterTopY + 18" text-anchor="middle" class="label-text">{{ u.unitMeterNode.label || '电表' }}</text>
-              <text :x="u.unitMeterX" :y="u.unitMeterTopY + 34" text-anchor="middle" class="value-text">PT/CT</text>
-            </template>
-
-            <!-- DC：并联共母线；下方仅 1 路 BMS 时省略直流母线直连 -->
-            <template v-if="u.dcParallel && !u.omitDcBus">
-              <line class="bus-line" :x1="-u.channelX" :y1="u.pcsTop + u.pcsH" :x2="-u.channelX" :y2="u.dcBusY" />
-              <line class="bus-line" :x1="u.channelX" :y1="u.pcsTop + u.pcsH" :x2="u.channelX" :y2="u.dcBusY" />
-              <line class="bus-line bus-thick" :x1="-u.channelX - 20" :y1="u.dcBusY" :x2="u.channelX + 20" :y2="u.dcBusY" />
-              <text :x="-u.channelX - 18" :y="u.dcBusY - 6" class="label-text">
-                {{ u.dcBus?.label || '直流母线' }} {{ u.dcVoltageLabel }}
-              </text>
-              <line class="bus-line" :x1="-u.channelX" :y1="u.dcBusY" :x2="-u.channelX" :y2="u.bmsTop" />
-              <line class="bus-line" :x1="u.channelX" :y1="u.dcBusY" :x2="u.channelX" :y2="u.bmsTop" />
-            </template>
-            <template v-else>
-              <line class="bus-line" :x1="-u.channelX" :y1="u.pcsTop + u.pcsH" :x2="-u.channelX" :y2="u.bmsTop" />
-              <line class="bus-line" :x1="u.channelX" :y1="u.pcsTop + u.pcsH" :x2="u.channelX" :y2="u.bmsTop" />
-            </template>
-
-            <BmsCard
-              v-if="u.pcsA"
-              :channel="u.pcsA"
-              :label="bmsLabel(u, 0)"
-              :x="-u.channelX"
-              :y="u.bmsTop"
-              :h="u.bmsH"
-              @bms-power-on="n => $emit('bms-power-on', n)"
-              @bms-power-off="n => $emit('bms-power-off', n)"
-              @bms-fault-clear="n => $emit('bms-fault-clear', n)"
-              @bms-set-soc="p => $emit('bms-set-soc', p)"
-            />
-            <DevicePlaceholder
-              v-else-if="u.runtimeMissing && u.drawPcsSlots >= 1"
-              :title="bmsLabel(u, 0)"
-              hint="运行时未加载"
-              :x="-u.channelX"
-              :y="u.bmsTop"
-              :h="u.bmsH"
-              tone="bms"
-            />
-            <BmsCard
-              v-if="u.pcsB"
-              :channel="u.pcsB"
-              :label="bmsLabel(u, 1)"
-              :x="u.channelX"
-              :y="u.bmsTop"
-              :h="u.bmsH"
-              @bms-power-on="n => $emit('bms-power-on', n)"
-              @bms-power-off="n => $emit('bms-power-off', n)"
-              @bms-fault-clear="n => $emit('bms-fault-clear', n)"
-              @bms-set-soc="p => $emit('bms-set-soc', p)"
-            />
-            <DevicePlaceholder
-              v-else-if="u.runtimeMissing && u.drawPcsSlots >= 2"
-              :title="bmsLabel(u, 1)"
-              hint="运行时未加载"
-              :x="u.channelX"
-              :y="u.bmsTop"
-              :h="u.bmsH"
-              tone="bms"
-            />
-
-            <text
-              v-if="u.runtimeMissing"
-              :x="0"
-              :y="u.pcsTop + u.pcsH / 2"
-              text-anchor="middle"
-              class="runtime-missing-hint"
-            >请在「系统配置」应用组态并重启</text>
+              <!-- 储能支路：PCS → 直流母线 → BMS，全量设备静态参数卡片（暂不绑定实时数据） -->
+              <g v-for="c in u.cards" :key="`card-${c.id}`" :transform="`translate(${c.x}, 0)`">
+                <foreignObject :x="-c.w / 2" :y="c.y" :width="c.w" :height="c.h">
+                  <div
+                    xmlns="http://www.w3.org/1999/xhtml"
+                    :class="['svg-device-box', c.tone === 'bms' ? 'bms-box' : 'pcs-box']"
+                  >
+                    <div class="box-title">{{ c.title }}</div>
+                    <div v-for="(ln, li) in c.lines" :key="li" class="box-line">{{ ln }}</div>
+                  </div>
+                </foreignObject>
+              </g>
+              <text
+                v-for="(lb, lbi) in u.labels"
+                :key="`unit-lb-${lbi}`"
+                :x="lb.x"
+                :y="lb.y"
+                class="label-text"
+              >{{ lb.text }}</text>
             </template>
           </g>
         </svg>
@@ -403,7 +241,7 @@
       <span><i class="legend-line legend-open" />分闸/跳闸</span>
       <span>经典单线图图例</span>
       <span>结构随组态工程自动适配</span>
-      <span>光伏/储能单元按设备类型展开</span>
+      <span>储能设备按物理拓扑全量绘制</span>
     </div>
   </div>
 </template>
@@ -432,15 +270,6 @@ const props = defineProps({
 })
 defineEmits([
   'toggle-main-breaker',
-  'toggle-unit-breaker',
-  'pcs-start',
-  'pcs-stop',
-  'pcs-set-power',
-  'pcs-set-reactive',
-  'bms-power-on',
-  'bms-power-off',
-  'bms-fault-clear',
-  'bms-set-soc',
   'pv-start',
   'pv-stop',
   'pv-set-power',
@@ -457,7 +286,7 @@ const isPanning = ref(false)
 let panDragStart = { x: 0, y: 0, panX: 0, panY: 0 }
 
 const layout = computed(() => {
-  const l = buildTopologyMainLineLayout(props.snap.topology, props.snap.units || [])
+  const l = buildTopologyMainLineLayout(props.snap.topology)
   return {
     ...l,
     wires: l.wires || [],
@@ -527,15 +356,6 @@ function chipStatusClass(status) {
   if (!status || status === '关') return 'bs-off'
   if (status.includes('运行') || status === '开' || status === '运') return 'bs-on'
   return 'bs-partial'
-}
-
-function bmsLabel(u, slot) {
-  const node = u.bmsNodes?.[slot]
-  if (node?.label) return node.label
-  const name = node?.parameters?.name
-  if (name) return String(name)
-  const ch = slot === 0 ? u.pcsA : u.pcsB
-  return `BMS 舱${ch?.compartmentNumber ?? slot + 1}`
 }
 
 function fmtVolt(v) {
@@ -636,34 +456,6 @@ function getDraft(ch, kind, fallback) {
   return powerDrafts[key]
 }
 function setDraft(ch, kind, value) { powerDrafts[draftKey(ch, kind)] = value }
-
-const DevicePlaceholder = defineComponent({
-  props: {
-    title: String,
-    hint: String,
-    x: Number,
-    y: Number,
-    h: Number,
-    tone: { type: String, default: 'pcs' }
-  },
-  setup(p) {
-    return () => {
-      const halfW = BOX_W / 2
-      return h('g', { transform: `translate(${p.x}, 0)` }, [
-        h('foreignObject', { x: -halfW, y: p.y, width: BOX_W, height: p.h }, [
-          h('div', {
-            xmlns: 'http://www.w3.org/1999/xhtml',
-            class: ['svg-device-box', 'placeholder-box', p.tone === 'bms' ? 'bms-box' : 'pcs-box']
-          }, [
-            h('div', { class: 'box-title' }, p.title || '设备'),
-            h('div', { class: 'box-line muted' }, p.hint || '运行时未加载'),
-            h('div', { class: 'box-line muted' }, '应用组态后显示')
-          ])
-        ])
-      ])
-    }
-  }
-})
 
 const PvXfmrCard = defineComponent({
   props: { unit: Object, live: Object, x: Number, y: Number, h: Number },
@@ -821,133 +613,6 @@ const PvArrayCard = defineComponent({
     }
   }
 })
-
-const PcsCard = defineComponent({
-  props: { channel: Object, side: String, x: Number, busY: Number, y: Number, h: Number },
-  emits: ['pcs-start', 'pcs-stop', 'pcs-set-power', 'pcs-set-reactive'],
-  setup(p, { emit }) {
-    return () => {
-      const ch = p.channel
-      const halfW = BOX_W / 2
-      const lines = [
-        ch.pcsDeviceState, ch.pcsStartStop, ch.pcsTargetP, ch.pcsActualP,
-        ch.pcsTargetQ, ch.pcsActualQ, ch.pcsBlackStart,
-        ch.pcsGridMode !== '—' ? `模式:${ch.pcsGridMode}` : null
-      ].filter(Boolean)
-      return h('g', { transform: `translate(${p.x}, 0)` }, [
-        // 母线 —引线— PCS（禁止设备贴连母线）
-        h('line', { class: 'bus-line', x1: 0, y1: p.busY ?? 96, x2: 0, y2: p.y }),
-        h('foreignObject', { x: -halfW, y: p.y, width: BOX_W, height: p.h }, [
-          h('div', { xmlns: 'http://www.w3.org/1999/xhtml', class: 'svg-device-box pcs-box' }, [
-            h('div', { class: 'box-title' }, `PCS-${p.side} (PCS${ch.pcsNumber})`),
-            ...lines.map(t => h('div', { class: 'box-line' }, t)),
-            h('div', { class: 'box-controls' }, [
-              h('div', { class: 'power-row' }, [
-                h('label', { class: 'power-label' }, 'P设(kW)'),
-                h('input', {
-                  type: 'text', inputMode: 'decimal', class: 'power-input',
-                  value: getDraft(ch, 'p', ch.targetActivePowerKw),
-                  onInput: (e) => setDraft(ch, 'p', e.target.value)
-                }),
-                h('button', {
-                  type: 'button', class: 'act-btn act-set',
-                  onClick: (e) => {
-                    e.stopPropagation()
-                    const kw = Number(getDraft(ch, 'p', ch.targetActivePowerKw))
-                    if (!Number.isFinite(kw)) return
-                    emit('pcs-set-power', { pcsNumber: ch.pcsNumber, emuUnit: ch.emuUnitNumber, ytPoint: ch.activePowerYtPoint, powerKw: kw })
-                  }
-                }, '设定')
-              ]),
-              h('div', { class: 'power-row' }, [
-                h('label', { class: 'power-label' }, 'Q设(kvar)'),
-                h('input', {
-                  type: 'text', inputMode: 'decimal', class: 'power-input',
-                  value: getDraft(ch, 'q', ch.targetReactivePowerKvar),
-                  onInput: (e) => setDraft(ch, 'q', e.target.value)
-                }),
-                h('button', {
-                  type: 'button', class: 'act-btn act-set',
-                  onClick: (e) => {
-                    e.stopPropagation()
-                    const kvar = Number(getDraft(ch, 'q', ch.targetReactivePowerKvar))
-                    if (!Number.isFinite(kvar)) return
-                    emit('pcs-set-reactive', { pcsNumber: ch.pcsNumber, emuUnit: ch.emuUnitNumber, ytPoint: ch.reactivePowerYtPoint, reactiveKvar: kvar })
-                  }
-                }, '设定')
-              ]),
-              h('div', { class: 'box-actions' }, [
-                h('button', { type: 'button', class: 'act-btn act-on', onClick: (e) => { e.stopPropagation(); emit('pcs-start', ch.pcsNumber) } }, '启动'),
-                h('button', { type: 'button', class: 'act-btn act-off', onClick: (e) => { e.stopPropagation(); emit('pcs-stop', ch.pcsNumber) } }, '停机')
-              ])
-            ])
-          ])
-        ])
-      ])
-    }
-  }
-})
-
-const BmsCard = defineComponent({
-  props: { channel: Object, label: String, x: Number, y: Number, h: Number },
-  emits: ['bms-power-on', 'bms-power-off', 'bms-fault-clear', 'bms-set-soc'],
-  setup(p, { emit }) {
-    return () => {
-      const ch = p.channel
-      const halfW = BOX_W / 2
-      const lines = [
-        ch.bmsCompact,
-        ch.bmsRunStatus || '运行:—',
-        ch.bmsAirConditioner,
-        ch.bmsEnergy || `累计充 ${(ch.cumulativeChargeEnergyKwh ?? 0).toFixed(1)} / 放 ${(ch.cumulativeDischargeEnergyKwh ?? 0).toFixed(1)} kWh`,
-        `并网:${ch.gridConnect}`,
-        ch.bmsBlackStart
-      ].filter(Boolean)
-      return h('g', { transform: `translate(${p.x}, 0)` }, [
-        h('foreignObject', { x: -halfW, y: p.y, width: BOX_W, height: p.h }, [
-          h('div', { xmlns: 'http://www.w3.org/1999/xhtml', class: 'svg-device-box bms-box' }, [
-            h('div', { class: 'box-title' }, p.label || `BMS 舱${ch.compartmentNumber}`),
-            ...lines.map(t => h('div', { class: 'box-line' }, t)),
-            h('div', { class: 'box-controls' }, [
-              h('div', { class: 'power-row' }, [
-                h('label', { class: 'power-label' }, 'SOC(%)'),
-                h('input', {
-                  type: 'text', inputMode: 'decimal', class: 'power-input',
-                  value: getDraft(ch, 'soc', ch.socPercent),
-                  onInput: (e) => setDraft(ch, 'soc', e.target.value),
-                  onKeydown: (e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      const pct = Number(getDraft(ch, 'soc', ch.socPercent))
-                      if (!Number.isFinite(pct)) return
-                      emit('bms-set-soc', { bmsNumber: ch.compartmentNumber, socPercent: pct })
-                    }
-                  }
-                }),
-                h('button', {
-                  type: 'button', class: 'act-btn act-set',
-                  onClick: (e) => {
-                    e.stopPropagation()
-                    const pct = Number(getDraft(ch, 'soc', ch.socPercent))
-                    if (!Number.isFinite(pct)) return
-                    emit('bms-set-soc', { bmsNumber: ch.compartmentNumber, socPercent: pct })
-                  }
-                }, '设定')
-              ]),
-              h('div', { class: 'box-actions' }, [
-                h('button', { type: 'button', class: 'act-btn act-on', onClick: (e) => { e.stopPropagation(); emit('bms-power-on', ch.compartmentNumber) } }, '上电'),
-                h('button', { type: 'button', class: 'act-btn act-off', onClick: (e) => { e.stopPropagation(); emit('bms-power-off', ch.compartmentNumber) } }, '下电')
-              ]),
-              h('div', { class: 'box-actions' }, [
-                h('button', { type: 'button', class: 'act-btn act-clear', onClick: (e) => { e.stopPropagation(); emit('bms-fault-clear', ch.compartmentNumber) } }, '故障清除')
-              ])
-            ])
-          ])
-        ])
-      ])
-    }
-  }
-})
 </script>
 
 <style scoped>
@@ -980,20 +645,6 @@ const BmsCard = defineComponent({
 .bus-line { stroke: #000; stroke-width: 2; fill: none; }
 .bus-thick { stroke-width: 3.5; }
 .meter-box { fill: #f5eef8; stroke: #8e44ad; stroke-width: 1.5; }
-.emu-overlay { pointer-events: none; }
-.group-box {
-  fill: rgba(64, 158, 255, 0.04);
-  stroke: #909399;
-  stroke-width: 1.5;
-  stroke-dasharray: 6 4;
-  rx: 8;
-}
-.runtime-missing-hint {
-  font-size: 11px;
-  font-weight: 600;
-  fill: #e6a23c;
-  pointer-events: none;
-}
 .mainline-blackstart {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
   margin-top: 8px; padding: 8px 10px; border: 1px solid #ebeef5;
@@ -1051,11 +702,6 @@ const BmsCard = defineComponent({
 .svg-device-box.pv-xfmr-box .power-input { height: 18px; padding: 0 3px; }
 .svg-device-box.pv-xfmr-box .act-btn { height: 18px; padding: 0 4px; line-height: 16px; }
 .svg-device-box.pv-xfmr-box .box-actions { margin-top: 3px; }
-.svg-device-box.placeholder-box {
-  opacity: 0.85;
-  border-style: dashed;
-  justify-content: center;
-}
 .svg-device-box .box-title { font-weight: 700; margin-bottom: 3px; color: #1e3a5f; }
 .svg-device-box .box-line { white-space: normal; overflow: visible; margin-bottom: 1px; }
 .svg-device-box .box-line.muted { color: #909399; }
