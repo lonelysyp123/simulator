@@ -806,7 +806,7 @@ namespace EssSimulator.Web.Topology
             if (emuBindingCheck != null)
                 return emuBindingCheck;
 
-            // EMU 分组归属（可选）：已选 groupId 时须指向存在的分组，且分组与设备所属 EMU 一致；组级断路器/电表/变压器各至多 1 台
+            // EMU 分组归属（可选）：已选 groupId 时须指向存在的分组，且分组与设备所属 EMU 一致；组级断路器至多 1 台（电表允许多台）
             var groupBindingCheck = ValidateEmuGroupBindings(project, emuIds, details);
             if (groupBindingCheck != null)
                 return groupBindingCheck;
@@ -914,7 +914,7 @@ namespace EssSimulator.Web.Topology
         /// <summary>
         /// EMU 分组绑定校验：已选 groupId 的设备须指向存在的分组（GROUP_UNASSIGNED），
         /// 分组所属 EMU 须有效且与设备自身 emuId 一致（GROUP_EMU_MISMATCH），
-        /// 每个分组下断路器/电表各至多 1 台（EMU_GROUP_BREAKER_DUPLICATE / EMU_GROUP_METER_DUPLICATE），变压器不限台数。
+        /// 每个分组下断路器至多 1 台（EMU_GROUP_BREAKER_DUPLICATE），电表/变压器不限台数。
         /// 无分组的工程全部规则退化通过。校验通过返回 null。
         /// </summary>
         private static TopologyValidationResult? ValidateEmuGroupBindings(
@@ -961,27 +961,21 @@ namespace EssSimulator.Web.Topology
             }
 
             var groupLabel = groups.ToDictionary(n => n.Id, n => n.Label, StringComparer.Ordinal);
-            foreach (var (templateId, deviceLabel, dupCode) in new[]
+            // 组级断路器至多 1 台；组级电表允许多台（运行期按绑定顺序逐台建镜像）
+            var dupGroups = bound
+                .Where(n => n.TemplateId == "ac_breaker")
+                .GroupBy(n => TopologyParamHelper.GetString(n.Parameters, "groupId"))
+                .Where(g => g.Count() > 1)
+                .ToList();
+            if (dupGroups.Count > 0)
             {
-                ("ac_breaker", "断路器", "EMU_GROUP_BREAKER_DUPLICATE"),
-                ("ac_meter", "电表", "EMU_GROUP_METER_DUPLICATE")
-            })
-            {
-                var dupGroups = bound
-                    .Where(n => n.TemplateId == templateId)
-                    .GroupBy(n => TopologyParamHelper.GetString(n.Parameters, "groupId"))
-                    .Where(g => g.Count() > 1)
-                    .ToList();
-                if (dupGroups.Count > 0)
+                foreach (var g in dupGroups)
                 {
-                    foreach (var g in dupGroups)
-                    {
-                        var name = groupLabel.TryGetValue(g.Key, out var l) && !string.IsNullOrWhiteSpace(l) ? l : g.Key;
-                        details.Add($"EMU 分组「{name}」绑定了 {g.Count()} 台{deviceLabel}：{string.Join("、", g.Select(n => n.Label))}");
-                    }
-                    return Fail(dupCode, $"每个 EMU 分组至多绑定 1 台{deviceLabel}",
-                        details: details, problemNodeIds: dupGroups.SelectMany(g => g.Select(n => n.Id)).ToList());
+                    var name = groupLabel.TryGetValue(g.Key, out var l) && !string.IsNullOrWhiteSpace(l) ? l : g.Key;
+                    details.Add($"EMU 分组「{name}」绑定了 {g.Count()} 台断路器：{string.Join("、", g.Select(n => n.Label))}");
                 }
+                return Fail("EMU_GROUP_BREAKER_DUPLICATE", "每个 EMU 分组至多绑定 1 台断路器",
+                    details: details, problemNodeIds: dupGroups.SelectMany(g => g.Select(n => n.Id)).ToList());
             }
 
             return null;

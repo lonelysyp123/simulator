@@ -675,8 +675,9 @@ public class TopologyValidatorTests
     }
 
     [Fact]
-    public void Save_rejects_two_meters_in_one_group()
+    public void Save_accepts_two_meters_in_one_group()
     {
+        // 组级电表允许多台（运行期按绑定顺序逐台建镜像）
         var p = GroupBindingProject();
         p.Nodes.Add(Node("pcs1", "pcs", "PCS-1",
             new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
@@ -686,10 +687,7 @@ public class TopologyValidatorTests
             new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "g1" }));
 
         var r = TopologyValidator.ValidateProjectForSave(p);
-        Assert.False(r.Ok);
-        Assert.Equal("EMU_GROUP_METER_DUPLICATE", r.Code);
-        Assert.Contains("gm1", r.ProblemNodeIds);
-        Assert.Contains("gm2", r.ProblemNodeIds);
+        Assert.True(r.Ok, r.Message);
     }
 
     [Fact]
