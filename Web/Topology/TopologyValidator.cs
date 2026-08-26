@@ -801,12 +801,12 @@ namespace EssSimulator.Web.Topology
                     details: details, problemNodeIds: orphanPcs.Select(n => n.Id).ToList());
             }
 
-            // 断路器/电表归属（可选）：已选 emuId 时须指向存在的 EMU，且每个 EMU 至多各 1 台
+            // 断路器/电表/变压器归属（可选）：已选 emuId 时须指向存在的 EMU，且每个 EMU 至多各 1 台
             var emuBindingCheck = ValidateEmuDeviceBindings(project, emuIds, details);
             if (emuBindingCheck != null)
                 return emuBindingCheck;
 
-            // EMU 分组归属（可选）：已选 groupId 时须指向存在的分组，且分组与设备所属 EMU 一致；组级断路器/电表各至多 1 台
+            // EMU 分组归属（可选）：已选 groupId 时须指向存在的分组，且分组与设备所属 EMU 一致；组级断路器/电表/变压器各至多 1 台
             var groupBindingCheck = ValidateEmuGroupBindings(project, emuIds, details);
             if (groupBindingCheck != null)
                 return groupBindingCheck;
@@ -865,7 +865,7 @@ namespace EssSimulator.Web.Topology
         }
 
         /// <summary>
-        /// 断路器/电表绑定 EMU 校验：绑定可选，但已选 emuId 必须有效，且同一 EMU 下断路器/电表各至多 1 台。
+        /// 断路器/电表/变压器绑定 EMU 校验：绑定可选，但已选 emuId 必须有效，且同一 EMU 下断路器/电表/变压器各至多 1 台。
         /// 已选 groupId 的设备属组级绑定，不参与 EMU 级计数。校验通过返回 null。
         /// </summary>
         private static TopologyValidationResult? ValidateEmuDeviceBindings(
@@ -874,7 +874,8 @@ namespace EssSimulator.Web.Topology
             foreach (var (templateId, deviceLabel, dupCode) in new[]
             {
                 ("ac_breaker", "断路器", "EMU_BREAKER_DUPLICATE"),
-                ("ac_meter", "电表", "EMU_METER_DUPLICATE")
+                ("ac_meter", "电表", "EMU_METER_DUPLICATE"),
+                ("transformer", "变压器", "EMU_TRANSFORMER_DUPLICATE")
             })
             {
                 var bound = project.Nodes
@@ -914,7 +915,7 @@ namespace EssSimulator.Web.Topology
         /// <summary>
         /// EMU 分组绑定校验：已选 groupId 的设备须指向存在的分组（GROUP_UNASSIGNED），
         /// 分组所属 EMU 须有效且与设备自身 emuId 一致（GROUP_EMU_MISMATCH），
-        /// 每个分组下断路器/电表各至多 1 台（EMU_GROUP_BREAKER_DUPLICATE / EMU_GROUP_METER_DUPLICATE）。
+        /// 每个分组下断路器/电表/变压器各至多 1 台（EMU_GROUP_BREAKER_DUPLICATE / EMU_GROUP_METER_DUPLICATE / EMU_GROUP_TRANSFORMER_DUPLICATE）。
         /// 无分组的工程全部规则退化通过。校验通过返回 null。
         /// </summary>
         private static TopologyValidationResult? ValidateEmuGroupBindings(
@@ -928,7 +929,7 @@ namespace EssSimulator.Web.Topology
                 StringComparer.Ordinal);
 
             var bound = project.Nodes
-                .Where(n => n.TemplateId is "pcs" or "ac_breaker" or "ac_meter")
+                .Where(n => n.TemplateId is "pcs" or "ac_breaker" or "ac_meter" or "transformer")
                 .Where(n => !string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(n.Parameters, "groupId")))
                 .ToList();
             if (bound.Count == 0)
@@ -964,7 +965,8 @@ namespace EssSimulator.Web.Topology
             foreach (var (templateId, deviceLabel, dupCode) in new[]
             {
                 ("ac_breaker", "断路器", "EMU_GROUP_BREAKER_DUPLICATE"),
-                ("ac_meter", "电表", "EMU_GROUP_METER_DUPLICATE")
+                ("ac_meter", "电表", "EMU_GROUP_METER_DUPLICATE"),
+                ("transformer", "变压器", "EMU_GROUP_TRANSFORMER_DUPLICATE")
             })
             {
                 var dupGroups = bound

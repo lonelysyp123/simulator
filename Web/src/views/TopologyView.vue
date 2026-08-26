@@ -53,6 +53,7 @@
             <div class="desc">PCS×{{ pcsCountOfEmu(e.id) }}</div>
             <div class="desc">断路器：{{ boundDeviceLabel(e.id, 'ac_breaker') || '未绑定' }}</div>
             <div class="desc">电表：{{ boundDeviceLabel(e.id, 'ac_meter') || '未绑定' }}</div>
+            <div class="desc">变压器：{{ boundDeviceLabel(e.id, 'transformer') || '未绑定' }}</div>
             <div
               v-for="g in groupsOfEmu(e.id)"
               :key="g.id"
@@ -165,6 +166,7 @@
                 v-else-if="def.type === 'emu_select'"
                 :model-value="selectedNode.parameters[def.key] || ''"
                 placeholder="选择 EMU 储能单元"
+                clearable
                 style="width:100%"
                 @change="v => onEmuParamChange(def.key, v)"
               >
@@ -391,16 +393,18 @@ const groupOptionsForSelected = computed(() => {
   return groupsOfEmu(n.parameters?.emuId || '')
 })
 
-/** 归入某 EMU 的设备节点（PCS / 断路器 / 电表） */
+/** 归入某 EMU 的设备节点（PCS / 断路器 / 电表 / 变压器） */
 function devicesOfEmu(emuId) {
-  return project.nodes.filter(n => ['pcs', 'ac_breaker', 'ac_meter'].includes(n.templateId) && n.parameters?.emuId === emuId)
+  return project.nodes.filter(n => ['pcs', 'ac_breaker', 'ac_meter', 'transformer'].includes(n.templateId) && n.parameters?.emuId === emuId)
 }
 
-/** EMU 绑定的断路器/电表展示名（排除组级绑定；未绑定返回空串） */
+/** EMU 绑定的断路器/电表/变压器展示名：单元级优先；仅组级绑定时也视为已绑定（未绑定返回空串） */
 function boundDeviceLabel(emuId, templateId) {
-  const n = project.nodes.find(x => x.templateId === templateId && x.parameters?.emuId === emuId && !x.parameters?.groupId)
-  if (!n) return ''
-  return n.label || n.parameters?.name || n.id
+  const bound = project.nodes.filter(x => x.templateId === templateId && x.parameters?.emuId === emuId)
+  const unitLevel = bound.filter(x => !x.parameters?.groupId)
+  const list = unitLevel.length ? unitLevel : bound
+  if (!list.length) return ''
+  return list.map(n => n.label || n.parameters?.name || n.id).join('、')
 }
 
 function onEmuParamChange(key, value) {
@@ -420,7 +424,7 @@ function onGroupParamChange(key, value) {
   clearValidation()
 }
 
-/** 解除该 EMU 下全部设备（pcs/ac_breaker/ac_meter）的 emuId/groupId 归属 */
+/** 解除该 EMU 下全部设备（pcs/ac_breaker/ac_meter/transformer）的 emuId/groupId 归属 */
 function unassignDevicesFromEmu(emuId) {
   for (const n of devicesOfEmu(emuId)) {
     n.parameters.emuId = ''
