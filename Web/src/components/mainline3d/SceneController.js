@@ -49,6 +49,24 @@ function pvArrayOf(pv, side) {
   return side === 'B' ? (pv.arrayB || pv.ArrayB) : (pv.arrayA || pv.ArrayA)
 }
 
+/** 单元运行时通道列表：优先逐槽位 channels，兼容旧 A/B 双通道字段 */
+function unitChannels(unit) {
+  if (!unit) return []
+  return (unit.channels || [unit.channelA, unit.channelB]).filter(Boolean)
+}
+
+/** 侧位字母（A=槽位 0）→ 单元对应运行时通道 */
+function channelOfSide(unit, side) {
+  const c = String(side || '').toUpperCase().charCodeAt(0)
+  if (!Number.isFinite(c) || c < 65) return null
+  return unitChannels(unit)[c - 65] || null
+}
+
+/** 单元全部通道实时有功合计 */
+function unitPowerKw(unit) {
+  return unitChannels(unit).reduce((s, ch) => s + channelPowerKw(ch), 0)
+}
+
 /**
  * Three.js 主接线场景控制器
  */
@@ -402,7 +420,7 @@ export class SceneController {
       } else {
         const unit = (snap.units || []).find(u => (u.unitIndex ?? -1) === a.unitIndex)
           || (snap.units || [])[a.unitIndex]
-        const channel = a.side === 'A' ? unit?.channelA : unit?.channelB
+        const channel = channelOfSide(unit, a.side)
         if (!channel) continue
 
         const state = reactive({ channel: { ...channel } })
@@ -458,14 +476,14 @@ export class SceneController {
    * @param {string} panelKey
    */
   _resolvePanelKey(panelKey) {
-    const m = String(panelKey || '').match(/^(pcs|bms)-(\d+)-(A|B)$/)
+    const m = String(panelKey || '').match(/^(pcs|bms)-(\d+)-([A-Z])$/)
     if (!m) return null
     const type = m[1]
     const unitIndex = Number(m[2])
     const side = m[3]
     const unit = (this.snap?.units || []).find(u => u.unitIndex === unitIndex)
       || (this.snap?.units || [])[unitIndex]
-    const channel = side === 'A' ? unit?.channelA : unit?.channelB
+    const channel = channelOfSide(unit, side)
     if (!channel) return null
     return { type, unitIndex, side, channel, key: panelKey }
   }
@@ -878,7 +896,7 @@ export class SceneController {
     // 全站对外有功：PCS 实发 + 光伏实发（光伏只向电网送电，≥0）
     let plantPowerKw = 0
     for (const u of snap.units || []) {
-      plantPowerKw += channelPowerKw(u.channelA) + channelPowerKw(u.channelB)
+      plantPowerKw += unitPowerKw(u)
     }
     for (const pv of snap.pvUnits || []) {
       plantPowerKw += pvUnitPowerKw(pv)
@@ -915,13 +933,13 @@ export class SceneController {
         const unit = (snap.units || []).find(x => x.unitIndex === ui)
         const unitLive = !!(unit?.unitBreakerClosed && !unit?.unitBreakerTripped && mainLive)
         tripped = !!(unit?.unitBreakerTripped || snap.mainBreakerTripped)
-        const unitPower = channelPowerKw(unit?.channelA) + channelPowerKw(unit?.channelB)
+        const unitPower = unitPowerKw(unit)
 
         if (role === 'unit-drop' || role === 'unit-xf' || role === 'unit-690') {
           energized = unitLive
           powerKw = unitPower
         } else if (role === 'pcs-feed' || role === 'dc-link') {
-          const ch = side === 'A' ? unit?.channelA : unit?.channelB
+          const ch = channelOfSide(unit, side)
           energized = unitLive
           powerKw = channelPowerKw(ch)
         }
@@ -948,12 +966,12 @@ export class SceneController {
 
     // 面板数据
     for (const [key, state] of this.panelStates) {
-      const ess = key.match(/^(pcs|bms)-(\d+)-(A|B)$/)
+      const ess = key.match(/^(pcs|bms)-(\d+)-([A-Z])$/)
       if (ess) {
         const unitIndex = Number(ess[2])
         const side = ess[3]
         const unit = (snap.units || []).find(u => u.unitIndex === unitIndex)
-        const ch = side === 'A' ? unit?.channelA : unit?.channelB
+        const ch = channelOfSide(unit, side)
         if (ch) Object.assign(state.channel, ch)
         continue
       }
