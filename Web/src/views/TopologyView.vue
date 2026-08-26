@@ -190,6 +190,33 @@
               <div v-if="def.description" class="param-hint">{{ def.description }}</div>
             </el-form-item>
           </el-form>
+          <template v-if="emuBoundView">
+            <el-divider content-position="left">已绑定设备</el-divider>
+            <el-form label-position="top" size="small">
+              <el-form-item label="EMU 分组">
+                <el-tag v-for="g in emuBoundView.groups" :key="g.id" size="small" effect="plain" class="bound-tag" @click="focusProblem(g.id)">{{ g.label }}</el-tag>
+                <span v-if="!emuBoundView.groups.length" class="empty">暂无分组</span>
+              </el-form-item>
+              <template v-for="row in emuBoundView.unitRows" :key="`u-${row.role}`">
+                <el-form-item v-if="row.nodes.length" :label="`单元级${row.role}`">
+                  <el-tag v-for="d in row.nodes" :key="d.id" size="small" effect="plain" class="bound-tag" @click="focusProblem(d.id)">{{ d.label }}</el-tag>
+                </el-form-item>
+              </template>
+              <template v-for="row in emuBoundView.groupRows" :key="`g-${row.role}`">
+                <el-form-item v-if="row.nodes.length" :label="`组级${row.role}`">
+                  <el-tag v-for="d in row.nodes" :key="d.id" size="small" type="warning" effect="plain" class="bound-tag" @click="focusProblem(d.id)">{{ d.label }} · {{ labelOf(d.parameters?.groupId) }}</el-tag>
+                </el-form-item>
+              </template>
+              <p v-if="emuBoundView.isEmpty" class="empty">尚未绑定设备；在设备属性面板选择「所属 EMU 储能单元」即可归入</p>
+            </el-form>
+          </template>
+          <template v-else-if="groupBoundDevices">
+            <el-divider content-position="left">组内设备</el-divider>
+            <div class="bound-list">
+              <el-tag v-for="d in groupBoundDevices" :key="d.id" size="small" effect="plain" class="bound-tag" @click="focusProblem(d.id)">{{ d.label }}</el-tag>
+              <p v-if="!groupBoundDevices.length" class="empty">暂无设备归入本分组</p>
+            </div>
+          </template>
           <el-alert
             v-if="selectedTemplate.description"
             :title="selectedTemplate.description"
@@ -405,6 +432,42 @@ function boundDeviceLabel(emuId, templateId) {
   const list = unitLevel.length ? unitLevel : bound
   if (!list.length) return ''
   return list.map(n => n.label || n.parameters?.name || n.id).join('、')
+}
+
+/** 属性面板绑定设备视图：仅选中 EMU 虚拟节点时返回（分组/单元级/组内设备分行），否则 null */
+const emuBoundView = computed(() => {
+  const n = selectedNode.value
+  if (!n || n.templateId !== 'emu') return null
+  const roles = [['pcs', 'PCS'], ['ac_breaker', '断路器'], ['ac_meter', '电表'], ['transformer', '变压器']]
+  const unitRows = roles.map(([tid, role]) => ({
+    role,
+    nodes: project.nodes.filter(x => x.templateId === tid && x.parameters?.emuId === n.id && !x.parameters?.groupId)
+  }))
+  const groupRows = roles.map(([tid, role]) => ({
+    role,
+    nodes: project.nodes.filter(x => x.templateId === tid && x.parameters?.emuId === n.id && x.parameters?.groupId)
+  }))
+  const groups = groupsOfEmu(n.id)
+  const isEmpty = !unitRows.some(r => r.nodes.length) && !groupRows.some(r => r.nodes.length)
+  return { groups, unitRows, groupRows, isEmpty }
+})
+
+/** 某分组下绑定的设备（PCS/断路器/电表/变压器） */
+function devicesOfGroup(emuId, groupId) {
+  return project.nodes.filter(x => ['pcs', 'ac_breaker', 'ac_meter', 'transformer'].includes(x.templateId)
+    && x.parameters?.emuId === emuId && x.parameters?.groupId === groupId)
+}
+
+/** 属性面板：选中 EMU 分组时列出组内设备，否则 null */
+const groupBoundDevices = computed(() => {
+  const n = selectedNode.value
+  if (!n || n.templateId !== 'emu_group') return null
+  return devicesOfGroup(n.parameters?.emuId, n.id)
+})
+
+/** 节点 id → 展示名（找不到时回退 id） */
+function labelOf(id) {
+  return project.nodes.find(n => n.id === id)?.label || id
 }
 
 function onEmuParamChange(key, value) {
@@ -1069,6 +1132,8 @@ onBeforeUnmount(() => {
 .emu-group-row.active { color: #0f8a9d; font-weight: 600; }
 .empty { font-size: 12px; color: #909399; line-height: 1.5; }
 .param-hint { font-size: 11px; color: #909399; margin-top: 2px; line-height: 1.3; }
+.bound-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.bound-tag { margin: 0 6px 4px 0; cursor: pointer; }
 .validation-box { margin-bottom: 12px; }
 .issue-list { margin: 6px 0 0; padding-left: 18px; }
 .issue-item { font-size: 12px; line-height: 1.5; margin-bottom: 4px; }
