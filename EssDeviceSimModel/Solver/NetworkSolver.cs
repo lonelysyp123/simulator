@@ -167,8 +167,8 @@ namespace EssSimulator.EssDeviceSimModel.Solver
 
                 double unitP = 0;
                 double unitQ = 0;
-                int baseChannel = u * 2;
-                for (int ch = 0; ch < 2; ch++)
+                var (baseChannel, pcsCount) = PcsUnitLayout.RangeOfUnit(_network.PcsPerUnit, u);
+                for (int ch = 0; ch < pcsCount; ch++)
                 {
                     int idx = baseChannel + ch;
                     if (TryGetPcsPower(idx, out double pKw, out double qKvar))
@@ -205,7 +205,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                     ? unitTransformer.Secondary.Output.Ac!.Internal.LineVoltageV
                     : 0;
 
-                for (int ch = 0; ch < 2; ch++)
+                for (int ch = 0; ch < pcsCount; ch++)
                 {
                     int idx = baseChannel + ch;
                     if (idx >= _network.PcsDevices.Count) continue;
@@ -288,7 +288,8 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                     return EssIslandBusLogic.EstimateIslandedBus35LineVoltageV(
                         _legacyEss._unitTransformers,
                         _legacyEss._unitBreakers,
-                        _legacyEss._pcsList);
+                        _legacyEss._pcsList,
+                        _legacyEss.PcsPerUnit);
                 }
             }
 

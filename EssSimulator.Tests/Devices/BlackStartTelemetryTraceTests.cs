@@ -90,6 +90,7 @@ public class BlackStartTelemetryTraceTests
                 pcsList,
                 isUnitBreakerClosed: _ => true,
                 pcsCfg,
+                pcsPerUnit: new[] { 1 },
                 simTime,
                 step);
 

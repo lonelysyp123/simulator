@@ -102,6 +102,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 PcsDevices = networkPcsDevices,
                 BmsDevices = bmsDevices,
                 DcLinks = dcLinks,
+                PcsPerUnit = pcsPerUnit ?? Array.Empty<int>(),
                 PccLineVoltageV = pccCfg.NominalLineVoltage,
                 StationBus35LineVoltageV = pccCfg.StationBusNominalLineVoltage
             };

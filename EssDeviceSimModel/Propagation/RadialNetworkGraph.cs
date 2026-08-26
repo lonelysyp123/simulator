@@ -109,8 +109,8 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
 
             for (int u = 0; u < UnitBuses690.Count; u++)
             {
-                int baseChannel = u * 2;
-                for (int ch = 0; ch < 2; ch++)
+                var (baseChannel, pcsCount) = PcsUnitLayout.RangeOfUnit(network.PcsPerUnit, u);
+                for (int ch = 0; ch < pcsCount; ch++)
                 {
                     int idx = baseChannel + ch;
                     if (idx >= network.PcsDevices.Count)
@@ -125,8 +125,8 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
         {
             for (int u = 0; u < UnitBuses690.Count; u++)
             {
-                int baseChannel = u * 2;
-                for (int ch = 0; ch < 2; ch++)
+                var (baseChannel, pcsCount) = PcsUnitLayout.RangeOfUnit(network.PcsPerUnit, u);
+                for (int ch = 0; ch < pcsCount; ch++)
                 {
                     int idx = baseChannel + ch;
                     if (idx >= network.PcsDevices.Count)
