@@ -1,6 +1,7 @@
 using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.Bms;
+using EssSimulator.EssSimModelApi.Mappers;
 using EssSimulator.Protocol;
 using EssSimulator.Web;
 using System;
@@ -38,7 +39,7 @@ namespace EssSimulator.Display
                 return ExecuteBmsFaultClear(args);
 
             if (verb.StartsWith("pcs", StringComparison.OrdinalIgnoreCase))
-                return ExecutePcsStartStop(args);
+                return ExecutePcsCommand(args);
 
             if (verb.StartsWith("setpv", StringComparison.OrdinalIgnoreCase))
                 return ExecuteSetPv(args);
@@ -59,10 +60,15 @@ namespace EssSimulator.Display
                 "  link status [pcsN|bmsN|em]     // 查看协议链路状态（省略目标则列出全部）",
                 "  setGrid frequency <Hz>         // 设定仿真电网额定频率（并网时 PCS 跟网、电表 yc19）",
                 "  setGrid voltage <V>            // 设定仿真电网额定线电压（如 220000）",
-                "  pcsN start|stop                // PCS 启停（内部走 dpc 写 EMU yx3/yx5 控制点）",
+                "  pcsN start|stop                // PCS 启停（直控仿真设备，不依赖点表点位）",
+                "  pcsN power <kW>                // PCS 有功设定（工程值 kW；无功保留现值）",
+                "  pcsN reactive <kvar>           // PCS 无功设定（工程值 kvar；有功保留现值）",
                 "  setbmsN power on|off           // BMS 物理并网/离网（PCS↔BMS 直流链路）",
                 "  setbmsN soc <0~1|%>            // 热设 BMS 整堆 SOC（须待机；写透电芯，立即生效）",
                 "  bmsN fault clear               // 待机时清除充放电方向内部故障，恢复可并网",
+                "  setpvN run on|off              // 光伏单元启停（直控仿真设备）",
+                "  setpvN power <kW>              // 光伏有功设定（限发 kW，≥0）",
+                "  setpvN reactive <kvar>         // 光伏无功设定（kvar，可正可负）",
                 "  setpvN array A|B temperature <℃> // 设定光伏方阵温度，下一步按 MPPT 重算最大放电功率",
                 "  setpvN array A|B angle <度>    // 设定光伏方阵光照入射角（90=正对 1000 W/㎡，0/180=0）",
                 "",
@@ -274,49 +280,106 @@ namespace EssSimulator.Display
                 server.InvalidateDataShadow(name);
         }
 
-        private static CommandResult ExecutePcsStartStop(string[] args)
+        private static CommandResult ExecutePcsCommand(string[] args)
         {
-            if (args.Length != 2)
-                return CommandResult.Fail("用法: esscmd pcsN start|stop\n示例: esscmd pcs1 start");
+            if (!TryParsePcsIndex(args[0], out int pcs1Based, out var parseMessage))
+                return CommandResult.Fail(parseMessage);
 
-            if (!args[0].StartsWith("pcs", StringComparison.OrdinalIgnoreCase) ||
-                !int.TryParse(args[0].AsSpan(3), out int pcs1Based) ||
-                pcs1Based < 1)
-                return CommandResult.Fail("子命令格式应为 pcsN，例如 pcs1");
-
-            string state = args[1].ToLowerInvariant();
-            bool? start = state switch
+            if (args.Length == 2)
             {
-                "start" or "on" or "1" or "true" => true,
-                "stop" or "off" or "0" or "false" => false,
-                _ => null
-            };
-            if (start == null)
-                return CommandResult.Fail("请使用 start|stop");
+                string state = args[1].ToLowerInvariant();
+                bool? start = state switch
+                {
+                    "start" or "on" or "1" or "true" => true,
+                    "stop" or "off" or "0" or "false" => false,
+                    _ => null
+                };
+                if (start == null)
+                    return CommandResult.Fail("请使用 start|stop");
 
-            var layout = GuiSimDataAccess.GetPcsPerUnit();
-            int emuUnit = PcsUnitLayout.UnitIndexOf(layout, pcs1Based - 1) + 1;
-            int slot = PcsUnitLayout.SlotOfChannel(layout, pcs1Based - 1);
-            string point = slot == 0 ? "yx3" : "yx5";
-            string[] dpcArgs = { $"simEmu{emuUnit}.{point}", "set", start.Value ? "1" : "0" };
+                if (!DeviceControlFacade.TrySetPcsRun(pcs1Based, start.Value, out var runMessage))
+                    return CommandResult.Fail($"操作失败: {runMessage}");
 
-            if (!DataPointChangeCommand.TryExecuteDpcOperation(dpcArgs, out var message))
-                return CommandResult.Fail(message);
+                return CommandResult.Ok($"执行成功: PCS{pcs1Based} {(start.Value ? "启动" : "停机")} — {runMessage}");
+            }
 
-            return CommandResult.Ok($"执行成功: PCS{pcs1Based} {(start.Value ? "启动" : "停机")} — {message}");
+            if (args.Length == 3 &&
+                (args[1].Equals("power", StringComparison.OrdinalIgnoreCase) ||
+                 args[1].Equals("reactive", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (!double.TryParse(args[2], out var value))
+                    return CommandResult.Fail("请输入有效的数字");
+
+                bool active = args[1].Equals("power", StringComparison.OrdinalIgnoreCase);
+                if (!DeviceControlFacade.TrySetPcsPower(
+                    pcs1Based,
+                    active ? value : null,
+                    active ? null : value,
+                    out var powerMessage))
+                    return CommandResult.Fail($"操作失败: {powerMessage}");
+
+                return CommandResult.Ok($"执行成功: {powerMessage}");
+            }
+
+            return CommandResult.Fail(
+                "用法: esscmd pcsN start|stop\n      esscmd pcsN power <kW>\n      esscmd pcsN reactive <kvar>\n示例: esscmd pcs1 start\n      esscmd pcs1 power 500");
+        }
+
+        private static bool TryParsePcsIndex(string target, out int pcs1Based, out string message)
+        {
+            pcs1Based = 0;
+            message = string.Empty;
+            if (!target.StartsWith("pcs", StringComparison.OrdinalIgnoreCase) ||
+                !int.TryParse(target.AsSpan(3), out pcs1Based) ||
+                pcs1Based < 1)
+            {
+                message = "子命令格式应为 pcsN，例如 pcs1";
+                return false;
+            }
+
+            return true;
         }
 
         private static CommandResult ExecuteSetPv(string[] args)
         {
+            if (!TryParseSetPvIndex(args[0], out int pv1Based, out var parseMessage))
+                return CommandResult.Fail(parseMessage);
+
+            if (args.Length == 3 && args[1].Equals("run", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryParseLinkState(args[2], out bool run, out var stateMessage))
+                    return CommandResult.Fail(stateMessage);
+
+                if (!DeviceControlFacade.TrySetPvRun(pv1Based, run, out var runMessage))
+                    return CommandResult.Fail($"操作失败: {runMessage}");
+
+                return CommandResult.Ok($"执行成功: {runMessage}");
+            }
+
+            if (args.Length == 3 &&
+                (args[1].Equals("power", StringComparison.OrdinalIgnoreCase) ||
+                 args[1].Equals("reactive", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (!double.TryParse(args[2], out var pvValue))
+                    return CommandResult.Fail("请输入有效的数字");
+
+                bool active = args[1].Equals("power", StringComparison.OrdinalIgnoreCase);
+                if (!DeviceControlFacade.TrySetPvPower(
+                    pv1Based,
+                    active ? pvValue : null,
+                    active ? null : pvValue,
+                    out var powerMessage))
+                    return CommandResult.Fail($"操作失败: {powerMessage}");
+
+                return CommandResult.Ok($"执行成功: {powerMessage}");
+            }
+
             if (args.Length != 5
                 || !args[1].Equals("array", StringComparison.OrdinalIgnoreCase))
             {
                 return CommandResult.Fail(
-                    "用法: esscmd setpvN array A|B temperature|angle <数值>\n示例: esscmd setpv1 array A temperature 35\n      esscmd setpv1 array B angle 30");
+                    "用法: esscmd setpvN run on|off\n      esscmd setpvN power <kW>\n      esscmd setpvN reactive <kvar>\n      esscmd setpvN array A|B temperature|angle <数值>\n示例: esscmd setpv1 run on\n      esscmd setpv1 array A temperature 35");
             }
-
-            if (!TryParseSetPvIndex(args[0], out int pv1Based, out var parseMessage))
-                return CommandResult.Fail(parseMessage);
 
             string side = args[2].Trim().ToUpperInvariant();
             if (side != "A" && side != "B")

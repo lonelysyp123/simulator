@@ -1,6 +1,7 @@
 using EssSimulator.Configuration;
 using EssSimulator.Core;
 using EssSimulator.Display;
+using EssSimulator.EssSimModelApi.Mappers;
 using EssSimulator.Web.DroopSlices;
 using EssSimulator.Web.Topology;
 using Microsoft.AspNetCore.Builder;
@@ -255,11 +256,12 @@ namespace EssSimulator.Web
                 return FromCommandResult(result);
             });
 
-            // 单元断路器：经 dpc 写 EMU 控制点 yx0（高压断路器开合），unit 从 1 起
-            app.MapPost("/api/breaker/unit/{unit:int}/{closed:bool}", (int unit, bool closed, WebCommandExecutor exec) =>
+            // 单元断路器：直控仿真设备（EMU 镜像 PowerOnOff + 电气网络），不经点表写点；unit 从 1 起
+            app.MapPost("/api/breaker/unit/{unit:int}/{closed:bool}", (int unit, bool closed) =>
             {
-                var result = exec.Execute($"dpc simEmu{unit}.yx0 set {(closed ? 1 : 0)}");
-                return FromCommandResult(result);
+                if (!DeviceControlFacade.TrySetUnitBreaker(unit, closed, out var message))
+                    return FromCommandResult(CommandResult.Fail(message));
+                return FromCommandResult(CommandResult.Ok($"执行成功: {message}"));
             });
 
             // 通用命令执行：POST /api/command  body: { "input": "esscmd link status" }
