@@ -301,7 +301,7 @@ function expandFeederUnit(opts) {
 
   if (kind === 'emu') {
     // 储能支路：按物理拓扑全量绘制 PCS → 直流母线 → BMS 设备链；
-    // 不引入 EMU / EMU 分组 / 单元断 / 单元变等虚拟概念，暂不绑定运行时实时数据
+    // 不引入 EMU / EMU 分组 / 单元断 / 单元变等虚拟概念；卡片绑定运行时实时数据与控制
     const c = pcsCluster || { pcsNodes: [], dcBus: null, bmsNodes: [] }
     const pcsNodes = c.pcsNodes.length ? c.pcsNodes : (feeder ? [feeder] : [])
     const n = Math.max(1, pcsNodes.length)
@@ -310,10 +310,11 @@ function expandFeederUnit(opts) {
     const span = cnt => cnt * CARD_W + (cnt - 1) * CARD_GAP
     const cardX = (cnt, i) => -span(cnt) / 2 + CARD_W / 2 + i * (CARD_W + CARD_GAP)
     const pcsTop = LINK_STUB
-    const pcsH = 96
+    // 卡片高度需容纳运行时数据行与设定/启停控件（对齐旧版交互卡）
+    const pcsH = 228
     const dcBusY = pcsTop + pcsH + LINK_STUB * 2
     const bmsTop = dcBusY + LINK_STUB * 2
-    const bmsH = 96
+    const bmsH = 214
 
     const cards = []
     const wires = []
@@ -323,6 +324,7 @@ function expandFeederUnit(opts) {
       cards.push({
         id: `pcs-${p.id}`,
         tone: 'pcs',
+        num: (pcsRank.get(p.id) ?? i) + 1,
         x, y: pcsTop, w: CARD_W, h: pcsH,
         title: `PCS${(pcsRank.get(p.id) ?? i) + 1}`,
         lines: [
@@ -339,6 +341,7 @@ function expandFeederUnit(opts) {
       cards.push({
         id: `bms-${b.id}`,
         tone: 'bms',
+        num: (bmsRank.get(b.id) ?? j) + 1,
         x, y: bmsTop, w: CARD_W, h: bmsH,
         title: `BMS${(bmsRank.get(b.id) ?? j) + 1}`,
         lines: [

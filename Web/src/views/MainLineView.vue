@@ -88,7 +88,7 @@
         电站概览
         <span class="card-hint">
           {{ useTopologyMainLine
-            ? '工程模式：经典单线图 · 右键平移 · Ctrl/⌘+滚轮缩放'
+            ? '工程模式：经典单线图 · 右键平移 · Ctrl/⌘+滚轮缩放 · PCS/BMS 可启停/设定'
             : '左键点击断路器 · 右键平移 · Ctrl/⌘+滚轮缩放 · PCS 可启停/设定功率' }}
         </span>
       </p>
@@ -102,6 +102,14 @@
         @pv-set-reactive="onPvSetReactive"
         @pv-set-temp="onPvSetTemp"
         @pv-set-angle="onPvSetAngle"
+        @pcs-start="onPcsStart"
+        @pcs-stop="onPcsStop"
+        @pcs-set-power="onPcsSetPower"
+        @pcs-set-reactive="onPcsSetReactive"
+        @bms-power-on="onBmsPowerOn"
+        @bms-power-off="onBmsPowerOff"
+        @bms-fault-clear="onBmsFaultClear"
+        @bms-set-soc="onBmsSetSoc"
       />
       <MainLineSvg
         v-else
