@@ -101,31 +101,16 @@
         <line class="bus-line" x1="0" y1="82" x2="0" y2="96" />
 
         <!-- 690V 母线 -->
-        <line class="bus-line" :x1="-BRANCH.channelX" y1="96" :x2="BRANCH.channelX" y2="96" />
-        <text :x="-BRANCH.channelX + 3" y="110" class="label-text">690V {{ fmtVolt(u.bus690?.lineVoltageV ?? u.unitTransformerSecondary?.lineVoltageV) }}</text>
+        <line class="bus-line" :x1="branchX(u, 0)" y1="96" :x2="branchX(u, Math.max(0, (u.channels || []).length - 1))" y2="96" />
+        <text :x="branchX(u, 0) + 3" y="110" class="label-text">690V {{ fmtVolt(u.bus690?.lineVoltageV ?? u.unitTransformerSecondary?.lineVoltageV) }}</text>
 
-        <!-- PCS-A / 舱-A -->
+        <!-- PCS / 舱：逐槽位支路（对称排布，兼容任意台数） -->
         <ChannelBranch
-          v-if="u.channelA"
-          :channel="u.channelA"
-          side="A"
-          :x="-BRANCH.channelX"
-          :bus-y="96"
-          @pcs-start="n => $emit('pcs-start', n)"
-          @pcs-stop="n => $emit('pcs-stop', n)"
-          @pcs-set-power="p => $emit('pcs-set-power', p)"
-          @pcs-set-reactive="p => $emit('pcs-set-reactive', p)"
-          @bms-power-on="n => $emit('bms-power-on', n)"
-          @bms-power-off="n => $emit('bms-power-off', n)"
-          @bms-fault-clear="n => $emit('bms-fault-clear', n)"
-          @bms-set-soc="p => $emit('bms-set-soc', p)"
-        />
-        <!-- PCS-B / 舱-B -->
-        <ChannelBranch
-          v-if="u.channelB"
-          :channel="u.channelB"
-          side="B"
-          :x="BRANCH.channelX"
+          v-for="(ch, si) in (u.channels || [])"
+          :key="`ch-${u.unitIndex}-${si}`"
+          :channel="ch"
+          :side="String.fromCharCode(65 + si)"
+          :x="branchX(u, si)"
           :bus-y="96"
           @pcs-start="n => $emit('pcs-start', n)"
           @pcs-stop="n => $emit('pcs-stop', n)"
@@ -196,9 +181,10 @@ const panLayerStyle = computed(() => ({
 }))
 
 const unitCount = computed(() => (props.snap.units || []).length)
-const svgWidth = computed(() =>
-  Math.max(900, MARGIN_LEFT + unitCount.value * UNIT_WIDTH + MARGIN_RIGHT)
-)
+const svgWidth = computed(() => {
+  const total = (props.snap.units || []).reduce((s, u) => s + unitWidth(u), 0)
+  return Math.max(900, MARGIN_LEFT + total + MARGIN_RIGHT)
+})
 const renderWidth = computed(() => Math.round(svgWidth.value * zoom.value))
 const renderHeight = computed(() => Math.round(svgHeight.value * zoom.value))
 
@@ -262,7 +248,7 @@ const BOTTOM_PAD = 12
 /** PCS / BMS 支路布局 */
 const BRANCH = {
   boxW: 132,
-  /** A/B 支路中心距单元中心的水平偏移；须满足 2*channelX > boxW + 间距 */
+  /** 相邻支路中心距的一半；须满足 2*channelX > boxW + 间距 */
   channelX: 92,
   pcsTop: 24,
   pcsH: 228,
@@ -271,6 +257,12 @@ const BRANCH = {
   get bmsTop() { return this.pcsTop + this.pcsH + this.gap },
   get linkMid() { return this.pcsTop + this.pcsH + this.gap / 2 },
   get bottomY() { return 96 + this.bmsTop + this.bmsH }
+}
+
+/** 单元第 i 条支路中心相对单元中心的水平偏移（对称排布） */
+function branchX(u, i) {
+  const n = Math.max(1, (u.channels || []).length)
+  return (i - (n - 1) / 2) * 2 * BRANCH.channelX
 }
 
 const mainX = MAIN_X
@@ -292,10 +284,22 @@ function chipStatusClass(status) {
   return 'bs-partial'
 }
 
-const busEndX = computed(() => MARGIN_LEFT + Math.max(0, unitCount.value - 1) * UNIT_WIDTH + UNIT_WIDTH / 2)
+const busEndX = computed(() => {
+  const units = props.snap.units || []
+  return units.length ? unitCenterX(units.length - 1) : MARGIN_LEFT
+})
+
+/** 单元占宽：随通道台数自适应，不低于原双通道宽 */
+function unitWidth(u) {
+  const n = Math.max(1, (u?.channels || []).length)
+  return Math.max(UNIT_WIDTH, Math.round((n - 1) * 2 * BRANCH.channelX + BRANCH.boxW + 40))
+}
 
 function unitCenterX(i) {
-  return MARGIN_LEFT + i * UNIT_WIDTH + UNIT_WIDTH / 2
+  const units = props.snap.units || []
+  let x = MARGIN_LEFT
+  for (let k = 0; k < i; k++) x += unitWidth(units[k])
+  return x + unitWidth(units[i]) / 2
 }
 
 function fmtVolt(v) {

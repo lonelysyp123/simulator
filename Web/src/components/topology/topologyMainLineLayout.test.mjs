@@ -93,7 +93,7 @@ describe('buildTopologyMainLineLayout pv units', () => {
       ],
       edges: []
     }
-    const units = [{ unitIndex: 0, unitNumber: 1, channelA: { pcsNumber: 1 } }]
+    const units = [{ unitIndex: 0, unitNumber: 1, channels: [{ pcsNumber: 1 }] }]
     const layout = buildTopologyMainLineLayout(topology, units)
 
     assert.equal(layout.units.length, 2)
@@ -117,8 +117,8 @@ describe('buildTopologyMainLineLayout pv units', () => {
       edges: []
     }
     const units = [
-      { unitIndex: 0, unitNumber: 1, channelA: { pcsNumber: 1 } },
-      { unitIndex: 1, unitNumber: 2, channelA: { pcsNumber: 2 } }
+      { unitIndex: 0, unitNumber: 1, channels: [{ pcsNumber: 1 }] },
+      { unitIndex: 1, unitNumber: 2, channels: [{ pcsNumber: 2 }] }
     ]
     const layout = buildTopologyMainLineLayout(topology, units)
 

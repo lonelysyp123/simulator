@@ -107,10 +107,15 @@ namespace EssSimulator.Web
         private static MainLineUnitViewModel EnrichUnit(UnitBranchSnapshot u, int channelCount)
         {
             var layout = GuiSimDataAccess.GetPcsPerUnit();
-            int a = EssDeviceSimModel.PcsUnitLayout.BaseIndexOfUnit(layout, u.UnitIndex);
-            int b = a + 1;
-            // 单元仅 1 台 PCS 时不构造 B 通道，避免实时数据 / 控制命令越单元错位
-            bool hasSlotB = EssDeviceSimModel.PcsUnitLayout.CountOfUnit(layout, u.UnitIndex) > 1;
+            int baseIdx = EssDeviceSimModel.PcsUnitLayout.BaseIndexOfUnit(layout, u.UnitIndex);
+            // 逐槽位构造运行时通道；越界全局通道号截断，避免实时数据 / 控制命令错位
+            var channels = new List<MainLineChannelViewModel>();
+            for (int s = 0; s < u.PcsChannels.Count; s++)
+            {
+                int idx = baseIdx + s;
+                if (idx >= channelCount) break;
+                channels.Add(BuildChannel(idx, u.UnitIndex, s, u.PcsChannels[s]));
+            }
             return new MainLineUnitViewModel
             {
                 UnitIndex = u.UnitIndex,
@@ -122,10 +127,8 @@ namespace EssSimulator.Web
                 UnitTransformerSecondary = u.UnitTransformerSecondary,
                 UnitTransformerLine = GuiStatusFormatters.FormatAcPhasorViPhi(u.UnitTransformerSecondary),
                 Bus690 = u.Bus690,
-                PcsA = u.PcsA,
-                PcsB = u.PcsB,
-                ChannelA = a < channelCount ? BuildChannel(a, u.UnitIndex, 0, u.PcsA) : null,
-                ChannelB = hasSlotB && b < channelCount ? BuildChannel(b, u.UnitIndex, 1, u.PcsB) : null
+                PcsChannels = u.PcsChannels,
+                Channels = channels
             };
         }
 
@@ -315,10 +318,10 @@ namespace EssSimulator.Web
         public AcPhasorSnapshot UnitTransformerSecondary { get; set; }
         public string UnitTransformerLine { get; set; } = "";
         public BusNodeSnapshot? Bus690 { get; set; }
-        public PcsChannelSnapshot? PcsA { get; set; }
-        public PcsChannelSnapshot? PcsB { get; set; }
-        public MainLineChannelViewModel? ChannelA { get; set; }
-        public MainLineChannelViewModel? ChannelB { get; set; }
+        /// <summary>单元内各槽位 PCS 电气快照（可含 null，与布局台数对齐）。</summary>
+        public IReadOnlyList<PcsChannelSnapshot?> PcsChannels { get; set; } = Array.Empty<PcsChannelSnapshot?>();
+        /// <summary>单元内各槽位运行时通道（实时数据 + 控制），按槽位顺序。</summary>
+        public List<MainLineChannelViewModel> Channels { get; set; } = new();
     }
 
     public sealed class MainLineChannelViewModel

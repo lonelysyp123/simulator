@@ -48,8 +48,7 @@ namespace EssSimulator.Display
         AcPhasorSnapshot UnitTransformerPrimary,
         AcPhasorSnapshot UnitTransformerSecondary,
         BusNodeSnapshot? Bus690,
-        PcsChannelSnapshot? PcsA,
-        PcsChannelSnapshot? PcsB);
+        IReadOnlyList<PcsChannelSnapshot?> PcsChannels);
 
     public sealed class MainLineSnapshot
     {
@@ -142,10 +141,13 @@ namespace EssSimulator.Display
             var units = new List<UnitBranchSnapshot>();
             for (int u = unitStart; u < unitEndExclusive; u++)
             {
-                int a = EssDeviceSimModel.PcsUnitLayout.BaseIndexOfUnit(layout, u);
-                int b = a + 1;
-                // 单元仅 1 台 PCS 时不存在 B 槽，避免把下一单元的 PCS 当作本单元 PcsB
-                bool hasSlotB = EssDeviceSimModel.PcsUnitLayout.CountOfUnit(layout, u) > 1;
+                // 单元内 PCS 台数由布局决定，逐槽位读取，不再限定 A/B 双通道
+                int baseIdx = EssDeviceSimModel.PcsUnitLayout.BaseIndexOfUnit(layout, u);
+                int slotCount = Math.Max(1, EssDeviceSimModel.PcsUnitLayout.CountOfUnit(layout, u));
+                var channels = new List<PcsChannelSnapshot?>(slotCount);
+                for (int s = 0; s < slotCount; s++)
+                    channels.Add(ReadPcsChannel(baseIdx + s, u, s));
+
                 units.Add(new UnitBranchSnapshot(
                     u,
                     GuiSimDataAccess.SafeGetBool($"ess.ElectricalNetwork.UnitBreakers[{u}].SwitchState.IsClosed",
@@ -160,8 +162,7 @@ namespace EssSimulator.Display
                         $"ess._unitTransformers[{u}]._currentState.SecondaryCurrent",
                         $"ess._unitTransformers[{u}].Secondary.Output.Ac.Internal"),
                     ReadBusNode($"ess.RadialGraph.UnitBuses690[{u}]"),
-                    ReadPcsChannel(a, u, 0),
-                    hasSlotB ? ReadPcsChannel(b, u, 1) : null));
+                    channels));
             }
 
             return new MainLineSnapshot

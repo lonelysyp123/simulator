@@ -125,7 +125,7 @@ describe('buildStation3dLayout from topology', () => {
           { fromNodeId: 'pcs1', toNodeId: 'bms1', fromPortId: 'dc_pos', toPortId: 'dc_pos' }
         ]
       },
-      units: [{ unitIndex: 0, unitNumber: 1, channelA: { pcsNumber: 1 } }]
+      units: [{ unitIndex: 0, unitNumber: 1, channels: [{ pcsNumber: 1 }] }]
     }
     const layout = buildStation3dLayout(snap)
     const pcs = layout.items.filter(i => i.templateId === 'pcs')
@@ -531,7 +531,7 @@ describe('bus is drawn as a node (star wiring rule)', () => {
 
   it('fallback layout also draws the bus as a node', () => {
     const layout = buildStation3dLayout({
-      units: [{ unitIndex: 0, unitNumber: 1, channelA: { pcsNumber: 1 } }, { unitIndex: 1, unitNumber: 2, channelA: { pcsNumber: 3 } }],
+      units: [{ unitIndex: 0, unitNumber: 1, channels: [{ pcsNumber: 1 }] }, { unitIndex: 1, unitNumber: 2, channels: [{ pcsNumber: 3 }] }],
       pvUnits: []
     })
     const bus = layout.items.find(i => i.templateId === 'ac_bus')

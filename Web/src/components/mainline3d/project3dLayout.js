@@ -171,7 +171,9 @@ function expandEmu(unit, origin, items, cables, ctx, graph = null) {
   const unitBreakerNode = deviceLevel ? (unit.unitBreakerNode || null) : null
   const unitMeterNode = deviceLevel ? (unit.unitMeterNode || null) : null
   const node = unit.emu
-  const livePcs = [unit.pcsA, unit.pcsB].filter(Boolean).length
+  // 运行时通道列表：优先逐槽位通道，兼容旧 A/B 双通道字段
+  const liveChannelList = (unit.pcsChannels || [unit.pcsA, unit.pcsB]).filter(Boolean)
+  const livePcs = liveChannelList.length
   // 新模型 PCS 台数取组态 pcsNodes；运行时兑底单元仍走 pcsCount 参数
   const pcsCount = pcsNodes.length
     ? pcsNodes.length
@@ -328,7 +330,7 @@ function expandEmu(unit, origin, items, cables, ctx, graph = null) {
     feedAllFromBus = true
   }
 
-  const channels = [unit.pcsA, unit.pcsB].filter(Boolean)
+  const channels = liveChannelList
   pcsXs.forEach((x, i) => {
     const ch = channels[i] || null
     const side = i === 0 ? 'A' : String.fromCharCode(65 + i)
@@ -1008,12 +1010,11 @@ function fromSnapFallback(snap) {
       unitBus690Y: 13 / PX,
       pcsTop: 18 / PX,
       bmsTop: 26 / PX,
-      drawPcsSlots: [u.channelA, u.channelB].filter(Boolean).length,
-      pcsA: u.channelA,
-      pcsB: u.channelB,
-      bmsNodes: [u.channelA, u.channelB].filter(Boolean).map((_, k) => ({ id: `ch${k}` })),
-      dcParallel: [u.channelA, u.channelB].filter(Boolean).length > 1,
-      omitBus690: [u.channelA, u.channelB].filter(Boolean).length <= 1,
+      drawPcsSlots: (u.channels || [u.channelA, u.channelB]).filter(Boolean).length,
+      pcsChannels: (u.channels || [u.channelA, u.channelB]).filter(Boolean),
+      bmsNodes: (u.channels || [u.channelA, u.channelB]).filter(Boolean).map((_, k) => ({ id: `ch${k}` })),
+      dcParallel: (u.channels || [u.channelA, u.channelB]).filter(Boolean).length > 1,
+      omitBus690: (u.channels || [u.channelA, u.channelB]).filter(Boolean).length <= 1,
       emu: { parameters: {}, label: `UNIT ${u.unitNumber ?? i + 1}` },
       unitSnap: u,
       unitXfLabel: u.unitTransformerLine || '',

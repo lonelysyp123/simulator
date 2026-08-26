@@ -413,7 +413,7 @@ const runtimeChannelMaps = computed(() => {
   const pcsMap = new Map()
   const bmsMap = new Map()
   for (const u of props.snap.units || []) {
-    for (const ch of [u.channelA, u.channelB]) {
+    for (const ch of u.channels || []) {
       if (!ch) continue
       if (ch.pcsNumber != null) pcsMap.set(ch.pcsNumber, ch)
       if (ch.compartmentNumber != null) bmsMap.set(ch.compartmentNumber, ch)

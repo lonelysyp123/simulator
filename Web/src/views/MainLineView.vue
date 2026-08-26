@@ -152,10 +152,10 @@
       <el-table :data="unitRows" size="small" border stripe>
         <el-table-column prop="unit" label="UNIT" width="80" fixed />
         <el-table-column label="单元断/单元变" min-width="200"><template #default="{ row }">{{ row.xf }}</template></el-table-column>
-        <el-table-column label="PCS-A" min-width="240"><template #default="{ row }">{{ row.pcsA }}</template></el-table-column>
-        <el-table-column label="PCS-B" min-width="240"><template #default="{ row }">{{ row.pcsB }}</template></el-table-column>
-        <el-table-column label="舱-A" min-width="200"><template #default="{ row }">{{ row.bmsA }}</template></el-table-column>
-        <el-table-column label="舱-B" min-width="200"><template #default="{ row }">{{ row.bmsB }}</template></el-table-column>
+        <template v-for="s in maxUnitSlots" :key="`slot-${s}`">
+          <el-table-column :label="`PCS-${s}`" min-width="240"><template #default="{ row }">{{ row.pcs[s - 1] || '—' }}</template></el-table-column>
+          <el-table-column :label="`舱-${s}`" min-width="200"><template #default="{ row }">{{ row.bms[s - 1] || '—' }}</template></el-table-column>
+        </template>
       </el-table>
     </div>
 
@@ -320,14 +320,16 @@ const acRows = computed(() => [
   }
 ])
 
-const unitRows = computed(() => (snap.value.units || []).map(u => ({
-  unit: `UNIT ${u.unitNumber ?? u.unitIndex + 1}`,
-  xf: `${u.unitBreakerLabel || fmtBreaker(u.unitBreakerClosed, u.unitBreakerTripped)} | ${u.unitTransformerLine || fmtPhasorViPhi(u.unitTransformerSecondary)}`,
-  pcsA: fmtPcsChannel(u.channelA),
-  pcsB: fmtPcsChannel(u.channelB),
-  bmsA: fmtBmsChannel(u.channelA),
-  bmsB: fmtBmsChannel(u.channelB)
-})))
+const unitRows = computed(() => (snap.value.units || []).map(u => {
+  const chans = u.channels || []
+  return {
+    unit: `UNIT ${u.unitNumber ?? u.unitIndex + 1}`,
+    xf: `${u.unitBreakerLabel || fmtBreaker(u.unitBreakerClosed, u.unitBreakerTripped)} | ${u.unitTransformerLine || fmtPhasorViPhi(u.unitTransformerSecondary)}`,
+    pcs: chans.map(ch => fmtPcsChannel(ch)),
+    bms: chans.map(ch => fmtBmsChannel(ch))
+  }
+}))
+const maxUnitSlots = computed(() => unitRows.value.reduce((m, r) => Math.max(m, r.pcs.length), 0))
 
 function fmtPvArray(a) {
   if (!a) return '—'
