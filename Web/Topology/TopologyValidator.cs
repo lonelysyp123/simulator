@@ -865,8 +865,8 @@ namespace EssSimulator.Web.Topology
         }
 
         /// <summary>
-        /// 断路器/电表/变压器绑定 EMU 校验：绑定可选，但已选 emuId 必须有效，且同一 EMU 下断路器/电表/变压器各至多 1 台。
-        /// 已选 groupId 的设备属组级绑定，不参与 EMU 级计数。校验通过返回 null。
+        /// 断路器/电表/变压器绑定 EMU 校验：绑定可选，但已选 emuId 必须有效，且同一 EMU 下断路器/电表各至多 1 台。
+        /// 变压器不限台数（实际电站常见多台单元变）。已选 groupId 的设备属组级绑定，不参与 EMU 级计数。校验通过返回 null。
         /// </summary>
         private static TopologyValidationResult? ValidateEmuDeviceBindings(
             TopologyProject project, HashSet<string> emuIds, List<string> details)
@@ -874,8 +874,7 @@ namespace EssSimulator.Web.Topology
             foreach (var (templateId, deviceLabel, dupCode) in new[]
             {
                 ("ac_breaker", "断路器", "EMU_BREAKER_DUPLICATE"),
-                ("ac_meter", "电表", "EMU_METER_DUPLICATE"),
-                ("transformer", "变压器", "EMU_TRANSFORMER_DUPLICATE")
+                ("ac_meter", "电表", "EMU_METER_DUPLICATE")
             })
             {
                 var bound = project.Nodes
@@ -915,7 +914,7 @@ namespace EssSimulator.Web.Topology
         /// <summary>
         /// EMU 分组绑定校验：已选 groupId 的设备须指向存在的分组（GROUP_UNASSIGNED），
         /// 分组所属 EMU 须有效且与设备自身 emuId 一致（GROUP_EMU_MISMATCH），
-        /// 每个分组下断路器/电表/变压器各至多 1 台（EMU_GROUP_BREAKER_DUPLICATE / EMU_GROUP_METER_DUPLICATE / EMU_GROUP_TRANSFORMER_DUPLICATE）。
+        /// 每个分组下断路器/电表各至多 1 台（EMU_GROUP_BREAKER_DUPLICATE / EMU_GROUP_METER_DUPLICATE），变压器不限台数。
         /// 无分组的工程全部规则退化通过。校验通过返回 null。
         /// </summary>
         private static TopologyValidationResult? ValidateEmuGroupBindings(
@@ -965,8 +964,7 @@ namespace EssSimulator.Web.Topology
             foreach (var (templateId, deviceLabel, dupCode) in new[]
             {
                 ("ac_breaker", "断路器", "EMU_GROUP_BREAKER_DUPLICATE"),
-                ("ac_meter", "电表", "EMU_GROUP_METER_DUPLICATE"),
-                ("transformer", "变压器", "EMU_GROUP_TRANSFORMER_DUPLICATE")
+                ("ac_meter", "电表", "EMU_GROUP_METER_DUPLICATE")
             })
             {
                 var dupGroups = bound
