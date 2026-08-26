@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0",
   "id": "f0f5c528153545168e6ae959dab94003",
-  "name": "\u5E38\u7528\u50A8\u80FD\u7535\u7AD9#1",
-  "updatedAtUtc": "2026-08-26T02:53:45.905502Z",
+  "name": "\u5E38\u7528\u50A8\u80FD\u7535\u7AD9-10MW",
+  "updatedAtUtc": "2026-08-26T03:11:22.236225Z",
   "nodes": [
     {
       "id": "4a575f073f4ed1a037e5a2c9",
@@ -58,22 +58,6 @@
       }
     },
     {
-      "id": "da608f866361781a037e6b62f",
-      "templateId": "ac_breaker",
-      "libraryItemId": "f67892b2406f4eb789c265453c14cdbb",
-      "label": "\u4E09\u76F8\u65AD\u8DEF\u5668",
-      "x": 580,
-      "y": 600,
-      "parameters": {
-        "ratedVoltage": 35000,
-        "closed": true,
-        "isMainBreaker": false,
-        "name": "\u65AD\u8DEF\u5668",
-        "emuId": "3541efc02497e1a037e8e641",
-        "groupId": "447f24c15d13581a037e8f112"
-      }
-    },
-    {
       "id": "7b4a5c2dadfe381a037e7286d",
       "templateId": "transformer",
       "libraryItemId": "5fc2d6d7e23d4345b77acb332b74542d",
@@ -87,8 +71,8 @@
         "impedancePercent": 4,
         "noLoadLossW": 100,
         "loadLossW": 200,
-        "emuId": "",
-        "groupId": ""
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "447f24c15d13581a037e8f112"
       }
     },
     {
@@ -210,7 +194,7 @@
     {
       "id": "447f24c15d13581a037e8f112",
       "templateId": "emu_group",
-      "label": "EMU \u5206\u7EC4",
+      "label": "EMU \u5206\u7EC4#1",
       "x": 0,
       "y": 680,
       "parameters": {
@@ -314,7 +298,9 @@
         "ratedPowerKva": 5000,
         "impedancePercent": 4,
         "noLoadLossW": 100,
-        "loadLossW": 200
+        "loadLossW": 200,
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "447f24c15d13581a037e8f112"
       }
     },
     {
@@ -393,7 +379,9 @@
         "ratedVoltage": 35000,
         "closed": true,
         "isMainBreaker": false,
-        "name": "\u65AD\u8DEF\u5668"
+        "name": "\u65AD\u8DEF\u5668",
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "ec536ef5be29e81a03bfdff7b"
       }
     },
     {
@@ -422,7 +410,9 @@
         "ratedPowerKva": 5000,
         "impedancePercent": 4,
         "noLoadLossW": 100,
-        "loadLossW": 200
+        "loadLossW": 200,
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "ec536ef5be29e81a03bfdff7b"
       }
     },
     {
@@ -438,7 +428,9 @@
         "ratedPowerKva": 5000,
         "impedancePercent": 4,
         "noLoadLossW": 100,
-        "loadLossW": 200
+        "loadLossW": 200,
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "ec536ef5be29e81a03bfdff7b"
       }
     },
     {
@@ -481,7 +473,8 @@
         "dcVoltageMin": 1000,
         "dcVoltageMax": 1500,
         "name": "PCS\u53D8\u6D41\u5668",
-        "emuId": "3541efc02497e1a037e8e641"
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "ec536ef5be29e81a03bfdff7b"
       }
     },
     {
@@ -498,7 +491,8 @@
         "dcVoltageMin": 1000,
         "dcVoltageMax": 1500,
         "name": "PCS\u53D8\u6D41\u5668",
-        "emuId": "3541efc02497e1a037e8e641"
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "ec536ef5be29e81a03bfdff7b"
       }
     },
     {
@@ -562,7 +556,8 @@
         "dcVoltageMin": 1000,
         "dcVoltageMax": 1500,
         "name": "PCS\u53D8\u6D41\u5668",
-        "emuId": "3541efc02497e1a037e8e641"
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "ec536ef5be29e81a03bfdff7b"
       }
     },
     {
@@ -579,7 +574,8 @@
         "dcVoltageMin": 1000,
         "dcVoltageMax": 1500,
         "name": "PCS\u53D8\u6D41\u5668",
-        "emuId": "3541efc02497e1a037e8e641"
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "ec536ef5be29e81a03bfdff7b"
       }
     },
     {
@@ -637,7 +633,7 @@
       "y": 880,
       "parameters": {
         "ptPrimaryVoltage": 35000,
-        "ctPrimaryCurrent": 2000,
+        "ctPrimaryCurrent": 1000,
         "accuracyClass": "0.2S",
         "isPccMeter": false,
         "emuId": "3541efc02497e1a037e8e641",
@@ -652,9 +648,38 @@
       "y": 900,
       "parameters": {
         "ptPrimaryVoltage": 35000,
-        "ctPrimaryCurrent": 2000,
+        "ctPrimaryCurrent": 1000,
         "accuracyClass": "0.2S",
-        "isPccMeter": false
+        "isPccMeter": false,
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "ec536ef5be29e81a03bfdff7b"
+      }
+    },
+    {
+      "id": "ec536ef5be29e81a03bfdff7b",
+      "templateId": "emu_group",
+      "label": "EMU \u5206\u7EC4#2",
+      "x": 940,
+      "y": 680,
+      "parameters": {
+        "name": "EMU\u5206\u7EC4",
+        "emuId": "3541efc02497e1a037e8e641"
+      }
+    },
+    {
+      "id": "b57dcac4c256e1a03bfefdcf",
+      "templateId": "ac_breaker",
+      "libraryItemId": "f67892b2406f4eb789c265453c14cdbb",
+      "label": "\u4E2D\u538B\u4E09\u76F8\u65AD\u8DEF\u5668",
+      "x": 600,
+      "y": 580,
+      "parameters": {
+        "ratedVoltage": 35000,
+        "closed": true,
+        "isMainBreaker": false,
+        "name": "\u65AD\u8DEF\u5668",
+        "emuId": "3541efc02497e1a037e8e641",
+        "groupId": "447f24c15d13581a037e8f112"
       }
     }
   ],
@@ -699,27 +724,6 @@
       "fromNodeId": "1a6e03cdab45681a037e5d999",
       "fromPortId": "sec_c",
       "toNodeId": "c4836a62ed59581a037e61e2a",
-      "toPortId": "c"
-    },
-    {
-      "id": "7b7c4bafaf0e4e5da2bc4e970d5b1b8c",
-      "fromNodeId": "c4836a62ed59581a037e61e2a",
-      "fromPortId": "a2",
-      "toNodeId": "da608f866361781a037e6b62f",
-      "toPortId": "a"
-    },
-    {
-      "id": "ca730b6d279846f3bbdc08b52abe229f",
-      "fromNodeId": "c4836a62ed59581a037e61e2a",
-      "fromPortId": "b2",
-      "toNodeId": "da608f866361781a037e6b62f",
-      "toPortId": "b"
-    },
-    {
-      "id": "7388a4ed62e14b8e8333d2f48b18276f",
-      "fromNodeId": "c4836a62ed59581a037e61e2a",
-      "fromPortId": "c2",
-      "toNodeId": "da608f866361781a037e6b62f",
       "toPortId": "c"
     },
     {
@@ -896,27 +900,6 @@
       "fromPortId": "c2",
       "toNodeId": "c9a7785c35c081a037eb60aa",
       "toPortId": "pt_c"
-    },
-    {
-      "id": "1c067e35178746b78c41c10767dcbda9",
-      "fromNodeId": "da608f866361781a037e6b62f",
-      "fromPortId": "a2",
-      "toNodeId": "0f63830db1e61a037ec92c6",
-      "toPortId": "a"
-    },
-    {
-      "id": "e214922a69624a84b635a6ccc71c6b61",
-      "fromNodeId": "da608f866361781a037e6b62f",
-      "fromPortId": "b2",
-      "toNodeId": "0f63830db1e61a037ec92c6",
-      "toPortId": "b"
-    },
-    {
-      "id": "0e592204200846fb84374c8eb9802a28",
-      "fromNodeId": "da608f866361781a037e6b62f",
-      "fromPortId": "c2",
-      "toNodeId": "0f63830db1e61a037ec92c6",
-      "toPortId": "c"
     },
     {
       "id": "717624998dec44c9b185521fc5233d4e",
@@ -1449,6 +1432,48 @@
       "fromPortId": "c2",
       "toNodeId": "9e080b78199ce81a03bfcb2fa",
       "toPortId": "pt_c"
+    },
+    {
+      "id": "1654d4fc04ab4ade886957058bd7a288",
+      "fromNodeId": "c4836a62ed59581a037e61e2a",
+      "fromPortId": "a2",
+      "toNodeId": "b57dcac4c256e1a03bfefdcf",
+      "toPortId": "a"
+    },
+    {
+      "id": "54a0288e32cf402abf00ff0cf3a54bf8",
+      "fromNodeId": "c4836a62ed59581a037e61e2a",
+      "fromPortId": "b2",
+      "toNodeId": "b57dcac4c256e1a03bfefdcf",
+      "toPortId": "b"
+    },
+    {
+      "id": "d4accc4576dd4d2d995a427a47eecbad",
+      "fromNodeId": "c4836a62ed59581a037e61e2a",
+      "fromPortId": "c2",
+      "toNodeId": "b57dcac4c256e1a03bfefdcf",
+      "toPortId": "c"
+    },
+    {
+      "id": "749c3a3d3016499fb713675888f790a3",
+      "fromNodeId": "b57dcac4c256e1a03bfefdcf",
+      "fromPortId": "a2",
+      "toNodeId": "0f63830db1e61a037ec92c6",
+      "toPortId": "a"
+    },
+    {
+      "id": "e0d12c5787df41aa8ea3a50ee917da2a",
+      "fromNodeId": "b57dcac4c256e1a03bfefdcf",
+      "fromPortId": "b2",
+      "toNodeId": "0f63830db1e61a037ec92c6",
+      "toPortId": "b"
+    },
+    {
+      "id": "e9e78bab904d4f65b5fe89dbeb265104",
+      "fromNodeId": "b57dcac4c256e1a03bfefdcf",
+      "fromPortId": "c2",
+      "toNodeId": "0f63830db1e61a037ec92c6",
+      "toPortId": "c"
     }
   ]
 }
