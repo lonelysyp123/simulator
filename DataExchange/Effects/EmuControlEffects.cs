@@ -22,19 +22,7 @@ namespace EssSimulator.DataExchange.Effects
             if (!TryResolveEmuUnit(context, out int unit1Based))
                 return;
 
-            var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
-            var emu = SimulatorHost.Instance.Get<EnergyManagementData>($"emu{unit1Based}");
-            if (ess == null || emu == null)
-                return;
-
-            int pcsBase = ess.PcsBaseIndexOfUnit(unit1Based - 1);
-            // 先跑 EMU 级系统操作/黑启动写入与功率均分，再下发到各 PCS
-            EmuSystemOperationApplier.Apply(emu);
-            EmuPowerDispatcher.Dispatch(emu);
-            PcsMapper.ApplyEmuCommands(emu, ess, pcsBase);
-            PcsEmuSynchronizer.SyncPcsStateFromModel(ess, emu, pcsBase);
-            _refreshTelemetry?.Invoke();
-            SnapshotService.RequestImmediatePush();
+            EmuCommandPipeline.TryApplyUnit(unit1Based, _refreshTelemetry);
         }
 
         /// <summary>

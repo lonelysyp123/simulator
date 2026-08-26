@@ -438,6 +438,48 @@ namespace EssSimulator.EssDeviceSimModel
             return false;
         }
 
+        /// <summary>启停光伏单元（直驱设备；点表存在 logger 启停位绑定时由反馈管道自动回写）。</summary>
+        public bool TrySetPvRun(int pvNumber1Based, bool run, out string message)
+        {
+            message = string.Empty;
+            if (pvNumber1Based < 1 || pvNumber1Based > PvUnits.Count)
+            {
+                message = $"找不到 pv{pvNumber1Based}";
+                return false;
+            }
+
+            var unit = PvUnits[pvNumber1Based - 1];
+            unit.Logger.SubarrayOnOff = (ushort)(run ? 1 : 0);
+            message = $"pv{pvNumber1Based} {(run ? "启动" : "停机")}";
+            return true;
+        }
+
+        /// <summary>设定光伏单元有功/无功（kW/kvar，缺省项保留现值；setter 自带 clamp 并下发逆变器）。</summary>
+        public bool TrySetPvPower(int pvNumber1Based, double? activeKw, double? reactiveKvar, out string message)
+        {
+            message = string.Empty;
+            if (activeKw == null && reactiveKvar == null)
+            {
+                message = "有功与无功至少提供一项";
+                return false;
+            }
+
+            if (pvNumber1Based < 1 || pvNumber1Based > PvUnits.Count)
+            {
+                message = $"找不到 pv{pvNumber1Based}";
+                return false;
+            }
+
+            var logger = PvUnits[pvNumber1Based - 1].Logger;
+            if (activeKw.HasValue)
+                logger.SubarrayActivePowerKw = activeKw.Value;
+            if (reactiveKvar.HasValue)
+                logger.SubarrayReactivePowerKvar = reactiveKvar.Value;
+
+            message = $"pv{pvNumber1Based} 有功设定 {logger.SubarrayActivePowerKw:0.##} kW · 无功设定 {logger.SubarrayReactivePowerKvar:0.##} kvar";
+            return true;
+        }
+
         /// <summary>写入 PCS 黑启动开关（含断路器联锁）；违规则返回 false 且不开启。</summary>
         public bool TrySetPcsBlackStart(int pcsSimIndex, bool requested)
         {

@@ -290,8 +290,9 @@ namespace EssSimulator.EssSimModelApi.Mappers
 
                 if (!cmdOn)
                 {
-                    if (pcsSim.IsExternalRunCommand)
-                        pcsSim.SyncExternalRunCommand(false);
+                    // 无条件同步写 0：SyncExternalRunCommand(false) 幂等，且故障跳闸自行撤回命令后
+                    // 外部再次写 0 仍需能清除故障锁存（与 EMS 停机/复归语义一致）
+                    pcsSim.SyncExternalRunCommand(false);
                     ess.PushPcsChannelToNetwork(simIdx);
                     continue;
                 }

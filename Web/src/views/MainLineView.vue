@@ -389,17 +389,6 @@ async function onToggleUnitBreaker(unitIndex) {
   }
 }
 
-function resolvePcsModbus(pcsNumber, kind = 'p') {
-  const n = Number(pcsNumber)
-  if (!Number.isFinite(n) || n < 1) return null
-  const emuUnit = Math.ceil(n / 2)
-  const isA = n % 2 === 1
-  const ytPoint = kind === 'p'
-    ? (isA ? 'yt0' : 'yt4')
-    : (isA ? 'yt1' : 'yt5')
-  return { emuUnit, ytPoint }
-}
-
 async function onPcsStart(pcsNumber) {
   await runChannelCommand(`esscmd pcs${pcsNumber} start`)
 }
@@ -409,37 +398,31 @@ async function onPcsStop(pcsNumber) {
 }
 
 async function onPcsSetPower(payload = {}) {
+  const n = Number(payload.pcsNumber)
+  if (!Number.isFinite(n) || n < 1) {
+    ElMessage.error('无法解析 PCS 编号')
+    return
+  }
   const kw = Number(payload.powerKw)
   if (!Number.isFinite(kw)) {
     ElMessage.warning('请输入有效的有功功率')
     return
   }
-  const resolved = resolvePcsModbus(payload.pcsNumber, 'p')
-  const emuUnit = Number(payload.emuUnit) > 0 ? Number(payload.emuUnit) : resolved?.emuUnit
-  const ytPoint = payload.ytPoint || resolved?.ytPoint
-  if (!emuUnit || !ytPoint) {
-    ElMessage.error('无法解析 PCS 对应的 Modbus 设备')
-    return
-  }
-  const raw = Math.round(kw * 10)
-  await runChannelCommand(`dpc simEmu${emuUnit}.${ytPoint} set ${raw}`)
+  await runChannelCommand(`esscmd pcs${n} power ${kw}`)
 }
 
 async function onPcsSetReactive(payload = {}) {
+  const n = Number(payload.pcsNumber)
+  if (!Number.isFinite(n) || n < 1) {
+    ElMessage.error('无法解析 PCS 编号')
+    return
+  }
   const kvar = Number(payload.reactiveKvar)
   if (!Number.isFinite(kvar)) {
     ElMessage.warning('请输入有效的无功功率')
     return
   }
-  const resolved = resolvePcsModbus(payload.pcsNumber, 'q')
-  const emuUnit = Number(payload.emuUnit) > 0 ? Number(payload.emuUnit) : resolved?.emuUnit
-  const ytPoint = payload.ytPoint || resolved?.ytPoint
-  if (!emuUnit || !ytPoint) {
-    ElMessage.error('无法解析 PCS 对应的 Modbus 设备')
-    return
-  }
-  const raw = Math.round(kvar * 10)
-  await runChannelCommand(`dpc simEmu${emuUnit}.${ytPoint} set ${raw}`)
+  await runChannelCommand(`esscmd pcs${n} reactive ${kvar}`)
 }
 
 function resolvePvNumber(payload) {
@@ -453,7 +436,7 @@ async function onPvStart(payload) {
     ElMessage.error('无法解析光伏单元')
     return
   }
-  await runChannelCommand(`dpc simPv${n}.yt4 set 1`)
+  await runChannelCommand(`esscmd setpv${n} run on`)
 }
 
 async function onPvStop(payload) {
@@ -462,7 +445,7 @@ async function onPvStop(payload) {
     ElMessage.error('无法解析光伏单元')
     return
   }
-  await runChannelCommand(`dpc simPv${n}.yt4 set 0`)
+  await runChannelCommand(`esscmd setpv${n} run off`)
 }
 
 async function onPvSetPower(payload = {}) {
@@ -476,8 +459,7 @@ async function onPvSetPower(payload = {}) {
     ElMessage.warning('请输入有效的有功功率（≥0）')
     return
   }
-  const raw = Math.round(kw * 10)
-  await runChannelCommand(`dpc simPv${n}.yt5 set ${raw}`)
+  await runChannelCommand(`esscmd setpv${n} power ${kw}`)
 }
 
 async function onPvSetReactive(payload = {}) {
@@ -491,8 +473,7 @@ async function onPvSetReactive(payload = {}) {
     ElMessage.warning('请输入有效的无功功率')
     return
   }
-  const raw = Math.round(kvar * 10)
-  await runChannelCommand(`dpc simPv${n}.yt7 set ${raw}`)
+  await runChannelCommand(`esscmd setpv${n} reactive ${kvar}`)
 }
 
 function resolvePvSide(payload) {
