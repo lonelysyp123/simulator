@@ -147,7 +147,8 @@ onMounted(async () => {
 
   try {
     const hub = await getHub()
-    hub.on(RealtimeMethods.ReceiveAlert, a => Object.assign(alert, a))
+    // 回调不得带返回值：SignalR 客户端会尝试把返回值回传给服务端并告警
+    hub.on(RealtimeMethods.ReceiveAlert, a => { Object.assign(alert, a) })
   } catch { /* ignore */ }
 })
 </script>
