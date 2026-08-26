@@ -83,6 +83,15 @@
               </text>
             </g>
 
+            <!-- 母线联络分段断路器：状态取组态静态参数 -->
+            <g v-for="br in layout.tieBreakers" :key="`tie-brk-${br.id}`">
+              <rect :x="br.x - 18" :y="br.yTop" width="36" :height="br.yBottom - br.yTop" rx="3" fill="transparent" />
+              <BreakerSymbol :x="br.x" :y="br.y" :closed="br.closed" :tripped="br.tripped" />
+              <text :x="br.x + 22" :y="br.y + 4" class="label-text breaker-label">
+                {{ br.label }} {{ fmtBreaker(br.closed, br.tripped) }}
+              </text>
+            </g>
+
             <g v-for="bus in layout.buses" :key="`bus-${bus.id}`">
               <template v-if="!bus.omit">
                 <line class="bus-line bus-thick" :x1="bus.x1" :y1="bus.y" :x2="bus.x2" :y2="bus.y" />
@@ -456,7 +465,8 @@ const layout = computed(() => {
     transformers: l.transformers || l.stationXfmrs || [],
     meters: l.meters || [],
     loads: l.loads || [],
-    stemBreakers: l.stemBreakers || []
+    stemBreakers: l.stemBreakers || [],
+    tieBreakers: l.tieBreakers || []
   }
 })
 

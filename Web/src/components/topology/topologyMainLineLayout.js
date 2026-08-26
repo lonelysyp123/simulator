@@ -151,6 +151,7 @@ function buildBusFrame(graph, bus, incomingXfmrId, visitedBuses, visitedXfmrs) {
   const skip = new Set([incomingXfmrId].filter(Boolean))
   const hangs = []
   const xfmrs = []
+  const busLinks = []
   for (const hop of acHops(graph, bus.id, skip)) {
     const n = hop.node
     if (!n || n.templateId === 'grid' || n.templateId === 'dc_bus' || n.templateId === 'bms') continue
@@ -167,13 +168,21 @@ function buildBusFrame(graph, bus, incomingXfmrId, visitedBuses, visitedXfmrs) {
       xfmrs.push({ xfmr: n, downstream })
       continue
     }
+    if (n.templateId === 'ac_bus') {
+      // 母线联络（经分段断路器透明 hop 或直接相连）：邻接母线递归为子帧，中间断路器随子帧绘制
+      if (visitedBuses.has(n.id)) continue
+      const downstream = buildBusFrame(graph, n, null, visitedBuses, visitedXfmrs)
+      downstream.viaBusLink = true
+      busLinks.push({ breaker: hop.viaBreaker || null, downstream })
+      continue
+    }
     if (n.templateId === 'pcs' || n.templateId === 'pv_unit' || n.templateId === 'load' || n.templateId === 'ac_meter') {
       // 已归入 EMU 的电表在单元框内绘制，不再作为母线挂件重复入图
       if (n.templateId === 'ac_meter' && paramStr(n, 'emuId')) continue
       hangs.push({ node: n })
     }
   }
-  return { node: bus, incomingXfmrId, hangs, xfmrs, synthetic: false }
+  return { node: bus, incomingXfmrId, hangs, xfmrs, busLinks, synthetic: false }
 }
 
 function walkFrames(frame, visit) {
@@ -181,6 +190,17 @@ function walkFrames(frame, visit) {
   for (const xf of frame.xfmrs) {
     if (xf.downstream) walkFrames(xf.downstream, visit)
   }
+  for (const bl of frame.busLinks || []) {
+    if (bl.downstream) walkFrames(bl.downstream, visit)
+  }
+}
+
+/** 因 PCS 组全局去重而变空的子帧：父帧跳过对应变压器槽位，避免悬空支路 */
+function isCollapsedFrame(fr) {
+  return !!fr && (fr.elided || 0) > 0
+    && fr.hangs.length === 0
+    && fr.xfmrs.length === 0
+    && (fr.busLinks || []).length === 0
 }
 
 export function findBmsForPcs(graph, pcsId) {
@@ -245,6 +265,7 @@ function groupFramePcsHangs(graph, frame) {
 
 function canvasX(slotItem) {
   if (slotItem.kind === 'xfmr') return slotItem.xf.xfmr.x || 0
+  if (slotItem.kind === 'buslink') return slotItem.bl.downstream?.node?.x || 0
   return slotItem.hang.node.x || 0
 }
 
@@ -500,6 +521,22 @@ export function buildTopologyMainLineLayout(topology, units = []) {
   }
 
   for (const root of roots) walkFrames(root, fr => groupFramePcsHangs(graph, fr))
+  // 同一 EMU 的 PCS 组只挂一次：按帧遍历顺序保留首次出现，后续帧让位（避免同一运行时单元被重复展开）
+  const seenGroupKeys = new Set()
+  for (const root of roots) walkFrames(root, fr => {
+    const keptHangs = []
+    for (const h of fr.hangs) {
+      if (h.pcsGroup && h.groupKey != null) {
+        if (seenGroupKeys.has(h.groupKey)) {
+          fr.elided = (fr.elided || 0) + 1
+          continue
+        }
+        seenGroupKeys.add(h.groupKey)
+      }
+      keptHangs.push(h)
+    }
+    fr.hangs = keptHangs
+  })
   const hangingIds = new Set()
   for (const root of roots) walkFrames(root, fr => {
     for (const h of fr.hangs) {
@@ -555,11 +592,14 @@ export function buildTopologyMainLineLayout(topology, units = []) {
 
   function measure(frame) {
     const items = [
-      ...frame.xfmrs.map(xf => ({ kind: 'xfmr', xf })),
+      ...frame.xfmrs
+        .filter(xf => !isCollapsedFrame(xf.downstream))
+        .map(xf => ({ kind: 'xfmr', xf })),
+      ...(frame.busLinks || []).map(bl => ({ kind: 'buslink', bl })),
       ...frame.hangs
         .filter(hang => hangKind(hang.node) === 'feeder')
         .map(hang => ({ kind: 'feeder', hang }))
-    ].sort((a, b) => canvasX(a) - canvasX(b) || String(a.hang?.node?.id || a.xf?.xfmr.id).localeCompare(String(b.hang?.node?.id || b.xf?.xfmr.id)))
+    ].sort((a, b) => canvasX(a) - canvasX(b) || String(a.hang?.node?.id || a.xf?.xfmr.id || a.bl?.downstream?.node?.id).localeCompare(String(b.hang?.node?.id || b.xf?.xfmr.id || b.bl?.downstream?.node?.id)))
     frame.taps = frame.hangs.filter(hang => {
       const k = hangKind(hang.node)
       return k === 'ac_meter' || k === 'load'
@@ -569,19 +609,24 @@ export function buildTopologyMainLineLayout(topology, units = []) {
       if (item.kind === 'xfmr') {
         if (item.xf.downstream) measure(item.xf.downstream)
         slots.push({ item, w: Math.max(item.xf.downstream?.width || 0, UNIT_W) })
+      } else if (item.kind === 'buslink') {
+        measure(item.bl.downstream)
+        slots.push({ item, w: Math.max(item.bl.downstream.width || 0, UNIT_W) })
       } else {
         slots.push({ item, w: UNIT_W })
       }
     }
     frame.slots = slots
     const tapCount = frame.taps.length
+    // 母线联络结构（busLinks / 经联络到达的子帧）必须画出母线横杠，不适用单挂件省略规则
+    const structural = (frame.busLinks || []).length > 0 || !!frame.viaBusLink
     if (!slots.length) {
       frame.width = Math.max(UNIT_W, tapCount * HANG_W)
-      frame.omit = tapCount <= 1
+      frame.omit = tapCount <= 1 && !structural
       return
     }
     frame.width = slots.reduce((s, sl) => s + sl.w, 0) + BAY_GAP * (slots.length - 1)
-    frame.omit = (slots.length + tapCount) <= 1
+    frame.omit = (slots.length + tapCount) <= 1 && !structural
   }
   for (const root of forest) measure(root)
 
@@ -591,6 +636,7 @@ export function buildTopologyMainLineLayout(topology, units = []) {
     transformers: [],
     meters: [],
     loads: [],
+    tieBreakers: [],
     placements: []
   }
 
@@ -619,10 +665,12 @@ export function buildTopologyMainLineLayout(topology, units = []) {
     const slots = frame.slots || []
     const taps = frame.taps || []
     const hasXfmr = slots.some(s => s.item.kind === 'xfmr')
+    const hasTieBrk = slots.some(s => s.item.kind === 'buslink' && s.item.bl.breaker)
     const hasMeter = taps.some(t => t.node.templateId === 'ac_meter')
     const hasLoad = taps.some(t => t.node.templateId === 'load')
     const equipH = Math.max(
       hasXfmr ? XFMR_SPAN : 0,
+      hasTieBrk ? BRK_SPAN : 0,
       hasMeter ? METER_H : 0,
       hasLoad ? LOAD_SYMBOL_H + LINK_STUB : 0
     )
@@ -667,6 +715,28 @@ export function buildTopologyMainLineLayout(topology, units = []) {
           rec.busRight = downstream.x2
           rec.omitBusLv = !!downstream.omit
         }
+      } else if (item.kind === 'buslink') {
+        // 母线联络：母线 → 分段断路器 → 子帧母线
+        const brk = item.bl.breaker
+        const downstream = item.bl.downstream
+        structXs.push(cx)
+        scene.wires.push({ x1: cx, y1: yBus, x2: cx, y2: yEquip })
+        if (brk) {
+          scene.tieBreakers.push({
+            id: brk.id,
+            node: brk,
+            x: cx,
+            yTop: yEquip,
+            y: yEquip + BRK_SPAN / 2,
+            yBottom: yEquip + BRK_SPAN,
+            label: brk.label || brk.parameters?.name || '断路器',
+            closed: truthy(brk.parameters?.closed),
+            tripped: truthy(brk.parameters?.tripped)
+          })
+        }
+        const yChild = yEquip + equipH + LINK_STUB + (downstream.omit ? LINK_STUB : 24)
+        scene.wires.push({ x1: cx, y1: yEquip + (brk ? BRK_SPAN : 0), x2: cx, y2: yChild })
+        placeFrame(downstream, x, yChild)
       } else if (item.kind === 'feeder') {
         structXs.push(cx)
         scene.placements.push({
@@ -833,6 +903,10 @@ export function buildTopologyMainLineLayout(topology, units = []) {
     maxX = Math.max(maxX, m.x + METER_HALF_W + 16)
     maxY = Math.max(maxY, m.y + m.h + 16)
   }
+  for (const b of scene.tieBreakers) {
+    maxX = Math.max(maxX, b.x + 80)
+    maxY = Math.max(maxY, b.yBottom + 24)
+  }
   for (const u of unitLayouts) {
     maxX = Math.max(maxX, u.cx + UNIT_W / 2)
     maxY = Math.max(maxY, u.originY + u.bottom + 36)
@@ -853,6 +927,7 @@ export function buildTopologyMainLineLayout(topology, units = []) {
     transformers: scene.transformers,
     meters: scene.meters,
     loads: scene.loads,
+    tieBreakers: scene.tieBreakers,
     stemBreakers,
     gridX,
     stationCenterX: gridX,

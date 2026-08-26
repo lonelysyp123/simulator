@@ -27,10 +27,16 @@ namespace EssSimulator.Web.Topology
                 {
                     if (unit == null)
                         return false;
-                    if (unit.Pcs is not { Count: > 0 })
+                    if (unit.HasGroups)
+                    {
+                        // 分组构成：运行时按 group 顺序展平，要求各组 PCS/BMS 完整
+                        if (unit.Groups.Any(g => g == null || g.Pcs is not { Count: > 0 } || g.Bms is not { Count: > 0 }))
+                            return false;
+                    }
+                    else if (unit.Pcs is not { Count: > 0 } || unit.Bms is not { Count: > 0 })
+                    {
                         return false;
-                    if (unit.Bms is not { Count: > 0 })
-                        return false;
+                    }
                 }
             }
 
