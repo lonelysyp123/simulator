@@ -189,6 +189,19 @@ namespace EssSimulator.Web.Topology
                     : Results.Ok(p);
             });
 
+            g.MapPost("/projects/{id}/copy", (string id, TopologyStore store, CopyProjectRequest? body) =>
+            {
+                try
+                {
+                    var p = store.CopyNamedProject(id, body?.Name);
+                    return Results.Ok(p);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.NotFound(new { message = ex.Message });
+                }
+            });
+
             g.MapDelete("/projects/{id}", (string id, TopologyStore store) =>
                 store.DeleteNamedProject(id)
                     ? Results.Ok(new { ok = true })
@@ -213,6 +226,11 @@ namespace EssSimulator.Web.Topology
     }
 
     public sealed class CreateProjectRequest
+    {
+        public string? Name { get; set; }
+    }
+
+    public sealed class CopyProjectRequest
     {
         public string? Name { get; set; }
     }

@@ -26,9 +26,10 @@
             <el-tag v-else type="info" size="small" effect="plain">已保存</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="onEdit(row)">修改</el-button>
+            <el-button link type="primary" @click="onCopy(row)">复制</el-button>
             <el-button link type="danger" @click="onDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -40,6 +41,7 @@
       <ul class="tips">
         <li><strong>新增</strong>：清空画布并跳转到「组态编辑」，搭建完成后填写名称并保存。</li>
         <li><strong>修改</strong>：将该工程导入组态编辑器，可继续改拓扑与参数；保存时若名称与其他工程冲突会提示是否替换。</li>
+        <li><strong>复制</strong>：以该工程为模板生成新工程（新 Id），副本名默认「原名-副本」，重名自动加序号；复制后可直接打开编辑。</li>
         <li><strong>删除</strong>：从工程库移除；若该工程正在系统配置中作为运行模板，将清除激活引用。</li>
         <li>应用到仿真请到「系统配置」开启工程模式并选择工程后确认重启。</li>
       </ul>
@@ -56,6 +58,7 @@ import {
   getSystemConfig,
   postTopologyProjectNew,
   postTopologyProjectOpen,
+  postTopologyProjectCopy,
   deleteTopologyProject
 } from '@/services/api.js'
 
@@ -124,6 +127,44 @@ async function onEdit(row) {
     await router.push({ path: '/topology', query: { mode: 'edit', id: row.id } })
   } catch (e) {
     ElMessage.error(e.message || '打开失败')
+  }
+}
+
+async function onCopy(row) {
+  let name
+  try {
+    const res = await ElMessageBox.prompt(
+      `以工程「${row.name}」为模板复制新工程，请输入副本名称：`,
+      '复制工程',
+      {
+        confirmButtonText: '复制',
+        cancelButtonText: '取消',
+        inputValue: `${row.name}-副本`,
+        inputValidator: v => (v && v.trim() ? true : '名称不能为空')
+      }
+    )
+    name = res.value.trim()
+  } catch {
+    return
+  }
+
+  try {
+    const copy = await postTopologyProjectCopy(row.id, name)
+    ElMessage.success(`已复制为「${copy.name}」`)
+    await reload()
+    try {
+      await ElMessageBox.confirm(
+        `是否立即打开副本「${copy.name}」进入组态编辑？当前画布内容会被覆盖。`,
+        '复制成功',
+        { type: 'success', confirmButtonText: '打开编辑', cancelButtonText: '留在列表' }
+      )
+    } catch {
+      return
+    }
+    await postTopologyProjectOpen(copy.id)
+    await router.push({ path: '/topology', query: { mode: 'edit', id: copy.id } })
+  } catch (e) {
+    ElMessage.error(e.message || '复制失败')
   }
 }
 

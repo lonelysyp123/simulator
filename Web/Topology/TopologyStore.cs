@@ -211,6 +211,34 @@ namespace EssSimulator.Web.Topology
             }
         }
 
+        /// <summary>
+        /// 复制命名工程为新工程：新 Id，副本名默认「原名-副本」，
+        /// 名称冲突时自动追加序号（-副本 2、-副本 3 …）。
+        /// </summary>
+        public TopologyProject CopyNamedProject(string id, string? newName = null)
+        {
+            var source = LoadNamedProject(id);
+            if (source == null)
+                throw new InvalidOperationException("待复制的工程不存在");
+
+            var sourceName = string.IsNullOrWhiteSpace(source.Name) ? source.Id : source.Name.Trim();
+            var baseName = string.IsNullOrWhiteSpace(newName) ? $"{sourceName}-副本" : newName.Trim();
+            var name = baseName;
+            for (int suffix = 2; FindProjectByName(name) != null; suffix++)
+                name = $"{baseName} {suffix}";
+
+            // LoadNamedProject 每次从 JSON 反序列化，Nodes/Edges 已是深拷贝
+            var copy = new TopologyProject
+            {
+                SchemaVersion = source.SchemaVersion,
+                Id = Guid.NewGuid().ToString("N"),
+                Name = name,
+                Nodes = source.Nodes,
+                Edges = source.Edges
+            };
+            return SaveNamedProject(copy);
+        }
+
         /// <summary>将命名工程载入当前画布（供「修改」进入组态编辑）。</summary>
         public TopologyProject? OpenNamedProject(string id)
         {
