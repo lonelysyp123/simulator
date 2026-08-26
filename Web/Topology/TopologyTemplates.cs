@@ -143,8 +143,8 @@ namespace EssSimulator.Web.Topology
                 new() { Key = "impedancePercent", Label = "短路阻抗", Type = "number", Unit = "%", Min = 0.1 },
                 new() { Key = "noLoadLossW", Label = "空载损耗", Type = "number", Unit = "W", Min = 0 },
                 new() { Key = "loadLossW", Label = "负载损耗", Type = "number", Unit = "W", Min = 0 },
-                new() { Key = "emuId", Label = "所属 EMU 储能单元", Type = "emu_select", Description = "可选；选择后本变压器归入该 EMU 虚拟单元，作为其单元变压器；每个 EMU 至多 1 台" },
-                new() { Key = "groupId", Label = "所属 EMU 分组", Type = "group_select", Description = "可选；选择后本变压器归入该 EMU 分组（须先选所属 EMU），作为组级变压器；每个分组至多 1 台" }
+                new() { Key = "emuId", Label = "所属 EMU 储能单元", Type = "emu_select", Description = "可选；选择后本变压器归入该 EMU 虚拟单元，作为其单元变压器；同一 EMU 可绑定多台" },
+                new() { Key = "groupId", Label = "所属 EMU 分组", Type = "group_select", Description = "可选；选择后本变压器归入该 EMU 分组（须先选所属 EMU），作为组级变压器；同一分组可绑定多台" }
             },
             DefaultParameters = new Dictionary<string, object?>
             {
