@@ -644,6 +644,7 @@ namespace EssSimulator.EssDeviceSimModel
                 _pcsList,
                 IsUnitBreakerClosed,
                 _pcsCfg,
+                _pcsPerUnit,
                 simTime,
                 simStep);
 

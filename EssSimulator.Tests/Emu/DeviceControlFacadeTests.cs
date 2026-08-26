@@ -168,6 +168,69 @@ public class DeviceControlFacadeTests
     }
 
     [Fact]
+    public void PcsStart_BeyondSecondSlot_SurvivesSimulationTicks_NoIslandingTrip()
+    {
+        // 回归：修复前网侧状态只回写每单元通道 0/1，pcs3 始终 IsAvailable=false，
+        // 启动后短暂待机，下一拍孤岛保护（故障 3）跳闸回停机。
+        // 不走 SimulatorHost 单例（避免并行测试互相替换注册），直接经映射层下发启停。
+        var cfg = new SimulatorConfig
+        {
+            Devices =
+            {
+                new EssUnitConfig
+                {
+                    Pcs =
+                    {
+                        new EssSimulator.Configuration.PcsDeviceConfig(),
+                        new EssSimulator.Configuration.PcsDeviceConfig(),
+                        new EssSimulator.Configuration.PcsDeviceConfig(),
+                        new EssSimulator.Configuration.PcsDeviceConfig()
+                    }
+                }
+            }
+        };
+        var pcsPhy = CreatePcsPhy();
+        var ess = new EnergyStorageSystem(
+            cfg, pcsPhy,
+            new TransformerConfig(), new UnitTransformerConfig(),
+            new LoadConfig(), new PccConfig(), new MeterConfig());
+        using (ess)
+        {
+            var emu = PcsDataServer.BuildEmuMirror(cfg.Devices[0], pcsPhy);
+            var pcs3 = ess._pcsList[2];
+            ess.SetMainBreakerClosed(true);
+            ess.SetUnitBreakerClosed(0, true);
+            foreach (var bms in ess._bmsRackDevices)
+                bms.IsLinked = true;
+
+            var simTime = DateTime.UtcNow;
+            var step = TimeSpan.FromMilliseconds(200);
+
+            // 预热：让电池簇电压先建立（启动上升沿会清除预热期锁存的直流低压故障）
+            for (int i = 0; i < 3; i++)
+            {
+                simTime += step;
+                ess.PlantEngine.Step(simTime, step, step);
+            }
+
+            emu.PcsList[2].pcsOnOffSwitch = true;
+            PcsMapper.ApplyEmuCommands(emu, ess, 0);
+            Assert.NotEqual(OperationMode.Off, pcs3.GetCurrentState().Mode);
+
+            for (int i = 0; i < 10; i++)
+            {
+                simTime += step;
+                ess.PlantEngine.Step(simTime, step, step);
+            }
+
+            // 网侧状态已回写到第三槽位：无孤岛故障，保持并网运行
+            Assert.True(pcs3.IsGridElectricallyAvailable);
+            Assert.Equal(0, pcs3.GetCurrentState().FaultType);
+            Assert.Equal(OperationMode.Normal, pcs3.GetCurrentState().Mode);
+        }
+    }
+
+    [Fact]
     public void PvRunAndPower_DrivePvLogger_AndUnitMode()
     {
         var cfg = new SimulatorConfig

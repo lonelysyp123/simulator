@@ -17,6 +17,7 @@ namespace EssSimulator.EssDeviceSimModel
             IReadOnlyList<PcsDevice> pcsList,
             Func<int, bool> isUnitBreakerClosed,
             PcsPhysicalConfig pcsCfg,
+            IReadOnlyList<int>? pcsPerUnit,
             DateTime simTime,
             TimeSpan simStep)
         {
@@ -34,8 +35,7 @@ namespace EssSimulator.EssDeviceSimModel
 
             for (int u = 0; u < unitCount; u++)
             {
-                int a = u * 2;
-                int b = u * 2 + 1;
+                var (baseIdx, pcsCount) = PcsUnitLayout.RangeOfUnit(pcsPerUnit, u);
                 unitHvClosed[u] = isUnitBreakerClosed(u);
                 if (!unitHvClosed[u])
                     continue;
@@ -50,8 +50,8 @@ namespace EssSimulator.EssDeviceSimModel
                     localUnitQ[u] += st.ReactivePower;
                 }
 
-                Accumulate(a);
-                Accumulate(b);
+                for (int ch = 0; ch < pcsCount; ch++)
+                    Accumulate(baseIdx + ch);
 
                 if (mainBreakerClosed || localLv690[u] <= 0)
                     continue;
@@ -95,7 +95,7 @@ namespace EssSimulator.EssDeviceSimModel
 
             ApplyBlackStartStationElectricalLoadAcrossBus(
                 unitTransformers, mainTransformer, pcsList, pcsCfg,
-                localUnitP, unitPrimaryV, mainBreakerClosed, stationBus35LineVoltageV);
+                localUnitP, unitPrimaryV, mainBreakerClosed, stationBus35LineVoltageV, pcsPerUnit);
         }
 
         private static void ApplyBlackStartStationElectricalLoadAcrossBus(
@@ -106,7 +106,8 @@ namespace EssSimulator.EssDeviceSimModel
             double[] localUnitP,
             double[] unitPrimaryV,
             bool mainBreakerClosed,
-            double stationBus35LineVoltageV)
+            double stationBus35LineVoltageV,
+            IReadOnlyList<int>? pcsPerUnit)
         {
             double totalMagQ = 0;
             double totalLossP = 0;
@@ -144,7 +145,7 @@ namespace EssSimulator.EssDeviceSimModel
             if (participants.Count == 0)
                 return;
 
-            ApplyUnitTransformerInrushDemand(unitTransformers, unitPrimaryV, pcsList, participants);
+            ApplyUnitTransformerInrushDemand(unitTransformers, unitPrimaryV, pcsList, participants, pcsPerUnit);
 
             double qEach = totalMagQ / participants.Count;
             double pEach = totalLossP / participants.Count;
@@ -159,7 +160,8 @@ namespace EssSimulator.EssDeviceSimModel
             IReadOnlyList<TransformerDevice> unitTransformers,
             double[] unitPrimaryV,
             IReadOnlyList<PcsDevice> pcsList,
-            List<int> participants)
+            List<int> participants,
+            IReadOnlyList<int>? pcsPerUnit)
         {
             var participantSet = participants.ToHashSet();
             for (int u = 0; u < unitTransformers.Count; u++)
@@ -172,12 +174,13 @@ namespace EssSimulator.EssDeviceSimModel
                     continue;
 
                 var unitPcs = new List<int>();
-                int a = u * 2;
-                int b = u * 2 + 1;
-                if (a >= 0 && a < pcsList.Count && participantSet.Contains(a))
-                    unitPcs.Add(a);
-                if (b >= 0 && b < pcsList.Count && participantSet.Contains(b))
-                    unitPcs.Add(b);
+                var (baseIdx, pcsCount) = PcsUnitLayout.RangeOfUnit(pcsPerUnit, u);
+                for (int ch = 0; ch < pcsCount; ch++)
+                {
+                    int idx = baseIdx + ch;
+                    if (idx >= 0 && idx < pcsList.Count && participantSet.Contains(idx))
+                        unitPcs.Add(idx);
+                }
                 if (unitPcs.Count == 0)
                     continue;
 

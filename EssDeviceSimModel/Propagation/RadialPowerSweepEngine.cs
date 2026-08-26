@@ -164,8 +164,8 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 double bus690V = _graph.UnitBuses690[u].LineVoltageV;
                 bool gridAvailable = context.MainBreakerClosed && unitClosed;
 
-                int baseChannel = u * 2;
-                for (int ch = 0; ch < 2; ch++)
+                var (baseChannel, pcsCount) = PcsUnitLayout.RangeOfUnit(_network.PcsPerUnit, u);
+                for (int ch = 0; ch < pcsCount; ch++)
                 {
                     int idx = baseChannel + ch;
                     if (idx >= _network.PcsDevices.Count)

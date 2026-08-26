@@ -24,7 +24,8 @@ namespace EssSimulator.EssDeviceSimModel
         public static double EstimateIslandedBus35LineVoltageV(
             IReadOnlyList<TransformerDevice> unitTransformers,
             IReadOnlyList<Breaker> unitBreakers,
-            IReadOnlyList<PcsDevice> pcsList)
+            IReadOnlyList<PcsDevice> pcsList,
+            IReadOnlyList<int>? pcsPerUnit = null)
         {
             double bus35 = 0;
             for (int u = 0; u < unitTransformers.Count; u++)
@@ -32,8 +33,7 @@ namespace EssSimulator.EssDeviceSimModel
                 if (u >= unitBreakers.Count || !unitBreakers[u].IsClosed)
                     continue;
 
-                int a = u * 2;
-                int b = a + 1;
+                var (baseIdx, pcsCount) = PcsUnitLayout.RangeOfUnit(pcsPerUnit, u);
                 double lv690 = 0;
 
                 void Acc(int idx)
@@ -44,8 +44,8 @@ namespace EssSimulator.EssDeviceSimModel
                     lv690 = Math.Max(lv690, st.AcVoltage);
                 }
 
-                Acc(a);
-                Acc(b);
+                for (int ch = 0; ch < pcsCount; ch++)
+                    Acc(baseIdx + ch);
                 if (lv690 <= 0)
                     continue;
 

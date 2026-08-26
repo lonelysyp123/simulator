@@ -88,12 +88,12 @@ namespace EssSimulator.EssDeviceSimModel.Solver
         {
             for (int u = 0; u < ess._unitTransformers.Count; u++)
             {
-                int a = u * 2;
-                int b = u * 2 + 1;
+                int baseIdx = ess.PcsBaseIndexOfUnit(u);
+                int count = ess.PcsCountOfUnit(u);
 
                 if (u >= network.UnitBreakers.Count || u >= network.UnitTransformers.Count)
                 {
-                    DeenergizeUnitPcs(ess, a, b);
+                    DeenergizeUnitPcs(ess, baseIdx, count);
                     continue;
                 }
 
@@ -102,7 +102,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
 
                 if (!unitClosed)
                 {
-                    DeenergizeUnitPcs(ess, a, b);
+                    DeenergizeUnitPcs(ess, baseIdx, count);
                     continue;
                 }
 
@@ -112,7 +112,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
 
                 if (network.StationBus35LineVoltageV <= 1.0 && unitSec.LineVoltageV <= 1.0)
                 {
-                    DeenergizeUnitPcs(ess, a, b);
+                    DeenergizeUnitPcs(ess, baseIdx, count);
                     continue;
                 }
 
@@ -120,19 +120,23 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 bool gridAvailable = mainClosed && lv690 > pcsCfg.AcVoltageNominal * 0.1;
 
                 double gridFreq = network.SystemFrequencyHz;
-                if (a < ess._pcsList.Count)
-                    ess._pcsList[a].UpdateGridState(lv690, gridFreq, gridAvailable);
-                if (b < ess._pcsList.Count)
-                    ess._pcsList[b].UpdateGridState(lv690, gridFreq, gridAvailable);
+                for (int ch = 0; ch < count; ch++)
+                {
+                    int idx = baseIdx + ch;
+                    if (idx < ess._pcsList.Count)
+                        ess._pcsList[idx].UpdateGridState(lv690, gridFreq, gridAvailable);
+                }
             }
         }
 
-        private static void DeenergizeUnitPcs(EnergyStorageSystem ess, int a, int b)
+        private static void DeenergizeUnitPcs(EnergyStorageSystem ess, int baseIdx, int count)
         {
-            if (a < ess._pcsList.Count)
-                ess.ApplyPcsGridWhenUnitDeenergized(a, ess._pcsList[a]);
-            if (b < ess._pcsList.Count)
-                ess.ApplyPcsGridWhenUnitDeenergized(b, ess._pcsList[b]);
+            for (int ch = 0; ch < count; ch++)
+            {
+                int idx = baseIdx + ch;
+                if (idx < ess._pcsList.Count)
+                    ess.ApplyPcsGridWhenUnitDeenergized(idx, ess._pcsList[idx]);
+            }
         }
     }
 }

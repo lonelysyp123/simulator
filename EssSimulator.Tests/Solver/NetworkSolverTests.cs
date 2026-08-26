@@ -61,4 +61,48 @@ public class NetworkSolverTests
         Assert.Equal(0, network.PccMeter.Telemetry.Primary.ActivePowerKw);
         Assert.Equal(0, network.PccMeter.Telemetry.Primary.ReactivePowerKvar);
     }
+
+    [Fact]
+    public void UnitWithFourPcs_GridStateReachesAllChannels()
+    {
+        // 回归：修复前 SolveUnitBranches 只步进每单元通道 0/1，第三槽位及以后收不到网侧状态
+        var simCfg = new SimulatorConfig
+        {
+            Devices =
+            {
+                new EssUnitConfig
+                {
+                    Pcs =
+                    {
+                        new EssSimulator.Configuration.PcsDeviceConfig(),
+                        new EssSimulator.Configuration.PcsDeviceConfig(),
+                        new EssSimulator.Configuration.PcsDeviceConfig(),
+                        new EssSimulator.Configuration.PcsDeviceConfig()
+                    }
+                }
+            }
+        };
+
+        var network = NetworkTopologyBuilder.Build(
+            simCfg,
+            new PcsPhysicalConfig(),
+            new TransformerConfig(),
+            new UnitTransformerConfig(),
+            new LoadConfig(),
+            new PccConfig(),
+            pcsPerUnit: simCfg.GetPcsCountsPerUnit());
+
+        Assert.Equal(new[] { 4 }, network.PcsPerUnit);
+        Assert.Equal(4, network.PcsDevices.Count);
+
+        network.MainBreaker.ApplyCommand(new DeviceCommand { Kind = DeviceCommandKind.CloseBreaker });
+        foreach (var ub in network.UnitBreakers)
+            ub.ApplyCommand(new DeviceCommand { Kind = DeviceCommandKind.CloseBreaker });
+
+        var step = TimeSpan.FromMilliseconds(200);
+        network.Solver.Step(step, step);
+
+        for (int i = 0; i < network.PcsDevices.Count; i++)
+            Assert.True(network.PcsDevices[i].IsGridElectricallyAvailable, $"pcs{i + 1} 未收到网侧可用状态");
+    }
 }

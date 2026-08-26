@@ -21,6 +21,15 @@ namespace EssSimulator.EssDeviceSimModel.Solver
         public IReadOnlyList<BmsRackDevice> BmsDevices { get; init; } = Array.Empty<BmsRackDevice>();
         public IReadOnlyList<DcLink> DcLinks { get; init; } = Array.Empty<DcLink>();
 
+        /// <summary>各储能单元下属 PCS 台数（缺失时求解器按每单元 2 台回退）。</summary>
+        public IReadOnlyList<int> PcsPerUnit { get; init; } = Array.Empty<int>();
+
+        /// <summary>指定单元第一台 PCS 的全局通道索引（0 基）。</summary>
+        public int PcsBaseIndexOfUnit(int unit) => PcsUnitLayout.BaseIndexOfUnit(PcsPerUnit, unit);
+
+        /// <summary>指定单元下属 PCS 台数。</summary>
+        public int PcsCountOfUnit(int unit) => PcsUnitLayout.CountOfUnit(PcsPerUnit, unit);
+
         public INetworkSolver Solver { get; set; } = null!;
 
         public double PccLineVoltageV { get; internal set; }
