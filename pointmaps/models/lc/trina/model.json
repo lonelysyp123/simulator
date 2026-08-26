@@ -1,5 +1,0 @@
-{
-  "id": "trina",
-  "name": "天合中压版-系统级",
-  "description": "TRINA MV-EMS Modbus TCP 协议 V0.15 LC 系统级并集点表（兼容 5.5MW/10MW 一体机）：72 点，自 EMU 点表剥离的 SYSTEM 点位（sysyc* 遥测 + syst* 控制，含版本/容量/SOC/SOH/时间/对时/重启）；系统故障总/精简状态/PCS 台数/黑启动状态经插件层组字聚合，系统功率/电量遥测绑定 ess/em/bms 仿真模型，sum 绑定按 4 机组最大口径（emu1~emu4），2 机组场景缺失机组自动按 0 计入；控制点（远程使能/模式、系统操作、黑启动写入、目标P/Q 均分）绑定聚合组首机组 EMU 虚拟模型（emuDeviceId 占位符运行期替换）"
-}
