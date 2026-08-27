@@ -724,7 +724,11 @@ export function createBusBar(item) {
   tube.rotation.z = Math.PI / 2
   tube.position.y = item.y ?? Y.cable
   g.add(tube)
-  const node = createBusNode(0, item.y ?? Y.cable, 0, { radius: item.radius ?? 0.22, label: item.node?.label || '' })
+  const node = createBusNode(0, item.y ?? Y.cable, 0, {
+    radius: item.radius ?? 0.22,
+    label: item.node?.label || '',
+    voltage: item.voltage ?? item.node?.parameters?.nominalVoltage
+  })
   g.add(node)
   g.userData.kind = 'bus-bar'
   g.userData.core = node.children?.[0]
@@ -849,12 +853,17 @@ const TEMPLATE_MODELS = {
     label: item.node?.label || '',
     voltage: item.voltage ?? item.node?.parameters?.nominalVoltage
   })),
-  // 直流母线与交流母线统一：汇流点节点（球体 + 指示环），半径随挂接规模自适应
-  dc_bus: (item) => createBusNode(0, item.y ?? Y.cable, 0, {
-    radius: item.radius ?? 0.24,
-    label: item.node?.label || '',
-    voltage: item.voltage ?? item.node?.parameters?.nominalVoltage
-  }),
+  // 直流母线：有横向跨度（并联多设备）时画横管母线，PCS/BMS 竖段落接在横管上；
+  // 无跨度退化为汇流点节点
+  dc_bus: (item) => {
+    const span = Math.abs((item.x2 ?? item.x) - (item.x1 ?? item.x))
+    if (span > 0.5) return createBusBar(item)
+    return createBusNode(0, item.y ?? Y.cable, 0, {
+      radius: item.radius ?? 0.24,
+      label: item.node?.label || '',
+      voltage: item.voltage ?? item.node?.parameters?.nominalVoltage
+    })
+  },
   ac_meter: () => createAcMeter(),
   load: () => createLoadBank(),
   bms: (item) => createBmsContainer(item.panelKey),
@@ -879,6 +888,7 @@ export function buildStation(layout) {
     mainBreaker: null,
     unitBreakers: [],
     pvBreakers: [],
+    tieBreakers: [],
     pvArrays: [],
     cables: [],
     busNodes: [],
@@ -907,6 +917,7 @@ export function buildStation(layout) {
       if (item.kind === 'main-breaker') refs.mainBreaker = mesh
       if (item.kind === 'unit-breaker' && item.unitIndex != null) refs.unitBreakers[item.unitIndex] = mesh
       if (item.kind === 'pv-breaker' && item.pvIndex != null) refs.pvBreakers[item.pvIndex] = mesh
+      if (item.kind === 'tie-breaker') refs.tieBreakers.push(mesh)
       if (item.templateId === 'pv_array') {
         refs.pvArrays.push(mesh)
         // 组串出线：每串（行）一根单独出线 → 方阵前缘汇流点（30 块串联成串，16 串并联）
@@ -939,7 +950,7 @@ export function buildStation(layout) {
     }
 
     const labelKinds = new Set([
-      'grid', 'main-breaker', 'stem-breaker', 'station-xf', 'bus-bar', 'bus-node', 'dc-bus',
+      'grid', 'main-breaker', 'stem-breaker', 'tie-breaker', 'station-xf', 'bus-bar', 'bus-node', 'dc-bus',
       'meter', 'load', 'unit-title', 'unit-breaker', 'unit-xf',
       'pv-title', 'pv-breaker', 'pv-xf', 'pv-array'
     ])

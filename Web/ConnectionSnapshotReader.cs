@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using EssSimulator.Display;
@@ -58,7 +59,7 @@ namespace EssSimulator.Web
 
             if (SimServer.serverListenInfo != null)
             {
-                foreach (var kv in SimServer.serverListenInfo)
+                foreach (var kv in SimServer.serverListenInfo.OrderBy(kv => ServerSortKey(kv.Key)))
                 {
                     dto.Servers.Add(new ServerListenDto { Server = kv.Key, ListenInfo = kv.Value });
                 }
@@ -78,6 +79,23 @@ namespace EssSimulator.Web
 
             dto.LinkStatus = EssCommand.BuildAllLinkStatus();
             return dto;
+        }
+
+        private static (int, int) ServerSortKey(string name)
+        {
+            if (name.StartsWith("simBms")) return (0, ExtractTrailingNumber(name));
+            if (name.StartsWith("simEmu")) return (1, ExtractTrailingNumber(name));
+            if (name == "simEm") return (2, 0);
+            if (name.StartsWith("simLc")) return (3, ExtractTrailingNumber(name));
+            if (name.StartsWith("simPvMeter")) return (5, ExtractTrailingNumber(name));
+            if (name.StartsWith("simPv")) return (4, ExtractTrailingNumber(name));
+            return (99, 0);
+        }
+
+        private static int ExtractTrailingNumber(string name)
+        {
+            var digits = new string(name.Reverse().TakeWhile(char.IsDigit).Reverse().ToArray());
+            return int.TryParse(digits, out var n) ? n : 0;
         }
     }
 }

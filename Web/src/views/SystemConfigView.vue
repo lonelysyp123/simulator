@@ -128,12 +128,10 @@
 
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getSystemConfig, postSystemApply, getDeviceModels, postDeviceModelsApply, getHealth } from '@/services/api.js'
 import { lockSystem, unlockSystem, updateSystemProgress } from '@/services/systemLock.js'
 
-const router = useRouter()
 const engineeringMode = ref(false)
 const projectId = ref(null)
 const projects = ref([])
@@ -289,7 +287,6 @@ async function apply() {
       await new Promise(r => setTimeout(r, 350))
       unlockSystem()
       applying.value = false
-      router.push('/mainline')
       return
     }
     updateSystemProgress(100, '配置已更新', '完成')
@@ -307,7 +304,6 @@ async function apply() {
         await new Promise(r => setTimeout(r, 350))
         unlockSystem()
         applying.value = false
-        router.push('/mainline')
         return
       }
     }

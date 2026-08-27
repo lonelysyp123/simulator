@@ -49,10 +49,7 @@ describe('buildTopologyMainLineLayout pv units', () => {
     assert.equal(u.groupB.totalRatedKw, 2560)
     assert.equal(u.totalRatedKw, 5120)
     assert.equal(u.unitXfLabel, '35kV/690V')
-    assert.equal(u.omitBus690, true)
-    assert.equal(u.dcParallel, false)
-    assert.equal(u.unitSnap, null)
-    assert.equal(layout.groups.filter(g => g.kind === 'pv').length, 0, '光伏单元不再画外框虚线')
+    assert.equal(layout.groups.length, 0, '不再画任何外框虚线')
     assert.ok(u.xfmrCardTop >= u.unitBrkBottom)
     assert.ok(u.bmsTop >= u.xfmrCardTop + u.xfmrCardH, '两路光伏方阵在箱变模块下方')
     assert.ok(u.arraySplitY > u.xfmrCardTop + u.xfmrCardH)
@@ -82,31 +79,32 @@ describe('buildTopologyMainLineLayout pv units', () => {
     assert.equal(u.groupB.inverterCount, 10)
   })
 
-  it('places emu and pv left-to-right and keeps ess snapshot on emu only', () => {
-    // 新模型：EMU 为虚拟节点，储能支路由归属它的 PCS 组展开；无 PCS 的 EMU 不生成支路
+  it('places emu and pv left-to-right and carries device nodes on emu units', () => {
+    // 新模型：储能支路由 PCS 物理拓扑展开，单元携带设备节点；2D 不绑定运行时快照（绑定在卡片/3D 层按编号完成）
     const topology = {
       nodes: [
         node('emu1', 'emu', 'EMU-1', 400),
+        node('dc1', 'dc_bus', '直流母线', 420, { nominalVoltage: 800 }),
         node('pcs1', 'pcs', 'PCS-1', 380, { emuId: 'emu1' }),
         node('pcs2', 'pcs', 'PCS-2', 460, { emuId: 'emu1' }),
         node('pv1', 'pv_unit', '光伏单元-1', 100, { inverterCount: 16, inverterRatedPowerKw: 320 })
       ],
-      edges: []
+      edges: [edge('pcs1', 'dc1'), edge('pcs2', 'dc1')]
     }
     const units = [{ unitIndex: 0, unitNumber: 1, channels: [{ pcsNumber: 1 }] }]
     const layout = buildTopologyMainLineLayout(topology, units)
 
     assert.equal(layout.units.length, 2)
     assert.equal(layout.units[0].kind, 'pv')
-    assert.equal(layout.units[0].unitSnap, null)
     assert.equal(layout.units[1].kind, 'emu')
-    assert.equal(layout.units[1].unitSnap?.unitNumber, 1)
     assert.equal(layout.units[1].pcsNodes.length, 2)
+    assert.deepEqual(layout.units[1].pcsNums, [1, 2], 'PCS 全局编号与卡片 num 一致')
+    assert.equal(layout.units[1].emu?.id, 'emu1')
     assert.equal(layout.omitBusLv, false)
   })
 
-  it('assigns live units by emu node rank (Y,X), independent of draw order', () => {
-    // emu1 节点在左但其 PCS 画在右侧；运行时单元序按 EMU 节点 (Y,X)，与绘制顺序相反
+  it('orders emu feeders by pcs canvas position, independent of emu node order', () => {
+    // emu1 节点在左但其 PCS 画在右侧；绘制序按 PCS 画布坐标，emu 字段随支路反查携带
     const topology = {
       nodes: [
         node('emu1', 'emu', 'EMU-1', 100),
@@ -116,18 +114,16 @@ describe('buildTopologyMainLineLayout pv units', () => {
       ],
       edges: []
     }
-    const units = [
-      { unitIndex: 0, unitNumber: 1, channels: [{ pcsNumber: 1 }] },
-      { unitIndex: 1, unitNumber: 2, channels: [{ pcsNumber: 2 }] }
-    ]
-    const layout = buildTopologyMainLineLayout(topology, units)
+    const layout = buildTopologyMainLineLayout(topology, [])
 
     assert.equal(layout.units.length, 2)
-    // 绘制序：emu2 组（leader x=160）在左
+    // 绘制序：pcs2（x=160）在左，其归属 emu2 随支路携带；全局编号按 (Y,X) 秩：左起 1、2
+    assert.equal(layout.units[0].pcsNodes[0].id, 'pcs2')
     assert.equal(layout.units[0].emu?.id, 'emu2')
-    assert.equal(layout.units[0].unitSnap?.unitNumber, 2)
+    assert.deepEqual(layout.units[0].pcsNums, [1])
+    assert.equal(layout.units[1].pcsNodes[0].id, 'pcs1')
     assert.equal(layout.units[1].emu?.id, 'emu1')
-    assert.equal(layout.units[1].unitSnap?.unitNumber, 1)
+    assert.deepEqual(layout.units[1].pcsNums, [2])
   })
 
   it('omits lv bus when only one pv feeder hangs below', () => {
@@ -297,15 +293,28 @@ describe('buildTopologyMainLineLayout emu device binding', () => {
     }
   }
 
-  it('dashed frame wraps the whole unit content down to the bms bottom', () => {
-    const layout = buildTopologyMainLineLayout(emuTopology(), [{ unitIndex: 0, unitNumber: 1 }])
+  it('lays out pcs and bms device cards inside the unit', () => {
+    // 新模型不再画虚线框；改为验证单元内容：设备卡片行 + 底边覆盖到 BMS 底部 + 槽位至少一个单元宽
+    const layout = buildTopologyMainLineLayout(
+      emuTopology([
+        node('dc1', 'dc_bus', '直流母线', 400, { nominalVoltage: 800 }),
+        node('bms1', 'bms', 'BMS-1', 400, { clusterCount: 1, packCount: 1 })
+      ], [
+        edge('pcs1', 'dc1'), edge('pcs2', 'dc1'), edge('bms1', 'dc1')
+      ]),
+      []
+    )
     const u = layout.units.find(x => x.kind === 'emu')
-    const g = layout.groups.find(x => x.kind === 'emu')
-    assert.ok(u && g, 'emu unit and dashed group exist')
-    // 框纵向覆盖完整单元：顶部到 BMS 底边，而非只到 PCS 卡片底部
-    assert.ok(g.y <= u.originY + u.pcsTop, 'frame starts above pcs cards')
-    assert.ok(g.y + g.h >= u.originY + u.bottom, 'frame covers down to bms bottom')
-    assert.ok(g.y + g.h > u.originY + u.pcsTop + 60, 'frame extends far below pcs cards')
+    assert.ok(u, 'emu unit exists')
+    assert.equal(layout.groups.length, 0, '不引入虚线框等虚拟概念')
+    const pcsCards = u.cards.filter(c => c.tone === 'pcs')
+    const bmsCards = u.cards.filter(c => c.tone === 'bms')
+    assert.equal(pcsCards.length, 2)
+    assert.equal(bmsCards.length, 1)
+    const bmsBottom = Math.max(...bmsCards.map(c => c.y + c.h))
+    assert.ok(u.bottom >= bmsBottom, 'unit bottom covers down to bms bottom')
+    // 单元宽度随物理卡片行自适应（2 列：2*132 + 间隔 20）
+    assert.equal(u.halfSpan * 2, 2 * 132 + 20, 'unit span follows the card rows')
   })
 
   it('picks bound breaker / meter nodes into the unit and keeps meter off the bus pendants', () => {
@@ -313,32 +322,70 @@ describe('buildTopologyMainLineLayout emu device binding', () => {
       node('brk1', 'ac_breaker', '单元断-1', 400, { emuId: 'emu1' }),
       node('meter1', 'ac_meter', '单元电表', 520, { emuId: 'emu1' })
     ])
-    const layout = buildTopologyMainLineLayout(topology, [{ unitIndex: 0, unitNumber: 1 }])
+    const layout = buildTopologyMainLineLayout(topology, [])
     const u = layout.units.find(x => x.kind === 'emu')
     assert.equal(u.unitBreakerNode?.id, 'brk1', 'bound breaker node picked')
     assert.equal(u.unitMeterNode?.id, 'meter1', 'bound meter node picked')
-    // 绑电表强制画 690 母线；电表挂 690 母线右侧，虚线框右扩包住电表
-    assert.equal(u.omitBus690, false)
-    assert.ok(Number.isFinite(u.unitMeterX))
-    const g = layout.groups.find(x => x.kind === 'emu')
-    assert.ok(g.x + g.w >= u.cx + u.unitMeterX + u.unitMeterHalfW, 'frame widened to cover the meter')
-    // EMU 电表不作母线挂件
+    // 绑定断路器在引线段绘制：母线 → 断路器 → PCS 卡，卡片行相应下移；主干引线接至断路器
+    assert.equal(u.brkMid, 18 + 14)
+    assert.equal(u.pcsTop, 18 + 28 + 18, 'pcs row shifted below the breaker')
+    assert.ok(u.cards.filter(c => c.tone === 'pcs').every(c => c.y === u.pcsTop))
+    assert.ok(layout.wires.some(w => Math.abs(w.y1 - u.originY) < 0.5 && Math.abs(w.y2 - (u.originY + u.brkBottom)) < 0.5), 'stem wire reaches the breaker')
+    // EMU 绑定电表不作母线挂件（随单元下发供 3D 使用）
     assert.ok(!layout.meters.some(m => m.node?.id === 'meter1'), 'emu meter is not a bus pendant')
   })
 
-  it('leaves breaker / meter unbound without error and keeps default frame width', () => {
+  it('leaves breaker / meter unbound without error and keeps default slot width', () => {
     const bound = buildTopologyMainLineLayout(
       emuTopology([node('meter1', 'ac_meter', '单元电表', 520, { emuId: 'emu1' })]),
-      [{ unitIndex: 0, unitNumber: 1 }]
+      []
     )
-    const unbound = buildTopologyMainLineLayout(emuTopology(), [{ unitIndex: 0, unitNumber: 1 }])
+    const unbound = buildTopologyMainLineLayout(emuTopology(), [])
     const uBound = bound.units.find(x => x.kind === 'emu')
     const uFree = unbound.units.find(x => x.kind === 'emu')
     assert.equal(uBound.unitBreakerNode, null, 'no breaker bound')
+    assert.equal(uBound.unitMeterNode?.id, 'meter1')
     assert.equal(uFree.unitBreakerNode, null)
     assert.equal(uFree.unitMeterNode, null)
-    const gBound = bound.groups.find(x => x.kind === 'emu')
-    const gFree = unbound.groups.find(x => x.kind === 'emu')
-    assert.ok(gFree.w < gBound.w, 'frame without meter is narrower than with meter')
+    // 未绑定断路器时维持短引线（卡片行不下移）；绑定设备不影响槽位宽度（物理卡片行决定宽度）
+    assert.equal(uFree.pcsTop, 18)
+    assert.equal(uFree.halfSpan, uBound.halfSpan)
+  })
+})
+
+describe('buildTopologyMainLineLayout sectional bus breaker', () => {
+  // 单母线分段：35kV 主母线 —[中压断路器 emuId=emu1]— 35kV 分段母线 → 级变 → 690V → EMU
+  function sectionTopology() {
+    return {
+      nodes: [
+        node('main', 'ac_bus', '35kV主母线', 400, { nominalVoltage: 35000 }),
+        node('sec', 'ac_breaker', '中压三相断路器', 300, { emuId: 'emu1', closed: true }),
+        node('sub', 'ac_bus', '35kV分段', 200, { nominalVoltage: 35000 }),
+        node('emu1', 'emu', 'EMU-1', 200),
+        node('xf', 'transformer', '级变', 200, { primaryVoltage: 35000, secondaryVoltage: 690 }),
+        node('lv', 'ac_bus', '690V', 200, { nominalVoltage: 690 }),
+        node('pcs1', 'pcs', 'PCS-1', 160, { emuId: 'emu1' }),
+        node('dc1', 'dc_bus', '直流母线', 200, { nominalVoltage: 800 }),
+        node('bms1', 'bms', 'BMS-1', 200, {})
+      ],
+      edges: [
+        edge('main', 'sec'), edge('sec', 'sub'), edge('sub', 'xf'), edge('xf', 'lv'),
+        edge('lv', 'pcs1'), edge('pcs1', 'dc1'), edge('dc1', 'bms1'), edge('emu1', 'lv')
+      ]
+    }
+  }
+
+  it('emits the emuId-bound section breaker once, on the bus, with its unit index', () => {
+    const layout = buildTopologyMainLineLayout(sectionTopology(), [])
+    assert.equal(layout.tieBreakers.length, 1, 'section breaker drawn on the bus')
+    const tb = layout.tieBreakers[0]
+    assert.equal(tb.id, 'sec')
+    assert.equal(tb.emuId, 'emu1', 'emu binding surfaced for live telemetry')
+    const u = layout.units.find(x => x.kind === 'emu')
+    assert.equal(tb.unitIndex, u.index, 'tie breaker points at its owning unit')
+    // 遥信绑定保留，但单元内不再重复绘制、引线段也不因此加高
+    assert.equal(u.unitBreakerNode?.id, 'sec')
+    assert.equal(u.unitBreakerOnBus, true)
+    assert.equal(u.pcsTop, 18, 'unit card is not shifted down by a breaker it does not draw')
   })
 })

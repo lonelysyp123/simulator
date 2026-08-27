@@ -501,7 +501,7 @@ namespace EssSimulator.Display
             detail = string.Empty;
             if (string.IsNullOrWhiteSpace(target))
             {
-                detail = "请指定 pcsN、bmsN 或 em";
+                detail = "请指定 pcsN、bmsN、pvN、pvMeterN 或 em";
                 return false;
             }
 
@@ -551,7 +551,35 @@ namespace EssSimulator.Display
                 return true;
             }
 
-            detail = "目标格式应为 pcsN、bmsN 或 em，例如 pcs1、bms3、em";
+            if (target.StartsWith("pvMeter", StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(target.AsSpan(7), out int pvMeterIdx) &&
+                pvMeterIdx >= 1)
+            {
+                serverName = $"simPvMeter{pvMeterIdx}";
+                server = store.Get<ModbusSimServer>(serverName);
+                if (server == null)
+                {
+                    detail = $"找不到 {serverName}（pvMeter{pvMeterIdx} 超出当前配置范围）";
+                    return false;
+                }
+                return true;
+            }
+
+            if (target.StartsWith("pv", StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(target.AsSpan(2), out int pvIdx) &&
+                pvIdx >= 1)
+            {
+                serverName = $"simPv{pvIdx}";
+                server = store.Get<ModbusSimServer>(serverName);
+                if (server == null)
+                {
+                    detail = $"找不到 {serverName}（pv{pvIdx} 超出当前配置范围）";
+                    return false;
+                }
+                return true;
+            }
+
+            detail = "目标格式应为 pcsN、bmsN、pvN、pvMeterN 或 em，例如 pcs1、bms3、pv1、em";
             return false;
         }
 
@@ -586,6 +614,22 @@ namespace EssSimulator.Display
                     : $"pcs{pcsA}~pcs{pcsA + Math.Max(0, pcsCount - 1)}";
                 list.Add(BuildLinkStatusDto(pcsLabel, $"simEmu{emu}", server!, $"emu 单元 {emu}", $"pcs{pcsA}"));
                 emu++;
+            }
+
+            int pv = 1;
+            while (store.Contains($"simPv{pv}"))
+            {
+                var server = store.Get<ModbusSimServer>($"simPv{pv}");
+                list.Add(BuildLinkStatusDto($"pv{pv}", $"simPv{pv}", server!, "", $"pv{pv}"));
+                pv++;
+            }
+
+            int pvMeter = 1;
+            while (store.Contains($"simPvMeter{pvMeter}"))
+            {
+                var server = store.Get<ModbusSimServer>($"simPvMeter{pvMeter}");
+                list.Add(BuildLinkStatusDto($"pvMeter{pvMeter}", $"simPvMeter{pvMeter}", server!, "", $"pvMeter{pvMeter}"));
+                pvMeter++;
             }
 
             return list;

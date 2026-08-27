@@ -295,7 +295,8 @@ function busLabel(bus, fallbackV = 0) {
 function expandFeederUnit(opts) {
   const {
     feeder, cx, xfmrId, originY, index, pvRank, graph, scene,
-    busCx, UNIT_W, LINK_STUB, BRK_SPAN, pcsCluster, pcsRank, bmsRank
+    busCx, UNIT_W, LINK_STUB, BRK_SPAN, pcsCluster, pcsRank, bmsRank, boundClaim,
+    sectionBreakerIds
   } = opts
   const kind = feeder?.templateId === 'pv_unit' ? 'pv' : 'emu'
 
@@ -309,7 +310,33 @@ function expandFeederUnit(opts) {
     const cols = Math.max(n, m)
     const span = cnt => cnt * CARD_W + (cnt - 1) * CARD_GAP
     const cardX = (cnt, i) => -span(cnt) / 2 + CARD_W / 2 + i * (CARD_W + CARD_GAP)
-    const pcsTop = LINK_STUB
+
+    // 单元归属的 EMU 虚拟节点（经 PCS 的 emuId 反查），供 3D 等下游识别绑定设备；
+    // 绑定断路器（如中压三相断路器）画在母线与 PCS 卡之间的引线段，电表随单元下发供 3D 使用。
+    // 同 emu 多支路时按序逐个认领，2D 母线挂件不重复绘制
+    const emuId = paramStr(pcsNodes[0], 'emuId')
+    const emu = emuId ? graph.byId.get(emuId) || null : null
+    const pickBound = tpl => {
+      if (!emuId) return null
+      const claimed = boundClaim || new Set()
+      const cand = graph.nodes
+        .filter(nd => nd.templateId === tpl && paramStr(nd, 'emuId') === emuId && !claimed.has(nd.id))
+        .sort((a, b) => (a.y - b.y) || (a.x - b.x))
+      if (cand[0]) claimed.add(cand[0].id)
+      return cand[0] || null
+    }
+    const unitBreakerNode = pickBound('ac_breaker')
+    const unitMeterNode = pickBound('ac_meter')
+    // 该断路器若为母线分段断路器（两端皆母线），已按 tieBreaker 画在母线上：
+    // 单元内不再重复绘制，仅保留 unitBreakerNode 作为实时遥信的绑定关系
+    const unitBreakerOnBus = !!unitBreakerNode && !!sectionBreakerIds?.has(unitBreakerNode.id)
+    const drawnBreakerNode = unitBreakerOnBus ? null : unitBreakerNode
+
+    // 绑断路器时引线段加高：母线 → 断路器 → PCS 卡；未绑定维持短引线
+    const brkTop = LINK_STUB
+    const brkMid = brkTop + BRK_SPAN / 2
+    const brkBottom = brkTop + BRK_SPAN
+    const pcsTop = drawnBreakerNode ? brkBottom + LINK_STUB : LINK_STUB
     // 卡片高度需容纳运行时数据行与设定/启停控件（对齐旧版交互卡）
     const pcsH = 228
     const dcBusY = pcsTop + pcsH + LINK_STUB * 2
@@ -319,6 +346,16 @@ function expandFeederUnit(opts) {
     const cards = []
     const wires = []
     const labels = []
+    if (drawnBreakerNode) {
+      // 主干：母线 → 断路器，再经汇流横线接入各 PCS 卡顶（经典馈线画法）
+      wires.push({ x1: cx, y1: originY, x2: cx, y2: originY + brkBottom })
+      if (n > 1) {
+        wires.push({ x1: cx, y1: originY + brkBottom, x2: cx, y2: originY + pcsTop })
+        wires.push({ x1: cx + cardX(n, 0), y1: originY + pcsTop, x2: cx + cardX(n, n - 1), y2: originY + pcsTop })
+      } else {
+        wires.push({ x1: cx, y1: originY + brkBottom, x2: cx + cardX(1, 0), y2: originY + pcsTop })
+      }
+    }
     pcsNodes.forEach((p, i) => {
       const x = cardX(n, i)
       cards.push({
@@ -334,7 +371,9 @@ function expandFeederUnit(opts) {
           `直流 ${paramNum(p, 'dcVoltageMin')}~${paramNum(p, 'dcVoltageMax')} V`
         ]
       })
-      wires.push({ x1: cx + x, y1: originY, x2: cx + x, y2: originY + pcsTop })
+      if (!drawnBreakerNode) {
+        wires.push({ x1: cx + x, y1: originY, x2: cx + x, y2: originY + pcsTop })
+      }
     })
     c.bmsNodes.forEach((b, j) => {
       const x = cardX(m, j)
@@ -381,12 +420,28 @@ function expandFeederUnit(opts) {
     } else {
       bottom = pcsTop + pcsH
     }
-    scene.wires.push(...wires)
+    // unitWire 标记：这些连线仅用于 2D 单线图卡片绘制；3D 由逐设备展开自行布线，转换时应跳过
+    scene.wires.push(...wires.map(w => ({ ...w, unitWire: true })))
 
     return {
       unit: {
         index, kind, cx, originY, xfmrId,
         busCx: busCx ?? cx,
+        emu,
+        pcsNodes,
+        pcsNums: pcsNodes.map((p, i) => (pcsRank.get(p.id) ?? i) + 1),
+        bmsNodes: c.bmsNodes,
+        bmsNums: c.bmsNodes.map((b, j) => (bmsRank.get(b.id) ?? j) + 1),
+        dcBus: c.dcBus,
+        unitBreakerNode,
+        unitBreakerOnBus,
+        unitMeterNode,
+        brkTop,
+        brkMid,
+        brkBottom,
+        pcsTop,
+        dcBusY,
+        bmsTop,
         cards, labels,
         halfSpan: span(cols) / 2,
         bottom: bottom + 16
@@ -543,6 +598,13 @@ export function buildTopologyMainLineLayout(topology) {
   })
   const frames = []
   for (const root of roots) walkFrames(root, fr => frames.push(fr))
+  // 母线分段/联络断路器：两端皆为母线，已随 tieBreakers 画在母线上
+  const sectionBreakerIds = new Set()
+  for (const fr of frames) {
+    for (const bl of fr.busLinks || []) {
+      if (bl.breaker) sectionBreakerIds.add(bl.breaker.id)
+    }
+  }
   for (const f of feeders) {
     if (hangingIds.has(f.id)) continue
     const hang = f.templateId === 'pcs' ? pcsHangOf(graph, f) : { node: f }
@@ -607,7 +669,13 @@ export function buildTopologyMainLineLayout(topology) {
         measure(item.bl.downstream)
         slots.push({ item, w: Math.max(item.bl.downstream.width || 0, UNIT_W) })
       } else {
-        slots.push({ item, w: Math.max(clusterSpan(item.hang), 180) })
+        // 光伏支路图例按 channelX 两翼展开，槽位至少占一个单元宽，避免相邻光伏单元叠板
+        slots.push({
+          item,
+          w: item.hang.node.templateId === 'pv_unit'
+            ? UNIT_W
+            : Math.max(clusterSpan(item.hang), 180)
+        })
       }
     }
     frame.slots = slots
@@ -727,6 +795,8 @@ export function buildTopologyMainLineLayout(topology) {
             y: yEquip + BRK_SPAN / 2,
             yBottom: yEquip + BRK_SPAN,
             label: brk.label || brk.parameters?.name || '断路器',
+            emuId: paramStr(brk, 'emuId') || null,
+            unitIndex: null,
             closed: truthy(brk.parameters?.closed),
             tripped: truthy(brk.parameters?.tripped)
           })
@@ -763,7 +833,8 @@ export function buildTopologyMainLineLayout(topology) {
         tapX = leftX
       }
       if (n.templateId === 'ac_meter') {
-        scene.wires.push({ x1: tapX, y1: yBus, x2: tapX, y2: yEquip })
+        // meterTap 标记：3D 不绘制电表，该挂线在 3D 转换时应跳过，避免悬空线
+        scene.wires.push({ x1: tapX, y1: yBus, x2: tapX, y2: yEquip, meterTap: true })
         scene.meters.push({
           id: n.id,
           node: n,
@@ -845,6 +916,7 @@ export function buildTopologyMainLineLayout(topology) {
 
   const unitLayouts = []
   let unitBottom = 400
+  const boundClaim = new Set()
   scene.placements.forEach((p, i) => {
     const built = expandFeederUnit({
       feeder: p.feeder,
@@ -861,11 +933,20 @@ export function buildTopologyMainLineLayout(topology) {
       BRK_SPAN,
       pcsCluster: p.pcsCluster,
       pcsRank,
-      bmsRank
+      bmsRank,
+      boundClaim,
+      sectionBreakerIds
     })
     unitLayouts.push(built.unit)
     unitBottom = Math.max(unitBottom, built.unitBottom)
   })
+
+  // 分段断路器绑定了 EMU 时，实时分合闸遥信取自该 EMU 对应的运行时单元
+  for (const tb of scene.tieBreakers) {
+    if (!tb.emuId) continue
+    const owner = unitLayouts.find(u => u.emu?.id === tb.emuId)
+    if (owner) tb.unitIndex = owner.index
+  }
 
   const yUnitTop = unitLayouts[0]?.originY ?? yRoot
   const yBusHv = forest[0]?.y ?? yRoot
