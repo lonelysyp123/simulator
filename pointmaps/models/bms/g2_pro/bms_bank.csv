@@ -170,11 +170,3 @@ FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
 6,12356,u16,16,param170,1,一键复归,model=4|arg1=bmsdeviceId.BatteryStacks[0].FaultClearCommand|arg2=|arg3=|arg4=1
 6,12357,u16,16,param171,1,黑启动模式,model=4|arg1=bmsdeviceId.BatteryStacks[0].BlackStartCommand|arg2=|arg3=|arg4=1
 6,12358,u16,16,param172,1,除雪指令,0
-6,20481,u16,16,param173,1,年,0
-6,20482,u16,16,param174,1,月,0
-6,20483,u16,16,param175,1,日,0
-6,20484,u16,16,param176,1,时,0
-6,20485,u16,16,param177,1,分,0
-6,20486,u16,16,param178,1,秒,0
-6,20487,u16,16,param179,1,除雪周期/h,0
-6,20488,u16,16,param180,1,除雪命令持续时间/min,0
