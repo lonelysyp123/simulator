@@ -240,10 +240,11 @@ public class TelemetryPluginTests
         };
         Assert.All(systemKeys, k => Assert.Contains(catalog.PluginPoints, p => p.WordKey == k));
 
-        // 组电表绑定：PCS1/2 块交流电流与电网电压绑定所属分组电表（单机组 emu1 扁平口径）
+        // 组电表绑定：PCS1/2 块交流电流与电网电压绑定所属分组电表（单机组 emu1 扁平口径）；
+        // 分组绑两台电表时，PCS2 块绑第二台组电表 Meters[1]
         Assert.Equal("emu1.Groups[0].Meters[0].LineVoltageAB", catalog.FindTelemetry("yc20")!.Target.FullPath);
-        Assert.Equal("emu1.Groups[1].Meters[0].PhaseACurrent", catalog.FindTelemetry("yc207")!.Target.FullPath);
-        Assert.Equal("emu1.Groups[1].Meters[0].LineVoltageCA", catalog.FindTelemetry("yc217")!.Target.FullPath);
+        Assert.Equal("emu1.Groups[1].Meters[1].PhaseACurrent", catalog.FindTelemetry("yc207")!.Target.FullPath);
+        Assert.Equal("emu1.Groups[1].Meters[1].LineVoltageCA", catalog.FindTelemetry("yc217")!.Target.FullPath);
     }
 
     [Fact]
@@ -399,10 +400,11 @@ public class TelemetryPluginTests
         Assert.Equal(8, dcPower!.Paths.Count);
         Assert.Contains("emu1.PcsList[3].BatteryPower", dcPower.Paths);
 
-        // 电网电压（各 PCS 块 RS/ST/TR）绑定所属分组的组电表线电压
+        // 电网电压（各 PCS 块 RS/ST/TR）绑定所属分组的组电表线电压；
+        // 分组绑两台电表时，PCS2/4 块绑第二台组电表 Meters[1]
         Assert.Equal("emu1.Groups[0].Meters[0].LineVoltageAB", catalog.FindTelemetry("yc20")!.Target.FullPath);
-        Assert.Equal("emu1.Groups[0].Meters[0].LineVoltageBC", catalog.FindTelemetry("yc225")!.Target.FullPath);
-        Assert.Equal("emu1.Groups[1].Meters[0].LineVoltageCA", catalog.FindTelemetry("yc634")!.Target.FullPath);
+        Assert.Equal("emu1.Groups[0].Meters[1].LineVoltageBC", catalog.FindTelemetry("yc225")!.Target.FullPath);
+        Assert.Equal("emu1.Groups[1].Meters[1].LineVoltageCA", catalog.FindTelemetry("yc634")!.Target.FullPath);
 
         // 允许充/放电功率：单机组直接绑定 EMU 限值
         var chargePower = catalog.FindTelemetry("sysyc113");
