@@ -883,6 +883,19 @@ export class SceneController {
       }
     }
 
+    for (const br of this.refs.tieBreakers || []) {
+      const item = br.userData?.layoutItem || {}
+      const live = item.unitIndex != null
+        ? (snap.units || []).find(u => u.unitIndex === item.unitIndex)
+        : null
+      setBreakerVisual(br, live
+        ? { closed: !!live.unitBreakerClosed, tripped: !!live.unitBreakerTripped }
+        : {
+          closed: !!item.node?.parameters?.closed,
+          tripped: !!item.node?.parameters?.tripped
+        })
+    }
+
     for (const arr of this.refs.pvArrays || []) {
       const pv = (snap.pvUnits || []).find(x => x.pvIndex === arr.userData.pvIndex)
         || (snap.pvUnits || [])[arr.userData.pvIndex]
@@ -1023,6 +1036,15 @@ export class SceneController {
         lines = [
           `${item.label || item.node?.label || '断路器'} ${fmtBreaker(snap.mainBreakerClosed, snap.mainBreakerTripped)}`
         ]
+      } else if (kind === 'tie-breaker') {
+        const live = a.unitIndex != null
+          ? (snap.units || []).find(u => u.unitIndex === a.unitIndex)
+          : null
+        const closed = live ? !!live.unitBreakerClosed : !!item.node?.parameters?.closed
+        const tripped = live ? !!live.unitBreakerTripped : !!item.node?.parameters?.tripped
+        lines = [
+          `${item.label || item.node?.label || '断路器'} ${fmtBreaker(closed, tripped)}`
+        ]
       } else if (kind === 'station-xf') {
         lines = [
           item.label || item.node?.label || '变压器',
@@ -1046,7 +1068,10 @@ export class SceneController {
         lines = [item.text?.[0] || `UNIT ${u?.unitNumber ?? (a.unitIndex ?? 0) + 1}`]
       } else if (kind === 'unit-breaker') {
         const u = (snap.units || []).find(x => x.unitIndex === a.unitIndex)
-        lines = [`单元断 ${u?.unitBreakerLabel || fmtBreaker(u?.unitBreakerClosed, u?.unitBreakerTripped)}`]
+        // 组态绑定的真实断路器（如中压三相断路器）显示节点名；合成兑底单元回落「单元断」
+        const name = item.label || item.node?.label || '单元断'
+        const state = u?.unitBreakerLabel || fmtBreaker(u?.unitBreakerClosed, u?.unitBreakerTripped)
+        lines = [`${name} ${state}`]
       } else if (kind === 'unit-xf') {
         const u = (snap.units || []).find(x => x.unitIndex === a.unitIndex)
         lines = [item.label || '单元变', u?.unitTransformerLine || fmtVolt(u?.unitTransformerSecondary?.lineVoltageV)]

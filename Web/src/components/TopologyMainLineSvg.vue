@@ -84,12 +84,12 @@
               </text>
             </g>
 
-            <!-- 母线联络分段断路器：状态取组态静态参数 -->
+            <!-- 母线联络分段断路器：绑定 EMU 时取运行时遥信，否则取组态静态参数 -->
             <g v-for="br in layout.tieBreakers" :key="`tie-brk-${br.id}`">
               <rect :x="br.x - 18" :y="br.yTop" width="36" :height="br.yBottom - br.yTop" rx="3" fill="transparent" />
-              <BreakerSymbol :x="br.x" :y="br.y" :closed="br.closed" :tripped="br.tripped" />
+              <BreakerSymbol :x="br.x" :y="br.y" :closed="tieBreakerLive(br).closed" :tripped="tieBreakerLive(br).tripped" />
               <text :x="br.x + 22" :y="br.y + 4" class="label-text breaker-label">
-                {{ br.label }} {{ fmtBreaker(br.closed, br.tripped) }}
+                {{ br.label }} {{ tieBreakerLive(br).label }}
               </text>
             </g>
 
@@ -202,7 +202,14 @@
               />
             </template>
             <template v-else>
-              <!-- 储能支路：PCS → 直流母线 → BMS；命中运行时通道时渲染实时数据+控制卡片，否则回退静态参数卡 -->
+              <!-- 储能支路：（绑定断路器 →）PCS → 直流母线 → BMS；命中运行时通道时渲染实时数据+控制卡片，否则回退静态参数卡 -->
+              <template v-if="u.unitBreakerNode && !u.unitBreakerOnBus">
+                <rect x="-22" :y="u.brkTop" width="44" :height="u.brkBottom - u.brkTop" rx="3" fill="transparent" />
+                <BreakerSymbol :x="0" :y="u.brkMid" :closed="emuBreakerLive(u).closed" :tripped="emuBreakerLive(u).tripped" />
+                <text x="24" :y="u.brkMid + 4" class="label-text breaker-label">
+                  {{ u.unitBreakerNode.label || '断路器' }} {{ emuBreakerLive(u).label }}
+                </text>
+              </template>
               <template v-for="c in u.cards" :key="`card-${c.id}`">
                 <PcsCard
                   v-if="c.tone === 'pcs' && pcsChannelOf(c)"
@@ -423,6 +430,34 @@ const runtimeChannelMaps = computed(() => {
 })
 function pcsChannelOf(card) { return runtimeChannelMaps.value.pcsMap.get(card?.num) || null }
 function bmsChannelOf(card) { return runtimeChannelMaps.value.bmsMap.get(card?.num) || null }
+/** 储能支路绑定断路器的运行时状态：优先同索引运行时单元，未命中回落组态静态参数 */
+function emuBreakerLive(u) {
+  const live = (props.snap.units || []).find(x => x.unitIndex === u.index)
+    || (props.snap.units || [])[u.index]
+  if (live) {
+    return {
+      closed: !!live.unitBreakerClosed,
+      tripped: !!live.unitBreakerTripped,
+      label: live.unitBreakerLabel || fmtBreaker(live.unitBreakerClosed, live.unitBreakerTripped)
+    }
+  }
+  const closed = breakerClosed(u.unitBreakerNode)
+  return { closed, tripped: false, label: fmtBreaker(closed, false) }
+}
+/** 母线分段断路器状态：绑定了 EMU 时取该运行时单元的实时遥信，否则回落组态静态参数 */
+function tieBreakerLive(br) {
+  const live = br.unitIndex != null
+    ? (props.snap.units || []).find(x => x.unitIndex === br.unitIndex)
+    : null
+  if (live) {
+    return {
+      closed: !!live.unitBreakerClosed,
+      tripped: !!live.unitBreakerTripped,
+      label: live.unitBreakerLabel || fmtBreaker(live.unitBreakerClosed, live.unitBreakerTripped)
+    }
+  }
+  return { closed: br.closed, tripped: br.tripped, label: fmtBreaker(br.closed, br.tripped) }
+}
 function fmtBreaker(closed, tripped) { return tripped ? '跳闸' : closed ? '合' : '分' }
 function breakerClosed(node) {
   const v = node?.parameters?.closed

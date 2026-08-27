@@ -5,7 +5,8 @@ import {
   buildStation3dLayout,
   stationKey,
   slotXs,
-  paramNum
+  paramNum,
+  devicePort
 } from './project3dLayout.js'
 import { pvArrayFieldSize } from './pvArrayLayout.js'
 import { createPvStringLeads, createStaticCable } from './buildMeshes.js'
@@ -192,7 +193,7 @@ describe('buildStation3dLayout from topology', () => {
     assert.equal(paramNum(layout.items.find(i => i.templateId === 'dc_bus').node, 'nominalVoltage'), 1500)
   })
 
-  it('places meters and loads that exist on the bus, and omits a single-hang bus bar', () => {
+  it('omits meters but places loads that exist on the bus, and omits a single-hang bus bar', () => {
     const snap = {
       topology: {
         nodes: [
@@ -206,7 +207,10 @@ describe('buildStation3dLayout from topology', () => {
       units: []
     }
     const layout = buildStation3dLayout(snap)
-    assert.equal(byTemplate(layout, 'ac_meter').length, 1)
+    // 3D 视图不绘制电表（含兜底），且不产生连向电表的悬空电缆
+    assert.equal(byTemplate(layout, 'ac_meter').length, 0)
+    assert.ok(!layout.cables.some(c =>
+      [c.ax, c.bx, c.az, c.bz].some(v => !Number.isFinite(v))), 'no dangling cable')
     assert.equal(byTemplate(layout, 'load').length, 1)
     assert.equal(byTemplate(layout, 'grid').length, 1)
   })
@@ -497,13 +501,11 @@ describe('bus is drawn as a node (star wiring rule)', () => {
       assert.ok(!layout.items.some(i => i.kind === kind), `no synthetic ${kind}`)
     }
     assert.ok(!layout.items.some(i => i.busRole === 'unit-lv-bus'), 'no synthetic 690 bus')
-    // 逐设备出 item：断路器/电表用真实组态节点身份
+    // 逐设备出 item：绑定断路器用真实组态节点身份；电表不在 3D 绘制
     const brk = layout.items.find(i => i.templateId === 'ac_breaker' && i.kind === 'unit-breaker')
     assert.ok(brk, 'bound breaker drawn')
     assert.equal(brk.node?.id, 'brk1', 'breaker identity from topology node')
-    const meter = layout.items.find(i => i.templateId === 'ac_meter' && i.kind === 'meter')
-    assert.ok(meter, 'bound meter drawn')
-    assert.equal(meter.node?.id, 'meter1', 'meter identity from topology node')
+    assert.ok(!layout.items.some(i => i.templateId === 'ac_meter'), 'bound meter not drawn in 3D')
     assert.equal(byTemplate(layout, 'pcs').length, 2, 'one item per pcs node')
     assert.equal(byTemplate(layout, 'bms').length, 2, 'one item per bms node')
   })
@@ -569,5 +571,190 @@ describe('stationKey', () => {
       }
     }
     assert.notEqual(stationKey(a), stationKey(b))
+  })
+})
+
+describe('sectional bus breaker in 3d', () => {
+  // 3D 此前完全不渲染 sld.tieBreakers，绑定到 EMU 的中压断路器只出现在单元馈线上
+  function sectionSnap() {
+    return {
+      topology: {
+        nodes: [
+          node('main', 'ac_bus', '35kV主母线', 400, { nominalVoltage: 35000 }),
+          node('sec', 'ac_breaker', '中压三相断路器', 300, { emuId: 'emu1', closed: true }),
+          node('sub', 'ac_bus', '35kV分段', 200, { nominalVoltage: 35000 }),
+          node('emu1', 'emu', 'EMU-1', 200),
+          node('xf', 'transformer', '级变', 200, { primaryVoltage: 35000, secondaryVoltage: 690 }),
+          node('lv', 'ac_bus', '690V', 200, { nominalVoltage: 690 }),
+          node('pcs1', 'pcs', 'PCS-1', 160, { emuId: 'emu1' }),
+          node('dc1', 'dc_bus', '直流母线', 200, { nominalVoltage: 800 }),
+          node('bms1', 'bms', 'BMS-1', 200, {})
+        ],
+        edges: [
+          edge('main', 'sec'), edge('sec', 'sub'), edge('sub', 'xf'), edge('xf', 'lv'),
+          edge('lv', 'pcs1'), edge('pcs1', 'dc1'), edge('dc1', 'bms1'), edge('emu1', 'lv')
+        ]
+      },
+      units: []
+    }
+  }
+
+  it('renders the section breaker once, on the bus, not inside the unit', () => {
+    const layout = buildStation3dLayout(sectionSnap())
+    const brk = byTemplate(layout, 'ac_breaker')
+    assert.equal(brk.length, 1, 'drawn exactly once')
+    assert.equal(brk[0].kind, 'tie-breaker', 'placed on the bus, not as a unit breaker')
+    assert.equal(brk[0].node.id, 'sec')
+    assert.equal(brk[0].unitIndex, 0, 'carries the emu binding for live telemetry')
+
+    const hubs35 = byTemplate(layout, 'ac_bus')
+      .filter(b => b.node?.parameters?.nominalVoltage === 35000)
+    assert.equal(hubs35.length, 2, 'main bus plus one section')
+    // 分段断路器对齐子分段母线列，并落在两段母线之间
+    assert.ok(hubs35.some(h => Math.abs(h.x - brk[0].x) < 0.01),
+      'sits on one of the 35kV hub columns')
+    const zs = hubs35.map(h => h.z).sort((a, b) => a - b)
+    assert.ok(brk[0].z > zs[0] && brk[0].z < zs[1],
+      'sits between the two 35kV hubs')
+
+    const unitZ = byTemplate(layout, 'pcs')[0].z
+    assert.ok(brk[0].z < unitZ, 'stays upstream of the pcs row')
+  })
+})
+
+describe('edge-derived cable redraw', () => {
+  // 一根连线 ⇔ 组态中存在对应节点边：并行边去重、未绘制模板跳过、端点必落在设备锚点上
+  function stationSnap() {
+    return {
+      topology: {
+        nodes: [
+          node('grid', 'grid', '电网', 400, { outputVoltage: 220000 }),
+          node('main', 'ac_breaker', '主断路器', 400, { isMainBreaker: true }),
+          node('hv', 'ac_bus', '220kV母线', 400, { nominalVoltage: 220000 }),
+          node('xf', 'transformer', '主变', 400, { primaryVoltage: 220000, secondaryVoltage: 35000 }),
+          node('mv', 'ac_bus', '35kV母线', 400, { nominalVoltage: 35000 }),
+          node('uxf', 'transformer', '2级变', 300, { primaryVoltage: 35000, secondaryVoltage: 690 }),
+          node('lv', 'ac_bus', '690V母线', 300, { nominalVoltage: 690 }),
+          node('emu1', 'emu', 'EMU-1', 300),
+          node('pcs1', 'pcs', 'PCS-1', 260, { emuId: 'emu1' }),
+          node('pcs2', 'pcs', 'PCS-2', 340, { emuId: 'emu1' }),
+          node('dc1', 'dc_bus', '直流母线', 300, { nominalVoltage: 1200 }),
+          node('bms1', 'bms', 'BMS-1', 260, {}),
+          node('bms2', 'bms', 'BMS-2', 340, {}),
+          node('m1', 'ac_meter', '三相电表', 500, {})
+        ],
+        edges: [
+          // 三相并行边：同一对节点 3 条边只画 1 根线
+          edge('grid', 'main'), edge('grid', 'main'), edge('grid', 'main'),
+          edge('main', 'hv'), edge('hv', 'xf'), edge('xf', 'mv'),
+          edge('mv', 'uxf'), edge('uxf', 'lv'),
+          edge('lv', 'pcs1'), edge('lv', 'pcs2'),
+          edge('pcs1', 'dc1'), edge('pcs2', 'dc1'),
+          edge('dc1', 'bms1'), edge('dc1', 'bms2'),
+          edge('mv', 'm1')
+        ]
+      },
+      units: []
+    }
+  }
+
+  /** 电缆端点必须落在某个已放置节点的出线口 / 母线汇流点 / 直流母线横杠夹取点上 */
+  function onPort(layout, x, z) {
+    return layout.items.some(it => {
+      if ((it.templateId === 'dc_bus' || it.templateId === 'ac_bus')
+        && Number.isFinite(it.x1) && Number.isFinite(it.x2)) {
+        return Math.abs(it.z - z) < 1e-6
+          && x >= Math.min(it.x1, it.x2) - 1e-6
+          && x <= Math.max(it.x1, it.x2) + 1e-6
+      }
+      const front = devicePort(it, it.z + 10)
+      const back = devicePort(it, it.z - 10)
+      const ports = [front, back].filter(Boolean)
+      if (ports.length) {
+        return ports.some(p => Math.abs(p.x - x) < 1e-6 && Math.abs(p.z - z) < 1e-6)
+      }
+      return Math.abs(it.x - x) < 1e-6 && Math.abs(it.z - z) < 1e-6
+    })
+  }
+
+  it('dedupes parallel three-phase edges into one cable per node pair', () => {
+    const layout = buildStation3dLayout(stationSnap())
+    const grid = layout.items.find(i => i.templateId === 'grid')
+    const main = layout.items.find(i => i.node?.id === 'main')
+    // 出线口：电网前口 → 主断后口（面向对端选口）
+    const gp = devicePort(grid, main.z)
+    const mp = devicePort(main, grid.z)
+    const between = layout.cables.filter(c =>
+      Math.abs(c.ax - gp.x) < 1e-6 && Math.abs(c.az - gp.z) < 1e-6
+      && Math.abs(c.bx - mp.x) < 1e-6 && Math.abs(c.bz - mp.z) < 1e-6)
+      .concat(layout.cables.filter(c =>
+        Math.abs(c.ax - mp.x) < 1e-6 && Math.abs(c.az - mp.z) < 1e-6
+        && Math.abs(c.bx - gp.x) < 1e-6 && Math.abs(c.bz - gp.z) < 1e-6))
+    assert.equal(between.length, 1, '3 parallel edges → exactly 1 cable')
+  })
+
+  it('draws exactly one cable per placed node pair, every endpoint on a port', () => {
+    const layout = buildStation3dLayout(stationSnap())
+    // 14 个唯一节点对 − 电表对（3D 不画电表）= 13 条… 其中 pcs/bms 全覆盖不触发兜底
+    // 逐对核对：电网—主断—220kV—主变—35kV—2级变—690V—2PCS—直流母线—2BMS
+    assert.equal(layout.cables.length, 12, `cable count = placed pairs, got ${layout.cables.length}`)
+    for (const c of layout.cables) {
+      assert.equal(c.static, true, 'edge cables are static')
+      assert.ok(onPort(layout, c.ax, c.az), `a-end on a port: (${c.ax}, ${c.az})`)
+      assert.ok(onPort(layout, c.bx, c.bz), `b-end on a port: (${c.bx}, ${c.bz})`)
+    }
+  })
+
+  it('terminates every BMS cable on the single BMS port', () => {
+    const layout = buildStation3dLayout(stationSnap())
+    for (const bms of layout.items.filter(i => i.templateId === 'bms')) {
+      const port = devicePort(bms, bms.z - 10)
+      const touches = layout.cables.filter(c =>
+        (Math.abs(c.ax - bms.x) < 1e-6 && Math.abs(c.az - port.z) < 1e-6)
+        || (Math.abs(c.bx - bms.x) < 1e-6 && Math.abs(c.bz - port.z) < 1e-6))
+      assert.ok(touches.length >= 1, `bms ${bms.key} has its port cable`)
+      for (const c of touches) {
+        const end = Math.abs(c.ax - bms.x) < 1e-6 && Math.abs(c.az - port.z) < 1e-6
+          ? [c.ax, c.az] : [c.bx, c.bz]
+        assert.equal(end[1], port.z, 'BMS cables only use the single port')
+      }
+    }
+  })
+
+  it('classifies roles so energization sync keeps working', () => {
+    const layout = buildStation3dLayout(stationSnap())
+    const feeds = layout.cables.filter(c => c.role === 'pcs-feed')
+    assert.equal(feeds.length, 2, '690V bus → each PCS')
+    for (const f of feeds) {
+      assert.ok(Number.isFinite(f.unitIndex), 'pcs-feed carries unitIndex')
+      assert.ok(f.side, 'pcs-feed carries side')
+    }
+    const dcs = layout.cables.filter(c => c.role === 'dc-link')
+    assert.equal(dcs.length, 4, 'PCS→dc bar drops + dc bar→BMS rises')
+    assert.equal(layout.cables.filter(c => c.role === 'sld-wire').length, 6,
+      'grid/main breaker/hv bus/main xf/35kV bus/2级变 chain')
+    assert.equal(layout.cables.filter(c => c.role === 'unit-drop').length, 0)
+  })
+
+  it('clamps dc bus bar anchors when the counterpart sits beyond the bar span', () => {
+    const snap = {
+      topology: {
+        nodes: [
+          node('dc1', 'dc_bus', '直流母线', 0, { nominalVoltage: 1200 }),
+          node('bms1', 'bms', '远端BMS', 600, {})
+        ],
+        edges: [edge('dc1', 'bms1')]
+      },
+      units: []
+    }
+    const layout = buildStation3dLayout(snap)
+    const bar = layout.items.find(i => i.templateId === 'dc_bus')
+    assert.ok(bar, 'fallback dc bar drawn')
+    const cable = layout.cables.find(c => c.role !== 'pv-dc')
+    assert.ok(cable, 'edge cable drawn')
+    const barEndX = Math.max(bar.x1, bar.x2)
+    // BMS 远在横杠右端之外：横杠侧锚点夹取到端点而不是越过横杠
+    const onBarX = Math.abs(cable.ax - barEndX) < 1e-6 ? cable.ax : cable.bx
+    assert.ok(Math.abs(onBarX - barEndX) < 1e-6, `clamped to bar end: ${onBarX} vs ${barEndX}`)
   })
 })
