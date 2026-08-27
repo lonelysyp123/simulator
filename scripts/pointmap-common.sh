@@ -2,6 +2,7 @@
 # 点位表管理与复制（供发布脚本、sync-pointmaps-to-root.sh 引用）
 # 旧版本目录（pointmaps/common|lc|battery）已迁移为设备型号点表：
 # pointmaps/models/{设备类型}/{型号}/，运行期可在系统配置界面选型。
+# 注意：仅使用 bash 3.2 兼容语法（macOS 自带 bash 为 3.2，不支持 declare -A）。
 set -euo pipefail
 
 _POINTMAP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -10,13 +11,13 @@ POINTMAP_ROOT="${POINTMAP_ROOT:-$(cd "$_POINTMAP_SCRIPT_DIR/.." && pwd)/pointmap
 # 根目录运行时点表统一取 standard 型号
 DEFAULT_ROOT_MODEL="standard"
 
-# 设备类型 → 运行时根目录文件
-declare -A DEVICE_TYPE_FILES=(
-  [bms]="bms_bank.csv bms_rack.csv"
-  [emu]="emu.csv"
-  [em]="em.csv"
-  [lc]="lc.csv"
-)
+# 设备类型 → 运行时根目录文件（每行 "类型 文件1 [文件2 ...]"，保持展示顺序）
+DEVICE_TYPE_FILES="
+bms bms_bank.csv bms_rack.csv
+emu emu.csv
+em em.csv
+lc lc.csv
+"
 
 device_model_dir() {
   local type="$1"
@@ -25,20 +26,21 @@ device_model_dir() {
 }
 
 validate_device_models() {
-  local type dir f
-  for type in "${!DEVICE_TYPE_FILES[@]}"; do
+  local type files dir f
+  while read -r type files; do
+    [[ -z "$type" ]] && continue
     dir="$(device_model_dir "$type")"
     if [[ ! -d "$dir" ]]; then
       echo "设备型号点表目录不存在: $dir" >&2
       return 1
     fi
-    for f in ${DEVICE_TYPE_FILES[$type]}; do
+    for f in $files; do
       if [[ ! -f "$dir/$f" ]]; then
         echo "设备型号点表 [$type/$DEFAULT_ROOT_MODEL] 缺少文件: $f" >&2
         return 1
       fi
     done
-  done
+  done <<< "$DEVICE_TYPE_FILES"
   return 0
 }
 
@@ -54,14 +56,15 @@ copy_pointmaps_to() {
   validate_device_models
 
   echo "==> Copying root point maps (model: $DEFAULT_ROOT_MODEL) ..."
-  local type dir f
-  for type in "${!DEVICE_TYPE_FILES[@]}"; do
+  local type files dir f
+  while read -r type files; do
+    [[ -z "$type" ]] && continue
     dir="$(device_model_dir "$type")"
-    for f in ${DEVICE_TYPE_FILES[$type]}; do
+    for f in $files; do
       cp -f "$dir/$f" "$out/$f"
       echo "    $f (models/$type/$DEFAULT_ROOT_MODEL)"
     done
-  done
+  done <<< "$DEVICE_TYPE_FILES"
 
   copy_device_models_to "$out"
 }
@@ -82,8 +85,9 @@ copy_device_models_to() {
 }
 
 list_device_types() {
-  local type
-  for type in "${!DEVICE_TYPE_FILES[@]}"; do
+  local type files
+  while read -r type files; do
+    [[ -z "$type" ]] && continue
     echo "$type"
-  done
+  done <<< "$DEVICE_TYPE_FILES"
 }
