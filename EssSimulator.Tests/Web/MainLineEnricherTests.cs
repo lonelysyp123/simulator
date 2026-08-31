@@ -3,12 +3,13 @@ using EssSimulator.Core;
 using EssSimulator.Display;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssDeviceSimModel.Model;
+using EssSimulator.EssSimModelApi.EnergyManagementSystem;
 using EssSimulator.Web;
 using Xunit;
 
 namespace EssSimulator.Tests.Web;
 
-public class MainLineEnricherTests
+public class MainLineEnricherTests : SimulatorHostTestBase
 {
     [Fact]
     public void ResolveEssChannelCount_zero_when_pv_only()
@@ -59,7 +60,7 @@ public class MainLineEnricherTests
             new LoadConfig(),
             new PccConfig(),
             new MeterConfig());
-        SimulatorHost.Instance.Register("ess", ess);
+        SimulatorHost.Instance.RegisterEss(ess);
 
         var channels = new List<PcsChannelSnapshot?>();
         for (int s = 0; s < 4; s++)
@@ -79,5 +80,80 @@ public class MainLineEnricherTests
         Assert.Equal(new[] { 1, 2, 3, 4 }, unit.Channels.Select(c => c.PcsNumber).ToArray());
         Assert.Equal(new[] { 0, 1, 2, 3 }, unit.Channels.Select(c => c.SlotInUnit).ToArray());
         Assert.Equal(4, unit.PcsChannels.Count);
+    }
+
+    [Fact]
+    public void EnrichUnit_copies_emu_meter_and_transformer_mirrors()
+    {
+        var cfg = new SimulatorConfig
+        {
+            Devices =
+            {
+                new EssUnitConfig
+                {
+                    Pcs =
+                    {
+                        new EssSimulator.Configuration.PcsDeviceConfig(),
+                        new EssSimulator.Configuration.PcsDeviceConfig()
+                    }
+                }
+            }
+        };
+        using var ess = new EnergyStorageSystem(
+            cfg,
+            new PcsPhysicalConfig { AcVoltageNominal = 690 },
+            new TransformerConfig(),
+            new UnitTransformerConfig(),
+            new LoadConfig(),
+            new PccConfig(),
+            new MeterConfig());
+        SimulatorHost.Instance.RegisterEss(ess);
+
+        var emu = new EnergyManagementData();
+        emu.ElectricityMeter.LineVoltageAB = 690f;
+        emu.ElectricityMeter.LineVoltageBC = 691f;
+        emu.ElectricityMeter.LineVoltageCA = 692f;
+        emu.ElectricityMeter.PhaseACurrent = 10f;
+        emu.ElectricityMeter.PhaseBCurrent = 11f;
+        emu.ElectricityMeter.PhaseCCurrent = 12f;
+        emu.ElectricityMeter.TotalActivePower = 200f;
+        emu.ElectricityMeter.TotalReactivePower = 30f;
+        emu.ElectricityMeter.PowerFactor = 0.98f;
+        emu.ElectricityMeter.Frequency = 50f;
+        emu.Transformers.Add(new TransformerMirrorData
+        {
+            LoadFraction = 0.4f,
+            OilTemperatureC = 48f,
+            ActivePowerKw = 210f,
+            ReactivePowerKvar = 15f
+        });
+        SimulatorHost.Instance.RegisterEmu(1, emu);
+
+        var channels = new List<PcsChannelSnapshot?>
+        {
+            new PcsChannelSnapshot(0, 0, 0, default, 0, 0, 690, 0, 50, "GridConnected", "Inactive", false),
+            new PcsChannelSnapshot(1, 0, 1, default, 0, 0, 690, 0, 50, "GridConnected", "Inactive", false)
+        };
+        var snap = new MainLineSnapshot
+        {
+            Units = new List<UnitBranchSnapshot>
+            {
+                new UnitBranchSnapshot(0, true, false, default, default, null, channels)
+            }
+        };
+
+        var vm = MainLineEnricher.Build(snap, channelCountOverride: 2);
+        var unit = Assert.Single(vm.Units);
+        Assert.Equal(690, unit.UnitMeterThreePhase.LineVoltageAB, 3);
+        Assert.Equal(691, unit.UnitMeterThreePhase.LineVoltageBC, 3);
+        Assert.Equal(10, unit.UnitMeterThreePhase.PhaseACurrent, 3);
+        Assert.Equal(200, unit.UnitMeterActivePowerKw, 3);
+        Assert.Equal(30, unit.UnitMeterReactivePowerKvar, 3);
+        Assert.Equal(0.98, unit.UnitMeterPowerFactor, 3);
+        Assert.Equal(50, unit.UnitMeterFrequencyHz, 3);
+        Assert.Equal(0.4, unit.UnitTransformerLoadFraction, 3);
+        Assert.Equal(48, unit.UnitTransformerOilTemperatureC, 3);
+        Assert.Equal(210, unit.UnitTransformerActivePowerKw, 3);
+        Assert.Equal(15, unit.UnitTransformerReactivePowerKvar, 3);
     }
 }

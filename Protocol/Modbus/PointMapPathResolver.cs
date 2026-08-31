@@ -5,8 +5,8 @@ namespace EssSimulator.Protocol.Modbus
 {
     /// <summary>
     /// 解析运行时点表 CSV 路径：优先按设备型号选型（pointmaps/models/{type}/{model}），
-    /// 其次工作目录/输出目录根下的文件，
-    /// 最后 <c>pointmaps/models/{类型}/standard/</c>（未执行 sync-pointmaps-to-root 时的开发兜底）。
+    /// 未选型时回退到 <c>pointmaps/models/{类型}/standard/</c>。
+    /// 不读取工作目录或输出目录根下的同名 CSV。
     /// </summary>
     public static class PointMapPathResolver
     {
@@ -18,31 +18,19 @@ namespace EssSimulator.Protocol.Modbus
             if (Path.IsPathRooted(fileName) && File.Exists(fileName))
                 return fileName;
 
-            // 设备型号选型命中时优先使用型号目录下的点表
             var selected = ResolveSelected(fileName);
             if (selected != null)
                 return selected;
 
             string name = Path.GetFileName(fileName);
-            string[] bases =
+            foreach (var root in DeviceModelRegistry.CandidateRoots())
             {
-                Directory.GetCurrentDirectory(),
-                AppContext.BaseDirectory
-            };
-
-            foreach (var root in bases)
-            {
-                if (string.IsNullOrWhiteSpace(root)) continue;
-                var direct = Path.Combine(root, name);
-                if (File.Exists(direct)) return Path.GetFullPath(direct);
-
-                // 开发兜底：未选型时回退到该文件所属设备类型的 standard 型号点表
                 var standard = ResolveStandardModel(root, fileName);
                 if (standard != null) return standard;
             }
 
             throw new FileNotFoundException(
-                $"找不到点表文件 `{name}`。请在仓库根目录执行: ./scripts/sync-pointmaps-to-root.sh",
+                $"找不到点表文件 `{name}`。请确认 `pointmaps/models/` 下存在对应设备类型的点表，并检查 `configs/topology/device-models.json` 选型。",
                 name);
         }
 

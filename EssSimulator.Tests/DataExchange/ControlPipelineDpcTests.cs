@@ -1,3 +1,4 @@
+using EssSimulator.DataExchange;
 using EssSimulator.DataExchange.Adapters;
 using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Effects;
@@ -116,5 +117,59 @@ public class ControlPipelineDpcTests
 
         Assert.False(Convert.ToBoolean(simulation.Read("emu1.PcsList[0].pcsOnOffSwitch")!));
         Assert.Equal(0, Convert.ToInt32(modbus.ReadParsedPoint("yx3")!));
+    }
+
+    [Fact]
+    public void RunOnce_NotifiesControlPointCapture_OnHoldChange()
+    {
+        var catalog = new PointCatalog
+        {
+            ServerName = "simEmu1",
+            TelemetryPoints = Array.Empty<PointBinding>(),
+            ControlPoints = new[] { Yx3Binding() },
+            DefaultValues = new Dictionary<string, object>()
+        };
+
+        var simulation = new FakeSimulationAdapter();
+        var modbus = new FakeModbusAdapter();
+        var shadow = new ShadowStore();
+        simulation.Write("emu1.PcsList[0].pcsOnOffSwitch", false);
+        shadow.CommitControl("yx3", 0);
+        var yx3 = Yx3Binding();
+        modbus.WritePoints(new Dictionary<string, object>
+        {
+            { "yx3", ModbusPointCodec.Encode(true, yx3.Entry, applyScale: true) }
+        });
+
+        var recorder = new RecordingControlPointCapture();
+        ControlPointCapture.Current = recorder;
+        try
+        {
+            var control = new ControlPipeline(
+                catalog, simulation, modbus, CreateParser(),
+                shadow, new ControlEffectRegistry(), "simEmu1", logControlChanges: false);
+            control.RunOnce();
+            Assert.Equal(1, recorder.Count);
+            Assert.Equal("simEmu1", recorder.LastServerName);
+            Assert.Equal("yx3", recorder.LastParamName);
+        }
+        finally
+        {
+            ControlPointCapture.Reset();
+        }
+    }
+
+    private sealed class RecordingControlPointCapture : IControlPointCapture
+    {
+        public int Count { get; private set; }
+        public string? LastServerName { get; private set; }
+        public string? LastParamName { get; private set; }
+
+        public void OnControlApplied(string serverName, PointBinding binding, object applied, object? previous)
+        {
+            Count++;
+            LastServerName = serverName;
+            LastParamName = binding.ParamName;
+        }
     }
 }

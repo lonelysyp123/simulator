@@ -1,7 +1,6 @@
 using EssSimulator.DataExchange.Adapters;
 using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Effects;
-using EssSimulator.Web.DroopSlices;
 using log4net;
 
 namespace EssSimulator.DataExchange.Pipeline
@@ -78,7 +77,7 @@ namespace EssSimulator.DataExchange.Pipeline
                 _shadow.CommitControl(binding.ParamName, applied);
 
                 // 白盒切片：EMS 写有功/无功设定瞬间采集
-                DroopSliceStore.TryCapture(_serverName, binding, applied, previous);
+                ControlPointCapture.Current.OnControlApplied(_serverName, binding, applied, previous);
 
                 if (_logControlChanges)
                 {

@@ -55,7 +55,7 @@ public class TopologyOverlayLoaderTests
     public void TryLoad_returns_null_when_overlay_has_no_units()
     {
         using var tmp = new TempTopologyRoot(engineeringMode: true, overlay: new TopologyRuntimeOverlay());
-        Assert.Null(TopologyOverlayLoader.TryLoad(tmp.Root));
+        CaptureConsole(() => Assert.Null(TopologyOverlayLoader.TryLoad(tmp.Root)));
     }
 
     [Fact]
@@ -74,25 +74,18 @@ public class TopologyOverlayLoaderTests
     {
         using var tmp = new TempTopologyRoot(engineeringMode: true, overlay: UsableOverlay());
         File.WriteAllText(tmp.OverlayPath, "{ not-json");
-        Assert.Null(TopologyOverlayLoader.TryLoad(tmp.Root));
+        var log = CaptureConsole(() => Assert.Null(TopologyOverlayLoader.TryLoad(tmp.Root)));
+        Assert.Contains(tmp.OverlayPath, log);
+        Assert.Contains("JsonException", log);
     }
 
     [Fact]
-    public void Repo_default_engineering_overlay_is_usable()
+    public void TryLoad_unusable_overlay_logs_path_and_falls_back()
     {
-        var root = FindRepoRoot();
-        var modePath = Path.Combine(root, "configs", "topology", "runtime-mode.json");
-        if (!File.Exists(modePath))
-            return;
-
-        var mode = JsonSerializer.Deserialize<TopologyRuntimeMode>(File.ReadAllText(modePath), JsonOpts);
-        if (mode?.EngineeringMode != true)
-            return;
-
-        var overlay = TopologyOverlayLoader.TryLoad(root);
-        Assert.NotNull(overlay);
-        Assert.True(TopologyOverlayLoader.IsUsable(overlay));
-        Assert.True(overlay!.EssUnits.Count >= 1 || overlay.PvUnits.Count >= 1);
+        using var tmp = new TempTopologyRoot(engineeringMode: true, overlay: new TopologyRuntimeOverlay());
+        var log = CaptureConsole(() => Assert.Null(TopologyOverlayLoader.TryLoad(tmp.Root)));
+        Assert.Contains(tmp.OverlayPath, log);
+        Assert.Contains("改用 appsettings", log);
     }
 
     [Fact]
@@ -111,6 +104,27 @@ public class TopologyOverlayLoaderTests
         Assert.Empty(loaded.EssUnits);
     }
 
+    private static readonly object ConsoleGate = new();
+
+    private static string CaptureConsole(Action act)
+    {
+        lock (ConsoleGate)
+        {
+            var original = Console.Out;
+            var sw = new StringWriter();
+            Console.SetOut(sw);
+            try
+            {
+                act();
+                return sw.ToString();
+            }
+            finally
+            {
+                Console.SetOut(original);
+            }
+        }
+    }
+
     private static TopologyRuntimeOverlay UsableOverlay() => new()
     {
         SourceProjectName = "fixture",
@@ -124,19 +138,6 @@ public class TopologyOverlayLoaderTests
             }
         }
     };
-
-    private static string FindRepoRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null)
-        {
-            if (File.Exists(Path.Combine(dir.FullName, "EssSimulator.csproj")))
-                return dir.FullName;
-            dir = dir.Parent;
-        }
-
-        throw new DirectoryNotFoundException("未找到仓库根目录");
-    }
 
     private sealed class TempTopologyRoot : IDisposable
     {

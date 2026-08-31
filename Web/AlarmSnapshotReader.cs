@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using EssSimulator.Core;
 using EssSimulator.Display;
+using EssSimulator.EssDeviceSimModel.Bms;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 
 namespace EssSimulator.Web

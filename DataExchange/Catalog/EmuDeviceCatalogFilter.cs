@@ -33,7 +33,7 @@ namespace EssSimulator.DataExchange.Catalog
         /// <summary>
         /// 判断单条模型绑定路径是否指向机组内实际存在的设备。
         /// 路径根须为 emuK 机组根路径；PcsList[i] 要求 i 小于该机组 PCS 台数；
-        /// ElectricityMeter 要求该机组下属存在电表（直绑单元或任一分组绑定）；Breaker.*（断路器状态镜像）要求该机组下属存在断路器；Emu.PowerOnOff（单元高压断路器控制）要求该机组直绑断路器；
+        /// ElectricityMeter 要求该机组下属存在电表（直绑单元或任一分组绑定）；Breaker.*（断路器状态镜像）要求该机组下属存在断路器；Emu.PowerOnOff / Breaker.Closed（单元高压断路器控制）要求该机组直绑断路器（PowerOnOff）或下属存在断路器（Breaker.*）；
         /// Groups[g].PcsList[i] / Groups[g].Breaker 按分组构成校验；Transformers[k] 本期仅 k=0（单元变）；
         /// 其余 Emu.* 为单元虚拟模型，恒允许。
         /// </summary>

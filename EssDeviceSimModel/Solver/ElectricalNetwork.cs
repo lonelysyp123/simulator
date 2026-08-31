@@ -30,10 +30,13 @@ namespace EssSimulator.EssDeviceSimModel.Solver
         /// <summary>指定单元下属 PCS 台数。</summary>
         public int PcsCountOfUnit(int unit) => PcsUnitLayout.CountOfUnit(PcsPerUnit, unit);
 
-        public INetworkSolver Solver { get; set; } = null!;
+        /// <summary>测试夹具求解器；生产路径不构造，保持 null。</summary>
+        public INetworkSolver? Solver { get; set; }
 
         public double PccLineVoltageV { get; internal set; }
         public double StationBus35LineVoltageV { get; internal set; }
+        /// <summary>组态是否包含站用主变；false 时主断下游即站用母线。</summary>
+        public bool HasMainTransformer { get; init; } = true;
 
         /// <summary>当前步系统唯一频率（Hz），由 <see cref="SystemFrequencyResolver"/> 每步刷新。</summary>
         public double SystemFrequencyHz { get; internal set; }

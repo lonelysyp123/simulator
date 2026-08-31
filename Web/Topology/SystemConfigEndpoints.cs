@@ -195,8 +195,8 @@ namespace EssSimulator.Web.Topology
                 store.SaveNamedProject(project);
                 store.SaveProject(project);
 
-                // 按 PCS 总数自动选型 EMU 点表（本次重启即生效）
-                EmuPointMapAutoSelect.ApplyForProject(project);
+                // 按 PCS 总数自动选型 LC 点表（本次重启即生效）
+                LcPointMapAutoSelect.ApplyForProject(project);
 
                 var (overlay, validation) = TopologyRuntimeConverter.ConvertForApply(project);
                 if (!validation.Ok || overlay == null)

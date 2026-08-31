@@ -313,7 +313,8 @@ namespace EssSimulator.DataExchange.Catalog
                     target.PropertyPath.Contains("Emu.RemoteControlMode", StringComparison.Ordinal))
                     return ControlEffectId.PcsApplyCommands;
 
-                if (target.PropertyPath.EndsWith(".PowerOnOff", StringComparison.Ordinal))
+                if (target.PropertyPath.Equals("Breaker.Closed", StringComparison.OrdinalIgnoreCase) ||
+                    target.PropertyPath.EndsWith(".PowerOnOff", StringComparison.Ordinal))
                     return ControlEffectId.UnitHighVoltageBreaker;
             }
 

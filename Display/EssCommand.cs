@@ -3,7 +3,6 @@ using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.Bms;
 using EssSimulator.EssSimModelApi.Mappers;
 using EssSimulator.Protocol;
-using EssSimulator.Web;
 using System;
 using System.Collections.Generic;
 
@@ -158,7 +157,7 @@ namespace EssSimulator.Display
                 if (!ess.TrySetGridFrequency(hz, out var message))
                     return CommandResult.Fail($"操作失败: {message}");
 
-                SnapshotService.RequestImmediatePush();
+                UiSnapshotNotifier.RequestImmediatePush();
                 return CommandResult.Ok($"执行成功: {message}");
             }
 
@@ -170,7 +169,7 @@ namespace EssSimulator.Display
                 if (!ess.TrySetGridVoltage(volts, out var message))
                     return CommandResult.Fail($"操作失败: {message}");
 
-                SnapshotService.RequestImmediatePush();
+                UiSnapshotNotifier.RequestImmediatePush();
                 return CommandResult.Ok($"执行成功: {message}");
             }
 
@@ -217,7 +216,7 @@ namespace EssSimulator.Display
                 return CommandResult.Fail($"操作失败: {result}");
 
             InvalidateBmsTelemetryShadow(bms1Based, "yc11", "param47");
-            SnapshotService.RequestImmediatePush();
+            UiSnapshotNotifier.RequestImmediatePush();
             return CommandResult.Ok($"执行成功: bms{bms1Based} — {result}");
         }
 
@@ -395,7 +394,7 @@ namespace EssSimulator.Display
             if (!ess.TrySetPvArrayClimate(pv1Based, side, args[3], value, out var message))
                 return CommandResult.Fail($"操作失败: {message}");
 
-            SnapshotService.RequestImmediatePush();
+            UiSnapshotNotifier.RequestImmediatePush();
             return CommandResult.Ok($"执行成功: {message}");
         }
 

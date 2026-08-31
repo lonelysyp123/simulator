@@ -26,6 +26,24 @@ namespace EssSimulator.EssSimModelApi.Mappers
             PcsMapper.MapEmuState(emu, racks);
             PcsMapper.MapGroupState(emu);
 
+            ApplyCommandsIfChanged(ess, emu, unitIndex0, pcsBaseIndex);
+
+            SyncDeviceMirrors(ess, emu, unitIndex0, unitXfRatedKw);
+        }
+
+        /// <summary>
+        /// 控制字段或联锁输入相对上一拍未变时跳过下发，避免每拍重写启停/功率设定打断爬坡。
+        /// </summary>
+        private static void ApplyCommandsIfChanged(
+            EnergyStorageSystem ess,
+            EnergyManagementData emu,
+            int unitIndex0,
+            int pcsBaseIndex)
+        {
+            int fingerprint = ComputeCommandFingerprint(ess, emu, unitIndex0);
+            if (emu.HasCommandSyncFingerprint && fingerprint == emu.LastCommandSyncFingerprint)
+                return;
+
             if (unitIndex0 < ess._unitBreakers.Count)
                 ess.SetUnitBreakerClosed(unitIndex0, emu.Emu.PowerOnOff != 0);
 
@@ -33,7 +51,49 @@ namespace EssSimulator.EssSimModelApi.Mappers
             EmuSystemOperationApplier.Apply(emu);
             PcsMapper.ApplyEmuCommands(emu, ess, pcsBaseIndex);
 
-            SyncDeviceMirrors(ess, emu, unitIndex0, unitXfRatedKw);
+            emu.LastCommandSyncFingerprint = ComputeCommandFingerprint(ess, emu, unitIndex0);
+            emu.HasCommandSyncFingerprint = true;
+        }
+
+        private static int ComputeCommandFingerprint(
+            EnergyStorageSystem ess,
+            EnergyManagementData emu,
+            int unitIndex0)
+        {
+            var h = new HashCode();
+            var e = emu.Emu;
+            h.Add(e.PowerOnOff);
+            h.Add(e.RemoteControlEnable);
+            h.Add(e.RemoteControlMode);
+            h.Add(e.SystemOperation);
+            h.Add(e.BlackStartModeWrite);
+            h.Add(e.TargetActivePower);
+            h.Add(e.TargetReactivePower);
+            h.Add(ess.IsMainBreakerClosed);
+            h.Add(ess.IsUnitBreakerClosed(unitIndex0));
+
+            int pcsBase = ess.PcsBaseIndexOfUnit(unitIndex0);
+            for (int i = 0; i < emu.PcsList.Count; i++)
+            {
+                var pcs = emu.PcsList[i];
+                h.Add(pcs.pcsOnOffSwitch);
+                h.Add(pcs.PCSActivePowerSetting);
+                h.Add(pcs.PCSReactivePowerSetting);
+                h.Add(pcs.BlackStartEnabled);
+                h.Add(pcs.IslandVoltageSetting);
+                h.Add(pcs.ChargeProhibited);
+                h.Add(pcs.DischargeProhibited);
+
+                int simIdx = pcsBase + i;
+                if (simIdx < 0 || simIdx >= ess._pcsList.Count)
+                    continue;
+                var sim = ess._pcsList[simIdx];
+                h.Add(sim.HasLatchedFaultTrip);
+                h.Add(sim.IsGridElectricallyAvailable);
+                h.Add(sim.IsBlackStartSynchronized);
+            }
+
+            return h.ToHashCode();
         }
 
         /// <summary>
@@ -49,7 +109,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
         {
             emu.Breaker.Closed = (ushort)(emu.Emu.PowerOnOff != 0 ? 1 : 0);
 
-            PcsMapper.MapElectricityMeterState(emu);
+            PcsMapper.MapElectricityMeterState(emu, ess, unitIndex0);
 
             if (emu.Transformers.Count == 0)
                 return;

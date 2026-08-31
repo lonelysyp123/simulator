@@ -1,6 +1,6 @@
 using EssSimulator.EssDeviceSimModel;
+using EssSimulator.EssDeviceSimModel.Bms;
 using EssSimulator.EssDeviceSimModel.Devices;
-using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 
 namespace EssSimulator.Tests.Devices;
 

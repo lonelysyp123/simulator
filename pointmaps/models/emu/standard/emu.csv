@@ -1,5 +1,5 @@
 FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim
-5,1000,bool,1,yx0,1,高压断路器开合,model=4|arg1=emuDeviceId.Emu.PowerOnOff|arg2=|arg3=|arg4=1000
+5,1000,bool,1,yx0,1,高压断路器开合,model=4|arg1=emuDeviceId.Breaker.Closed|arg2=|arg3=|arg4=1000
 5,1001,bool,1,yx1,1,低压断路器开合,0
 5,1002,bool,1,yx2,1,PCS1黑启动开启,model=4|arg1=emuDeviceId.PcsList[0].BlackStartEnabled|arg2=|arg3=|arg4=1000
 5,1003,bool,1,yx3,1,单元1PCS启停,model=4|arg1=emuDeviceId.PcsList[0].pcsOnOffSwitch|arg2=|arg3=|arg4=1000

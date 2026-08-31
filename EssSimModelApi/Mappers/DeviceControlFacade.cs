@@ -2,7 +2,6 @@ using EssSimulator.Core;
 using EssSimulator.Display;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
-using EssSimulator.Web;
 
 namespace EssSimulator.EssSimModelApi.Mappers
 {
@@ -61,7 +60,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
             return true;
         }
 
-        /// <summary>单元高压断路器：写 EMU 镜像 PowerOnOff 并驱动电气网络（与 EmuUnitBreakerEffect 语义一致）。</summary>
+        /// <summary>单元高压断路器：写 EMU 级 Breaker.Closed（并同步 PowerOnOff 别名）并驱动电气网络。</summary>
         public static bool TrySetUnitBreaker(int unit1Based, bool closed, out string message)
         {
             message = string.Empty;
@@ -71,17 +70,19 @@ namespace EssSimulator.EssSimModelApi.Mappers
                 return false;
             }
 
-            var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
-            var emu = SimulatorHost.Instance.Get<EnergyManagementData>($"emu{unit1Based}");
+            var ess = SimulatorHost.Instance.TryGetEss();
+            var emu = SimulatorHost.Instance.TryGetEmu(unit1Based);
             if (ess == null || emu == null)
             {
                 message = $"找不到 emu{unit1Based} 或 ess（请确认仿真已启动且单元号在配置范围内）";
                 return false;
             }
 
-            emu.Emu.PowerOnOff = (ushort)(closed ? 1 : 0);
+            ushort value = (ushort)(closed ? 1 : 0);
+            emu.Breaker.Closed = value;
+            emu.Emu.PowerOnOff = value;
             ess.SetUnitBreakerClosed(unit1Based - 1, closed);
-            SnapshotService.RequestImmediatePush();
+            UiSnapshotNotifier.RequestImmediatePush();
 
             message = $"单元 {unit1Based} 高压断路器{(closed ? "合闸" : "分闸")}";
             return true;
@@ -90,7 +91,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
         /// <summary>光伏启停（直驱 PvLogger → PvUnitDevice）。</summary>
         public static bool TrySetPvRun(int pv1Based, bool run, out string message)
         {
-            var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
+            var ess = SimulatorHost.Instance.TryGetEss();
             if (ess == null)
             {
                 message = "找不到 ess 模型，请确认仿真已启动";
@@ -100,14 +101,14 @@ namespace EssSimulator.EssSimModelApi.Mappers
             if (!ess.TrySetPvRun(pv1Based, run, out message))
                 return false;
 
-            SnapshotService.RequestImmediatePush();
+            UiSnapshotNotifier.RequestImmediatePush();
             return true;
         }
 
         /// <summary>光伏有功/无功设定（kW/kvar，缺省项保留现值）。</summary>
         public static bool TrySetPvPower(int pv1Based, double? activeKw, double? reactiveKvar, out string message)
         {
-            var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
+            var ess = SimulatorHost.Instance.TryGetEss();
             if (ess == null)
             {
                 message = "找不到 ess 模型，请确认仿真已启动";
@@ -117,7 +118,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
             if (!ess.TrySetPvPower(pv1Based, activeKw, reactiveKvar, out message))
                 return false;
 
-            SnapshotService.RequestImmediatePush();
+            UiSnapshotNotifier.RequestImmediatePush();
             return true;
         }
 
@@ -144,7 +145,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
             unit1Based = PcsUnitLayout.UnitIndexOf(layout, pcs1Based - 1) + 1;
             slot = PcsUnitLayout.SlotOfChannel(layout, pcs1Based - 1);
 
-            emu = SimulatorHost.Instance.Get<EnergyManagementData>($"emu{unit1Based}");
+            emu = SimulatorHost.Instance.TryGetEmu(unit1Based);
             if (emu == null)
             {
                 message = $"找不到 emu{unit1Based}（PCS{pcs1Based} 超出当前配置范围或仿真未启动）";

@@ -4,9 +4,9 @@ using EssSimulator.EssDeviceSimModel.Model;
 namespace EssSimulator.Web.Topology
 {
     /// <summary>
-    /// 将组态工程映射为径向电站运行时配置（规模 + 参数）。
-    /// 电气接线仍按 NetworkTopologyBuilder 固定模板展开：储能单元数 = 含 PCS 的 EMU 虚拟节点数，
-    /// 每单元 PCS 数 = 通过 emuId 归入该 EMU 的 PCS 节点数；
+    /// 将组态工程映射为径向电站运行时配置（规模 + 参数 + 电表抽头）。
+    /// 母线/电表连线解析为运行时母线 Id，供电表按实际挂点采样；
+    /// 储能单元数 = 含 PCS 的 EMU 虚拟节点数，每单元 PCS 数 = 通过 emuId 归入该 EMU 的 PCS 节点数；
     /// 光伏单元展开为 overlay.PvUnits，运行时挂在 35 kV 母线送电。
     /// 工程须至少包含一个含 PCS 的 EMU 或光伏单元。
     /// </summary>
@@ -60,13 +60,15 @@ namespace EssSimulator.Web.Topology
             }
 
             var mainXfmr = project.Nodes
-                .Where(n => n.TemplateId == "transformer")
+                .Where(n => n.TemplateId == "transformer"
+                    && string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(n.Parameters, "emuId")))
                 .OrderByDescending(n => TopologyParamHelper.GetDouble(n.Parameters, "primaryVoltage", 0))
                 .FirstOrDefault();
             if (mainXfmr != null)
             {
                 overlay.Transformer = new TransformerConfig
                 {
+                    Present = true,
                     PrimaryVoltage = TopologyParamHelper.GetDouble(mainXfmr.Parameters, "primaryVoltage", 220000),
                     SecondaryVoltage = TopologyParamHelper.GetDouble(mainXfmr.Parameters, "secondaryVoltage", 35000),
                     RatedPower = TopologyParamHelper.GetDouble(mainXfmr.Parameters, "ratedPowerKva", 31500),
@@ -77,6 +79,19 @@ namespace EssSimulator.Web.Topology
                 if (overlay.Pcc != null)
                     overlay.Pcc.StationBusNominalLineVoltage = overlay.Transformer.SecondaryVoltage;
                 overlay.Notes.Add($"主变 → {overlay.Transformer.PrimaryVoltage / 1000:0.#}/{overlay.Transformer.SecondaryVoltage / 1000:0.#} kV");
+            }
+            else
+            {
+                double stationV = overlay.Pcc?.NominalLineVoltage ?? 35000;
+                overlay.Transformer = new TransformerConfig
+                {
+                    Present = false,
+                    PrimaryVoltage = stationV,
+                    SecondaryVoltage = stationV
+                };
+                if (overlay.Pcc != null)
+                    overlay.Pcc.StationBusNominalLineVoltage = stationV;
+                overlay.Notes.Add("组态无站用主变：主断下游直接接到站用母线");
             }
 
             var meter = project.Nodes.FirstOrDefault(n =>
@@ -89,13 +104,19 @@ namespace EssSimulator.Web.Topology
                 const double CtSecondaryA = 5;
                 double ptPri = TopologyParamHelper.GetDouble(meter.Parameters, "ptPrimaryVoltage", 220000);
                 double ctPri = TopologyParamHelper.GetDouble(meter.Parameters, "ctPrimaryCurrent", 2000);
+                string sourceBusId = TopologyElectricalMapper.ResolveMeterSourceBusId(project, meter)
+                    ?? RuntimeBusIds.AfterMainBreaker;
+                string? busLabel = TopologyElectricalMapper.FindConnectedAcBus(project, meter.Id)?.Label;
                 overlay.Meter = new MeterConfig
                 {
                     PccMeter = new MeterInstanceConfig
                     {
-                        MountDescription = "组态工程 PCC 电表（一次侧统一抽头）",
+                        MountDescription = busLabel == null
+                            ? $"组态 PCC 电表抽头 {sourceBusId}"
+                            : $"组态 PCC 电表「{meter.Label}」接「{busLabel}」→ {sourceBusId}",
                         ReportedQuantity = MeterReportedQuantity.Primary,
                         AccuracyClass = TopologyParamHelper.GetString(meter.Parameters, "accuracyClass", "0.2S"),
+                        SourceBusId = sourceBusId,
                         Pt = new PtConfig
                         {
                             PrimaryLineVoltageV = ptPri,
@@ -109,7 +130,7 @@ namespace EssSimulator.Web.Topology
                         }
                     }
                 };
-                overlay.Notes.Add($"电表一次侧 · {ptPri / 1000:0.#} kV / {ctPri:0.#} A（二次固定 {PtSecondaryV:0}V / {CtSecondaryA:0}A）");
+                overlay.Notes.Add($"电表抽头 {sourceBusId} · {ptPri / 1000:0.#} kV / {ctPri:0.#} A（二次固定 {PtSecondaryV:0}V / {CtSecondaryA:0}A）");
             }
 
             // 单元变取首个 EMU 参数；PCS 额定取首台 PCS；仅有光伏时用光伏箱变/逆变器参数
@@ -207,6 +228,9 @@ namespace EssSimulator.Web.Topology
                 unit.UnitBreakerName = NodeDisplayName(unitBreaker);
                 unit.HasUnitMeter = unitMeter != null;
                 unit.UnitMeterName = NodeDisplayName(unitMeter);
+                unit.UnitMeterSourceBusId = unitMeter == null
+                    ? null
+                    : TopologyElectricalMapper.ResolveMeterSourceBusId(project, unitMeter);
 
                 var usedBms = new HashSet<string>(StringComparer.Ordinal);
                 int linkedBms = 0;

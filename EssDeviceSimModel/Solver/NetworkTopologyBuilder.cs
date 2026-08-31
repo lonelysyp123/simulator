@@ -49,7 +49,8 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 Connection = ThreePhaseConnection.Star
             };
 
-            var topology = BuildTopology(unitCount, pccCfg, unitTransCfg);
+            var topology = BuildTopology(
+                unitCount, pccCfg, unitTransCfg, meterCfg.PccMeter.SourceBusId, mainTransCfg.Present);
             var dcLinks = BuildDcLinks(unitCount, pcsPerUnit);
 
             var grid = new GridSimulator("grid", gridConfig);
@@ -104,17 +105,19 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 DcLinks = dcLinks,
                 PcsPerUnit = pcsPerUnit ?? Array.Empty<int>(),
                 PccLineVoltageV = pccCfg.NominalLineVoltage,
-                StationBus35LineVoltageV = pccCfg.StationBusNominalLineVoltage
+                StationBus35LineVoltageV = pccCfg.StationBusNominalLineVoltage,
+                HasMainTransformer = mainTransCfg.Present
             };
 
-            network.Solver = new NetworkSolver(network, pccCfg, pcsCfg, legacyEss);
             return network;
         }
 
         private static NetworkTopology BuildTopology(
             int unitCount,
             PccConfig pccCfg,
-            UnitTransformerConfig unitTransCfg)
+            UnitTransformerConfig unitTransCfg,
+            string? pccMeterSourceBusId,
+            bool hasMainTransformer)
         {
             var config = new ElectricalTopologyConfig
             {
@@ -125,23 +128,23 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 {
                     new BusDefinition
                     {
-                        Id = "BUS_GRID",
+                        Id = RuntimeBusIds.Grid,
                         NominalLineVoltageV = pccCfg.NominalLineVoltage,
                         Connection = ThreePhaseConnection.Star,
-                        Description = "220kV PCC"
+                        Description = "PCC grid"
                     },
                     new BusDefinition
                     {
-                        Id = "BUS_AFTER_MAIN_BRK",
+                        Id = RuntimeBusIds.AfterMainBreaker,
                         NominalLineVoltageV = pccCfg.NominalLineVoltage,
                         Connection = ThreePhaseConnection.Star
                     },
                     new BusDefinition
                     {
-                        Id = "BUS_35",
+                        Id = RuntimeBusIds.Station35,
                         NominalLineVoltageV = pccCfg.StationBusNominalLineVoltage,
                         Connection = ThreePhaseConnection.Star,
-                        Description = "35kV station bus"
+                        Description = "station bus"
                     }
                 },
                 SeriesLinks =
@@ -151,16 +154,10 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                         LinkId = "L_MAIN_BRK",
                         DeviceId = "main_breaker",
                         DeviceKind = ElectricalDeviceKind.Breaker,
-                        UpstreamBusId = "BUS_GRID",
-                        DownstreamBusId = "BUS_AFTER_MAIN_BRK"
-                    },
-                    new SeriesLinkDefinition
-                    {
-                        LinkId = "L_MAIN_XFMR",
-                        DeviceId = "main_transformer",
-                        DeviceKind = ElectricalDeviceKind.Transformer,
-                        UpstreamBusId = "BUS_AFTER_MAIN_BRK",
-                        DownstreamBusId = "BUS_35"
+                        UpstreamBusId = RuntimeBusIds.Grid,
+                        DownstreamBusId = hasMainTransformer
+                            ? RuntimeBusIds.AfterMainBreaker
+                            : RuntimeBusIds.Station35
                     }
                 },
                 MeasurementTaps =
@@ -168,11 +165,23 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                     new MeasurementTapDefinition
                     {
                         MeterDeviceId = "pcc_meter",
-                        SourceDeviceId = "main_transformer",
-                        SourcePortId = "primary"
+                        SourceDeviceId = pccMeterSourceBusId ?? RuntimeBusIds.AfterMainBreaker,
+                        SourcePortId = "bus"
                     }
                 }
             };
+
+            if (hasMainTransformer)
+            {
+                config.SeriesLinks.Add(new SeriesLinkDefinition
+                {
+                    LinkId = "L_MAIN_XFMR",
+                    DeviceId = "main_transformer",
+                    DeviceKind = ElectricalDeviceKind.Transformer,
+                    UpstreamBusId = RuntimeBusIds.AfterMainBreaker,
+                    DownstreamBusId = RuntimeBusIds.Station35
+                });
+            }
 
             for (int u = 0; u < unitCount; u++)
             {

@@ -1,9 +1,7 @@
 using EssSimulator.Core;
 using EssSimulator.DataExchange.Catalog;
-using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
 using EssSimulator.EssSimModelApi.Mappers;
-using EssSimulator.Web;
 
 namespace EssSimulator.DataExchange.Effects
 {
@@ -58,7 +56,7 @@ namespace EssSimulator.DataExchange.Effects
         }
     }
 
-    /// <summary>EMU 单元高压断路器（emu.Emu.PowerOnOff → 电气网络单元断路器）。</summary>
+    /// <summary>EMU 单元高压断路器（Breaker.Closed / Emu.PowerOnOff → 电气网络单元断路器）。</summary>
     public sealed class EmuUnitBreakerEffect : IControlEffect
     {
         public ControlEffectId Id => ControlEffectId.UnitHighVoltageBreaker;
@@ -68,13 +66,17 @@ namespace EssSimulator.DataExchange.Effects
             if (!EmuPcsControlEffect.TryResolveEmuUnit(context, out int unit1Based))
                 return;
 
-            var ess = SimulatorHost.Instance.Get<EnergyStorageSystem>("ess");
-            var emu = SimulatorHost.Instance.Get<EnergyManagementData>($"emu{unit1Based}");
-            if (ess == null || emu == null)
+            var emu = SimulatorHost.Instance.TryGetEmu(unit1Based);
+            if (emu == null)
                 return;
 
-            ess.SetUnitBreakerClosed(unit1Based - 1, emu.Emu.PowerOnOff != 0);
-            SnapshotService.RequestImmediatePush();
+            bool closed = IsEmuLevelBreakerClosed(context.Binding.Target.PropertyPath)
+                ? emu.Breaker.Closed != 0
+                : emu.Emu.PowerOnOff != 0;
+            DeviceControlFacade.TrySetUnitBreaker(unit1Based, closed, out _);
         }
+
+        internal static bool IsEmuLevelBreakerClosed(string? propertyPath) =>
+            string.Equals(propertyPath, "Breaker.Closed", StringComparison.OrdinalIgnoreCase);
     }
 }

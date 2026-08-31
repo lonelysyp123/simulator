@@ -409,15 +409,12 @@ namespace EssSimulator
                 var cfg = sp.GetRequiredService<IOptions<SimulatorConfig>>().Value;
                 return new BmsDataService(cfg);
             });
-            builder.Services.AddHostedService(sp => sp.GetRequiredService<BmsDataService>());
 
             builder.Services.AddHostedService<BmsLinkService>();
 
             builder.Services.AddSingleton<PcsDataServer>();
-            builder.Services.AddHostedService(sp => sp.GetRequiredService<PcsDataServer>());
-
             builder.Services.AddSingleton<EmDataService>();
-            builder.Services.AddHostedService(sp => sp.GetRequiredService<EmDataService>());
+            builder.Services.AddSingleton<ProtocolProjectionService>();
 
             bool enableLocalControl = builder.Configuration.GetSection(SimulatorConfig.Section)
                 .GetSection(nameof(SimulatorConfig.Protocol))
@@ -440,6 +437,8 @@ namespace EssSimulator
 
             // 确保切片 Store 在控制管道写入前完成静态挂载
             _ = app.Services.GetRequiredService<EssSimulator.Web.DroopSlices.DroopSliceStore>();
+            // 协议镜像投影挂到 PlantEngine.Step 末尾（不再各自 100ms 循环）
+            _ = app.Services.GetRequiredService<ProtocolProjectionService>();
 
             var simCfg = app.Services.GetRequiredService<IOptions<SimulatorConfig>>().Value;
             BlackStartSafety.Register(app.Services.GetRequiredService<IHostApplicationLifetime>());
@@ -515,6 +514,7 @@ namespace EssSimulator
 
         private static void CopyTransformer(TransformerConfig src, TransformerConfig dst)
         {
+            dst.Present = src.Present;
             dst.RatedPower = src.RatedPower;
             dst.PrimaryVoltage = src.PrimaryVoltage;
             dst.SecondaryVoltage = src.SecondaryVoltage;

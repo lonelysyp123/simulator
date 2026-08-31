@@ -142,7 +142,7 @@ public class PvPointMapBindingTests
 
     private static ModbusPointMap LoadMap(string fileName)
     {
-        var path = Path.Combine(FindRepoRoot(), fileName);
+        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "pv", "standard", fileName);
         Assert.True(File.Exists(path), path);
         return new ModbusPointMap(path, "simPv1");
     }

@@ -5,9 +5,6 @@ namespace EssSimulator.Configuration
 {
     public class RuntimeConfig
     {
-        /// <summary>是否禁用控制台 GUI（无头模式）</summary>
-        public bool NoGui { get; set; } = false;
-
         /// <summary>
         /// 积分步长倍数（无量纲）：仅放大 SOC、电能等积分量的 dt（基于真实回调间隔），不改变瞬时值动力学 dt。
         /// </summary>
@@ -21,9 +18,6 @@ namespace EssSimulator.Configuration
 
         /// <summary>电压源（电网）激活性传播周期（ms）。</summary>
         public int PropagationIntervalMs { get; set; } = 100;
-
-        /// <summary>使用事件驱动电气传播替代 Solver 主循环步进。</summary>
-        public bool UseElectricalPropagation { get; set; } = true;
 
         /// <summary>设备 Step 后 Q-U 与电压传播的最大迭代轮数（≥1，首轮为 Phase3–5 主路径）。</summary>
         public int PropagationQuvMaxIterations { get; set; } = 3;
@@ -271,6 +265,8 @@ namespace EssSimulator.Configuration
         public bool HasUnitMeter { get; set; } = true;
         /// <summary>组态绑定到本单元的电表节点名称（未绑定时为 null）。</summary>
         public string? UnitMeterName { get; set; }
+        /// <summary>单元电表所接运行时母线 Id；空则仍按 PCS 交流母线镜像。</summary>
+        public string? UnitMeterSourceBusId { get; set; }
         /// <summary>组态绑定到本单元的单元变节点名称（可选，仅镜像展示）。</summary>
         public string? UnitTransformerName { get; set; }
 
@@ -355,7 +351,6 @@ namespace EssSimulator.Configuration
         public int PcsModbusPort => Protocol.BaseEmuModbusPort;
         public int EmModbusPort => Protocol.EmModbusPort;
         public double IntegrationStepMultiplier => Runtime.IntegrationStepMultiplier;
-        public bool NoGui => Runtime.NoGui;
 
         /// <summary>各储能单元下属 PCS 台数（未配置单元回退 2）。</summary>
         public IReadOnlyList<int> GetPcsCountsPerUnit()
@@ -511,6 +506,8 @@ namespace EssSimulator.Configuration
         public double MagnetizingInrushPeakExtraMultipleOfRatedPrimary { get; set; } = 4.0;
         public double MagnetizingInrushDecayTimeConstantSec { get; set; } = 0.45;
         public double MagnetizingInrushMaxExtraMultipleOfRatedPrimary { get; set; } = 12.0;
+        /// <summary>工程是否包含站用主变；false 时主断下游直接接到站用母线。</summary>
+        public bool Present { get; set; } = true;
     }
 
     /// <summary>单元升压一体机变压器参数（对应 appsettings.json: UnitTransformer 节，35kV/690V）</summary>

@@ -99,7 +99,7 @@ namespace EssSimulator.DataExchange.Pipeline
 
             if (_logFeedback)
             {
-                _log.Info(
+                _log.Debug(
                     $"[{FeedbackLogPrefix}-Feedback] {_serverName}.{paramName} write={FormatValue(applied)} readback={FormatValue(readback)} ok={readbackOk}");
             }
 
@@ -111,13 +111,6 @@ namespace EssSimulator.DataExchange.Pipeline
             }
 
             _shadow.CommitControl(paramName, applied);
-
-            if (_logFeedback)
-            {
-                _log.Info(
-                    $"[{FeedbackLogPrefix}-Feedback:change] {_serverName}.{paramName} -> {FormatValue(applied)}");
-            }
-
             return true;
         }
 

@@ -2,6 +2,8 @@ using EssSimulator;
 using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssDeviceSimModel.Devices;
+using EssSimulator.EssDeviceSimModel.Model;
+using EssSimulator.EssDeviceSimModel.Solver;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
 
@@ -152,11 +154,59 @@ namespace EssSimulator.EssSimModelApi.Mappers
         }
 
         /// <summary>
-        /// 单元电表镜像刷新：线/相电压与频率跟随单元 PCS 交流母线（同母线共量），
+        /// 单元电表镜像刷新：若组态电表接到运行时母线则按该母线采样，
+        /// 否则线/相电压与频率跟随单元 PCS 交流母线（同母线共量），
         /// 相电流按 PCS 求和，功率取 EMU 单元聚合值；电能字段无积分模型，不刷新。
         /// </summary>
         public static void MapElectricityMeterState(EnergyManagementData emu) =>
             FillMeterFromPcs(emu.ElectricityMeter, emu.PcsList, emu.Emu.OutputActivePower, emu.Emu.OutputReactivePower);
+
+        public static void MapElectricityMeterState(EnergyManagementData emu, EnergyStorageSystem ess, int unitIndex0)
+        {
+            var busId = ess.GetUnitMeterSourceBusId(unitIndex0);
+            if (!string.IsNullOrWhiteSpace(busId))
+            {
+                var sample = MeterBusSampler.Sample(
+                    ess.ElectricalNetwork,
+                    ess.RadialGraph,
+                    busId,
+                    ess.ElectricalNetwork.SystemFrequencyHz);
+                FillMeterFromSample(
+                    emu.ElectricityMeter,
+                    sample,
+                    emu.Emu.OutputActivePower,
+                    emu.Emu.OutputReactivePower);
+                return;
+            }
+
+            FillMeterFromPcs(emu.ElectricityMeter, emu.PcsList, emu.Emu.OutputActivePower, emu.Emu.OutputReactivePower);
+        }
+
+        public static void FillMeterFromSample(
+            EnergyManagementSystem.ElectricityMeterData meter,
+            AcInternalQuantities sample,
+            float totalP,
+            float totalQ)
+        {
+            float lineV = (float)sample.LineVoltageV;
+            meter.LineVoltageAB = lineV;
+            meter.LineVoltageBC = lineV;
+            meter.LineVoltageCA = lineV;
+            float phaseV = lineV / MathF.Sqrt(3);
+            meter.PhaseAVoltage = phaseV;
+            meter.PhaseBVoltage = phaseV;
+            meter.PhaseCVoltage = phaseV;
+            meter.Frequency = (float)sample.FrequencyHz;
+            float i = (float)sample.LineCurrentA;
+            meter.PhaseACurrent = i;
+            meter.PhaseBCurrent = i;
+            meter.PhaseCCurrent = i;
+            meter.TotalActivePower = totalP;
+            meter.TotalReactivePower = totalQ;
+            float apparent = MathF.Sqrt(totalP * totalP + totalQ * totalQ);
+            meter.TotalApparentPower = apparent;
+            meter.PowerFactor = apparent > 0 ? totalP / apparent : 0f;
+        }
 
         /// <summary>
         /// 电表镜像通用填充：电压/频率/相电流来自指定 PCS 集合的交流母线，

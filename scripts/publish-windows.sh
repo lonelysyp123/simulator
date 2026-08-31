@@ -8,8 +8,7 @@ source "$ROOT/scripts/pointmap-common.sh"
 OUT="$ROOT/dist/win-x64"
 ZIP="$ROOT/dist/EssSimulator-win-x64.zip"
 
-# 根目录点表固定取 standard 型号；设备型号点表（pointmaps/models）随发布携带，
-# 运行期可在系统配置界面选型。
+# 设备型号点表（pointmaps/models）随发布携带，运行期按选型解析。
 
 RUNTIME_FILES=(
   appsettings.json
@@ -18,7 +17,7 @@ RUNTIME_FILES=(
 )
 
 copy_runtime_files() {
-  echo "==> Copying runtime config (point map model: $DEFAULT_ROOT_MODEL)..."
+  echo "==> Copying runtime config..."
   for f in "${RUNTIME_FILES[@]}"; do
     cp -f "$ROOT/$f" "$OUT/$f"
     echo "    $f"

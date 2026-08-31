@@ -18,6 +18,9 @@ export async function getCells(unit, cluster) { return (await api.get(`/cells/${
 export async function getRackThresholds(unit, rack = 0) {
   return (await api.get(`/bms/${unit}/rack-thresholds`, { params: { rack } })).data
 }
+export async function postRackThresholds(unit, body) {
+  return (await api.post(`/bms/${unit}/rack-thresholds`, body)).data
+}
 export async function getAlarms() { return (await api.get('/alarms')).data }
 export async function getBmsAlarms(unit, rack) {
   return (await api.get(`/alarms/bms/${unit}`, { params: rack == null ? {} : { rack } })).data
