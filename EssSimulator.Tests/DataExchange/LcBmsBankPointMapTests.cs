@@ -194,6 +194,18 @@ public class LcBmsBankPointMapTests
     }
 
     [Fact]
+    public void G2ProRack_HasNoThresholdControlPoints_ProtocolSurfaceOnly()
+    {
+        var pointMap = new ModbusPointMap(LcBankCsvPath, "simBms1", clusterCount: 12);
+        var catalog = PointCatalogLoader.FromPointMap(pointMap, "simBms1");
+
+        Assert.DoesNotContain(
+            pointMap.RackControlMaps,
+            m => (m.ModelSim ?? "").Contains("Thresholds.", StringComparison.OrdinalIgnoreCase));
+        Assert.Null(catalog.FindRackControl("yt0"));
+    }
+
+    [Fact]
     public void LcBank_NoAddressDuplicates()
     {
         var pointMap = new ModbusPointMap(LcBankCsvPath, "simBms1", clusterCount: 12);

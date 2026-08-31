@@ -5,6 +5,9 @@ namespace EssSimulator.EssDeviceSimModel.Solver
     /// <summary>电气网络求解步编排：同步控制意图 → Solver → 回写电网/PCS 网侧状态。</summary>
     public static class NetworkStepOrchestrator
     {
+        /// <summary>
+        /// Solver 夹具步进前同步。生产路径由 <c>RadialPowerSweepEngine.SolveCycle</c> 自行同步，勿再从 PlantEngine 调用。
+        /// </summary>
         public static void SyncBeforeSolverStep(ElectricalNetwork network, EnergyStorageSystem ess, DateTime simTime)
         {
             NetworkControlBridge.SyncLoadPlan(network, ess._loadDevice, simTime);
@@ -20,6 +23,8 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             PcsPhysicalConfig pcsCfg)
         {
             SyncBeforeSolverStep(network, ess, simTime);
+            if (network.Solver == null)
+                throw new InvalidOperationException("NetworkSolver 仅测试夹具使用，生产路径请走 RadialPowerSweepEngine");
             network.Solver.Step(step, meterIntegrationStep);
             ApplyGridResultsToEnergyStorageSystem(network, ess, simTime, step, pcsCfg);
             NetworkControlBridge.ProjectBreakersToLegacy(network, ess);
@@ -58,9 +63,13 @@ namespace EssSimulator.EssDeviceSimModel.Solver
 
             if (mainClosed)
             {
-                ess._mainTransformer.OverrideSecondaryVoltage(network.StationBus35LineVoltageV);
+                if (network.HasMainTransformer)
+                    ess._mainTransformer.OverrideSecondaryVoltage(network.StationBus35LineVoltageV);
                 return;
             }
+
+            if (!network.HasMainTransformer)
+                return;
 
             if (network.StationBus35LineVoltageV > 1.0)
             {

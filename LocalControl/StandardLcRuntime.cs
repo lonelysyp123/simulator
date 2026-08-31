@@ -3,11 +3,10 @@ using log4net;
 namespace EssSimulator.LocalControl
 {
     /// <summary>
-    /// LocalControl 报文转发引擎：在 simLc* 与 simEmu* 寄存器之间做聚合与分发，不触碰物理仿真。
+    /// 基础 LC 运行时：在 simLc* 与 simEmu* 寄存器之间按点名聚合与分发，不触碰物理仿真。
     /// </summary>
-    internal sealed class LocalControlBridgeEngine
+    internal sealed class StandardLcRuntime : LcRuntimeBase
     {
-        private readonly ILog _log;
         private readonly Dictionary<string, double> _controlShadow = new();
 
         /// <summary>EMU 点名（对应 emu.csv）——遥测读取与控制下发共用。</summary>
@@ -39,9 +38,9 @@ namespace EssSimulator.LocalControl
 
         private const string EmuHvBreaker = "yx0";
 
-        public LocalControlBridgeEngine(ILog log) => _log = log;
+        public StandardLcRuntime(ILog log) : base(log) { }
 
-        public void RunCycle(
+        public override void RunCycle(
             Func<string, ModbusSimServer?> resolveEmu,
             LocalControlModbusServer lc,
             int lcIdx,
@@ -58,6 +57,7 @@ namespace EssSimulator.LocalControl
             string lcName = lc.ServerName;
             SyncTelemetry(resolveEmu, lc, lcIdx, emuPerGroup, emuCount);
             ApplyControls(resolveEmu, lc, lcName, lcIdx, emuPerGroup, emuCount);
+            CollectExtra(resolveEmu, lc, lcIdx, emuPerGroup, emuCount);
         }
 
         private void SyncTelemetry(
@@ -192,7 +192,7 @@ namespace EssSimulator.LocalControl
             if (!TryReadChangedControl(lc, lcName, lcParam, asBool: true, out var prevBlackStart, out var blackStartGlobal))
                 return;
 
-            _log.Info(
+            Log.Info(
                 $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevBlackStart)} -> {ModbusValueConverter.FormatControlValue(blackStartGlobal)}");
 
             bool success = true;
@@ -230,7 +230,7 @@ namespace EssSimulator.LocalControl
                 return;
             }
 
-            _log.Info(
+            Log.Info(
                 $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevHvCmd)} -> {ModbusValueConverter.FormatControlValue(hvCmd)}");
 
             bool success = true;
@@ -264,7 +264,7 @@ namespace EssSimulator.LocalControl
             }
             catch (Exception ex)
             {
-                _log.Warn($"{lcName}.param101 回退写入失败", ex);
+                Log.Warn($"{lcName}.param101 回退写入失败", ex);
             }
         }
 
@@ -293,7 +293,7 @@ namespace EssSimulator.LocalControl
             }
             catch (Exception ex)
             {
-                _log.Debug($"ReadParamOrDefault 读取 {paramName} 失败，回退 0", ex);
+                Log.Debug($"ReadParamOrDefault 读取 {paramName} 失败，回退 0", ex);
                 return 0;
             }
         }
@@ -309,7 +309,7 @@ namespace EssSimulator.LocalControl
             if (!TryReadChangedControl(lc, lcName, lcParam, asBool, out var prevValue, out var currentValue))
                 return;
 
-            _log.Info(
+            Log.Info(
                 $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevValue)} -> {ModbusValueConverter.FormatControlValue(currentValue)}");
 
             bool success;
@@ -447,13 +447,13 @@ namespace EssSimulator.LocalControl
             }
             catch (Exception ex)
             {
-                _log.Error(
+                Log.Error(
                     $"[LC-Publish:failed] {sourceLabel} -> {targetEmu}.{targetParam} value={value} error={ex.Message}",
                     ex);
                 return false;
             }
 
-            _log.Info($"[LC-Publish:success] {sourceLabel} -> {targetEmu}.{targetParam} value={value}");
+            Log.Debug($"[LC-Publish:success] {sourceLabel} -> {targetEmu}.{targetParam} value={value}");
             return true;
         }
     }

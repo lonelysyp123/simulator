@@ -45,10 +45,10 @@ namespace EssSimulator.Web.Topology
 
         public static TopologyRuntimeOverlay? TryLoad(string contentRoot)
         {
+            var modePath = Path.Combine(contentRoot, "configs", "topology", "runtime-mode.json");
+            var overlayPath = Path.Combine(contentRoot, "configs", "topology", "generated", "runtime-overlay.json");
             try
             {
-                var modePath = Path.Combine(contentRoot, "configs", "topology", "runtime-mode.json");
-                var overlayPath = Path.Combine(contentRoot, "configs", "topology", "generated", "runtime-overlay.json");
                 if (!File.Exists(modePath) || !File.Exists(overlayPath))
                     return null;
 
@@ -59,7 +59,8 @@ namespace EssSimulator.Web.Topology
                 var overlay = JsonSerializer.Deserialize<TopologyRuntimeOverlay>(File.ReadAllText(overlayPath), JsonOpts);
                 if (!IsUsable(overlay))
                 {
-                    Console.WriteLine("[Topology] 工程 overlay 无效（缺少储能或光伏发电单元），已忽略，改用 appsettings");
+                    Console.WriteLine(
+                        $"[Topology] 工程 overlay 无效（缺少储能或光伏发电单元），已忽略，改用 appsettings：{overlayPath}");
                     return null;
                 }
 
@@ -67,7 +68,8 @@ namespace EssSimulator.Web.Topology
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Topology] 加载工程 overlay 失败：{ex.Message}");
+                Console.WriteLine(
+                    $"[Topology] 加载工程 overlay 失败：{overlayPath} ({ex.GetType().Name}): {ex.Message}");
                 return null;
             }
         }

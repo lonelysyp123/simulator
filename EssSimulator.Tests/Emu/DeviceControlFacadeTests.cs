@@ -13,7 +13,7 @@ namespace EssSimulator.Tests.Emu;
 /// 内部设备直控门面测试：全程不注册 ModbusSimServer/点表，
 /// 验证控制不依赖点位存在，状态经 DTO 镜像冒泡。
 /// </summary>
-public class DeviceControlFacadeTests
+public class DeviceControlFacadeTests : SimulatorHostTestBase
 {
     private static PcsPhysicalConfig CreatePcsPhy() => new() { AcVoltageNominal = 690 };
 
@@ -40,8 +40,8 @@ public class DeviceControlFacadeTests
             new MeterConfig());
 
         var emu = PcsDataServer.BuildEmuMirror(cfg.Devices[0], pcsPhy);
-        SimulatorHost.Instance.Register("ess", ess);
-        SimulatorHost.Instance.Register("emu1", emu);
+        SimulatorHost.Instance.RegisterEss(ess);
+        SimulatorHost.Instance.RegisterEmu(1, emu);
         return (ess, emu);
     }
 
@@ -137,10 +137,12 @@ public class DeviceControlFacadeTests
             Assert.True(DeviceControlFacade.TrySetUnitBreaker(1, false, out _));
             Assert.False(ess.IsUnitBreakerClosed(0));
             Assert.Equal(0, emu.Emu.PowerOnOff);
+            Assert.Equal(0, emu.Breaker.Closed);
 
             Assert.True(DeviceControlFacade.TrySetUnitBreaker(1, true, out _));
             Assert.True(ess.IsUnitBreakerClosed(0));
             Assert.Equal(1, emu.Emu.PowerOnOff);
+            Assert.Equal(1, emu.Breaker.Closed);
         }
     }
 
@@ -172,7 +174,7 @@ public class DeviceControlFacadeTests
     {
         // 回归：修复前网侧状态只回写每单元通道 0/1，pcs3 始终 IsAvailable=false，
         // 启动后短暂待机，下一拍孤岛保护（故障 3）跳闸回停机。
-        // 不走 SimulatorHost 单例（避免并行测试互相替换注册），直接经映射层下发启停。
+        // 经映射层下发启停（本类已用 SimulatorHost 夹具隔离，不依赖点表）。
         var cfg = new SimulatorConfig
         {
             Devices =
@@ -267,5 +269,31 @@ public class DeviceControlFacadeTests
             Assert.Equal(0, pv.Logger.SubarrayOnOff);
             Assert.Equal(OperationMode.Off, pv.Inverters[0].GetCurrentState().Mode);
         }
+    }
+
+    [Fact]
+    public void TrySetUnitBreaker_RequestsSnapshotPush()
+    {
+        var recorder = new RecordingUiSnapshotNotifier();
+        UiSnapshotNotifier.Current = recorder;
+        try
+        {
+            var (ess, _) = BuildEssWithEmuMirror();
+            using (ess)
+            {
+                Assert.True(DeviceControlFacade.TrySetUnitBreaker(1, false, out _));
+                Assert.Equal(1, recorder.Count);
+            }
+        }
+        finally
+        {
+            UiSnapshotNotifier.Reset();
+        }
+    }
+
+    private sealed class RecordingUiSnapshotNotifier : IUiSnapshotNotifier
+    {
+        public int Count { get; private set; }
+        public void RequestImmediatePush() => Count++;
     }
 }

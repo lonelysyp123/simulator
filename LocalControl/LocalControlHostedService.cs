@@ -16,12 +16,12 @@ namespace EssSimulator.LocalControl
         private static readonly ILog Log = LogManager.GetLogger(typeof(LocalControlHostedService));
         private readonly SimulatorConfig _cfg;
         private readonly List<LocalControlModbusServer> _servers = new();
-        private readonly LocalControlBridgeEngine _bridge;
+        private readonly LcRuntimeBase _runtime;
 
         public LocalControlHostedService(IOptions<SimulatorConfig> simOptions)
         {
             _cfg = simOptions.Value;
-            _bridge = new LocalControlBridgeEngine(Log);
+            _runtime = LcRuntimeFactory.Create(LcRuntimeFactory.ResolveSelectedModelId(), Log);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -45,7 +45,7 @@ namespace EssSimulator.LocalControl
                     var lc = _servers[lcIdx];
                     try
                     {
-                        _bridge.RunCycle(store.Get<ModbusSimServer>, lc, lcIdx, emuPerGroup, emuCount);
+                        _runtime.RunCycle(store.Get<ModbusSimServer>, lc, lcIdx, emuPerGroup, emuCount);
                     }
                     catch (Exception ex)
                     {
@@ -101,7 +101,7 @@ namespace EssSimulator.LocalControl
                 var report = ProtocolLayerManager.Instance.RegisterAndStart(server, ProtocolDeviceType.Lc, "lc.csv");
                 _servers.Add(server);
                 if (server.IsOnline)
-                    Log.Info($"[LocalControl] {name} 已启动，端口 {server.Port}（从站号 {server.SlaveId}）");
+                    Log.Info($"[LocalControl] {name} 已启动，端口 {server.Port}（从站号 {server.SlaveId}），runtime={_runtime.GetType().Name}");
                 else
                     Log.Error($"[LocalControl] {name} 启动失败：{string.Join("；", report.Errors)}");
             }

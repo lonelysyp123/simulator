@@ -42,7 +42,7 @@ namespace EssSimulator.Protocol.Modbus
     /// 设备型号注册表：扫描 <c>pointmaps/models/{type}/{model}/</c> 发现设备类型与型号，
     /// 并在 <c>configs/topology/device-models.json</c> 持久化当前选型。
     /// 选型命中时 <see cref="PointMapPathResolver"/> 优先从型号目录解析点表；
-    /// 无选型文件时保持历史行为（根目录固定文件名 + pointmaps 版本目录兜底）。
+    /// 无选型时回退到 <c>pointmaps/models/{type}/standard/</c>。
     /// </summary>
     public static class DeviceModelRegistry
     {

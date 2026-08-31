@@ -27,24 +27,12 @@ namespace EssSimulator.EssDeviceSimModel
             _ess.CouplingGraph.StepCouplings(_ess.Thermal, simTime, elapsed, integrationElapsed);
             _ess.SyncUnitTransformerAfterPcsUpdate(simTime, elapsed);
             _ess.RefreshAllUnitBlackStartBusContexts();
-            NetworkControlBridge.SyncBmsLinksFromRacks(_ess.ElectricalNetwork, _ess._bmsRackDevices);
+            AfterPlantStep.Invoke(_ess, simTime, elapsed);
         }
 
         private void RunElectricalStep(DateTime simTime, TimeSpan elapsed, TimeSpan integrationElapsed)
         {
-            if (_ess.UseElectricalPropagation && _ess.PowerSweepEngine != null)
-            {
-                _ess.PowerSweepEngine.SolveCycle(simTime, elapsed, integrationElapsed);
-                return;
-            }
-
-            NetworkStepOrchestrator.SolverPrimaryStep(
-                _ess.ElectricalNetwork,
-                _ess,
-                simTime,
-                elapsed,
-                integrationElapsed,
-                _ess.PcsPhysicalConfig);
+            _ess.PowerSweepEngine.SolveCycle(simTime, elapsed, integrationElapsed);
         }
     }
 }

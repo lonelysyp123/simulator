@@ -1,39 +1,40 @@
 # 点位表（Point Maps）
 
-运行时程序从工作目录读取固定文件名：`emu.csv`、`em.csv`、`bms_bank.csv`、`bms_rack.csv`、`lc.csv`。
+运行时按逻辑文件名（`emu.csv`、`em.csv`、`bms_bank.csv`、`bms_rack.csv`、`lc.csv`、
+`pv_logger.csv`、`pv_apm810.csv`）解析，**只读取** `pointmaps/models/{类型}/{型号}/`。
+仓库根目录同名 CSV 不是源文件，开发也不再执行 `sync-pointmaps-to-root.sh`。
 
 解析优先级（见 `Protocol/Modbus/PointMapPathResolver.cs`）：
 
 1. **设备型号选型**（本目录 `models/`，运行期可在 Web「系统配置」页切换）
-2. 工作目录 / 输出目录根下的同名文件（sync / 发布脚本复制结果）
-3. `pointmaps/common/` 及其他版本目录（开发兜底）
+2. `pointmaps/models/{类型}/standard/`（未选型时的兜底）
 
 ## 设备型号（models/）
 
 按 **设备类型 → 设备型号 → 点表文件** 组织，运行期在系统配置界面选型，
 持久化到 `configs/topology/device-models.json`，重启后生效：
 
-EMU 点表另有自动选型规则：组态工程保存/应用时按 PCS 总数自动切换
+LC 点表另有自动选型规则：组态工程保存/应用时按 PCS 总数自动切换
 （2 台 → `standard`，4 台 → `trina_5.5MW`，8 台 → `trina_10MW`，
-其余数量保持现有选型，见 `Web/Topology/EmuPointMapAutoSelect.cs`）。
+其余数量保持现有选型，见 `Web/Topology/LcPointMapAutoSelect.cs`）。
+EMU 始终使用单元直控点表（`emu/standard`），不随 PCS 数量切换。
 
 ```
 pointmaps/models/
-  bms/          type.json + common/ lc/ battery/（bms_bank.csv + bms_rack.csv）
-  emu/          type.json + standard/（emu.csv）
+  bms/          type.json + standard/ g2_pro/（bms_bank.csv + bms_rack.csv）
+  emu/          type.json + standard/（emu.csv，单元 PCS 直控）
   em/           type.json + standard/（em.csv）
-  lc/           type.json + standard/（lc.csv）
+  lc/           type.json + standard/ trina_5.5MW/ trina_10MW/（lc.csv，中压系统）
+  pv/           type.json + standard/（pv_logger.csv + pv_apm810.csv）
 ```
 
 - `type.json`：`{ id, name, description, files }`，`files` 声明该设备类型使用的点表文件名。
 - `model.json`：`{ id, name, description }`，型号展示名与说明。
 - 新增型号：在对应设备类型目录下新建子目录，放入点表文件与 `model.json` 即可被自动识别，无需改代码。
-- PV 点表（`pv_logger.csv` 等）暂未纳入型号体系，仍从根目录读取。
 
-## EMU 系统级点位语义（emu.csv SYSTEM 工作表）
+## LC 中压系统级点位语义（trina_5.5MW / trina_10MW 的 lc.csv SYSTEM 段）
 
-EMU 为虚拟聚合模型（每储能单元 1 个 EMU，聚合 N 台 PCS），以下系统级点位
-绑定到 `emuN.Emu.*` 后由均分派发/批量语义生效：
+中压 LC 挂在 `simLc*`，系统级点位绑定到所属机组 `emuN.Emu.*` 后由均分派发/批量语义生效：
 
 | 点位 | 绑定字段 | 语义 |
 |------|----------|------|
@@ -45,10 +46,10 @@ EMU 为虚拟聚合模型（每储能单元 1 个 EMU，聚合 N 台 PCS），�
 | `syst1011` | `Emu.TargetReactivePower` | EMU 级目标无功（kvar）；远程使能时按台数均分 |
 | `sysyc200~203` | `Emu.TotalPcsCount` 等统计字段 | PCS 总数/运行/告警/故障台数（`MapEmuState` 同步刷新） |
 
-- 单 PCS 直控点位（yt/yx 系列，绑定 `emuN.PcsList[i].*`）在本地模式下照旧生效；
+- 单元 EMU（`emu/standard` 的 yt/yx 系列，绑定 `emuN.PcsList[i].*`）在本地模式下照旧生效；
   远程均分生效时以均分值覆盖功率设定。
-- standard 版 emu.csv 保持单 PCS 直控点位不变（向后兼容）；trina 型号点表的
-  系统级绑定待对应分支合入后手工补入。
+- 基础 LC（`lc/standard`）无 ModelSim，仍按点名桥接 `simEmu*`；中压 LC 点表含 ModelSim，
+  由 DataExchange 采集进本机 LC Modbus。
 
 ## EMU 设备树路径语法（分层构成）
 
@@ -83,11 +84,8 @@ EMU 不参与电气求解，分层仅为协议聚合视图：组内 PCS 与扁�
 
 ## 本地联调
 
-```bash
-./scripts/sync-pointmaps-to-root.sh           # 默认 common
-./scripts/sync-pointmaps-to-root.sh lc
-./scripts/sync-pointmaps-to-root.sh battery
-```
+点表源文件即 `pointmaps/models/`，`dotnet run` / `./scripts/dev-up.sh` 直接解析型号目录。
+`./scripts/sync-pointmaps-to-root.sh` 仅校验 models 完整性，不再把 CSV 复制到仓库根。
 
 ## 发布（开发脚本）
 

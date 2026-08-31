@@ -64,10 +64,11 @@ public class PointMapPathResolverSelectionTests : IDisposable
     [Fact]
     public void Resolve_WithoutSelection_FallsBackToStandardModel()
     {
-        // 构造器已清理选型文件；未选型时兜底到 standard 型号点表（或根目录运行时副本）
-        var resolved = PointMapPathResolver.Resolve("emu.csv");
+        var resolved = Path.GetFullPath(PointMapPathResolver.Resolve("emu.csv"));
+        Assert.Contains(Path.Combine("pointmaps", "models", "emu", "standard"), resolved);
         Assert.EndsWith("emu.csv", resolved);
         Assert.True(File.Exists(resolved));
+        AssertNotRootCopy(resolved, "emu.csv");
     }
 
     [Fact]
@@ -75,7 +76,6 @@ public class PointMapPathResolverSelectionTests : IDisposable
     {
         try
         {
-            // 仅选型 BMS；未选型的设备类型（EMU）仍走兜底解析（standard 型号或根目录副本）
             DeviceModelRegistry.SaveSelection(new DeviceModelSelection
             {
                 Selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -84,13 +84,76 @@ public class PointMapPathResolverSelectionTests : IDisposable
                 }
             });
 
-            var resolved = PointMapPathResolver.Resolve("emu.csv");
+            var resolved = Path.GetFullPath(PointMapPathResolver.Resolve("emu.csv"));
+            Assert.Contains(Path.Combine("pointmaps", "models", "emu", "standard"), resolved);
             Assert.EndsWith("emu.csv", resolved);
             Assert.True(File.Exists(resolved));
+            AssertNotRootCopy(resolved, "emu.csv");
         }
         finally
         {
             CleanupSelection();
+        }
+    }
+
+    [Fact]
+    public void Resolve_BmsG2Pro_DoesNotReadRootBankCsv()
+    {
+        try
+        {
+            DeviceModelRegistry.SaveSelection(new DeviceModelSelection
+            {
+                Selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["bms"] = "g2_pro"
+                }
+            });
+
+            var resolved = Path.GetFullPath(PointMapPathResolver.Resolve("bms_bank.csv"));
+            Assert.Contains(Path.Combine("pointmaps", "models", "bms", "g2_pro"), resolved);
+            Assert.EndsWith("bms_bank.csv", resolved);
+            AssertNotRootCopy(resolved, "bms_bank.csv");
+        }
+        finally
+        {
+            CleanupSelection();
+        }
+    }
+
+    [Theory]
+    [InlineData("emu.csv", "emu")]
+    [InlineData("em.csv", "em")]
+    [InlineData("bms_bank.csv", "bms")]
+    [InlineData("bms_rack.csv", "bms")]
+    [InlineData("lc.csv", "lc")]
+    [InlineData("pv_logger.csv", "pv")]
+    [InlineData("pv_apm810.csv", "pv")]
+    public void Resolve_RuntimeLogicalName_HitsModelsDirectory(string fileName, string typeId)
+    {
+        var resolved = Path.GetFullPath(PointMapPathResolver.Resolve(fileName));
+        Assert.Contains(Path.Combine("pointmaps", "models", typeId), resolved);
+        Assert.EndsWith(fileName, resolved);
+        Assert.True(File.Exists(resolved));
+        AssertNotRootCopy(resolved, fileName);
+    }
+
+    [Fact]
+    public void Resolve_MissingFile_ErrorMentionsModelsDirNotSyncScript()
+    {
+        var ex = Assert.Throws<FileNotFoundException>(
+            () => PointMapPathResolver.Resolve("no_such_pointmap.csv"));
+        Assert.DoesNotContain("sync-pointmaps-to-root", ex.Message);
+        Assert.Contains("pointmaps/models", ex.Message);
+        Assert.Contains("device-models.json", ex.Message);
+    }
+
+    private static void AssertNotRootCopy(string resolved, string fileName)
+    {
+        foreach (var root in DeviceModelRegistry.CandidateRoots())
+        {
+            var decoy = Path.GetFullPath(Path.Combine(root, fileName));
+            if (File.Exists(decoy))
+                Assert.NotEqual(decoy, resolved);
         }
     }
 }

@@ -40,7 +40,7 @@ namespace EssSimulator.Web
                 return Results.Ok(BatterySnapshotReader.ReadCells(idx, cluster - 1));
             });
 
-            // BMS 簇告警门限：点表元数据 + 当前工程值（下发仍走 POST /api/command → dpc）
+            // BMS 簇告警门限：模型层 ClusterThresholds（下发走 POST，不依赖点表写点）
             app.MapGet("/api/bms/{unit:int}/rack-thresholds", (int unit, int? rack) =>
             {
                 int unitCount = Math.Max(1, GuiSimDataAccess.GetEssUnitCount());
@@ -48,8 +48,16 @@ namespace EssSimulator.Web
                 int rackIndex = Math.Max(0, rack ?? 0);
                 var snap = RackThresholdSnapshotReader.Read(unitNum, rackIndex);
                 return snap == null
-                    ? Results.NotFound(new { message = $"未找到设备 simBms{unitNum} 或点表未加载" })
+                    ? Results.NotFound(new { message = $"未找到设备 bms{unitNum}" })
                     : Results.Ok(snap);
+            });
+
+            app.MapPost("/api/bms/{unit:int}/rack-thresholds", (int unit, RackThresholdWriteRequest req) =>
+            {
+                int unitCount = Math.Max(1, GuiSimDataAccess.GetEssUnitCount());
+                int unitNum = Math.Clamp(unit, 1, unitCount);
+                var result = RackThresholdWriter.Apply(unitNum, req ?? new RackThresholdWriteRequest());
+                return Results.Ok(result);
             });
 
             // 设备告警/故障位：绿=未触发，红=已触发
@@ -256,7 +264,7 @@ namespace EssSimulator.Web
                 return FromCommandResult(result);
             });
 
-            // 单元断路器：直控仿真设备（EMU 镜像 PowerOnOff + 电气网络），不经点表写点；unit 从 1 起
+            // 单元断路器：直控仿真设备（EMU 级 Breaker.Closed + 电气网络），不经点表写点；unit 从 1 起
             app.MapPost("/api/breaker/unit/{unit:int}/{closed:bool}", (int unit, bool closed) =>
             {
                 if (!DeviceControlFacade.TrySetUnitBreaker(unit, closed, out var message))

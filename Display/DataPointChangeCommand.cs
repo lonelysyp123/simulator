@@ -71,7 +71,7 @@ namespace EssSimulator.Display
                 try { anyEmu = SimulatorHost.Instance.Contains("simEmu1"); } catch { /* ignore */ }
                 message = anyEmu
                     ? $"找不到 Modbus 设备 `{dpcDeviceName}`"
-                    : $"找不到对应的 Modbus 设备 `{dpcDeviceName}`（仿真尚未就绪：点表未加载或 Modbus 从站启动失败。请执行 ./scripts/sync-pointmaps-to-root.sh 后重启）";
+                    : $"找不到对应的 Modbus 设备 `{dpcDeviceName}`（仿真尚未就绪：点表未加载或 Modbus 从站启动失败。请确认 `pointmaps/models/` 与 `device-models.json` 选型后重启）";
                 return false;
             }
 

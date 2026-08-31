@@ -116,7 +116,7 @@ namespace EssSimulator.Web
                 if (idx >= channelCount) break;
                 channels.Add(BuildChannel(idx, u.UnitIndex, s, u.PcsChannels[s]));
             }
-            return new MainLineUnitViewModel
+            var vm = new MainLineUnitViewModel
             {
                 UnitIndex = u.UnitIndex,
                 UnitNumber = u.UnitIndex + 1,
@@ -130,6 +130,31 @@ namespace EssSimulator.Web
                 PcsChannels = u.PcsChannels,
                 Channels = channels
             };
+            FillUnitAuxiliaries(vm, u.UnitIndex);
+            return vm;
+        }
+
+        private static void FillUnitAuxiliaries(MainLineUnitViewModel vm, int unitIndex0)
+        {
+            string emu = $"emu{unitIndex0 + 1}";
+            vm.UnitMeterThreePhase = new MeterThreePhaseSnapshot(
+                GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.LineVoltageAB"),
+                GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.LineVoltageBC"),
+                GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.LineVoltageCA"),
+                GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.PhaseACurrent"),
+                GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.PhaseBCurrent"),
+                GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.PhaseCCurrent"),
+                GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.PhaseAVoltage"),
+                GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.PhaseBVoltage"),
+                GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.PhaseCVoltage"));
+            vm.UnitMeterActivePowerKw = GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.TotalActivePower");
+            vm.UnitMeterReactivePowerKvar = GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.TotalReactivePower");
+            vm.UnitMeterPowerFactor = GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.PowerFactor");
+            vm.UnitMeterFrequencyHz = GuiSimDataAccess.SafeGetDouble($"{emu}.ElectricityMeter.Frequency");
+            vm.UnitTransformerLoadFraction = GuiSimDataAccess.SafeGetDouble($"{emu}.Transformers[0].LoadFraction");
+            vm.UnitTransformerOilTemperatureC = GuiSimDataAccess.SafeGetDouble($"{emu}.Transformers[0].OilTemperatureC");
+            vm.UnitTransformerActivePowerKw = GuiSimDataAccess.SafeGetDouble($"{emu}.Transformers[0].ActivePowerKw");
+            vm.UnitTransformerReactivePowerKvar = GuiSimDataAccess.SafeGetDouble($"{emu}.Transformers[0].ReactivePowerKvar");
         }
 
         private static MainLineChannelViewModel BuildChannel(
@@ -322,6 +347,15 @@ namespace EssSimulator.Web
         public IReadOnlyList<PcsChannelSnapshot?> PcsChannels { get; set; } = Array.Empty<PcsChannelSnapshot?>();
         /// <summary>单元内各槽位运行时通道（实时数据 + 控制），按槽位顺序。</summary>
         public List<MainLineChannelViewModel> Channels { get; set; } = new();
+        public MeterThreePhaseSnapshot UnitMeterThreePhase { get; set; }
+        public double UnitMeterActivePowerKw { get; set; }
+        public double UnitMeterReactivePowerKvar { get; set; }
+        public double UnitMeterPowerFactor { get; set; }
+        public double UnitMeterFrequencyHz { get; set; }
+        public double UnitTransformerLoadFraction { get; set; }
+        public double UnitTransformerOilTemperatureC { get; set; }
+        public double UnitTransformerActivePowerKw { get; set; }
+        public double UnitTransformerReactivePowerKvar { get; set; }
     }
 
     public sealed class MainLineChannelViewModel

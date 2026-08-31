@@ -12,14 +12,30 @@ public class NetworkSolverTests
         {
             Devices = { new EssUnitConfig() }
         };
-
-        return NetworkTopologyBuilder.Build(
+        var pccCfg = new PccConfig();
+        var pcsCfg = new PcsPhysicalConfig();
+        var network = NetworkTopologyBuilder.Build(
             simCfg,
+            pcsCfg,
+            new TransformerConfig(),
+            new UnitTransformerConfig(),
+            new LoadConfig(),
+            pccCfg);
+        network.Solver = new NetworkSolver(network, pccCfg, pcsCfg);
+        return network;
+    }
+
+    [Fact]
+    public void Build_DoesNotAttachSolver()
+    {
+        var network = NetworkTopologyBuilder.Build(
+            new SimulatorConfig { Devices = { new EssUnitConfig() } },
             new PcsPhysicalConfig(),
             new TransformerConfig(),
             new UnitTransformerConfig(),
             new LoadConfig(),
             new PccConfig());
+        Assert.Null(network.Solver);
     }
 
     [Fact]
@@ -31,7 +47,7 @@ public class NetworkSolverTests
             ub.ApplyCommand(new DeviceCommand { Kind = DeviceCommandKind.CloseBreaker });
 
         var step = TimeSpan.FromMilliseconds(200);
-        network.Solver.Step(step, step);
+        network.Solver!.Step(step, step);
 
         Assert.InRange(network.PccLineVoltageV, 210_000, 230_000);
         Assert.InRange(network.StationBus35LineVoltageV, 33_000, 37_000);
@@ -44,7 +60,7 @@ public class NetworkSolverTests
         network.MainBreaker.ApplyCommand(new DeviceCommand { Kind = DeviceCommandKind.OpenBreaker });
 
         var step = TimeSpan.FromMilliseconds(200);
-        network.Solver.Step(step, step);
+        network.Solver!.Step(step, step);
 
         Assert.Equal(0, network.PccLineVoltageV);
     }
@@ -56,10 +72,11 @@ public class NetworkSolverTests
         network.MainBreaker.ApplyCommand(new DeviceCommand { Kind = DeviceCommandKind.OpenBreaker });
 
         var step = TimeSpan.FromMilliseconds(200);
-        network.Solver.Step(step, step);
+        network.Solver!.Step(step, step);
 
         Assert.Equal(0, network.PccMeter.Telemetry.Primary.ActivePowerKw);
         Assert.Equal(0, network.PccMeter.Telemetry.Primary.ReactivePowerKvar);
+        Assert.Equal(0, network.PccMeter.Telemetry.Primary.LineVoltageV);
     }
 
     [Fact]
@@ -83,14 +100,17 @@ public class NetworkSolverTests
             }
         };
 
+        var pccCfg = new PccConfig();
+        var pcsCfg = new PcsPhysicalConfig();
         var network = NetworkTopologyBuilder.Build(
             simCfg,
-            new PcsPhysicalConfig(),
+            pcsCfg,
             new TransformerConfig(),
             new UnitTransformerConfig(),
             new LoadConfig(),
-            new PccConfig(),
+            pccCfg,
             pcsPerUnit: simCfg.GetPcsCountsPerUnit());
+        network.Solver = new NetworkSolver(network, pccCfg, pcsCfg);
 
         Assert.Equal(new[] { 4 }, network.PcsPerUnit);
         Assert.Equal(4, network.PcsDevices.Count);
@@ -100,7 +120,7 @@ public class NetworkSolverTests
             ub.ApplyCommand(new DeviceCommand { Kind = DeviceCommandKind.CloseBreaker });
 
         var step = TimeSpan.FromMilliseconds(200);
-        network.Solver.Step(step, step);
+        network.Solver!.Step(step, step);
 
         for (int i = 0; i < network.PcsDevices.Count; i++)
             Assert.True(network.PcsDevices[i].IsGridElectricallyAvailable, $"pcs{i + 1} 未收到网侧可用状态");

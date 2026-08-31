@@ -25,16 +25,16 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
             _pccCfg = pccCfg;
             PcsCfg = pcsCfg;
 
-            BusGrid = new ElectricalBusNode("BUS_GRID", pccCfg.NominalLineVoltage);
-            BusAfterMainBreaker = new ElectricalBusNode("BUS_MAIN_SEC", pccCfg.NominalLineVoltage);
-            Bus35 = new ElectricalBusNode("BUS_35", pccCfg.StationBusNominalLineVoltage);
+            BusGrid = new ElectricalBusNode(RuntimeBusIds.Grid, pccCfg.NominalLineVoltage);
+            BusAfterMainBreaker = new ElectricalBusNode(RuntimeBusIds.AfterMainBreaker, pccCfg.NominalLineVoltage);
+            Bus35 = new ElectricalBusNode(RuntimeBusIds.Station35, pccCfg.StationBusNominalLineVoltage);
 
             var unitBuses = new List<ElectricalBusNode>();
             int unitCount = network.UnitTransformers.Count;
             for (int u = 0; u < unitCount; u++)
             {
                 unitBuses.Add(new ElectricalBusNode(
-                    $"BUS_690_U{u}",
+                    RuntimeBusIds.Unit690(u),
                     pcsCfg.AcVoltageNominal));
             }
 
@@ -53,7 +53,17 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
         public ElectricalBusNode BusAfterMainBreaker { get; }
         public ElectricalBusNode Bus35 { get; }
         public IReadOnlyList<ElectricalBusNode> UnitBuses690 { get; }
-        public IReadOnlyList<IBusCoupler> Couplers => _couplers;
+        public ElectricalBusNode? FindBus(string busId)
+        {
+            busId = RuntimeBusIds.Canonicalize(busId);
+            if (string.Equals(busId, BusGrid.BusId, StringComparison.Ordinal))
+                return BusGrid;
+            if (string.Equals(busId, BusAfterMainBreaker.BusId, StringComparison.Ordinal))
+                return BusAfterMainBreaker;
+            if (string.Equals(busId, Bus35.BusId, StringComparison.Ordinal))
+                return Bus35;
+            return UnitBuses690.FirstOrDefault(b => string.Equals(b.BusId, busId, StringComparison.Ordinal));
+        }
 
         /// <summary>从电网母线发起电压传播（并网）。</summary>
         public void PropagateVoltageFromGrid(PropagationSweepContext sweep)
@@ -142,15 +152,18 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
             _couplers.Add(new BreakerBusCoupler(
                 network.MainBreaker,
                 BusGrid,
-                BusAfterMainBreaker,
+                network.HasMainTransformer ? BusAfterMainBreaker : Bus35,
                 ResolveStationSecondaryCurrent));
 
-            _couplers.Add(new TransformerBusCoupler(
-                network.MainTransformer,
-                BusAfterMainBreaker,
-                Bus35,
-                ResolveStationSecondaryCurrent,
-                sweep => sweep.MainBreakerClosed));
+            if (network.HasMainTransformer)
+            {
+                _couplers.Add(new TransformerBusCoupler(
+                    network.MainTransformer,
+                    BusAfterMainBreaker,
+                    Bus35,
+                    ResolveStationSecondaryCurrent,
+                    sweep => sweep.MainBreakerClosed));
+            }
 
             for (int u = 0; u < UnitBuses690.Count; u++)
             {

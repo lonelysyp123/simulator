@@ -2,7 +2,6 @@ using System;
 using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
-using EssSimulator.Web;
 
 namespace EssSimulator.EssSimModelApi.Mappers
 {
@@ -31,7 +30,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
             PcsMapper.ApplyEmuCommands(emu, ess, pcsBase);
             PcsEmuSynchronizer.SyncPcsStateFromModel(ess, emu, pcsBase);
             refreshTelemetry?.Invoke();
-            SnapshotService.RequestImmediatePush();
+            UiSnapshotNotifier.RequestImmediatePush();
             return true;
         }
     }

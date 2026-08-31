@@ -147,15 +147,63 @@
       </el-table>
     </div>
 
-    <div v-if="unitRows.length" class="card">
+    <div v-if="pcsRows.length || transformerRows.length" class="card unit-detail">
       <p class="card-title">储能单元明细</p>
-      <el-table :data="unitRows" size="small" border stripe>
-        <el-table-column prop="unit" label="UNIT" width="80" fixed />
-        <el-table-column label="单元断/单元变" min-width="200"><template #default="{ row }">{{ row.xf }}</template></el-table-column>
-        <template v-for="s in maxUnitSlots" :key="`slot-${s}`">
-          <el-table-column :label="`PCS-${s}`" min-width="240"><template #default="{ row }">{{ row.pcs[s - 1] || '—' }}</template></el-table-column>
-          <el-table-column :label="`舱-${s}`" min-width="200"><template #default="{ row }">{{ row.bms[s - 1] || '—' }}</template></el-table-column>
-        </template>
+
+      <p class="section-title">PCS 明细</p>
+      <el-table :data="pcsRows" size="small" border stripe>
+        <el-table-column prop="unit" label="UNIT" width="88" fixed />
+        <el-table-column prop="pcs" label="PCS" width="88" />
+        <el-table-column prop="state" label="状态" min-width="120" />
+        <el-table-column prop="startStop" label="启停" min-width="80" />
+        <el-table-column prop="targetP" label="目标 P" min-width="110" />
+        <el-table-column prop="actualP" label="实际 P" min-width="110" />
+        <el-table-column prop="targetQ" label="目标 Q" min-width="110" />
+        <el-table-column prop="actualQ" label="实际 Q" min-width="110" />
+        <el-table-column prop="mode" label="模式" width="80" />
+        <el-table-column prop="blackStart" label="黑启动" min-width="100" />
+        <el-table-column prop="ac" label="交流" min-width="180" />
+      </el-table>
+
+      <p class="section-title">BMS 明细</p>
+      <el-table :data="bmsRows" size="small" border stripe>
+        <el-table-column prop="unit" label="UNIT" width="88" fixed />
+        <el-table-column prop="bms" label="舱" width="80" />
+        <el-table-column prop="compact" label="SOC / Vdc / Idc" min-width="180" />
+        <el-table-column prop="run" label="运行" min-width="100" />
+        <el-table-column prop="energy" label="电能" min-width="180" />
+        <el-table-column prop="grid" label="并网" min-width="90" />
+        <el-table-column prop="blackStart" label="黑启动" min-width="100" />
+        <el-table-column prop="ac" label="空调" min-width="140" />
+      </el-table>
+
+      <p class="section-title">单元变压器明细</p>
+      <el-table :data="transformerRows" size="small" border stripe>
+        <el-table-column prop="unit" label="UNIT" width="88" fixed />
+        <el-table-column prop="primary" label="一次" min-width="180" />
+        <el-table-column prop="secondary" label="二次" min-width="180" />
+        <el-table-column prop="power" label="功率" min-width="180" />
+        <el-table-column prop="load" label="负载率" width="90" />
+        <el-table-column prop="oil" label="油温" width="90" />
+      </el-table>
+
+      <p class="section-title">单元断路器明细</p>
+      <el-table :data="breakerRows" size="small" border stripe>
+        <el-table-column prop="unit" label="UNIT" width="88" fixed />
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <span :class="row.tripped ? 'tag-offline' : (row.closed ? 'tag-online' : 'tag-offline')">{{ row.state }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <p class="section-title">单元电表明细</p>
+      <el-table :data="meterRows" size="small" border stripe>
+        <el-table-column prop="unit" label="UNIT" width="88" fixed />
+        <el-table-column prop="voltages" label="线电压" min-width="220" />
+        <el-table-column prop="currents" label="相电流" min-width="200" />
+        <el-table-column prop="power" label="功率" min-width="220" />
+        <el-table-column prop="freq" label="频率" width="90" />
       </el-table>
     </div>
 
@@ -254,16 +302,80 @@ function fmtPhaseCurrents(m) {
 }
 function fmtBreaker(closed, tripped) { return tripped ? '跳闸' : closed ? '合' : '分' }
 
-function fmtPcsChannel(ch) {
-  if (!ch) return '—'
-  return [ch.pcsDeviceState, ch.pcsStartStop, ch.pcsTargetP, ch.pcsActualP, ch.pcsTargetQ, ch.pcsActualQ, ch.pcsBlackStart, `模式:${ch.pcsGridMode}`].join(' ')
+function fmtPf(v) {
+  if (v == null || Number.isNaN(Number(v))) return '—'
+  return Number(v).toFixed(3)
 }
-function fmtBmsChannel(ch) {
-  if (!ch) return '—'
-  const energy = ch.bmsEnergy || `累计充 ${(ch.cumulativeChargeEnergyKwh ?? 0).toFixed(1)} / 放 ${(ch.cumulativeDischargeEnergyKwh ?? 0).toFixed(1)} kWh`
-  const run = ch.bmsRunStatus || '运行:—'
-  return [ch.bmsCompact, run, energy, `并网:${ch.gridConnect}`, ch.bmsBlackStart, ch.bmsAirConditioner].filter(Boolean).join(' | ')
+function unitLabel(u) {
+  return `UNIT ${u.unitNumber ?? (u.unitIndex ?? 0) + 1}`
 }
+
+const pcsRows = computed(() => {
+  const rows = []
+  for (const u of snap.value.units || []) {
+    for (const ch of u.channels || []) {
+      if (!ch) continue
+      rows.push({
+        unit: unitLabel(u),
+        pcs: `PCS-${ch.pcsNumber ?? ch.channelNumber ?? ''}`,
+        state: ch.pcsDeviceState || '—',
+        startStop: ch.pcsStartStop || '—',
+        targetP: ch.pcsTargetP || '—',
+        actualP: ch.pcsActualP || '—',
+        targetQ: ch.pcsTargetQ || '—',
+        actualQ: ch.pcsActualQ || '—',
+        mode: ch.pcsGridMode || '—',
+        blackStart: ch.pcsBlackStart || '—',
+        ac: ch.pcsAcLine || '—'
+      })
+    }
+  }
+  return rows
+})
+
+const bmsRows = computed(() => {
+  const rows = []
+  for (const u of snap.value.units || []) {
+    for (const ch of u.channels || []) {
+      if (!ch) continue
+      rows.push({
+        unit: unitLabel(u),
+        bms: `舱-${ch.compartmentNumber ?? ch.channelNumber ?? ''}`,
+        compact: ch.bmsCompact || '—',
+        run: ch.bmsRunStatus || '—',
+        energy: ch.bmsEnergy || `累计充 ${(ch.cumulativeChargeEnergyKwh ?? 0).toFixed(1)} / 放 ${(ch.cumulativeDischargeEnergyKwh ?? 0).toFixed(1)} kWh`,
+        grid: ch.gridConnect || '—',
+        blackStart: ch.bmsBlackStart || '—',
+        ac: ch.bmsAirConditioner || '—'
+      })
+    }
+  }
+  return rows
+})
+
+const transformerRows = computed(() => (snap.value.units || []).map(u => ({
+  unit: unitLabel(u),
+  primary: fmtPhasorViPhi(u.unitTransformerPrimary),
+  secondary: u.unitTransformerLine || fmtPhasorViPhi(u.unitTransformerSecondary),
+  power: `P ${fmtKw(u.unitTransformerActivePowerKw)}  Q ${fmtKvar(u.unitTransformerReactivePowerKvar)}`,
+  load: u.unitTransformerLoadFraction == null ? '—' : `${(Number(u.unitTransformerLoadFraction) * 100).toFixed(1)}%`,
+  oil: u.unitTransformerOilTemperatureC == null ? '—' : `${Number(u.unitTransformerOilTemperatureC).toFixed(1)} ℃`
+})))
+
+const breakerRows = computed(() => (snap.value.units || []).map(u => ({
+  unit: unitLabel(u),
+  state: u.unitBreakerLabel || fmtBreaker(u.unitBreakerClosed, u.unitBreakerTripped),
+  closed: !!u.unitBreakerClosed,
+  tripped: !!u.unitBreakerTripped
+})))
+
+const meterRows = computed(() => (snap.value.units || []).map(u => ({
+  unit: unitLabel(u),
+  voltages: fmtLineVoltages(u.unitMeterThreePhase),
+  currents: fmtPhaseCurrents(u.unitMeterThreePhase),
+  power: `P ${fmtKw(u.unitMeterActivePowerKw)}  Q ${fmtKvar(u.unitMeterReactivePowerKvar)}  PF ${fmtPf(u.unitMeterPowerFactor)}`,
+  freq: fmtHz(u.unitMeterFrequencyHz)
+})))
 
 const breakerLabel = computed(() =>
   snap.value.mainBreakerLabel || fmtBreaker(snap.value.mainBreakerClosed, snap.value.mainBreakerTripped)
@@ -319,17 +431,6 @@ const acRows = computed(() => [
     power: `P ${fmtKw(snap.value.loadActivePowerKw)}  Q ${fmtKvar(snap.value.loadReactivePowerKvar)}`
   }
 ])
-
-const unitRows = computed(() => (snap.value.units || []).map(u => {
-  const chans = u.channels || []
-  return {
-    unit: `UNIT ${u.unitNumber ?? u.unitIndex + 1}`,
-    xf: `${u.unitBreakerLabel || fmtBreaker(u.unitBreakerClosed, u.unitBreakerTripped)} | ${u.unitTransformerLine || fmtPhasorViPhi(u.unitTransformerSecondary)}`,
-    pcs: chans.map(ch => fmtPcsChannel(ch)),
-    bms: chans.map(ch => fmtBmsChannel(ch))
-  }
-}))
-const maxUnitSlots = computed(() => unitRows.value.reduce((m, r) => Math.max(m, r.pcs.length), 0))
 
 function fmtPvArray(a) {
   if (!a) return '—'
@@ -609,6 +710,16 @@ useRealtime(RealtimeChannels.MainLine, {
 
 <style scoped>
 .card-hint { font-size: 12px; color: #909399; font-weight: normal; margin-left: 12px; }
+
+.section-title {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+}
+.unit-detail .section-title:first-of-type {
+  margin-top: 4px;
+}
 
 .metric-item-editable {
   position: relative;

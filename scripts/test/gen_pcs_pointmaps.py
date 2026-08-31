@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""从 TRINA MV-EMS Modbus TCP 协议 V0.15 Excel 生成 10MW / 5.5MW 两份 EMU 点表。
+"""从 TRINA MV-EMS Modbus TCP 协议 V0.15 Excel 生成 10MW / 5.5MW 两份中压 LC 点表。
 
 ⚠ 警告: 本脚本全量重写目标 CSV，会覆盖任何手工修改（含点位增删、绑定调整、
 描述微调），且点位删除会导致 yc 序号重编号。点表 CSV 是运行期源文件，允许
@@ -20,8 +20,8 @@ import openpyxl
 ROOT = '/Users/songyinpei/jobs/trina/EssSimulator'
 XLSX = f'{ROOT}/TRINA MV-EMS Modbus TCP protocol(天合中压系统对外Modbus TCP通信协议)_V0.15_2026.08.13(1).xlsx'
 OUT = {
-    '10MW': f'{ROOT}/pointmaps/models/emu/trina_10MW/emu.csv',
-    '5.5MW': f'{ROOT}/pointmaps/models/emu/trina_5.5MW/emu.csv',
+    '10MW': f'{ROOT}/pointmaps/models/lc/trina_10MW/lc.csv',
+    '5.5MW': f'{ROOT}/pointmaps/models/lc/trina_5.5MW/lc.csv',
 }
 
 wb = openpyxl.load_workbook(XLSX, data_only=True)

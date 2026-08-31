@@ -4,17 +4,14 @@ using EssSimulator.Core;
 using EssSimulator.EssSimModelApi.BatteryManagementSystem;
 using EssSimulator.EssDeviceSimModel.Devices;
 using EssSimulator.EssSimModelApi.Mappers;
-using Microsoft.Extensions.Hosting;
 using System.Linq;
 
 namespace EssSimulator.EssSimModelApi
 {
     /// <summary>
-    /// BMS 数据同步后台服务：以 100 ms 周期将物理模型数据同步到 BMS 接口数据对象。
-    /// 按 UnitCount 动态创建 BMS 数据对象，不再硬编码两路。
-    /// 具体映射逻辑全部委托给 <see cref="BmsMapper"/>。
+    /// BMS 协议镜像：构造时按单元注册 DTO，投影由 <see cref="ProtocolProjectionService"/> 在物理步进末尾调用。
     /// </summary>
-    public class BmsDataService : BackgroundService
+    public class BmsDataService
     {
         private readonly int _unitCount;
         private readonly BatteryManagementSystemData[] _bmsDataList;
@@ -58,28 +55,17 @@ namespace EssSimulator.EssSimModelApi
             }
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        public void Project(EnergyStorageSystem ess)
         {
-            var store = SimulatorHost.Instance;
-            EnergyStorageSystem? ess = null;
-
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
-            while (await timer.WaitForNextTickAsync(stoppingToken))
+            for (int i = 0; i < _unitCount && i < ess._bmsRackDevices.Count; i++)
             {
-                ess ??= store.Get<EnergyStorageSystem>("ess");
-                if (ess == null) continue;
-
-                for (int i = 0; i < _unitCount && i < ess._bmsRackDevices.Count; i++)
-                {
-                    ess._bmsRackDevices[i].SyncTelemetryAndProtection(_bmsDataList[i]);
-                    // BMS 空调控制命令写回热模型：开启时制冷控温到设定值（降低电池节点温度、改善电芯散热）
-                    ApplyAirConditionerControl(ess, i, _bmsDataList[i]);
-                    BmsThermalProbeMapper.Apply(ess.Thermal, i, _bmsDataList[i]);
-                }
-
-                if (_unitCount > 0)
-                    _bmsDataList[0].Timestamp = DateTime.Now;
+                BmsMapper.SyncTelemetryAndProtection(ess._bmsRackDevices[i], _bmsDataList[i]);
+                ApplyAirConditionerControl(ess, i, _bmsDataList[i]);
+                BmsThermalProbeMapper.Apply(ess.Thermal, i, _bmsDataList[i]);
             }
+
+            if (_unitCount > 0)
+                _bmsDataList[0].Timestamp = DateTime.Now;
         }
 
         // 保留供外部（Cmd.cs 等）直接调用的告警状态机（向后兼容）

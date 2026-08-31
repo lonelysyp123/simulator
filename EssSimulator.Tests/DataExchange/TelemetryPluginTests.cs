@@ -250,8 +250,7 @@ public class TelemetryPluginTests
     [Fact]
     public void FromPointMap_Trina10MW_SystemControls_BoundToEmuVirtualModel()
     {
-        // SYSTEM 控制点随撤销剥离回到 10MW EMU 点表：绑定 emu1 虚拟模型，
-        // 并自动路由 PcsApplyCommands 副作用（占位符 emuDeviceId → emu1）
+        // SYSTEM 控制点：绑定 emu1 虚拟模型，并自动路由 PcsApplyCommands
         var catalog = LoadCatalog("trina_10MW");
 
         var expected = new Dictionary<string, string>
@@ -271,6 +270,21 @@ public class TelemetryPluginTests
             Assert.Equal(fullPath, binding!.Target.FullPath);
             Assert.Equal(ControlEffectId.PcsApplyCommands, binding.Effect);
         }
+    }
+
+    [Fact]
+    public void FromPointMap_Trina55MW_SystemControls_BoundToEmuVirtualModel()
+    {
+        var catalog = LoadCatalog("trina_5.5MW");
+        var syst6 = catalog.FindControl("syst6");
+        Assert.NotNull(syst6);
+        Assert.Equal("emu1.Emu.SystemOperation", syst6!.Target.FullPath);
+        Assert.Equal(ControlEffectId.PcsApplyCommands, syst6.Effect);
+
+        var syst7 = catalog.FindControl("syst7");
+        Assert.NotNull(syst7);
+        Assert.Equal("emu1.Emu.BlackStartModeWrite", syst7!.Target.FullPath);
+        Assert.Equal(ControlEffectId.PcsApplyCommands, syst7.Effect);
     }
 
     [Fact]
@@ -487,10 +501,10 @@ public class TelemetryPluginTests
 
     private static PointCatalog LoadCatalog(string modelDir)
     {
-        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "emu", modelDir, "emu.csv");
+        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "lc", modelDir, "lc.csv");
         Assert.True(File.Exists(path), path);
-        var pointMap = new ModbusPointMap(path, "simEmu1");
-        return PointCatalogLoader.FromPointMap(pointMap, "simEmu1", new DataExchangeOptions());
+        var pointMap = new ModbusPointMap(path, "simLc1", emuDeviceIdOverride: 1);
+        return PointCatalogLoader.FromPointMap(pointMap, "simLc1", new DataExchangeOptions());
     }
 
     private static string FindRepoRoot()

@@ -9,6 +9,7 @@ namespace EssSimulator.EssDeviceSimModel
 {
     using EssSimulator.Configuration;
     using EssSimulator.EssDeviceSimModel.Battery;
+    using EssSimulator.EssDeviceSimModel.Diagnostics;
     using EssSimulator.EssDeviceSimModel.Devices;
     using EssSimulator.EssDeviceSimModel.Model;
     using EssSimulator.EssDeviceSimModel.Plant;
@@ -16,33 +17,12 @@ namespace EssSimulator.EssDeviceSimModel
     using EssSimulator.EssDeviceSimModel.Solver;
     using EssSimulator.EssDeviceSimModel.Thermal;
     using EssSimulator.EssDeviceSimModel.Pv;
-    using EssSimulator.EssSimModelApi;
-    using EssSimulator.EssSimModelApi.BatteryManagementSystem;
     using System;
     using System.Collections.Generic;
 
     public class EnergyStorageSystem : BackgroundService
     {
         private static readonly ILog _log = LogManager.GetLogger(typeof(EnergyStorageSystem));
-        // 储能系统参数
-        public double Capacity { get; private set; } // 储能容量 (kWh)
-        public double CurrentEnergy { get; private set; } // 当前储能 (kWh)
-        public double Efficiency { get; private set; } // 充放电效率 (0-1)
-
-        // 统计数据
-        public double TotalChargeEnergy { get; private set; } // 总充电能量 (kWh)
-        public double TotalDischargeEnergy { get; private set; } // 总放电能量 (kWh)
-        public List<double> ChargeSessions { get; private set; } // 单次充电能量记录
-        public List<double> DischargeSessions { get; private set; } // 单次放电能量记录
-        public Dictionary<DateTime, double> DailyCharge { get; private set; } // 日充电能量
-        public Dictionary<DateTime, double> DailyDischarge { get; private set; } // 日放电能量
-        public double AvailableChargeEnergy => Capacity - CurrentEnergy; // 可获得充电能量
-        public double AvailableDischargeEnergy => CurrentEnergy; // 可获得放电能量
-
-        // 当前充电/放电状态
-
-
-        /// <summary>电池堆列表，索引 i 对应第 i+1 个储能单元。通过 ess._batteryRacks[i] 或路径 ess._batteryRacks[0] 访问。</summary>
         public IReadOnlyList<BatteryRackSimulator> _batteryRacks { get; }
 
         /// <summary>新电气网络 BMS 设备（与 _batteryRacks 一一对应）。</summary>
@@ -60,6 +40,7 @@ namespace EssSimulator.EssDeviceSimModel
 
         /// <summary>PCS 通道索引 → 所属单元索引 的映射表。</summary>
         private IReadOnlyList<int> _unitIndexByPcs = Array.Empty<int>();
+        private IReadOnlyList<string?> _unitMeterSourceBusIds = Array.Empty<string?>();
 
         /// <summary>PCS 通道（0 基）所属储能单元索引；越界时就近钉住边界。</summary>
         public int UnitIndexOfPcs(int pcsSimIndex)
@@ -78,25 +59,15 @@ namespace EssSimulator.EssDeviceSimModel
             return baseIdx;
         }
 
+        /// <summary>组态解析的单元电表抽头母线；未接线时为 null。</summary>
+        public string? GetUnitMeterSourceBusId(int unitIndex) =>
+            unitIndex >= 0 && unitIndex < _unitMeterSourceBusIds.Count
+                ? _unitMeterSourceBusIds[unitIndex]
+                : null;
+
         /// <summary>指定单元下属 PCS 台数。</summary>
         public int PcsCountOfUnit(int unit) =>
             unit >= 0 && unit < _pcsPerUnit.Count ? _pcsPerUnit[unit] : 0;
-
-        /// <summary>兼容旧路径：ess._batteryRack 等价于 ess._batteryRacks[0]</summary>
-        [Obsolete("请使用 _batteryRacks[0]")]
-        public BatteryRackSimulator _batteryRack => _batteryRacks.Count > 0 ? _batteryRacks[0] : null!;
-
-        /// <summary>兼容旧路径：ess._batteryRack2 等价于 ess._batteryRacks[1]</summary>
-        [Obsolete("请使用 _batteryRacks[1]")]
-        public BatteryRackSimulator _batteryRack2 => _batteryRacks.Count > 1 ? _batteryRacks[1] : null!;
-
-        /// <summary>兼容旧路径：ess._pcs1 等价于 ess._pcsList[0]</summary>
-        [Obsolete("请使用 _pcsList[0]")]
-        public PcsDevice _pcs1 => _pcsList.Count > 0 ? _pcsList[0] : null!;
-
-        /// <summary>兼容旧路径：ess._pcs2 等价于 ess._pcsList[1]</summary>
-        [Obsolete("请使用 _pcsList[1]")]
-        public PcsDevice _pcs2 => _pcsList.Count > 1 ? _pcsList[1] : null!;
 
         //public GridState _gridState;
         public Breaker _breaker { get; set; } //断路器
@@ -121,11 +92,11 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>电气输出订阅路由（设备间互相注册）。</summary>
         public ElectricalSignalRouter SignalRouter { get; }
 
-        /// <summary>径向前推回代引擎（<see cref="Configuration.RuntimeConfig.UseElectricalPropagation"/> 为 true 时非空）。</summary>
-        public RadialPowerSweepEngine? PowerSweepEngine { get; }
+        /// <summary>径向前推回代引擎（生产路径唯一电气步进）。</summary>
+        public RadialPowerSweepEngine PowerSweepEngine { get; }
 
         /// <summary>径向网络母线图。</summary>
-        public RadialNetworkGraph? RadialGraph { get; }
+        public RadialNetworkGraph RadialGraph { get; }
 
         /// <summary>
         /// 电站物理步进门面。主循环只应调用 <see cref="PlantEngine.Step"/>；
@@ -139,14 +110,10 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>设备耦合图（PCS–BMS 直流边等）。</summary>
         public PlantCouplingGraph CouplingGraph { get; private set; } = null!;
 
-        /// <summary>是否使用径向潮流主路径（供 <see cref="PlantEngine"/> 调度）。</summary>
-        internal bool UseElectricalPropagation => _useElectricalPropagation;
-
-        /// <summary>PCS 物理配置（供 <see cref="PlantEngine"/> 走 Solver 备用路径时使用）。</summary>
+        /// <summary>PCS 物理配置（供网络控制面与设备步进使用）。</summary>
         internal PcsPhysicalConfig PcsPhysicalConfig => _pcsCfg;
 
         private readonly ElectricalNetwork _electricalNetwork;
-        private readonly bool _useElectricalPropagation;
         private readonly int _propagationIntervalMs;
 
         public EnergyStorageSystem(
@@ -177,6 +144,7 @@ namespace EssSimulator.EssDeviceSimModel
                 unitIndexByChannel.Add(Math.Max(0, unitCount - 1));
             _pcsPerUnit = pcsPerUnit;
             _unitIndexByPcs = unitIndexByChannel;
+            _unitMeterSourceBusIds = simCfg.Devices.Select(d => d.UnitMeterSourceBusId).ToList();
 
             for (int i = 0; i < channelCount; i++)
             {
@@ -231,21 +199,12 @@ namespace EssSimulator.EssDeviceSimModel
 
             _loadDevice = LoadDeviceFactory.Create("load_35", loadCfg);
 
-            // 初始化统计数据
-            TotalChargeEnergy   = 0;
-            TotalDischargeEnergy = 0;
-            ChargeSessions    = new List<double>();
-            DischargeSessions = new List<double>();
-            DailyCharge    = new Dictionary<DateTime, double>();
-            DailyDischarge = new Dictionary<DateTime, double>();
-
             // 保存仿真时钟参数
             double integrationMult = simCfg.IntegrationStepMultiplier;
             _integrationMultiplier = integrationMult > 0 ? integrationMult : 1.0;
             _lastCycleUtc = DateTime.UtcNow;
             _transCfg  = transCfg;
             _pcsCfg    = pcsCfg;
-            _useElectricalPropagation = simCfg.Runtime.UseElectricalPropagation;
             _propagationIntervalMs = Math.Max(10, simCfg.Runtime.PropagationIntervalMs);
             PccLineVoltageV = pccCfg.NominalLineVoltage;
             StationBus35LineVoltageV = pccCfg.StationBusNominalLineVoltage;
@@ -263,22 +222,15 @@ namespace EssSimulator.EssDeviceSimModel
                 legacyEss: this,
                 pcsPerUnit: _pcsPerUnit);
 
-            if (_useElectricalPropagation)
-            {
-                RadialGraph = new RadialNetworkGraph(_electricalNetwork, pccCfg, pcsCfg, PvUnits);
-                PowerSweepEngine = new RadialPowerSweepEngine(
-                    RadialGraph,
-                    this,
-                    pccCfg,
-                    pcsCfg,
-                    simCfg.Runtime.PropagationQuvMaxIterations,
-                    simCfg.Runtime.PropagationVoltageTolerancePu);
-                _log.Info($"[EnergyStorageSystem] 母线前推回代已启用（{_propagationIntervalMs} ms）");
-            }
-            else
-            {
-                _log.Info("[EnergyStorageSystem] 电气网络 Solver 主路径已启用");
-            }
+            RadialGraph = new RadialNetworkGraph(_electricalNetwork, pccCfg, pcsCfg, PvUnits);
+            PowerSweepEngine = new RadialPowerSweepEngine(
+                RadialGraph,
+                this,
+                pccCfg,
+                pcsCfg,
+                simCfg.Runtime.PropagationQuvMaxIterations,
+                simCfg.Runtime.PropagationVoltageTolerancePu);
+            _log.Info($"[EnergyStorageSystem] 母线前推回代已启用（{_propagationIntervalMs} ms）");
 
             PlantEngine = new PlantEngine(this);
             Thermal = new PlantThermalSystem(simCfg.Runtime.Thermal, channelCount, DateTime.UtcNow);
@@ -340,12 +292,20 @@ namespace EssSimulator.EssDeviceSimModel
         }
 
         /// <summary>设定主断路器合/分（写入电气网络并投影至 Legacy）。</summary>
-        public void SetMainBreakerClosed(bool closed) =>
+        public void SetMainBreakerClosed(bool closed)
+        {
+            bool was = IsMainBreakerClosed;
             NetworkControlBridge.ApplyMainBreakerClosed(_electricalNetwork, _breaker, _loadDevice, closed);
+            SimStateChangeLogger.BreakerChanged("主断", was, closed);
+        }
 
         /// <summary>设定单元高压断路器合/分（写入电气网络并投影至 Legacy）。</summary>
-        public void SetUnitBreakerClosed(int unitIndex, bool closed) =>
+        public void SetUnitBreakerClosed(int unitIndex, bool closed)
+        {
+            bool was = IsUnitBreakerClosed(unitIndex);
             NetworkControlBridge.ApplyUnitBreakerClosed(_electricalNetwork, _unitBreakers, unitIndex, closed);
+            SimStateChangeLogger.BreakerChanged($"单元{unitIndex + 1}", was, closed);
+        }
 
         /// <summary>设定负载计划并同步至电气网络 Load 设备。</summary>
         public void SetLoadCharacteristic(string characteristic, double value) =>

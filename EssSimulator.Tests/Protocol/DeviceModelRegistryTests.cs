@@ -27,10 +27,15 @@ public class DeviceModelRegistryTests
         Assert.True(byId.ContainsKey("emu"));
         Assert.True(byId.ContainsKey("em"));
         Assert.True(byId.ContainsKey("lc"));
+        Assert.True(byId.ContainsKey("pv"));
 
         var bms = byId["bms"];
         Assert.Contains("bms_bank.csv", bms.Files);
         Assert.Contains("bms_rack.csv", bms.Files);
+
+        var pv = byId["pv"];
+        Assert.Contains("pv_logger.csv", pv.Files);
+        Assert.Contains("pv_apm810.csv", pv.Files);
 
         var modelIds = bms.Models.Select(m => m.Id).ToList();
         Assert.Contains("standard", modelIds);
@@ -39,6 +44,25 @@ public class DeviceModelRegistryTests
         {
             Assert.False(string.IsNullOrWhiteSpace(m.Name));
             Assert.True(Directory.Exists(m.Directory));
+        });
+    }
+
+    [Fact]
+    public void ListTypes_LcIncludesTrinaMvModels_EmuOnlyStandard()
+    {
+        var types = DeviceModelRegistry.ListTypes(FindRepoRoot());
+        var byId = types.ToDictionary(t => t.Id, StringComparer.OrdinalIgnoreCase);
+
+        var emuIds = byId["emu"].Models.Select(m => m.Id).ToList();
+        Assert.Equal(new[] { "standard" }, emuIds);
+
+        var lcIds = byId["lc"].Models.Select(m => m.Id).ToList();
+        Assert.Contains("standard", lcIds);
+        Assert.Contains("trina_5.5MW", lcIds);
+        Assert.Contains("trina_10MW", lcIds);
+        Assert.All(byId["lc"].Models, m =>
+        {
+            Assert.True(File.Exists(Path.Combine(m.Directory, "lc.csv")));
         });
     }
 
@@ -52,6 +76,7 @@ public class DeviceModelRegistryTests
         Assert.Equal("em", DeviceModelRegistry.FindTypeForFile("em.csv", root));
         Assert.Equal("lc", DeviceModelRegistry.FindTypeForFile("lc.csv", root));
         Assert.Equal("pv", DeviceModelRegistry.FindTypeForFile("pv_logger.csv", root));
+        Assert.Equal("pv", DeviceModelRegistry.FindTypeForFile("pv_apm810.csv", root));
     }
 
     [Fact]

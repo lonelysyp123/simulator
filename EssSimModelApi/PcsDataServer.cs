@@ -3,22 +3,22 @@ using EssSimulator.Core;
 using EssSimulator.EssDeviceSimModel;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
 using EssSimulator.EssSimModelApi.Mappers;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace EssSimulator.EssSimModelApi
 {
     /// <summary>
-    /// PCS/EMU 数据同步后台服务（100 ms 周期）：纯 ESS ↔ DTO，不含 Modbus。
-    /// Modbus 读写由 DataExchangeSession 负责。
+    /// PCS/EMU 协议镜像：构造时注册 DTO，投影由 <see cref="ProtocolProjectionService"/> 在物理步进末尾调用。
     /// </summary>
-    public class PcsDataServer : BackgroundService
+    public class PcsDataServer
     {
         private readonly List<EnergyManagementData> _emuUnits = new();
         private readonly int _unitCount;
         private readonly IReadOnlyList<int> _pcsPerUnit;
         private readonly bool _autoStartPcsOnStartup;
         private readonly double _unitXfRatedKw;
+        private bool _startupBlackStartChecked;
+        private bool _startupPcsApplied;
 
         public PcsDataServer(
             IOptions<SimulatorConfig> simOpts,
@@ -85,38 +85,26 @@ namespace EssSimulator.EssSimModelApi
             return emu;
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        /// <summary>将当前物理状态投影到已注册的 emu{n} 镜像（含启动一次性黑启动校验/自动开机）。</summary>
+        public void Project(EnergyStorageSystem ess)
         {
-            var store = SimulatorHost.Instance;
-            EnergyStorageSystem? ess = null;
-            var startupBlackStartChecked = false;
-            var startupPcsApplied = false;
-
-            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
-            int pcsBase = 0;
-            while (await timer.WaitForNextTickAsync(stoppingToken))
+            if (!_startupBlackStartChecked)
             {
-                ess ??= store.Get<EnergyStorageSystem>("ess");
-                if (ess == null) continue;
+                _startupBlackStartChecked = true;
+                BlackStartSafety.ValidateAll(ess, "系统初始化");
+            }
 
-                if (!startupBlackStartChecked)
-                {
-                    startupBlackStartChecked = true;
-                    BlackStartSafety.ValidateAll(ess, "系统初始化");
-                }
+            if (_autoStartPcsOnStartup && !_startupPcsApplied &&
+                PcsMapper.TryApplyStartupPcsStartStop(ess, _unitCount))
+            {
+                _startupPcsApplied = true;
+            }
 
-                if (_autoStartPcsOnStartup && !startupPcsApplied &&
-                    PcsMapper.TryApplyStartupPcsStartStop(ess, _unitCount))
-                {
-                    startupPcsApplied = true;
-                }
-
-                pcsBase = 0;
-                for (int u = 0; u < _unitCount; u++)
-                {
-                    PcsEmuSynchronizer.SyncUnit(ess, _emuUnits[u], u, pcsBase, _unitXfRatedKw);
-                    pcsBase += u < _pcsPerUnit.Count ? _pcsPerUnit[u] : 2;
-                }
+            int pcsBase = 0;
+            for (int u = 0; u < _unitCount; u++)
+            {
+                PcsEmuSynchronizer.SyncUnit(ess, _emuUnits[u], u, pcsBase, _unitXfRatedKw);
+                pcsBase += u < _pcsPerUnit.Count ? _pcsPerUnit[u] : 2;
             }
         }
 

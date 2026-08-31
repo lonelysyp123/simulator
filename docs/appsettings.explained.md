@@ -39,10 +39,8 @@
 
 - **`Simulator.Runtime`**
   - `IntegrationStepMultiplier = 1.0`
-  - `NoGui = false`
   - `AutoStartPcsOnStartup = true`
   - `PropagationIntervalMs = 100`
-  - `UseElectricalPropagation = true`
   - `PropagationQuvMaxIterations = 3`
   - `PropagationVoltageTolerancePu = 0.001`
 - **`Simulator.Protocol`**
@@ -85,10 +83,6 @@
 
 ### Simulator.Runtime
 
-- `Simulator.Runtime.NoGui`（bool）
-  - **作用**：历史字段。TUI 已移除，**不再关闭浏览器界面**。
-  - **影响**：Web 由 `Simulator.Web` 控制；本字段仅兼容旧配置。
-
 - `Simulator.Runtime.IntegrationStepMultiplier`（double，无量纲，默认 `1.0`）
   - **作用**：积分步长倍数（SOC、电能等积分量的 dt 放大系数）。
   - **影响**：仅放大**积分量**的时间步长，不改变瞬时值动力学；基于真实回调间隔 × 本倍数。
@@ -100,9 +94,6 @@
 - `Simulator.Runtime.PropagationIntervalMs`（int，ms，默认 `100`）
   - **作用**：电气传播主循环的真实休眠间隔（电压源激活性传播周期）。
   - **影响**：越小刷新越快、CPU 占用越高；主循环 `PeriodicTimer` 周期不低于 10 ms。
-
-- `Simulator.Runtime.UseElectricalPropagation`（bool，默认 `true`）
-  - **作用**：是否用事件驱动电气传播替代 Solver 主循环步进。
 
 - `Simulator.Runtime.PropagationQuvMaxIterations`（int，≥1，默认 `3`）
   - **作用**：设备 Step 后 Q-U 与电压传播的最大迭代轮数。

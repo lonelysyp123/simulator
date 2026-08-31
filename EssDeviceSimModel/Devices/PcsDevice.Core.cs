@@ -256,6 +256,9 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         // 获取当前状态（返回内部引用，调用方只应读取，不应直接赋值属性）
         public PcsState GetCurrentState() => _currentState;
 
+        /// <summary>当前待爬坡有功设定（kW），供边沿同步测试断言命令是否被覆盖。</summary>
+        internal double PendingActiveSetpoint => _pendingActiveSetpoint;
+
         /// <summary>网侧是否视为带电可用（单元高压分闸或主网失电时为 false）。与 EMS 启停配合时用于避免与主循环 Standby 对打。</summary>
         public bool IsGridElectricallyAvailable => _gridState.IsAvailable;
 
@@ -444,14 +447,20 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 return;
             }
 
+            double prevP;
+            double prevQ;
             lock (_setpointLock)
             {
+                prevP = _pendingActiveSetpoint;
+                prevQ = _pendingReactiveSetpoint;
                 _rampStopRequested = false;
                 _pendingActiveSetpoint = activePower;
                 _pendingReactiveSetpoint = reactivePower;
                 if (_rampDelayRemainingSec <= 0 && _delay > 0)
                     _rampDelayRemainingSec = _delay / 1000.0;
             }
+
+            SimStateChangeLogger.PcsPowerSetpointChanged(DisplayLabel, prevP, activePower, prevQ, reactivePower);
         }
 
         public void SetControlStrategy(PcsControlStrategy strategy, double setpoint)

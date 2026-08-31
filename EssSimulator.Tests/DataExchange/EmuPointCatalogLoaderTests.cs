@@ -45,6 +45,7 @@ public class EmuPointCatalogLoaderTests
         Assert.Equal(ControlEffectId.PcsApplyCommands, startStop.Effect);
 
         var hvBreaker = catalog.ControlPoints.First(p => p.ParamName == "yx0");
+        Assert.Equal("Breaker.Closed", hvBreaker.Target.PropertyPath);
         Assert.Equal(ControlEffectId.UnitHighVoltageBreaker, hvBreaker.Effect);
     }
 
@@ -84,7 +85,7 @@ public class EmuPointCatalogLoaderTests
         Assert.Contains(ungated.ControlPoints, p => p.ParamName == "yx0");
         Assert.Contains(ungated.ControlPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));
 
-        // 门控：无断路器剔除 PowerOnOff；越界 PCS 剔除；0 号 PCS 保留
+        // 门控：无断路器剔除高压开合（Breaker.Closed）；越界 PCS 剔除；0 号 PCS 保留
         Assert.DoesNotContain(gated.ControlPoints, p => p.ParamName == "yx0");
         Assert.DoesNotContain(gated.ControlPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));
         Assert.DoesNotContain(gated.TelemetryPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));

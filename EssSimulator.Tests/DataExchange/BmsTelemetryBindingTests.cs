@@ -15,7 +15,7 @@ namespace EssSimulator.Tests.DataExchange;
 /// <summary>
 /// 验证 BMS 点表 ModelSim 路径能否解析到 DTO 属性，以及遥测管道能否读到映射后的值。
 /// </summary>
-public class BmsTelemetryBindingTests
+public class BmsTelemetryBindingTests : SimulatorHostTestBase
 {
     /// <summary>
     /// common 版点表绝对路径。根目录 bms_bank.csv 可能随交付版本切换（如 LC 版），

@@ -38,8 +38,8 @@ namespace EssSimulator.Web.Topology
                     });
                 }
                 var saved = store.SaveProject(project);
-                // 按 PCS 总数自动选型 EMU 点表（随下次重启生效）
-                EmuPointMapAutoSelect.ApplyForProject(saved);
+                // 按 PCS 总数自动选型 LC 点表（随下次重启生效）
+                LcPointMapAutoSelect.ApplyForProject(saved);
                 return Results.Ok(saved);
             });
 

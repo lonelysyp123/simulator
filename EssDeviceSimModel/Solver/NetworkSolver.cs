@@ -74,34 +74,12 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 _network.PccLineVoltageV = 0;
             }
 
-            // S8: 电表采样
-            double systemF = _network.SystemFrequencyHz;
-            AcInternalQuantities primarySample;
-            if (context.MainBreakerClosed)
-            {
-                var raw = _network.MainTransformer.Primary.Output.Ac!.Internal;
-                primarySample = new AcInternalQuantities
-                {
-                    Connection = raw.Connection,
-                    LineVoltageV = raw.LineVoltageV,
-                    LineCurrentA = raw.LineCurrentA,
-                    PhaseAngleDeg = raw.PhaseAngleDeg,
-                    FrequencyHz = systemF
-                };
-            }
-            else
-            {
-                var raw = _network.MainTransformer.Primary.Output.Ac!.Internal;
-                primarySample = new AcInternalQuantities
-                {
-                    Connection = raw.Connection,
-                    LineVoltageV = raw.LineVoltageV,
-                    LineCurrentA = 0,
-                    PhaseAngleDeg = 0,
-                    FrequencyHz = systemF
-                };
-            }
-
+            // S8: 电表按组态抽头采样
+            var primarySample = MeterBusSampler.Sample(
+                _network,
+                graph: null,
+                _network.PccMeter.Config.SourceBusId,
+                _network.SystemFrequencyHz);
             _network.PccMeter.SampleFrom(primarySample, meterIntegrationStep);
             PublishBusQuantities();
         }
@@ -137,18 +115,25 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 ? _network.MainBreaker.Secondary.Output.Ac!.Internal.LineVoltageV
                 : 0;
 
-            SetAcInput(_network.MainTransformer.Primary, downstreamV, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
-            SetAcInput(_network.MainTransformer.Secondary, secCurrent, ThreePhaseConnection.Star, context);
-            _network.MainTransformer.Step(context, step);
+            if (_network.HasMainTransformer)
+            {
+                SetAcInput(_network.MainTransformer.Primary, downstreamV, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
+                SetAcInput(_network.MainTransformer.Secondary, secCurrent, ThreePhaseConnection.Star, context);
+                _network.MainTransformer.Step(context, step);
+            }
 
             if (context.MainBreakerClosed)
             {
-                bus35V = _network.MainTransformer.Secondary.Output.Ac!.Internal.LineVoltageV;
+                bus35V = _network.HasMainTransformer
+                    ? _network.MainTransformer.Secondary.Output.Ac!.Internal.LineVoltageV
+                    : downstreamV;
                 _network.PccLineVoltageV = gridVoltage;
-                _network.StationBus35LineVoltageV = GridFeedbackConventions.DeriveStationBusVoltage(
-                    gridVoltage,
-                    _pccCfg.NominalLineVoltage,
-                    _pccCfg.StationBusNominalLineVoltage);
+                _network.StationBus35LineVoltageV = _network.HasMainTransformer
+                    ? GridFeedbackConventions.DeriveStationBusVoltage(
+                        gridVoltage,
+                        _pccCfg.NominalLineVoltage,
+                        _pccCfg.StationBusNominalLineVoltage)
+                    : downstreamV;
             }
             else
             {
@@ -313,13 +298,26 @@ namespace EssSimulator.EssDeviceSimModel.Solver
 
         private void PublishBusQuantities()
         {
-            SetBusQuantity("BUS_GRID", _network.Grid.Port.Output.Ac!.Internal);
-            SetBusQuantity("BUS_35", new AcInternalQuantities
+            SetBusQuantity(RuntimeBusIds.Grid, _network.Grid.Port.Output.Ac!.Internal);
+            SetBusQuantity(RuntimeBusIds.AfterMainBreaker, new AcInternalQuantities
+            {
+                Connection = ThreePhaseConnection.Star,
+                LineVoltageV = contextMainClosed()
+                    ? (_network.HasMainTransformer
+                        ? _network.MainTransformer.Primary.Output.Ac?.Internal.LineVoltageV ?? 0
+                        : _network.MainBreaker.Secondary.Output.Ac?.Internal.LineVoltageV ?? 0)
+                    : 0,
+                FrequencyHz = _network.SystemFrequencyHz
+            });
+            SetBusQuantity(RuntimeBusIds.Station35, new AcInternalQuantities
             {
                 Connection = ThreePhaseConnection.Star,
                 LineVoltageV = _network.StationBus35LineVoltageV,
                 FrequencyHz = _network.SystemFrequencyHz
             });
+
+            bool contextMainClosed() =>
+                _network.MainBreaker.SwitchState.IsClosed && !_network.MainBreaker.SwitchState.IsTripped;
         }
 
         private void SetBusQuantity(string busId, AcInternalQuantities qty)

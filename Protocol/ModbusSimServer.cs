@@ -60,24 +60,11 @@ namespace EssSimulator
             _slave  = new ModbusTCPSlave(_deviceInfo, _pointMap.RawMaps, clusterCount);
             _parser = new ModbusParser(_pointMap.RawMaps);
 
-            if (RequiresDataExchange(serverName))
-            {
-                var options = dataExchangeOptions ?? new DataExchangeOptions();
-                var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName, options, essUnits);
-                _dataSync = new DataExchangeSession(
-                    _slave, _parser, catalog, _deviceInfo, options, clusterCount);
-            }
-            else
-            {
-                _dataSync = new ModbusDataSync(_slave, _parser, _pointMap, _deviceInfo, clusterCount);
-            }
+            var options = dataExchangeOptions ?? new DataExchangeOptions();
+            var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName, options, essUnits);
+            _dataSync = new DataExchangeSession(
+                _slave, _parser, catalog, _deviceInfo, options, clusterCount);
         }
-
-        private static bool RequiresDataExchange(string serverName) =>
-            serverName.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase)
-            || serverName.StartsWith("simBms", StringComparison.OrdinalIgnoreCase)
-            || serverName.StartsWith("simPv", StringComparison.OrdinalIgnoreCase)
-            || serverName.Equals("simEm", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// 尝试连接并启动所有 worker 线程。

@@ -1,3 +1,4 @@
+using EssSimulator.EssDeviceSimModel.Model;
 using EssSimulator.Web.Topology;
 using Xunit;
 
@@ -335,5 +336,17 @@ public class TopologyRuntimeConverterTests
         Assert.NotNull(overlay);
         Assert.Empty(overlay!.EssUnits);
         Assert.Equal(2, overlay.PvUnits.Count);
+    }
+
+    [Fact]
+    public void Convert_writes_pcc_meter_source_bus_from_connected_ac_bus()
+    {
+        var project = TopologyScaffold.BuildRadial(emuCount: 1);
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        Assert.NotNull(overlay!.Meter);
+        Assert.Equal(RuntimeBusIds.AfterMainBreaker, overlay.Meter!.PccMeter.SourceBusId);
+        Assert.True(overlay.Transformer!.Present);
+        Assert.Contains(overlay.Notes, n => n.Contains("电表抽头") && n.Contains(RuntimeBusIds.AfterMainBreaker));
     }
 }

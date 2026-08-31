@@ -39,8 +39,6 @@ Modbus TCP（simEm / simBms{N} / simEmu{N}）  ← EMS/测试工具接入
 | `ApiKeyEnabled` | false | 是否保护 `/api/*`（`/api/health` 豁免）；仓外托管建议 true |
 | `ApiKey` | `""` | 密钥明文；启用时必填，推荐环境变量 `Simulator__Web__ApiKey` |
 
-> `Runtime.NoGui` 已无实际意义（TUI 已移除），保留兼容旧配置。
-
 命令行/环境变量覆盖示例：
 
 ```bash

@@ -79,7 +79,7 @@ namespace EssSimulator
                     }
 
                     // 电表 Modbus 服务
-                    var em = new ModbusSimServer("em.csv", 0, "simEm");
+                    var em = new ModbusSimServer("em.csv", 0, "simEm", dataExchangeOptions: _dataExchange);
                     store.Register("simEm", em);
                     _manager.RegisterDevice(em, ProtocolDeviceType.Em, "em.csv");
 
@@ -94,7 +94,7 @@ namespace EssSimulator
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("Modbus 从站启动失败（dpc/esscmd 将提示找不到 Modbus 设备）。请确认点表 CSV 可用：./scripts/sync-pointmaps-to-root.sh", ex);
+                    Log.Error("Modbus 从站启动失败（dpc/esscmd 将提示找不到 Modbus 设备）。请确认 `pointmaps/models/` 下存在对应设备类型的点表，并检查 `configs/topology/device-models.json` 选型。", ex);
                 }
             }, cancellationToken);
 

@@ -1,9 +1,6 @@
-using EssSimulator.EssDeviceSimModel.Diagnostics;
 using EssSimulator.EssDeviceSimModel.Interface;
 using EssSimulator.EssDeviceSimModel.Model;
 using EssSimulator.EssDeviceSimModel.Thermal;
-using EssSimulator.EssSimModelApi.BatteryManagementSystem;
-using EssSimulator.EssSimModelApi.Mappers;
 
 namespace EssSimulator.EssDeviceSimModel.Devices
 {
@@ -113,22 +110,8 @@ namespace EssSimulator.EssDeviceSimModel.Devices
             return true;
         }
 
-        /// <summary>将物理量映射到 BMS DTO，评估簇级/Rack 级保护并回写 Rack 故障态。</summary>
-        public void SyncTelemetryAndProtection(BatteryManagementSystemData bmsData)
-        {
-            var rackState = _rack.GetRackState();
-            if (rackState == null || bmsData == null)
-                return;
-
-            BmsMapper.MapRackToStack(rackState, bmsData);
-            BmsMapper.MapClusters(_rack, bmsData);
-            BmsRackProtection.EvaluateAllClusters(_rack, bmsData);
-            BmsRackProtection.ApplyRackFaultSummary(bmsData, rackState);
-            // 告警/功率限值就绪后再刷新堆级运行状态（bank yc3）
-            BmsMapper.UpdateStackOperationStatus(bmsData);
-            BmsStateTracker.ReportProtectionChanges(DisplayLabel, bmsData, rackState);
-            RefreshFaultState();
-        }
+        /// <summary>保护评估后刷新电气故障态（由 Mapper 在投影完成时调用）。</summary>
+        internal void RefreshProtectionFault() => RefreshFaultState();
 
         public void SyncPortFromRack()
         {
