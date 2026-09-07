@@ -1,3 +1,4 @@
+using EssSimulator.Core;
 using EssSimulator.DataExchange;
 using EssSimulator.DataExchange.Adapters;
 using EssSimulator.DataExchange.Catalog;
@@ -7,6 +8,7 @@ using EssSimulator.Protocol.Modbus;
 
 namespace EssSimulator.Tests.DataExchange;
 
+[Collection("SimulatorHost")]
 public class ControlPipelineDpcTests
 {
     private sealed class FakeSimulationAdapter : ISimulationDataAdapter
@@ -54,17 +56,17 @@ public class ControlPipelineDpcTests
             _registers.TryGetValue(paramName, out var val) ? val : null;
     }
 
-    private static PointBinding Yx3Binding() => new()
+    private static PointBinding Yk3Binding() => new()
     {
         Entry = new MapEntry
         {
             Address = 1003,
             FunctionCode = 5,
-            ParamName = "yx3",
+            ParamName = "yk3",
             Size = 1,
             Type = "bool"
         },
-        ParamName = "yx3",
+        ParamName = "yk3",
         Target = new DataTarget { RootKey = "emu1", PropertyPath = "PcsList[0].pcsOnOffSwitch" },
         Semantics = ControlSemantics.Hold,
         Effect = ControlEffectId.PcsApplyCommands
@@ -72,7 +74,7 @@ public class ControlPipelineDpcTests
 
     private static ModbusParser CreateParser()
     {
-        // 固定加载 standard 型号 EMU 点表（含 yx3），避免受运行期设备型号选型劫持
+        // 固定加载 standard 型号 EMU 点表（含 yk3），避免受运行期设备型号选型劫持
         var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "emu", "standard", "emu.csv");
         var pointMap = new ModbusPointMap(path, "simEmu1");
         return new ModbusParser(pointMap.RawMaps);
@@ -97,7 +99,7 @@ public class ControlPipelineDpcTests
         {
             ServerName = "simEmu1",
             TelemetryPoints = Array.Empty<PointBinding>(),
-            ControlPoints = new[] { Yx3Binding() },
+            ControlPoints = new[] { Yk3Binding() },
             DefaultValues = new Dictionary<string, object>()
         };
 
@@ -106,8 +108,8 @@ public class ControlPipelineDpcTests
         var shadow = new ShadowStore();
 
         simulation.Write("emu1.PcsList[0].pcsOnOffSwitch", false);
-        shadow.CommitControl("yx3", 0);
-        modbus.WritePoints(new Dictionary<string, object> { { "yx3", 0 } });
+        shadow.CommitControl("yk3", 0);
+        modbus.WritePoints(new Dictionary<string, object> { { "yk3", 0 } });
 
         var control = new ControlPipeline(
             catalog, simulation, modbus, CreateParser(),
@@ -116,7 +118,44 @@ public class ControlPipelineDpcTests
         control.RunOnce();
 
         Assert.False(Convert.ToBoolean(simulation.Read("emu1.PcsList[0].pcsOnOffSwitch")!));
-        Assert.Equal(0, Convert.ToInt32(modbus.ReadParsedPoint("yx3")!));
+        Assert.Equal(0, Convert.ToInt32(modbus.ReadParsedPoint("yk3")!));
+    }
+
+    [Fact]
+    public void RunOnce_Skipped_WhenThirdPartyEmsExclusive()
+    {
+        var catalog = new PointCatalog
+        {
+            ServerName = "simEmu1",
+            TelemetryPoints = Array.Empty<PointBinding>(),
+            ControlPoints = new[] { Yk3Binding() },
+            DefaultValues = new Dictionary<string, object>()
+        };
+
+        var simulation = new FakeSimulationAdapter();
+        var modbus = new FakeModbusAdapter();
+        var shadow = new ShadowStore();
+        simulation.Write("emu1.PcsList[0].pcsOnOffSwitch", false);
+        shadow.CommitControl("yk3", 0);
+        var yk3 = Yk3Binding();
+        modbus.WritePoints(new Dictionary<string, object>
+        {
+            { "yk3", ModbusPointCodec.Encode(true, yk3.Entry, applyScale: true) }
+        });
+
+        ExternalControlGate.SetBlocked(true);
+        try
+        {
+            var control = new ControlPipeline(
+                catalog, simulation, modbus, CreateParser(),
+                shadow, new ControlEffectRegistry(), "simEmu1", logControlChanges: false);
+            control.RunOnce();
+            Assert.False(Convert.ToBoolean(simulation.Read("emu1.PcsList[0].pcsOnOffSwitch")!));
+        }
+        finally
+        {
+            ExternalControlGate.Reset();
+        }
     }
 
     [Fact]
@@ -126,7 +165,7 @@ public class ControlPipelineDpcTests
         {
             ServerName = "simEmu1",
             TelemetryPoints = Array.Empty<PointBinding>(),
-            ControlPoints = new[] { Yx3Binding() },
+            ControlPoints = new[] { Yk3Binding() },
             DefaultValues = new Dictionary<string, object>()
         };
 
@@ -134,11 +173,11 @@ public class ControlPipelineDpcTests
         var modbus = new FakeModbusAdapter();
         var shadow = new ShadowStore();
         simulation.Write("emu1.PcsList[0].pcsOnOffSwitch", false);
-        shadow.CommitControl("yx3", 0);
-        var yx3 = Yx3Binding();
+        shadow.CommitControl("yk3", 0);
+        var yk3 = Yk3Binding();
         modbus.WritePoints(new Dictionary<string, object>
         {
-            { "yx3", ModbusPointCodec.Encode(true, yx3.Entry, applyScale: true) }
+            { "yk3", ModbusPointCodec.Encode(true, yk3.Entry, applyScale: true) }
         });
 
         var recorder = new RecordingControlPointCapture();
@@ -151,7 +190,7 @@ public class ControlPipelineDpcTests
             control.RunOnce();
             Assert.Equal(1, recorder.Count);
             Assert.Equal("simEmu1", recorder.LastServerName);
-            Assert.Equal("yx3", recorder.LastParamName);
+            Assert.Equal("yk3", recorder.LastParamName);
         }
         finally
         {

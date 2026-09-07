@@ -57,6 +57,22 @@ public class PcsDisplayLabelsTests
     }
 
     [Fact]
+    public void MapPcsState_BatteryPower_IsKilowatts()
+    {
+        var src = new PcsState
+        {
+            DcVoltage = 1350,
+            DcCurrent = 40,
+            ActivePower = 50
+        };
+        var dst = new PcsData();
+
+        PcsMapper.MapPcsState(src, dst, null!);
+
+        Assert.Equal(54f, dst.BatteryPower, precision: 3);
+    }
+
+    [Fact]
     public void MapEmuState_SumsPcsActiveAndReactivePower()
     {
         var emu = new EnergyManagementData();

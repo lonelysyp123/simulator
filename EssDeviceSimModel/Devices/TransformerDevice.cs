@@ -82,7 +82,7 @@ namespace EssSimulator.EssDeviceSimModel.Devices
                 secIn.ReactivePowerKvar,
                 context.SimulationTime,
                 step,
-                applyReactiveVoltageShift: false);
+                applyReactiveVoltageShift: true);
 
             PublishPorts(priIn.FrequencyHz, secIn, context);
         }
@@ -110,6 +110,15 @@ namespace EssSimulator.EssDeviceSimModel.Devices
 
         public void OverrideSecondaryVoltage(double secondaryLineVoltageV) =>
             _currentState.SecondaryVoltage = secondaryLineVoltageV;
+
+        /// <summary>主断分闸且无反送时，状态与端口一并清零，避免界面读到上一拍并网电压。</summary>
+        public void WriteDeenergizedPorts()
+        {
+            var emptyPri = new AcInternalQuantities { Connection = _config.PrimaryConnection };
+            var emptySec = new AcInternalQuantities { Connection = _config.SecondaryConnection };
+            AcPortHelper.WriteAcOutput(Primary, emptyPri);
+            AcPortHelper.WriteAcOutput(Secondary, emptySec);
+        }
 
         public void RefreshIslandReverseExcitation(
             double stationBus35LineVoltageV,

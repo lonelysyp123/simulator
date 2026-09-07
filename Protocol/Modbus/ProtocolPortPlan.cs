@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using EssSimulator.Configuration;
+using EssSimulator.LocalControl;
 
 namespace EssSimulator.Protocol.Modbus
 {
@@ -27,6 +28,9 @@ namespace EssSimulator.Protocol.Modbus
         public string PointMapFile { get; set; } = string.Empty;
         /// <summary>BMS 簇级从站数量（占用 slaveId+1..slaveId+rackCount 的从站号）。</summary>
         public int RackCount { get; set; }
+
+        /// <summary>LC 点表按组展开的组数；非 LC 设备为 0。</summary>
+        public int LcGroupCount { get; set; }
 
         /// <summary>配置文件计算出的默认端口。</summary>
         public int DefaultPort { get; set; }
@@ -90,9 +94,11 @@ namespace EssSimulator.Protocol.Modbus
                     p.BaseBmsModbusPort + i * p.BmsPortStep, rackCount: clusterCount));
             }
 
-            for (int i = 0; i < cfg.EffectiveEssUnitCount; i++)
+            var emuEndpoints = EmuProtocolLayout.Enumerate(cfg);
+            for (int i = 0; i < emuEndpoints.Count; i++)
             {
-                plan.Entries.Add(MakeEntry($"simEmu{i + 1}", ProtocolDeviceType.Emu, "emu.csv",
+                var ep = emuEndpoints[i];
+                plan.Entries.Add(MakeEntry(ep.ServerName, ProtocolDeviceType.Emu, "emu.csv",
                     p.BaseEmuModbusPort + i * p.EmuPortStep));
             }
 
@@ -108,12 +114,12 @@ namespace EssSimulator.Protocol.Modbus
 
             if (p.EnableLocalControl && cfg.EffectiveEssUnitCount > 0)
             {
-                int emuPerGroup = Math.Max(1, p.LocalControlEmuPerGroup);
-                int lcCount = (int)Math.Ceiling(cfg.EffectiveEssUnitCount / (double)emuPerGroup);
+                int lcCount = cfg.EffectiveEssUnitCount;
                 for (int i = 0; i < lcCount; i++)
                 {
                     plan.Entries.Add(MakeEntry($"simLc{i + 1}", ProtocolDeviceType.Lc, "lc.csv",
-                        p.BaseLocalControlModbusPort + i * p.LocalControlPortStep));
+                        p.BaseLocalControlModbusPort + i * p.LocalControlPortStep,
+                        lcGroupCount: LcLayout.GroupCountForUnit(cfg, i)));
                 }
             }
 
@@ -121,7 +127,8 @@ namespace EssSimulator.Protocol.Modbus
         }
 
         private static ProtocolPortEntry MakeEntry(
-            string name, ProtocolDeviceType type, string pointMapFile, int defaultPort, int rackCount = 0)
+            string name, ProtocolDeviceType type, string pointMapFile, int defaultPort,
+            int rackCount = 0, int lcGroupCount = 0)
         {
             return new ProtocolPortEntry
             {
@@ -129,6 +136,7 @@ namespace EssSimulator.Protocol.Modbus
                 Type = type,
                 PointMapFile = pointMapFile,
                 RackCount = rackCount,
+                LcGroupCount = lcGroupCount,
                 DefaultPort = defaultPort,
                 DefaultSlaveId = 1,
                 Port = defaultPort,

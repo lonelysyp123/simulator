@@ -40,6 +40,7 @@ public class DeviceModelRegistryTests
         var modelIds = bms.Models.Select(m => m.Id).ToList();
         Assert.Contains("standard", modelIds);
         Assert.Contains("g2_pro", modelIds);
+        Assert.Contains("g2_4mwh", modelIds);
         Assert.All(bms.Models, m =>
         {
             Assert.False(string.IsNullOrWhiteSpace(m.Name));
@@ -54,12 +55,21 @@ public class DeviceModelRegistryTests
         var byId = types.ToDictionary(t => t.Id, StringComparer.OrdinalIgnoreCase);
 
         var emuIds = byId["emu"].Models.Select(m => m.Id).ToList();
-        Assert.Equal(new[] { "standard" }, emuIds);
+        Assert.Contains("standard", emuIds);
+        Assert.Contains("iec61850", emuIds);
+        Assert.False(DeviceModelRegistry.IsExclusiveModel(byId["emu"].Models.First(m => m.Id == "iec61850")));
 
         var lcIds = byId["lc"].Models.Select(m => m.Id).ToList();
-        Assert.Contains("standard", lcIds);
-        Assert.Contains("trina_5.5MW", lcIds);
-        Assert.Contains("trina_10MW", lcIds);
+        Assert.Contains("system", lcIds);
+        Assert.Contains("group", lcIds);
+        Assert.Contains("unit", lcIds);
+        Assert.Contains("mv", lcIds);
+        Assert.Contains("emu", lcIds);
+        Assert.DoesNotContain("trina_10MW", lcIds);
+        var unitLc = byId["lc"].Models.First(m => m.Id == "unit");
+        Assert.Equal(4, unitLc.MaxPcsPerGroup);
+        var emuLc = byId["lc"].Models.First(m => m.Id == "emu");
+        Assert.True(DeviceModelRegistry.IsExclusiveModel(emuLc));
         Assert.All(byId["lc"].Models, m =>
         {
             Assert.True(File.Exists(Path.Combine(m.Directory, "lc.csv")));
@@ -85,12 +95,81 @@ public class DeviceModelRegistryTests
         var root = FindRepoRoot();
 
         var ok = DeviceModelRegistry.ValidateSelection(
-            new Dictionary<string, string> { ["bms"] = "g2_pro", ["emu"] = "standard" }, root);
+            new Dictionary<string, string> { ["bms"] = "g2_pro", ["emu"] = "standard", ["lc"] = "emu" }, root);
         Assert.Empty(ok);
 
         var bad = DeviceModelRegistry.ValidateSelection(
             new Dictionary<string, string> { ["bms"] = "no-such-model", ["xxx"] = "standard" }, root);
         Assert.Equal(2, bad.Count);
+    }
+
+    [Fact]
+    public void ValidateSelection_RejectsLcFragmentAndUnknownModel()
+    {
+        var root = FindRepoRoot();
+        var fragment = DeviceModelRegistry.ValidateSelection(
+            new Dictionary<string, string> { ["lc"] = "group" }, root);
+        Assert.Contains(fragment, e => e.Contains("拼装片段"));
+
+        var unknown = DeviceModelRegistry.ValidateSelection(
+            new Dictionary<string, string> { ["lc"] = "trina_10MW" }, root);
+        Assert.Contains(unknown, e => e.Contains("不存在型号"));
+    }
+
+    [Fact]
+    public void GetSelectedModelDir_LcFragmentSelection_IsIgnored()
+    {
+        var tmp = CreateTempLcSelectionRoot(fragmentId: "group", exclusiveId: "emu");
+        try
+        {
+            DeviceModelRegistry.SaveSelection(new DeviceModelSelection
+            {
+                Selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["lc"] = "group"
+                }
+            }, tmp);
+
+            Assert.Null(DeviceModelRegistry.GetSelectedModelDir("lc", "lc.csv", tmp));
+            Assert.Null(DeviceModelRegistry.GetSelectedExclusiveLcDir(tmp));
+        }
+        finally
+        {
+            Directory.Delete(tmp, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void GetSelectedModelDir_ExclusiveLc_ReturnsDir()
+    {
+        var tmp = CreateTempLcSelectionRoot(fragmentId: "group", exclusiveId: "emu");
+        try
+        {
+            DeviceModelRegistry.SaveSelection(new DeviceModelSelection
+            {
+                Selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["lc"] = "emu"
+                }
+            }, tmp);
+
+            var dir = DeviceModelRegistry.GetSelectedModelDir("lc", "lc.csv", tmp);
+            Assert.NotNull(dir);
+            Assert.Equal("emu", Path.GetFileName(dir));
+            Assert.True(DeviceModelRegistry.TryGetExclusiveLcCsv(out var csv, tmp));
+            Assert.True(File.Exists(csv));
+        }
+        finally
+        {
+            Directory.Delete(tmp, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void GetSelectedModelDir_LcUnselected_IsNull()
+    {
+        var root = FindRepoRoot();
+        Assert.Null(DeviceModelRegistry.GetSelectedModelDir("lc", "lc.csv", root));
     }
 
     [Fact]
@@ -134,5 +213,26 @@ public class DeviceModelRegistryTests
         {
             Directory.Delete(tmp, recursive: true);
         }
+    }
+
+    private static string CreateTempLcSelectionRoot(string fragmentId, string exclusiveId)
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), "ess-devmodel-lc-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(tmp, "configs", "topology"));
+        var fragmentDir = Path.Combine(tmp, DeviceModelRegistry.ModelsRelativeDir, "lc", fragmentId);
+        var exclusiveDir = Path.Combine(tmp, DeviceModelRegistry.ModelsRelativeDir, "lc", exclusiveId);
+        Directory.CreateDirectory(fragmentDir);
+        Directory.CreateDirectory(exclusiveDir);
+        File.WriteAllText(Path.Combine(fragmentDir, "model.json"),
+            """{"id":"group","name":"fragment","role":"fragment"}""");
+        File.WriteAllText(Path.Combine(fragmentDir, "lc.csv"),
+            "FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim\n4,107,u16,16,param1,1,x,0\n");
+        File.WriteAllText(Path.Combine(exclusiveDir, "model.json"),
+            """{"id":"emu","name":"EMU 直控点表","role":"exclusive"}""");
+        File.WriteAllText(Path.Combine(exclusiveDir, "lc.csv"),
+            "FunctionCode,Address,Type,Size,ParamName,Scale,Description,ModelSim\n5,1000,bool,1,yx0,1,高压断路器,0\n");
+        File.WriteAllText(Path.Combine(tmp, DeviceModelRegistry.ModelsRelativeDir, "lc", "type.json"),
+            """{"id":"lc","name":"LocalControl","files":["lc.csv"]}""");
+        return tmp;
     }
 }

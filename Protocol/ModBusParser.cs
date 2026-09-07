@@ -48,11 +48,15 @@ namespace EssSimulator
                 var ResultArray = new Dictionary<string, object>();
                 foreach (var item in originalData)
                 {
-                    byte[]? data = item.Value as byte[];
                     MapEntry? point = FindPointByName(item.Key);
-                    if (point == null || data == null)
+                    if (point == null)
                         continue;
-                    ResultArray.Add(item.Key, ModbusPointCodec.Decode(data, point));
+
+                    // 61850 / 点影子可能直接写入工程值；Modbus 读回仍为字节数组。
+                    if (item.Value is byte[] data)
+                        ResultArray.Add(item.Key, ModbusPointCodec.Decode(data, point));
+                    else
+                        ResultArray.Add(item.Key, item.Value);
                 }
                 return ResultArray;
             }

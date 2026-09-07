@@ -9,6 +9,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=pointmap-common.sh
+source "$ROOT/scripts/pointmap-common.sh"
 cd "$ROOT"
 
 HTTP_PORT="${HTTP_PORT:-5050}"
@@ -114,9 +116,8 @@ start_backend() {
     echo "错误: 端口 $HTTP_PORT 已被占用，请先释放或设置 HTTP_PORT=..." >&2
     exit 1
   fi
-  # 运行时从 pointmaps/models/ 解析点表，不再要求仓库根存在 emu.csv
-  if [[ ! -f "$ROOT/pointmaps/models/emu/standard/emu.csv" ]]; then
-    echo "错误: 缺少点表 $ROOT/pointmaps/models/emu/standard/emu.csv" >&2
+  # 运行时从 pointmaps/models/ 解析：选型型回退 standard/，LC 扫描片段拼装
+  if ! validate_device_models; then
     exit 1
   fi
   echo "==> 启动后端: dotnet run (http://localhost:${HTTP_PORT})"

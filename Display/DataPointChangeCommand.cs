@@ -89,6 +89,9 @@ namespace EssSimulator.Display
 
             if (op == "set")
             {
+                if (!ExternalControlGate.TryAllow(out message))
+                    return false;
+
                 if (string.IsNullOrWhiteSpace(opdata))
                 {
                     message = "set 操作缺少参数值";
@@ -158,6 +161,9 @@ namespace EssSimulator.Display
                 message = "簇级门限点目前仅支持 set（写原始寄存器值）；读请用 mbpoll 对对应 rack 从站读 Holding";
                 return false;
             }
+
+            if (!ExternalControlGate.TryAllow(out message))
+                return false;
 
             if (string.IsNullOrWhiteSpace(opdata))
             {

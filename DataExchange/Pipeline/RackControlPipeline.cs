@@ -1,3 +1,4 @@
+using EssSimulator.Core;
 using EssSimulator.DataExchange.Adapters;
 using EssSimulator.DataExchange.Catalog;
 using log4net;
@@ -52,6 +53,8 @@ namespace EssSimulator.DataExchange.Pipeline
 
         public void RunOnce()
         {
+            if (ExternalControlGate.IsBlocked)
+                return;
             if (_points.Count == 0 || _clusterCount <= 0)
                 return;
 
@@ -63,6 +66,8 @@ namespace EssSimulator.DataExchange.Pipeline
 
         public void RunForRack(int rackId)
         {
+            if (ExternalControlGate.IsBlocked)
+                return;
             if (_points.Count == 0 || rackId < 0 || rackId >= _clusterCount)
                 return;
 

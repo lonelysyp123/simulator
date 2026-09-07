@@ -42,10 +42,12 @@ namespace EssSimulator.DataExchange.Catalog
             ["pcs1_startstop"] = ControlEffectId.PcsApplyCommands,
             ["pcs2_startstop"] = ControlEffectId.PcsApplyCommands,
             ["yx3"] = ControlEffectId.PcsApplyCommands,
+            ["yk3"] = ControlEffectId.PcsApplyCommands,
             ["yx5"] = ControlEffectId.PcsApplyCommands,
             ["pcs1_blackstart_enable"] = ControlEffectId.PcsApplyCommands,
             ["pcs2_blackstart_enable"] = ControlEffectId.PcsApplyCommands,
             ["yx2"] = ControlEffectId.PcsApplyCommands,
+            ["yk2"] = ControlEffectId.PcsApplyCommands,
             ["yx4"] = ControlEffectId.PcsApplyCommands,
             ["param55"] = ControlEffectId.PcsApplyCommands,
             ["param56"] = ControlEffectId.PcsApplyCommands,
@@ -53,6 +55,9 @@ namespace EssSimulator.DataExchange.Catalog
             ["param60"] = ControlEffectId.PcsApplyCommands,
             ["param64"] = ControlEffectId.PcsApplyCommands,
             ["param65"] = ControlEffectId.PcsApplyCommands,
+            ["yt3"] = ControlEffectId.PcsApplyCommands,
+            ["yt4"] = ControlEffectId.PcsApplyCommands,
+            ["yt7"] = ControlEffectId.PcsApplyCommands,
             ["highvoltagebreakeronoff"] = ControlEffectId.UnitHighVoltageBreaker
         };
 
@@ -186,7 +191,7 @@ namespace EssSimulator.DataExchange.Catalog
                     Entry = entry,
                     ParamName = entry.ParamName,
                     Target = target,
-                    Semantics = ResolveSemantics(entry.ParamName, isEmu, isBms, options),
+                    Semantics = ResolveSemantics(entry.ParamName, target, isEmu, isBms, options),
                     Effect = ResolveEffect(entry.ParamName, target, isEmu, isBms, options)
                 });
             }
@@ -255,6 +260,7 @@ namespace EssSimulator.DataExchange.Catalog
 
         private static ControlSemantics ResolveSemantics(
             string paramName,
+            DataTarget target,
             bool isEmu,
             bool isBms,
             DataExchangeOptions options)
@@ -267,6 +273,10 @@ namespace EssSimulator.DataExchange.Catalog
 
             if (isBms && BmsDefaultSemantics.TryGetValue(paramName, out var bmsDefault))
                 return bmsDefault;
+
+            if (isBms && (target.PropertyPath.Contains("GridConnectCommand", StringComparison.Ordinal) ||
+                          target.PropertyPath.Contains("FaultClearCommand", StringComparison.Ordinal)))
+                return ControlSemantics.Pulse;
 
             return ControlSemantics.Hold;
         }
@@ -301,7 +311,9 @@ namespace EssSimulator.DataExchange.Catalog
                 if (target.PropertyPath.Contains("pcsOnOffSwitch", StringComparison.Ordinal) ||
                     target.PropertyPath.Contains("BlackStartEnabled", StringComparison.Ordinal) ||
                     target.PropertyPath.Contains("PCSActivePowerSetting", StringComparison.Ordinal) ||
-                    target.PropertyPath.Contains("PCSReactivePowerSetting", StringComparison.Ordinal))
+                    target.PropertyPath.Contains("PCSReactivePowerSetting", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("IslandVoltageSetting", StringComparison.Ordinal) ||
+                    target.PropertyPath.Contains("IslandFrequencySetting", StringComparison.Ordinal))
                     return ControlEffectId.PcsApplyCommands;
 
                 // EMU 级（虚拟模型）系统控制：目标 P/Q 均分、系统操作、黑启动写入、远程使能/模式

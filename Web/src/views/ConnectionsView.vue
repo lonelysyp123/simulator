@@ -9,6 +9,22 @@
     </div>
 
     <div class="card">
+      <p class="card-title">IEC 61850 IED 监听</p>
+      <el-table :data="data?.iec61850Servers || []" size="small" border stripe>
+        <el-table-column prop="server" label="服务" width="140" />
+        <el-table-column prop="iedName" label="IED" width="140" />
+        <el-table-column prop="port" label="MMS 端口" width="110" />
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.online ? 'success' : 'danger'" size="small">{{ row.online ? '在线' : '离线' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="associatedClients" label="关联客户端" width="120" />
+        <el-table-column prop="listenInfo" label="监听" />
+      </el-table>
+    </div>
+
+    <div class="card">
       <p class="card-title">Modbus 服务监听</p>
       <el-table :data="data?.servers || []" size="small" border stripe>
         <el-table-column prop="server" label="服务" width="160" />
@@ -49,12 +65,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getConnections, postLink, getHub } from '@/services/api.js'
+import { getConnections, postLink, joinHubChannel, onHubMethod } from '@/services/api.js'
 import { RealtimeMethods, RealtimeChannels } from '@/services/constants.js'
 import { ElMessage } from 'element-plus'
 
 const data = ref(null)
-let hub = null
 
 async function reload() {
   try { data.value = await getConnections() } catch (e) { console.warn(e) }
@@ -73,9 +88,8 @@ async function toggle(target, state) {
 onMounted(async () => {
   await reload()
   try {
-    hub = await getHub()
-    await hub.invoke('JoinChannel', RealtimeChannels.Connections)
-    hub.on(RealtimeMethods.ReceiveConnections, d => { data.value = d })
+    onHubMethod(RealtimeMethods.ReceiveConnections, d => { data.value = d })
+    await joinHubChannel(RealtimeChannels.Connections)
   } catch { /* ignore */ }
 })
 </script>

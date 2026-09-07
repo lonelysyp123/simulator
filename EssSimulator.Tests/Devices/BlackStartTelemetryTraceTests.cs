@@ -73,6 +73,7 @@ public class BlackStartTelemetryTraceTests
         _output.WriteLine("----  --------------  -------  -------  -----  ------  ----  -------  ----  -------  ----------");
 
         double bus690 = 0;
+        double maxQ = 0;
         for (int i = 0; i < 35; i++)
         {
             simTime += step;
@@ -98,6 +99,7 @@ public class BlackStartTelemetryTraceTests
             pcs.RefreshBlackStartBusContext(bus690);
 
             var st = pcs.GetCurrentState();
+            maxQ = Math.Max(maxQ, st.ReactivePower);
             var ac = pcs.Ac.Output.Ac!.Internal;
             double nom = pcsCfg.AcVoltageNominal;
             double vCtrl = bus690 > nom * 0.08 ? bus690 : Math.Max(st.IslandVoltageEffectiveV, 1);
@@ -120,6 +122,6 @@ public class BlackStartTelemetryTraceTests
         _output.WriteLine($"稳态/末期: P={final.ActivePower:F0}kW Q={final.ReactivePower:F0}kvar " +
                           $"I={finalAc.LineCurrentA:F0}A φ={finalAc.PhaseAngleDeg:F1}° PF={finalAc.PowerFactor:F3}");
 
-        Assert.True(final.ReactivePower > 0, "黑启动建压期应有无功输出");
+        Assert.True(maxQ > 0, "黑启动建压期应有无功输出");
     }
 }

@@ -46,6 +46,7 @@ namespace EssSimulator.Display
             "SoftStarting" => "软启动",
             "VoltageRegulating" => "调压",
             "Synchronized" => "已同步",
+            "Following" => "预同步",
             _ => string.IsNullOrWhiteSpace(phase) ? "—" : phase
         };
 

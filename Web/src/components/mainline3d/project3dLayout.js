@@ -96,7 +96,8 @@ export function stationKey(snap) {
       .map(e => `${e.fromNodeId}>${e.toNodeId}`)
       .sort()
       .join(',')
-    return `t:${nodes}#${edges}`
+    // 布局语义变更时抬版本，已打开的 3D 场景会按新 unitIndex 重建网格
+    return `t:v2-emu-unit:${nodes}#${edges}`
   }
   const ess = snap?.units?.length || 0
   const pv = snap?.pvUnits?.length || 0
@@ -336,7 +337,7 @@ function expandEmu(unit, origin, items, cables, ctx, graph = null, live = null) 
   const cx = toX(unit.cx, origin)
   const busCx = unit.busCx != null ? toX(unit.busCx, origin) : cx
   const zBus = toZ(unit.originY, origin)
-  const unitIndex = unit.unitSnap?.unitIndex ?? unit.index
+  const unitIndex = unit.unitSnap?.unitIndex ?? unit.unitIndex ?? unit.index
   const pcsNodes = unit.pcsNodes || []
   // 组态模式（有 pcs 节点）：按物理拓扑逐设备展开，不合成单元标题/单元断/单元变/690 母线；
   // 运行时兑底单元（无组态节点）保留原合成表示（仅 fromSnapFallback 路径）

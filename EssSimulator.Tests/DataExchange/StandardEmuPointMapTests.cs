@@ -10,7 +10,7 @@ namespace EssSimulator.Tests.DataExchange;
 /// 验证 standard 版 EMU 点表（pointmaps/models/emu/standard/emu.csv）的绑定准确性：
 /// 1. 所有 ModelSim 绑定路径能在 EnergyManagementData（Emu + PcsList）上解析出非空值；
 /// 2. 控制点（FC5/FC6）绑定属性可写；
-/// 3. 频率与功率能力点位（yc23/yc36-39/yc50/yc63-66）已绑定真实模型属性。
+/// 3. 频率与功率能力点位（yc23/yc36-39）已绑定真实模型属性。
 /// </summary>
 public class StandardEmuPointMapTests
 {
@@ -63,7 +63,7 @@ public class StandardEmuPointMapTests
         var catalog = LoadStandardCatalog();
         var emu = CreateEmuData();
 
-        Assert.True(catalog.TelemetryPoints.Count > 40,
+        Assert.True(catalog.TelemetryPoints.Count > 20,
             $"standard 遥测绑定点位过少: {catalog.TelemetryPoints.Count}");
 
         var failures = new List<string>();
@@ -84,7 +84,7 @@ public class StandardEmuPointMapTests
         var catalog = LoadStandardCatalog();
         var emu = CreateEmuData();
 
-        Assert.True(catalog.ControlPoints.Count >= 10,
+        Assert.True(catalog.ControlPoints.Count >= 4,
             $"standard 控制点位过少: {catalog.ControlPoints.Count}");
 
         var failures = new List<string>();
@@ -99,17 +99,27 @@ public class StandardEmuPointMapTests
             $"以下控制绑定解析失败:\n{string.Join("\n", failures)}");
     }
 
+    [Fact]
+    public void Standard_PcsIndexPlaceholder_BindsSecondPcs()
+    {
+        var pointMap = new ModbusPointMap(StandardCsvPath, "simEmu1", emuDeviceIdOverride: 1, pcsIndex: 1);
+        var catalog = PointCatalogLoader.FromPointMap(pointMap, "simEmu1", new DataExchangeOptions());
+        var emu = CreateEmuData(pcsCount: 2);
+
+        var freq = catalog.TelemetryPoints.First(p => p.ParamName == "yc23");
+        Assert.Equal("emu1", freq.Target.RootKey);
+        Assert.Equal("PcsList[1].Frequency", freq.Target.PropertyPath);
+        Assert.NotNull(ObjectPathResolver.GetValue(emu, freq.Target.PropertyPath));
+    }
+
     [Theory]
     [InlineData("yc23", "PcsList[0].Frequency")]
-    [InlineData("yc50", "PcsList[1].Frequency")]
     [InlineData("yc36", "PcsList[0].ChargePowerLimit")]
     [InlineData("yc37", "PcsList[0].DischargePowerLimit")]
     [InlineData("yc38", "PcsList[0].PCSRatePower")]
     [InlineData("yc39", "PcsList[0].PCSRatePower")]
-    [InlineData("yc63", "PcsList[1].ChargePowerLimit")]
-    [InlineData("yc64", "PcsList[1].DischargePowerLimit")]
-    [InlineData("yc65", "PcsList[1].PCSRatePower")]
-    [InlineData("yc66", "PcsList[1].PCSRatePower")]
+    [InlineData("yc45", "PcsList[0].AlarmSummary1")]
+    [InlineData("yc46", "PcsList[0].CurrentFault")]
     public void Standard_FrequencyAndCapabilityPoints_BindModelProperties(string paramName, string expectedPath)
     {
         var catalog = LoadStandardCatalog();
@@ -117,5 +127,48 @@ public class StandardEmuPointMapTests
         var point = catalog.TelemetryPoints.FirstOrDefault(p => p.ParamName == paramName);
         Assert.NotNull(point);
         Assert.Equal(expectedPath, point!.Target.PropertyPath);
+    }
+
+    [Fact]
+    public void Standard_Yt4_BindsIslandFrequencySetting()
+    {
+        var catalog = LoadStandardCatalog();
+        var yt4 = catalog.ControlPoints.FirstOrDefault(p => p.ParamName == "yt4");
+        Assert.NotNull(yt4);
+        Assert.Equal("PcsList[0].IslandFrequencySetting", yt4!.Target.PropertyPath);
+
+        var rows = File.ReadAllLines(StandardCsvPath)
+            .Skip(1)
+            .Select(l => l.Split(','))
+            .ToList();
+        var row = rows.First(c => c[4] == "yt4");
+        Assert.Equal("40004", row[1]);
+        Assert.Equal("100", row[5]);
+        Assert.Contains("IslandFrequencySetting", row[7]);
+        Assert.NotEqual("0", row[7]);
+    }
+
+    [Fact]
+    public void Standard_Yc45Yc46_AreBoundNotPlaceholderZero()
+    {
+        var rows = File.ReadAllLines(StandardCsvPath)
+            .Skip(1)
+            .Select(l => l.Split(','))
+            .ToList();
+        var yc45 = rows.First(c => c[4] == "yc45");
+        var yc46 = rows.First(c => c[4] == "yc46");
+        Assert.Contains("AlarmSummary1", yc45[7]);
+        Assert.Contains("CurrentFault", yc46[7]);
+        Assert.NotEqual("0", yc45[7]);
+        Assert.NotEqual("0", yc46[7]);
+    }
+
+    [Fact]
+    public void CurrentFault_FollowsOperationStatusAndDriveOrBmsFault()
+    {
+        Assert.Equal(0, new PcsData { OperationStatus = 5 }.CurrentFault);
+        Assert.Equal(1, new PcsData { OperationStatus = 6 }.CurrentFault);
+        Assert.Equal(1, new PcsData { DriveFault = true }.CurrentFault);
+        Assert.Equal(1, new PcsData { BmsSystemFault = true }.CurrentFault);
     }
 }

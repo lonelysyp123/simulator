@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using EssSimulator.Configuration;
 using EssSimulator.DataExchange;
+using EssSimulator.DataExchange.Adapters;
 using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Config;
 using EssSimulator.Protocol.Modbus;
@@ -43,10 +44,13 @@ namespace EssSimulator
             string serverName,
             int clusterCount = 0,
             DataExchangeOptions? dataExchangeOptions = null,
-            IReadOnlyList<EssUnitConfig>? essUnits = null)
+            IReadOnlyList<EssUnitConfig>? essUnits = null,
+            int? emuDeviceIdOverride = null,
+            int pcsIndex = 0)
         {
             RackCount = clusterCount;
-            _pointMap = new EssSimulator.Protocol.Modbus.ModbusPointMap(mapFilePath, serverName, clusterCount);
+            _pointMap = new EssSimulator.Protocol.Modbus.ModbusPointMap(
+                mapFilePath, serverName, clusterCount, emuDeviceIdOverride, pcsIndex: pcsIndex);
 
             _deviceInfo = new DeviceInfoDto
             {
@@ -62,8 +66,11 @@ namespace EssSimulator
 
             var options = dataExchangeOptions ?? new DataExchangeOptions();
             var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName, options, essUnits);
-            _dataSync = new DataExchangeSession(
+            var session = new DataExchangeSession(
                 _slave, _parser, catalog, _deviceInfo, options, clusterCount);
+            _dataSync = session;
+            PointStore = session.PointStore;
+            KeepDataPathOnDisconnect = serverName.StartsWith("simEmu", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -86,6 +93,7 @@ namespace EssSimulator
                 if (_slave.GetCommunicatorState())
                 {
                     _dataSync.Start();
+                    IsDataPathReady = true;
                     return true;
                 }
                 _log.Warn($"{_deviceInfo.name} 连接失败，第 {attempt}/{maxRetries} 次重试...");
@@ -98,7 +106,19 @@ namespace EssSimulator
         {
             try { _dataSync.Stop(); }
             catch (Exception ex) { _log.Error("Stop error", ex); }
+            IsDataPathReady = false;
             _slave.DeviceDisconnect();
+        }
+
+        /// <summary>
+        /// 仅启动 DataExchange / 寄存器影子，不绑定 Modbus TCP。
+        /// 供 IEC 61850-only 的 PCS 以及 LC 进程内抄数使用。
+        /// </summary>
+        public bool StartDataPathOnly()
+        {
+            _dataSync.Start();
+            IsDataPathReady = true;
+            return true;
         }
 
         // ── 协议层编排接口（IProtocolLayerServer）────────────────
@@ -107,6 +127,11 @@ namespace EssSimulator
         public int Port => _deviceInfo.port;
         public byte SlaveId => _deviceInfo.slaveId;
         public int RackCount { get; }
+        public IProtocolPointStore PointStore { get; }
+        /// <summary>DataExchange 已运行（即使未监听 Modbus TCP）。</summary>
+        public bool IsDataPathReady { get; private set; }
+        /// <summary>链路 off 时是否保留点影子（EMU 默认保留，供 61850 / LC）。</summary>
+        public bool KeepDataPathOnDisconnect { get; set; }
 
         /// <summary>已加载的点表（bank + 可选 rack），供协议层地址查重使用。</summary>
         public EssSimulator.Protocol.Modbus.ModbusPointMap PointMap => _pointMap;
@@ -138,6 +163,12 @@ namespace EssSimulator
             }
 
             if (!IsOnline) return true;
+            if (KeepDataPathOnDisconnect)
+            {
+                _slave.DeviceDisconnect();
+                return !IsOnline;
+            }
+
             Stop();
             return !IsOnline;
         }

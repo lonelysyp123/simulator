@@ -24,7 +24,25 @@ namespace EssSimulator.EssDeviceSimModel.Model
         public double BlackStartMagnetizingPowerFraction { get; set; } = 0.02;
         public double BlackStartBusEnergizedFraction { get; set; } = 0.85;
         public double BlackStartPrechargeDelayMs { get; set; } = 300;
-        public double BlackStartVoltageRampVs { get; set; } = 120;
+        public double BlackStartVoltageRampVs { get; set; } = 138;
+        public double VoltageRampUpVs { get; set; }
+        public double VoltageRampDownVs { get; set; }
+        public bool QvDroopEnabled { get; set; } = true;
+        public double QvDroopCoefficientVPerKvar { get; set; }
+        public double QvDroopDeadbandKvar { get; set; }
+        public double QvDroopQ0Kvar { get; set; }
+        public bool QvDroopEnableAfterSoftStartOnly { get; set; }
+        public double QvDroopVmaxPu { get; set; } = 1.10;
+        public bool PfDroopEnabled { get; set; } = true;
+        public double PfDroopCoefficientHzPerKw { get; set; }
+        public double PfDroopDeadbandKw { get; set; }
+        public double PfDroopP0Kw { get; set; }
+        public double PllEnableVoltagePu { get; set; } = 0.20;
+        public double PllTauSec { get; set; } = 0.10;
+        public double PreSyncEnableVoltagePu { get; set; } = 0.70;
+        public double PreSyncVoltageWindowPu { get; set; } = 0.05;
+        public double PreSyncFrequencyWindowHz { get; set; } = 0.2;
+        public double PreSyncPhaseWindowDeg { get; set; } = 10;
         public double BlackStartFrequencyStartHz { get; set; } = 47;
         public double BlackStartFrequencyRampHzPerSec { get; set; } = 12;
         public double BlackStartReactiveVoltageGainKvarPerV { get; set; } = 4.0;

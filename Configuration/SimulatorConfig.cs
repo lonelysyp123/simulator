@@ -148,16 +148,27 @@ namespace EssSimulator.Configuration
         /// <summary>BMS 端口步长</summary>
         public int BmsPortStep { get; set; } = 10;
 
-        /// <summary>EMU Modbus TCP 基础端口（每个储能单元一个 EMU 从站）</summary>
-        public int BaseEmuModbusPort { get; set; } = 1501;
+        /// <summary>EMU Modbus TCP 基础端口（每台 PCS 一个从站；与 appsettings 默认 1601 对齐以免与 BMS 1502 冲突）</summary>
+        public int BaseEmuModbusPort { get; set; } = 1601;
 
         /// <summary>EMU 端口步长（单位：端口号）</summary>
         public int EmuPortStep { get; set; } = 1;
 
+        /// <summary>EMU IEC 61850 MMS 基础端口（避开需特权的 102）。</summary>
+        public int BaseEmuIec61850Port { get; set; } = 8102;
+
+        /// <summary>EMU IEC 61850 端口步长。</summary>
+        public int EmuIec61850PortStep { get; set; } = 1;
+
+        /// <summary>
+        /// GOOSE 网卡名。空=按 OS 默认（macOS en0 / Windows 0）；<c>none</c> 只建 GoCB 不发二层帧。
+        /// </summary>
+        public string? EmuIec61850GooseInterface { get; set; }
+
         /// <summary>电表 Modbus TCP 端口</summary>
         public int EmModbusPort { get; set; } = 1500;
 
-        /// <summary>是否启用 LocalControl 聚合协议（每路聚合 4 个 EMU / 8 台 PCS）。</summary>
+        /// <summary>是否启用 LocalControl 聚合协议（每个储能单元一路 simLc）。</summary>
         public bool EnableLocalControl { get; set; } = false;
 
         /// <summary>LocalControl Modbus TCP 基础端口。</summary>
@@ -166,7 +177,7 @@ namespace EssSimulator.Configuration
         /// <summary>LocalControl 端口步长（单位：端口号）。</summary>
         public int LocalControlPortStep { get; set; } = 1;
 
-        /// <summary>每路 LocalControl 聚合的 EMU 数。</summary>
+        /// <summary>每路 LocalControl 聚合的 EMU 数（已废弃：simLc 按储能单元 1:1 创建）。</summary>
         public int LocalControlEmuPerGroup { get; set; } = 4;
 
         /// <summary>光伏 Logger Modbus TCP 基础端口。</summary>
@@ -454,8 +465,62 @@ namespace EssSimulator.Configuration
         /// <summary>黑启动准备阶段时长（ms）：DC 就绪自检，AC 保持 0。</summary>
         public double BlackStartPrechargeDelayMs { get; set; } = 300;
 
-        /// <summary>软启动电压爬坡速率（V/s，线电压）。</summary>
-        public double BlackStartVoltageRampVs { get; set; } = 120;
+        /// <summary>软启动电压爬坡速率（V/s，线电压）。默认 138 保证 0→690 V 可在 5 s 内完成。</summary>
+        public double BlackStartVoltageRampVs { get; set; } = 138;
+
+        /// <summary>构网电压上升斜率（V/s）。≤0 表示未设，工厂取 max(BlackStartVoltageRampVs, Vnom/5)。</summary>
+        public double VoltageRampUpVs { get; set; }
+
+        /// <summary>构网电压下降斜率（V/s）。≤0 表示与上升斜率相同。</summary>
+        public double VoltageRampDownVs { get; set; }
+
+        /// <summary>构网 Q-V 下垂使能。</summary>
+        public bool QvDroopEnabled { get; set; } = true;
+
+        /// <summary>下垂系数 nq（V/kvar）。≤0 表示按 4% Vnom / 额定功率 计算。</summary>
+        public double QvDroopCoefficientVPerKvar { get; set; }
+
+        /// <summary>无功死区（kvar）。≤0 表示 2% 额定功率。</summary>
+        public double QvDroopDeadbandKvar { get; set; }
+
+        /// <summary>下垂无功工作点 Q0（kvar）。</summary>
+        public double QvDroopQ0Kvar { get; set; }
+
+        /// <summary>true 时仅软起结束后才下垂，软起段 Vref=Vramp。</summary>
+        public bool QvDroopEnableAfterSoftStartOnly { get; set; }
+
+        /// <summary>Vref 上限（相对 Vnom 的标幺）。≤0 视为 1.10。</summary>
+        public double QvDroopVmaxPu { get; set; } = 1.10;
+
+        /// <summary>构网 P-f 下垂使能。单机空载时 P≈0，频率仍为额定。</summary>
+        public bool PfDroopEnabled { get; set; } = true;
+
+        /// <summary>下垂系数 mp（Hz/kW）。≤0 表示按额定功率跌 0.5 Hz。</summary>
+        public double PfDroopCoefficientHzPerKw { get; set; }
+
+        /// <summary>有功死区（kW）。≤0 表示 2% 额定功率。</summary>
+        public double PfDroopDeadbandKw { get; set; }
+
+        /// <summary>下垂有功工作点 P0（kW）。</summary>
+        public double PfDroopP0Kw { get; set; }
+
+        /// <summary>停机 PLL 使能门槛（相对 Vnom 标幺）。</summary>
+        public double PllEnableVoltagePu { get; set; } = 0.20;
+
+        /// <summary>PLL 跟踪时间常数（秒）。</summary>
+        public double PllTauSec { get; set; } = 0.10;
+
+        /// <summary>预同步使能门槛（相对 Vnom 标幺，通常看主机斜坡/母线）。</summary>
+        public double PreSyncEnableVoltagePu { get; set; } = 0.70;
+
+        /// <summary>预同步电压窗口（标幺）。</summary>
+        public double PreSyncVoltageWindowPu { get; set; } = 0.05;
+
+        /// <summary>预同步频率窗口（Hz）。</summary>
+        public double PreSyncFrequencyWindowHz { get; set; } = 0.2;
+
+        /// <summary>预同步相位窗口（度）。</summary>
+        public double PreSyncPhaseWindowDeg { get; set; } = 10;
 
         /// <summary>软启动起始频率（Hz）。</summary>
         public double BlackStartFrequencyStartHz { get; set; } = 47;

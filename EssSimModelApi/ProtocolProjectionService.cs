@@ -18,7 +18,6 @@ namespace EssSimulator.EssSimModelApi
             _pcs = pcs ?? throw new ArgumentNullException(nameof(pcs));
             _em = em ?? throw new ArgumentNullException(nameof(em));
             _bms = bms ?? throw new ArgumentNullException(nameof(bms));
-            AfterPlantStepGate.Current = this;
         }
 
         public void AfterPlantStep(EnergyStorageSystem ess, DateTime simTime, TimeSpan elapsed)

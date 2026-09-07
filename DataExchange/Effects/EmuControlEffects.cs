@@ -24,15 +24,15 @@ namespace EssSimulator.DataExchange.Effects
         }
 
         /// <summary>
-        /// 解析控制点作用的机组号：simEmu{n} 直接取设备号；
-        /// simLc{n} 等其它设备从绑定目标根路径（emu{n}）取首机组号。
+        /// 解析控制点作用的机组号：优先绑定根路径 emu{n}（一台 PCS 一路时 simEmu 号与机组号不必 1:1）；
+        /// 无绑定时再从 simEmu{n} 设备号回退。
         /// </summary>
         internal static bool TryResolveEmuUnit(ControlEffectContext context, out int unit1Based)
         {
-            if (TryParseEmuUnit(context.ServerName, out unit1Based))
+            if (TryParseEmuRoot(context.Binding.Target.RootKey, out unit1Based))
                 return true;
 
-            return TryParseEmuRoot(context.Binding.Target.RootKey, out unit1Based);
+            return TryParseEmuUnit(context.ServerName, out unit1Based);
         }
 
         internal static bool TryParseEmuRoot(string? rootKey, out int unit1Based)

@@ -50,7 +50,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
 
             dst.BatteryVoltage = (float)src.DcVoltage;
             dst.BatteryCurrent = (float)src.DcCurrent;
-            dst.BatteryPower   = (float)src.DcVoltage * (float)src.DcCurrent;
+            dst.BatteryPower   = (float)(src.DcVoltage * src.DcCurrent / 1000.0);
 
             dst.ActivePower        = (float)src.ActivePower;
             dst.ReactivePower      = (float)src.ReactivePower;
@@ -83,7 +83,7 @@ namespace EssSimulator.EssSimModelApi.Mappers
         public static void MapEmuState(EnergyManagementData emu, IReadOnlyList<BatteryRackSimulator> batteryRacks)
         {
             if (batteryRacks.Count > 0 && batteryRacks[0].GetRackState() != null)
-                emu.Emu.AverageBatterySoc = (float)batteryRacks[0].GetRackState().MinClusterSOC * 100;
+                emu.Emu.AverageBatterySoc = (float)batteryRacks[0].GetRackState().MinClusterSOC;
 
             // 单元总有功/无功 = PcsList 各路之和；同步统计台数/告警/故障/禁充禁放
             float sumP = 0f, sumQ = 0f;
@@ -414,20 +414,43 @@ namespace EssSimulator.EssSimModelApi.Mappers
 
             int unit = ess.UnitIndexOfPcs(simIdx);
             double busV = ess.GetUnitAcBusVoltage(unit);
-            pcsSim.RefreshBlackStartBusContext(busV);
+            var (busF, busTh) = ess.GetUnitFormingReference(unit);
+            pcsSim.RefreshBlackStartBusContext(busV, busF, busTh);
 
-            if (!pcsSim.IsBlackStartSynchronized)
+            ushort islandSet = (ushort)Math.Min(pcsData.IslandVoltageSetting, maxIslandV);
+            if (islandSet != pcsData.IslandVoltageSetting)
+                pcsData.IslandVoltageSetting = islandSet;
+            if (pcsSim.IsLiveBusFollower && islandSet == 0)
             {
-                ushort islandSet = (ushort)Math.Min(pcsData.IslandVoltageSetting, maxIslandV);
-                if (islandSet != pcsData.IslandVoltageSetting)
-                    pcsData.IslandVoltageSetting = islandSet;
-                pcsSim.ApplyIslandVoltageCommand(islandSet);
+                double hostCmd = ess.GetUnitFormingVoltageCommandV(unit);
+                if (hostCmd > 1.0)
+                    islandSet = (ushort)Math.Clamp(Math.Round(hostCmd), 0, maxIslandV);
             }
+            // 已同步后仍要跟新 yt3：否则 50V 建压成功后无法再抬到 690V
+            pcsSim.ApplyIslandVoltageCommand(islandSet);
+            pcsSim.ApplyIslandFrequencyCommand(pcsData.IslandFrequencySetting);
 
             if (!pcsSim.IsGridElectricallyAvailable)
             {
                 if (pcsData.BlackStartEnabled || pcsData.IslandVoltageSetting > 0)
-                    pcsSim.TransitionToMode(OperationMode.Normal, "网侧无电，黑启动/孤岛建压运行");
+                {
+                    if (pcsSim.IsLiveBusFollower)
+                    {
+                        if (pcsSim.IsPreSyncReadyToCutIn && pcsSim.IsExternalRunCommand
+                            && pcsSim.TryCutInAsFormingParallel())
+                        {
+                            double joinedCmd = pcsSim.GetCurrentState().IslandVoltageCommandV;
+                            if (pcsData.IslandVoltageSetting == 0 && joinedCmd > 1.0)
+                                pcsData.IslandVoltageSetting = (ushort)Math.Clamp(
+                                    Math.Round(joinedCmd), 0, maxIslandV);
+                            pcsSim.TransitionToMode(OperationMode.Normal, "网侧无电，母线已带电，预同步构网并机");
+                        }
+                        else
+                            pcsSim.TransitionToMode(OperationMode.Standby, "网侧无电，母线已带电，预同步中");
+                    }
+                    else
+                        pcsSim.TransitionToMode(OperationMode.Normal, "网侧无电，黑启动/孤岛建压运行");
+                }
                 else
                     pcsSim.TransitionToMode(OperationMode.Standby, "网侧无电且无黑启动/孤岛电压设定");
             }

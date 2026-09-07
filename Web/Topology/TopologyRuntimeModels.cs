@@ -64,7 +64,7 @@ namespace EssSimulator.Web.Topology
         /// <summary>选中型号 id；未选型（legacy 兜底）时为 null。</summary>
         public string? ModelId { get; set; }
         public string? ModelName { get; set; }
-        /// <summary>selection=型号选型生效；legacy=未选型，按根目录/版本目录兜底。</summary>
+        /// <summary>selection=型号选型生效；legacy=未选型兜底；compose=LC 片段拼装。</summary>
         public string Source { get; set; } = "legacy";
     }
 

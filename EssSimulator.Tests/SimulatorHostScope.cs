@@ -23,6 +23,7 @@ public sealed class SimulatorHostScope : IDisposable
         SimulatorHost.Instance.Reset();
         AfterPlantStep.Reset();
         UiSnapshotNotifier.Reset();
+        ExternalControlGate.Reset();
     }
 }
 

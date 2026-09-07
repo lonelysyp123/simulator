@@ -291,6 +291,14 @@ namespace EssSimulator.EssDeviceSimModel
             return _unitBreakers[unitIndex].IsClosed;
         }
 
+        /// <summary>单元高压断路器是否处于跳闸锁存。</summary>
+        public bool IsUnitBreakerTripped(int unitIndex)
+        {
+            if (unitIndex < 0 || unitIndex >= _electricalNetwork.UnitBreakers.Count)
+                return false;
+            return _electricalNetwork.UnitBreakers[unitIndex].SwitchState.IsTripped;
+        }
+
         /// <summary>设定主断路器合/分（写入电气网络并投影至 Legacy）。</summary>
         public void SetMainBreakerClosed(bool closed)
         {
@@ -306,6 +314,10 @@ namespace EssSimulator.EssDeviceSimModel
             NetworkControlBridge.ApplyUnitBreakerClosed(_electricalNetwork, _unitBreakers, unitIndex, closed);
             SimStateChangeLogger.BreakerChanged($"单元{unitIndex + 1}", was, closed);
         }
+
+        /// <summary>复位单元高压跳闸锁存（不合闸）。</summary>
+        public void ResetUnitBreakerTrip(int unitIndex) =>
+            NetworkControlBridge.ResetUnitBreakerTrip(_electricalNetwork, unitIndex);
 
         /// <summary>设定负载计划并同步至电气网络 Load 设备。</summary>
         public void SetLoadCharacteristic(string characteristic, double value) =>
@@ -564,7 +576,10 @@ namespace EssSimulator.EssDeviceSimModel
         }
 
 
-        /// <summary>同单元 690V 母线电压（单元变二次侧与各 PCS 交流电压取大）。</summary>
+        /// <summary>
+        /// 同单元 690V 母线电压：单元变二次侧，以及正在离网建压的 PCS 输出的算术平均（下垂公共电压）。
+        /// 停机/跟网 PCS 的端子测量不是电源，不得回写进母线。
+        /// </summary>
         public double GetUnitAcBusVoltage(int unitIndex)
         {
             double v = 0;
@@ -572,26 +587,76 @@ namespace EssSimulator.EssDeviceSimModel
                 v = Math.Max(v, _unitTransformers[unitIndex].GetCurrentState().SecondaryVoltage);
             int baseIdx = PcsBaseIndexOfUnit(unitIndex);
             int count = PcsCountOfUnit(unitIndex);
+            double formingSum = 0;
+            int forming = 0;
             for (int k = 0; k < count; k++)
             {
                 int i = baseIdx + k;
-                if (i >= 0 && i < _pcsList.Count)
-                    v = Math.Max(v, _pcsList[i].GetCurrentState().AcVoltage);
+                if (i < 0 || i >= _pcsList.Count)
+                    continue;
+                var st = _pcsList[i].GetCurrentState();
+                if (!EssIslandBusLogic.IsPcsIslandVoltageBuilding(st) || st.AcVoltage <= 1.0)
+                    continue;
+                formingSum += st.AcVoltage;
+                forming++;
             }
+            if (forming > 0)
+                v = Math.Max(v, formingSum / forming);
             return v;
         }
 
         private void RefreshUnitBlackStartBusContext(int unitIndex)
         {
             double busV = GetUnitAcBusVoltage(unitIndex);
+            var (freqHz, phaseRad) = GetUnitFormingReference(unitIndex);
             int baseIdx = PcsBaseIndexOfUnit(unitIndex);
             int count = PcsCountOfUnit(unitIndex);
             for (int k = 0; k < count; k++)
             {
                 int i = baseIdx + k;
                 if (i >= 0 && i < _pcsList.Count)
-                    _pcsList[i].RefreshBlackStartBusContext(busV);
+                    _pcsList[i].RefreshBlackStartBusContext(busV, freqHz, phaseRad);
             }
+        }
+
+        /// <summary>同单元正在注入的构网源的频率与相位（算术/圆周平均；无源时为 0）。</summary>
+        public (double FrequencyHz, double PhaseRad) GetUnitFormingReference(int unitIndex)
+        {
+            var sources = new List<(double VoltageV, double FrequencyHz, double PhaseRad)>();
+            int baseIdx = PcsBaseIndexOfUnit(unitIndex);
+            int count = PcsCountOfUnit(unitIndex);
+            for (int k = 0; k < count; k++)
+            {
+                int i = baseIdx + k;
+                if (i < 0 || i >= _pcsList.Count)
+                    continue;
+                var pcs = _pcsList[i];
+                if (!pcs.TryGetIslandBusVoltageInjection(out var v, out var f) || v <= 1.0)
+                    continue;
+                sources.Add((v, f, pcs.FormingPhaseRad));
+            }
+
+            return EssIslandBusLogic.AverageFormingReference(sources);
+        }
+
+        /// <summary>同单元正在注入的构网源的孤岛电压设定算术平均（无源时为 0）。</summary>
+        public double GetUnitFormingVoltageCommandV(int unitIndex)
+        {
+            var cmds = new List<double>();
+            int baseIdx = PcsBaseIndexOfUnit(unitIndex);
+            int count = PcsCountOfUnit(unitIndex);
+            for (int k = 0; k < count; k++)
+            {
+                int i = baseIdx + k;
+                if (i < 0 || i >= _pcsList.Count)
+                    continue;
+                var pcs = _pcsList[i];
+                if (!pcs.TryGetIslandBusVoltageInjection(out var v, out _) || v <= 1.0)
+                    continue;
+                cmds.Add(pcs.GetCurrentState().IslandVoltageCommandV);
+            }
+
+            return EssIslandBusLogic.AverageFormingVoltageCommand(cmds);
         }
 
         /// <summary>PCS.Update 之后同步单元变与站用电分摊（见 <see cref="UnitTransformerIslandSync"/>）。</summary>

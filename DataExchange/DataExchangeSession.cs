@@ -30,6 +30,7 @@ namespace EssSimulator.DataExchange
         private readonly RackControlPipeline? _rackControlPipeline;
         private readonly ControlFeedbackPipeline _feedbackPipeline;
         private readonly IModbusRegisterAdapter _modbusAdapter;
+        private readonly IProtocolPointStore _pointStore;
         private readonly ControlEffectRegistry _effects;
 
         private readonly object _controlGate = new();
@@ -56,7 +57,8 @@ namespace EssSimulator.DataExchange
             _clusterCount = clusterCount;
 
             _simulation = new ReflectionSimulationAdapter();
-            _modbusAdapter = new ModbusRegisterAdapter(slave, parser);
+            _pointStore = new ProtocolPointStore(new ModbusRegisterAdapter(slave, parser));
+            _modbusAdapter = _pointStore;
 
             _effects = new ControlEffectRegistry();
             var telemetryPlugins = new TelemetryPluginRegistry();
@@ -110,6 +112,9 @@ namespace EssSimulator.DataExchange
             if (_options.ControlEventDriven && slave is ModbusSlave modbusSlave)
                 modbusSlave.ExternalControlWrite += OnExternalControlWrite;
         }
+
+        /// <summary>协议门面共用点影子（Modbus 与 IEC 61850）。</summary>
+        public IProtocolPointStore PointStore => _pointStore;
 
         private void OnExternalControlWrite(byte slaveId)
         {

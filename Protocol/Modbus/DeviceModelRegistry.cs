@@ -25,6 +25,16 @@ namespace EssSimulator.Protocol.Modbus
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        /// <summary>
+        /// 型号角色：<c>exclusive</c> 为与同类型其它型号互斥的整表（系统配置可选）；
+        /// 缺省或 <c>fragment</c> 为拼装片段，不进入选型下拉。
+        /// </summary>
+        public string? Role { get; set; }
+        /// <summary>
+        /// 该片段适用的组内最大 PCS 支路数；0 表示不限。
+        /// 实际组内支路数更大时拼装跳过该片段（如 10MW 单元段仅覆盖模块 1/2，上限 4 条支路）。
+        /// </summary>
+        public int MaxPcsPerGroup { get; set; }
         /// <summary>型号点表所在目录（绝对路径）。</summary>
         [JsonIgnore]
         public string Directory { get; set; } = string.Empty;
@@ -150,9 +160,51 @@ namespace EssSimulator.Protocol.Modbus
             return null;
         }
 
+        public const string ExclusiveRole = "exclusive";
+
+        /// <summary>互斥整表型号（系统配置可选）；拼装片段返回 false。</summary>
+        public static bool IsExclusiveModel(DeviceModelInfo? model) =>
+            model != null
+            && string.Equals(model.Role, ExclusiveRole, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// 当前 LC 互斥型号目录；未选型、选了拼装片段、或目录缺失时返回 null（走片段拼装）。
+        /// </summary>
+        public static string? GetSelectedExclusiveLcDir(string? rootOverride = null)
+        {
+            var selection = LoadSelection(rootOverride);
+            if (!selection.Selections.TryGetValue("lc", out var modelId) || string.IsNullOrWhiteSpace(modelId))
+                return null;
+
+            var root = rootOverride ?? FindModelsRoot();
+            if (root == null) return null;
+
+            var dir = Path.Combine(root, ModelsRelativeDir, "lc", modelId);
+            if (!Directory.Exists(dir)) return null;
+
+            var model = ReadJsonOrDefault<DeviceModelInfo>(Path.Combine(dir, "model.json"))
+                        ?? new DeviceModelInfo();
+            if (string.IsNullOrWhiteSpace(model.Id)) model.Id = modelId;
+            model.Directory = dir;
+            return IsExclusiveModel(model) ? dir : null;
+        }
+
+        public static bool TryGetExclusiveLcCsv(out string csvPath, string? rootOverride = null)
+        {
+            csvPath = string.Empty;
+            var dir = GetSelectedExclusiveLcDir(rootOverride);
+            if (dir == null) return false;
+            csvPath = Path.Combine(dir, "lc.csv");
+            return File.Exists(csvPath);
+        }
+
         /// <summary>某类型当前选中的型号目录；未选型或目录缺失返回 null。</summary>
         public static string? GetSelectedModelDir(string typeId, string fileName, string? rootOverride = null)
         {
+            _ = fileName;
+            if (string.Equals(typeId, "lc", StringComparison.OrdinalIgnoreCase))
+                return GetSelectedExclusiveLcDir(rootOverride);
+
             var selection = LoadSelection(rootOverride);
             if (!selection.Selections.TryGetValue(typeId, out var modelId) || string.IsNullOrWhiteSpace(modelId))
                 return null;
@@ -226,8 +278,18 @@ namespace EssSimulator.Protocol.Modbus
                     errors.Add($"未知设备类型: {pair.Key}");
                     continue;
                 }
-                if (!type.Models.Any(m => string.Equals(m.Id, pair.Value, StringComparison.OrdinalIgnoreCase)))
+                var model = type.Models.FirstOrDefault(m =>
+                    string.Equals(m.Id, pair.Value, StringComparison.OrdinalIgnoreCase));
+                if (model == null)
+                {
                     errors.Add($"设备类型 [{pair.Key}] 下不存在型号: {pair.Value}");
+                    continue;
+                }
+                if (string.Equals(pair.Key, "lc", StringComparison.OrdinalIgnoreCase)
+                    && !IsExclusiveModel(model))
+                {
+                    errors.Add("LC 仅可选择互斥点表（如 EMU 直控），拼装片段不能作为选型");
+                }
             }
             return errors;
         }

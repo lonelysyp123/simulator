@@ -92,7 +92,7 @@ copy_runtime_files() {
   local config
   config="$(edition_config_file "$edition")"
 
-  echo "==> Copying runtime config and point maps ($edition)..."
+  echo "==> Copying runtime config and point maps ($edition, models + LC fragments)..."
   cp -f "$config" "$out/appsettings.json"
   echo "    appsettings.json (from $(basename "$config"))"
 

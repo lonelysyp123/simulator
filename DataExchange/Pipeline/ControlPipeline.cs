@@ -1,3 +1,4 @@
+using EssSimulator.Core;
 using EssSimulator.DataExchange.Adapters;
 using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Effects;
@@ -40,6 +41,8 @@ namespace EssSimulator.DataExchange.Pipeline
 
         public void RunOnce()
         {
+            if (ExternalControlGate.IsBlocked)
+                return;
             if (_catalog.ControlPoints.Count == 0)
                 return;
 

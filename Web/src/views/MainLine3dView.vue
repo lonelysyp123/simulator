@@ -56,6 +56,12 @@ async function refreshHealth() {
   }
 }
 
+async function refreshSnap() {
+  try {
+    snap.value = await getMainLine()
+  } catch { /* 实时通道稍后会补 */ }
+}
+
 async function onToggleMainBreaker() {
   if (snap.value.mainBreakerTripped) {
     ElMessage.warning('主断路器已跳闸，请先复位')
@@ -65,6 +71,7 @@ async function onToggleMainBreaker() {
     const next = !snap.value.mainBreakerClosed
     const r = await postMainBreaker(next)
     ElMessage[r.success ? 'success' : 'error'](r.message)
+    if (r.success) await refreshSnap()
   } catch (e) {
     ElMessage.error(e.message)
   }
@@ -80,6 +87,7 @@ async function onToggleUnitBreaker(unitIndex) {
     const next = !(u?.unitBreakerClosed ?? false)
     const r = await postUnitBreaker(unitIndex + 1, next)
     ElMessage[r.success ? 'success' : 'error'](r.message)
+    if (r.success) await refreshSnap()
   } catch (e) {
     ElMessage.error(e.message)
   }
@@ -89,24 +97,19 @@ async function runChannelCommand(input) {
   try {
     const r = await postCommand(input)
     ElMessage[r.success ? 'success' : 'error'](r.message)
+    if (r.success) await refreshSnap()
   } catch (e) {
     ElMessage.error(e.message)
   }
 }
 
 /**
- * pcsN → simEmu{ceil(N/2)} + yt 点：奇数路 yt0/yt1，偶数路 yt4/yt5
- * （与 MainLineEnricher / emu 点表一致）
+ * pcsN → simEmu{N} + yt0/yt1（一台 PCS 一路）
  */
 function resolvePcsModbus(pcsNumber, kind = 'p') {
   const n = Number(pcsNumber)
   if (!Number.isFinite(n) || n < 1) return null
-  const emuUnit = Math.ceil(n / 2)
-  const isA = n % 2 === 1
-  const ytPoint = kind === 'p'
-    ? (isA ? 'yt0' : 'yt4')
-    : (isA ? 'yt1' : 'yt5')
-  return { emuUnit, ytPoint }
+  return { emuUnit: n, ytPoint: kind === 'p' ? 'yt0' : 'yt1' }
 }
 
 async function onPcsStart(pcsNumber) {

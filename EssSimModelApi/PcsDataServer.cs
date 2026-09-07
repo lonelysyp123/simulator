@@ -75,6 +75,14 @@ namespace EssSimulator.EssSimModelApi
                     emu.Groups.Add(gd);
                 }
             }
+            else
+            {
+                // 扁平机组：隐式 1 组，供 LC 组电表 Groups[0].Meters 绑定
+                var gd = new EmuGroupData { Name = unit.Name };
+                foreach (var pcs in emu.PcsList)
+                    gd.PcsList.Add(pcs);
+                emu.Groups.Add(gd);
+            }
 
             // 单元变镜像（对应电气层单元变，本期仅 1 台）
             emu.Transformers.Add(new TransformerMirrorData());

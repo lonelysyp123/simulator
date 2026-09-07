@@ -121,6 +121,14 @@ namespace EssSimulator.EssDeviceSimModel.Model
             return apparentKva * 1000.0 / (lineVoltageV * ElectricalConventions.Sqrt3);
         }
 
+        /// <summary>功率不变时把线电流从 from 电压折到 to 电压：I2 = I1 · V1 / V2。</summary>
+        public static double ReferLineCurrent(double lineCurrentA, double fromLineVoltageV, double toLineVoltageV)
+        {
+            if (fromLineVoltageV <= 1e-9 || toLineVoltageV <= 1e-9)
+                return 0;
+            return lineCurrentA * fromLineVoltageV / toLineVoltageV;
+        }
+
         public static double ComputeActivePowerKw(double lineVoltageV, double lineCurrentA, double phaseAngleDeg)
         {
             if (lineVoltageV <= 1e-9 || Math.Abs(lineCurrentA) <= 1e-9)

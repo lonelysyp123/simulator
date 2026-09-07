@@ -122,7 +122,15 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 _network.StationBus35LineVoltageV = islandV;
                 if (_network.HasMainTransformer)
                 {
-                    _graph.BusAfterMainBreaker.SetVoltage(0, 0, sweep, notifyCouplers: false);
+                    // 主断分闸后 Coupler 不再驱动主变；必须本步 Step，否则端口残留并网电压。
+                    // 35kV 有黑启动反送时，按变比折到一次侧供并网点抽头采样。
+                    double afterV = islandV > 1.0
+                        ? islandV * _network.MainTransformer.TurnsRatio
+                        : 0;
+                    double afterF = afterV > 1.0 ? _network.SystemFrequencyHz : 0;
+                    _graph.BusAfterMainBreaker.SetVoltage(afterV, afterF, sweep, notifyCouplers: false);
+                    StepMainBreakerIsolated(context, step, islandV, afterF);
+                    StepMainTransformerIsolated(context, step, islandV, afterV, afterF);
                 }
 
                 _graph.PropagateVoltageIsland(sweep, islandV);
@@ -234,16 +242,19 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 bool unitClosed = _network.UnitBreakers[u].SwitchState.IsClosed
                     && !_network.UnitBreakers[u].SwitchState.IsTripped;
                 var bus690 = _graph.UnitBuses690[u];
-                var unitCurrent = bus690.TotalLineCurrentA > 1e-6 || Math.Abs(bus690.TotalPhaseAngleDeg) > 1e-6
+                var unitCurrent = unitClosed && bus35V > 1.0
+                    && (bus690.TotalLineCurrentA > 1e-6 || Math.Abs(bus690.TotalPhaseAngleDeg) > 1e-6)
                     ? AcQuantityConverter.FromLineVoltageAndPower(
-                        Math.Max(bus690.LineVoltageV, _pcsCfg.AcVoltageNominal * 0.01),
+                        bus690.LineVoltageV,
                         bus690.TotalActivePowerKw,
                         bus690.TotalReactivePowerKvar,
                         ThreePhaseConnection.Star,
                         _network.SystemFrequencyHz)
                     : new AcInternalQuantities
                     {
-                        LineVoltageV = Math.Max(bus690.LineVoltageV, unitClosed ? _pcsCfg.AcVoltageNominal * 0.01 : 0)
+                        LineVoltageV = unitClosed && bus35V > 1.0 && bus690.LineVoltageV > 1.0
+                            ? bus690.LineVoltageV
+                            : 0
                     };
 
                 PropagationPortBinding.SetAcVoltageInput(
@@ -349,6 +360,60 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
 
             double ratio = _pccCfg.StationBusNominalLineVoltage / Math.Max(_pcsCfg.AcVoltageNominal, 1.0);
             return max690 * ratio;
+        }
+
+        /// <summary>
+        /// 主断分闸：Coupler 不再驱动主断。无反送则二次为 0；有 35kV 反送则二次为岛压，一次仍跟电网。
+        /// </summary>
+        private void StepMainBreakerIsolated(
+            DeviceStepContext context,
+            TimeSpan step,
+            double island35V,
+            double frequencyHz)
+        {
+            var brk = _network.MainBreaker;
+            double gridV = _graph.BusGrid.LineVoltageV;
+            double gridF = gridV > 1.0 ? _network.Grid.NominalFrequencyHz : 0;
+            PropagationPortBinding.SetAcVoltageInput(brk.Primary, gridV, ThreePhaseConnection.Star, gridF);
+
+            var secQty = island35V > 1.0
+                ? new AcInternalQuantities
+                {
+                    Connection = ThreePhaseConnection.Star,
+                    LineVoltageV = island35V,
+                    LineCurrentA = 0,
+                    FrequencyHz = frequencyHz
+                }
+                : new AcInternalQuantities { Connection = ThreePhaseConnection.Star };
+
+            PropagationPortBinding.SetAcQuantitiesInput(brk.Secondary, secQty);
+            brk.Step(context, step);
+        }
+
+        /// <summary>
+        /// 主断分闸：主变与电网隔离。无反送则一次/二次均为 0；有 35kV 反送则一次按变比折算。
+        /// </summary>
+        private void StepMainTransformerIsolated(
+            DeviceStepContext context,
+            TimeSpan step,
+            double island35V,
+            double afterMainBreakerV,
+            double frequencyHz)
+        {
+            var xf = _network.MainTransformer;
+            var secQty = island35V > 1.0
+                ? AcQuantityConverter.FromLineVoltageAndPower(
+                    island35V,
+                    _graph.Bus35.TotalActivePowerKw,
+                    _graph.Bus35.TotalReactivePowerKvar,
+                    ThreePhaseConnection.Star,
+                    frequencyHz)
+                : new AcInternalQuantities { Connection = ThreePhaseConnection.Star };
+
+            PropagationPortBinding.SetAcVoltageInput(
+                xf.Primary, afterMainBreakerV, ThreePhaseConnection.Star, frequencyHz);
+            PropagationPortBinding.SetAcQuantitiesInput(xf.Secondary, secQty);
+            xf.Step(context, step);
         }
 
         private DeviceStepContext BuildContext(DateTime simTime, TimeSpan step) =>

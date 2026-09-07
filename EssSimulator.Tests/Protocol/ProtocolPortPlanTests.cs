@@ -30,7 +30,7 @@ public class ProtocolPortPlanTests : IDisposable
     {
         var plan = ProtocolPortPlan.BuildDefault(new SimulatorConfig());
 
-        Assert.Equal(4, plan.Entries.Count);
+        Assert.Equal(5, plan.Entries.Count);
 
         var bms1 = plan.Find("simBms1")!;
         Assert.Equal(1502, bms1.Port);
@@ -38,7 +38,8 @@ public class ProtocolPortPlanTests : IDisposable
         Assert.Equal("bms_bank.csv", bms1.PointMapFile);
 
         Assert.Equal(1512, plan.Find("simBms2")!.Port);
-        Assert.Equal(1501, plan.Find("simEmu1")!.Port);
+        Assert.Equal(1601, plan.Find("simEmu1")!.Port);
+        Assert.Equal(1602, plan.Find("simEmu2")!.Port);
         Assert.Equal(1500, plan.Find("simEm")!.Port);
 
         Assert.All(plan.Entries, e =>
@@ -63,6 +64,73 @@ public class ProtocolPortPlanTests : IDisposable
         Assert.Equal(1700, lc!.Port);
         Assert.Equal(ProtocolDeviceType.Lc, lc.Type);
         Assert.Equal("lc.csv", lc.PointMapFile);
+        Assert.Equal(1, lc.LcGroupCount);
+        Assert.Null(plan.Find("simLc2"));
+    }
+
+    [Fact]
+    public void BuildDefault_LocalControlEnabled_OneSimLcPerEssUnit()
+    {
+        var cfg = new SimulatorConfig
+        {
+            Devices =
+            {
+                new EssUnitConfig { Name = "A" },
+                new EssUnitConfig { Name = "B" }
+            }
+        };
+        cfg.Protocol.EnableLocalControl = true;
+        cfg.Protocol.LocalControlEmuPerGroup = 4;
+
+        var plan = ProtocolPortPlan.BuildDefault(cfg);
+
+        Assert.NotNull(plan.Find("simLc1"));
+        Assert.NotNull(plan.Find("simLc2"));
+        Assert.Null(plan.Find("simLc3"));
+        Assert.Equal(1700, plan.Find("simLc1")!.Port);
+        Assert.Equal(1701, plan.Find("simLc2")!.Port);
+        Assert.Equal(1, plan.Find("simLc1")!.LcGroupCount);
+        Assert.Equal(1, plan.Find("simLc2")!.LcGroupCount);
+    }
+
+    [Fact]
+    public void BuildDefault_LcGroupCount_FollowsUnitGroups()
+    {
+        var cfg = new SimulatorConfig
+        {
+            Devices =
+            {
+                new EssUnitConfig { Name = "flat" },
+                new EssUnitConfig
+                {
+                    Name = "grouped",
+                    Groups =
+                    {
+                        new EmuGroupConfig { Name = "g1", Pcs = { new PcsDeviceConfig(), new PcsDeviceConfig() } },
+                        new EmuGroupConfig { Name = "g2", Pcs = { new PcsDeviceConfig(), new PcsDeviceConfig() } }
+                    }
+                }
+            }
+        };
+        cfg.Protocol.EnableLocalControl = true;
+
+        var plan = ProtocolPortPlan.BuildDefault(cfg);
+
+        Assert.Equal(1, plan.Find("simLc1")!.LcGroupCount);
+        Assert.Equal(2, plan.Find("simLc2")!.LcGroupCount);
+    }
+
+    [Fact]
+    public void BuildDefault_LocalControlDisabled_OmitsSimLcEvenWithUnits()
+    {
+        var cfg = new SimulatorConfig
+        {
+            Devices = { new EssUnitConfig { Name = "A" }, new EssUnitConfig { Name = "B" } }
+        };
+        cfg.Protocol.EnableLocalControl = false;
+
+        var plan = ProtocolPortPlan.BuildDefault(cfg);
+        Assert.Null(plan.Find("simLc1"));
     }
 
     [Fact]
@@ -116,7 +184,7 @@ public class ProtocolPortPlanTests : IDisposable
         var loaded = ProtocolPortPlan.Load(new SimulatorConfig(), out var error);
 
         Assert.NotNull(error);
-        Assert.Equal(1501, loaded.Find("simEmu1")!.Port);
+        Assert.Equal(1601, loaded.Find("simEmu1")!.Port);
     }
 
     [Fact]

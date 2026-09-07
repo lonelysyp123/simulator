@@ -14,17 +14,16 @@
 按 **设备类型 → 设备型号 → 点表文件** 组织，运行期在系统配置界面选型，
 持久化到 `configs/topology/device-models.json`，重启后生效：
 
-LC 点表另有自动选型规则：组态工程保存/应用时按 PCS 总数自动切换
-（2 台 → `standard`，4 台 → `trina_5.5MW`，8 台 → `trina_10MW`，
-其余数量保持现有选型，见 `Web/Topology/LcPointMapAutoSelect.cs`）。
-EMU 始终使用单元直控点表（`emu/standard`），不随 PCS 数量切换。
+LC 默认由 `models/lc/` 下互补片段按组拼装（`system` / `group` / `bms` / `mv` / `unit_10MW` 等），
+不是按 PCS 台数互斥选型。`unit_10MW` 的 `maxPcsPerGroup=4`：组内支路超过 4 条时跳过该片段。
+EMU 始终使用单元直控点表（`emu/standard`）。
 
 ```
 pointmaps/models/
-  bms/          type.json + standard/ g2_pro/（bms_bank.csv + bms_rack.csv）
+  bms/          type.json + standard/ g2_pro/ g2_4mwh/（bms_bank.csv + bms_rack.csv）
   emu/          type.json + standard/（emu.csv，单元 PCS 直控）
   em/           type.json + standard/（em.csv）
-  lc/           type.json + standard/ trina_5.5MW/ trina_10MW/（lc.csv，中压系统）
+  lc/           type.json + 拼装片段（system / group / bms / mv / unit_10MW）+ 互斥 emu/
   pv/           type.json + standard/（pv_logger.csv + pv_apm810.csv）
 ```
 
@@ -48,8 +47,8 @@ pointmaps/models/
 
 - 单元 EMU（`emu/standard` 的 yt/yx 系列，绑定 `emuN.PcsList[i].*`）在本地模式下照旧生效；
   远程均分生效时以均分值覆盖功率设定。
-- 基础 LC（`lc/standard`）无 ModelSim，仍按点名桥接 `simEmu*`；中压 LC 点表含 ModelSim，
-  由 DataExchange 采集进本机 LC Modbus。
+- 默认拼装 LC 含 ModelSim，由 DataExchange 采集进本机 LC Modbus；
+  选型互斥 `lc/emu` 时走 EMU 直控整表。
 
 ## EMU 设备树路径语法（分层构成）
 

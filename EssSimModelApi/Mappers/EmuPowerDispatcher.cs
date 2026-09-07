@@ -1,3 +1,4 @@
+using EssSimulator.Core;
 using EssSimulator.EssSimModelApi.EnergyManagementSystem;
 
 namespace EssSimulator.EssSimModelApi.Mappers
@@ -21,6 +22,8 @@ namespace EssSimulator.EssSimModelApi.Mappers
         {
             var list = emu.PcsList;
             if (list == null || list.Count == 0)
+                return;
+            if (ExternalControlGate.Owner == ExternalControlOwner.EmsStrategy)
                 return;
             if (!IsRemoteDispatchActive(emu))
                 return;

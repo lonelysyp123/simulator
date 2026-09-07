@@ -228,9 +228,8 @@ function applyP() {
   const pcsNumber = Number(ch.pcsNumber)
   const emuUnit = Number(ch.emuUnitNumber) > 0
     ? Number(ch.emuUnitNumber)
-    : Math.ceil(pcsNumber / 2)
-  const ytPoint = ch.activePowerYtPoint
-    || (pcsNumber % 2 === 1 ? 'yt0' : 'yt4')
+    : pcsNumber
+  const ytPoint = ch.activePowerYtPoint || 'yt0'
   emit('pcs-set-power', {
     pcsNumber,
     emuUnit,
@@ -247,9 +246,8 @@ function applyQ() {
   const pcsNumber = Number(ch.pcsNumber)
   const emuUnit = Number(ch.emuUnitNumber) > 0
     ? Number(ch.emuUnitNumber)
-    : Math.ceil(pcsNumber / 2)
-  const ytPoint = ch.reactivePowerYtPoint
-    || (pcsNumber % 2 === 1 ? 'yt1' : 'yt5')
+    : pcsNumber
+  const ytPoint = ch.reactivePowerYtPoint || 'yt1'
   emit('pcs-set-reactive', {
     pcsNumber,
     emuUnit,

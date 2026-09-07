@@ -454,10 +454,18 @@ const pvRows = computed(() => (snap.value.pvUnits || []).map(p => ({
   arrayB: fmtPvArray(p.arrayB)
 })))
 
+async function refreshSnap() {
+  try {
+    snap.value = await getMainLine()
+    syncLoadDrafts()
+  } catch { /* 实时通道稍后会补 */ }
+}
+
 async function runChannelCommand(input) {
   try {
     const r = await postCommand(input)
     ElMessage[r.success ? 'success' : 'error'](r.message)
+    if (r.success) await refreshSnap()
   } catch (e) {
     ElMessage.error(e.message)
   }
@@ -472,6 +480,7 @@ async function onToggleMainBreaker() {
     const next = !snap.value.mainBreakerClosed
     const r = await postMainBreaker(next)
     ElMessage[r.success ? 'success' : 'error'](r.message)
+    if (r.success) await refreshSnap()
   } catch (e) {
     ElMessage.error(e.message)
   }
@@ -487,6 +496,7 @@ async function onToggleUnitBreaker(unitIndex) {
     const next = !(u?.unitBreakerClosed ?? false)
     const r = await postUnitBreaker(unitIndex + 1, next)
     ElMessage[r.success ? 'success' : 'error'](r.message)
+    if (r.success) await refreshSnap()
   } catch (e) {
     ElMessage.error(e.message)
   }

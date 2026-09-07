@@ -148,6 +148,12 @@ namespace EssSimulator.EssDeviceSimModel.Devices
         {
             RefreshSchedule(context.SimulationTime);
             var bus = AcPortHelper.ReadAcInput(Port);
+            if (bus.LineVoltageV <= 1.0)
+            {
+                ActivePower = 0;
+                ReactivePower = 0;
+            }
+
             double activeKw = _config.Powered ? ActivePower : 0;
             double reactiveKvar = _config.Powered ? ReactivePower : 0;
 

@@ -29,4 +29,19 @@ namespace EssSimulator.EssDeviceSimModel
         public static readonly NoOpAfterPlantStep Instance = new();
         public void AfterPlantStep(EnergyStorageSystem ess, DateTime simTime, TimeSpan elapsed) { }
     }
+
+    /// <summary>按顺序调用多个 <see cref="IAfterPlantStep"/>（如 EMS 策略再协议投影）。</summary>
+    public sealed class CompositeAfterPlantStep : IAfterPlantStep
+    {
+        private readonly IAfterPlantStep[] _steps;
+
+        public CompositeAfterPlantStep(params IAfterPlantStep[] steps) =>
+            _steps = steps ?? Array.Empty<IAfterPlantStep>();
+
+        public void AfterPlantStep(EnergyStorageSystem ess, DateTime simTime, TimeSpan elapsed)
+        {
+            foreach (var step in _steps)
+                step?.AfterPlantStep(ess, simTime, elapsed);
+        }
+    }
 }
