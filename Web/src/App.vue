@@ -29,7 +29,7 @@
           </el-menu-item>
           <el-menu-item v-if="allowTopologyEditor" index="/projects">
             <el-icon><FolderOpened /></el-icon>
-            <span>工程管理</span>
+            <span>工程配置</span>
           </el-menu-item>
 
           <div class="menu-group-label">电池系统</div>
@@ -51,10 +51,6 @@
           </el-menu-item>
 
           <div class="menu-group-label">运维工具</div>
-          <el-menu-item v-if="allowTopologyEditor" index="/system">
-            <el-icon><Setting /></el-icon>
-            <span>系统配置</span>
-          </el-menu-item>
           <el-menu-item index="/command">
             <el-icon><Promotion /></el-icon>
             <span>命令输入</span>
