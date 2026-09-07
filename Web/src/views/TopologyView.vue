@@ -8,81 +8,31 @@
         <el-button size="small" :disabled="!canUndo" @click="undo" title="Ctrl+Z">撤销</el-button>
         <el-button size="small" :disabled="!canRedo" @click="redo" title="Ctrl+Shift+Z">重做</el-button>
         <el-button size="small" type="danger" plain :disabled="!canDelete" @click="deleteSelected">删除选中</el-button>
-        <el-button size="small" :disabled="!selectedNode" @click="openSaveLibrary">存入设备库</el-button>
+        <el-button size="small" :disabled="!canSaveLibrary" @click="openSaveLibrary">{{ saveLibraryButtonLabel }}</el-button>
         <el-button size="small" type="success" plain @click="wizardOpen = true">标准拓扑向导</el-button>
-        <el-button size="small" link type="primary" @click="goProjectManage">工程管理</el-button>
+        <el-button size="small" link type="primary" @click="goProjectManage">工程配置</el-button>
+        <el-button v-if="isNarrow" size="small" @click="propsDrawerOpen = !propsDrawerOpen">{{ propsDrawerOpen ? '收起属性' : '属性' }}</el-button>
       </div>
       <div class="right">
         <el-tag v-if="dirty" size="small" type="warning" style="margin-right:6px">未保存</el-tag>
         <el-tag v-if="editHint" size="small" type="success" style="margin-right:6px">{{ editHint }}</el-tag>
+        <el-tag v-if="selectedNodeIds.length" size="small" type="warning" style="margin-right:6px">已选 {{ selectedNodeIds.length }}</el-tag>
         <el-tag size="small" type="info">节点 {{ project.nodes.length }}</el-tag>
         <el-tag size="small" type="info" style="margin-left:6px">连线 {{ project.edges.length }}</el-tag>
       </div>
     </div>
 
-    <div class="workspace">
-      <aside class="palette card">
-        <div class="card-title">基础模板</div>
-        <div
-          v-for="t in templates"
-          :key="t.id"
-          class="palette-item"
-          draggable="true"
-          @dragstart="onDragTemplate($event, t)"
-          @dblclick="addFromTemplate(t)"
-        >
-          <span class="dot" :style="{ background: colorOf(t.id) }" />
-          <div class="meta">
-            <div class="name">{{ t.name }}</div>
-            <div class="desc">{{ t.category }}</div>
-          </div>
-        </div>
-
-        <div class="card-title" style="margin-top:14px">EMU 储能单元</div>
-        <div v-if="!emuNodes.length" class="empty">拖入「EMU 储能单元」模板，PCS 通过参数下拉框归入</div>
-        <div
-          v-for="e in emuNodes"
-          :key="e.id"
-          class="palette-item"
-          :class="{ active: selectedNodeId === e.id }"
-          @click="onSelectNode(e.id)"
-        >
-          <span class="dot" :style="{ background: colorOf('emu') }" />
-          <div class="meta">
-            <div class="name">{{ e.label }}</div>
-            <div class="desc">PCS×{{ pcsCountOfEmu(e.id) }}</div>
-            <div class="desc">断路器：{{ boundDeviceLabel(e.id, 'ac_breaker') || '未绑定' }}</div>
-            <div class="desc">电表：{{ boundDeviceLabel(e.id, 'ac_meter') || '未绑定' }}</div>
-            <div class="desc">变压器：{{ boundDeviceLabel(e.id, 'transformer') || '未绑定' }}</div>
-            <div
-              v-for="g in groupsOfEmu(e.id)"
-              :key="g.id"
-              class="desc emu-group-row"
-              :class="{ active: selectedNodeId === g.id }"
-              @click.stop="onSelectNode(g.id)"
-            >└ {{ g.label }} · PCS×{{ pcsCountOfGroup(g.id) }}</div>
-          </div>
-          <el-button link type="danger" size="small" @click.stop="deleteEmu(e.id)">删</el-button>
-        </div>
-
-        <div class="card-title" style="margin-top:14px">设备库</div>
-        <div v-if="!library.length" class="empty">改参后「存入设备库」</div>
-        <div
-          v-for="item in library"
-          :key="item.id"
-          class="palette-item"
-          draggable="true"
-          @dragstart="onDragLibrary($event, item)"
-          @dblclick="addFromLibrary(item)"
-        >
-          <span class="dot" :style="{ background: colorOf(item.templateId) }" />
-          <div class="meta">
-            <div class="name">{{ item.name }}</div>
-            <div class="desc">{{ templateName(item.templateId) }}</div>
-          </div>
-          <el-button link type="danger" size="small" @click.stop="removeLibrary(item.id)">删</el-button>
-        </div>
-      </aside>
+    <div class="workspace" :class="{ 'palette-collapsed': paletteCollapsed, narrow: isNarrow }">
+      <PalettePanel
+        v-model:collapsed="paletteCollapsed"
+        :templates="templates"
+        :library="library"
+        @drag-template="onDragTemplate"
+        @drag-library="onDragLibrary"
+        @add-template="addFromTemplate"
+        @add-library="addFromLibrary"
+        @remove-library="removeLibrary"
+      />
 
       <div
         class="canvas-wrap card"
@@ -95,46 +45,77 @@
           :edges="project.edges"
           :templates="templates"
           :selected-node-id="selectedNodeId"
+          :selected-node-ids="selectedNodeIds"
           :selected-edge-id="selectedEdgeId"
           :linking="linking"
           :pointer-world="pointerWorld"
           :problem-node-ids="problemNodeIds"
+          :highlight-node-ids="highlightNodeIds"
           :snap="true"
-          @select-node="onSelectNode"
+          @select-node="onSelectFromCanvas"
+          @select-nodes="onSelectNodes"
+          @clear-selection="clearSelection"
           @select-edge="onSelectEdge"
           @port-click="onPortClick"
-          @move-node="onMoveNode"
+          @move-commit="onMoveCommit"
           @pointer-world="w => pointerWorld = w"
         />
         <div v-if="linking" class="linking-tip">连线中…再点目标拐角（Esc 取消）</div>
       </div>
 
-      <aside class="props card">
-        <div v-if="validationIssues.length" class="validation-box">
-          <div class="card-title">校验问题</div>
-          <el-alert
-            :title="validationMessage || '工程配置不合理'"
-            type="error"
-            :closable="true"
-            show-icon
-            @close="clearValidation"
-          >
-            <ul class="issue-list">
-              <li
-                v-for="(issue, i) in validationIssues"
-                :key="i"
-                class="issue-item"
-                :class="{ clickable: !!issue.nodeId }"
-                @click="focusProblem(issue.nodeId)"
-              >
-                {{ issue.text }}
-              </li>
-            </ul>
-          </el-alert>
+      <aside v-show="propsVisible" class="props card">
+        <div v-if="isNarrow" class="props-head">
+          <el-button link size="small" @click="propsDrawerOpen = false">关闭</el-button>
         </div>
-
-        <div class="card-title">属性</div>
-        <template v-if="selectedNode && selectedTemplate">
+        <el-tabs v-model="inspectorTab" class="inspector-tabs">
+          <el-tab-pane label="属性" name="props">
+        <div class="inspector-body">
+        <template v-if="isMultiSelect">
+          <el-form label-position="top" size="small">
+            <el-form-item :label="`已选 ${selectedNodes.length} 个`">
+              <div class="bound-list">
+                <el-tag
+                  v-for="n in selectedNodes"
+                  :key="n.id"
+                  size="small"
+                  effect="plain"
+                  class="bound-tag"
+                  @click="focusProblem(n.id)"
+                >{{ n.label }}</el-tag>
+              </div>
+            </el-form-item>
+            <template v-if="batchAssignable.length">
+              <el-divider content-position="left">批量归属</el-divider>
+              <p class="param-hint">将写入 {{ batchAssignable.length }} 个可归属设备（PCS / 断路器 / 电表 / 变压器）</p>
+              <el-form-item label="所属 EMU 储能单元">
+                <el-select
+                  :model-value="batchEmuState.value"
+                  :placeholder="batchEmuState.mixed ? '多个值' : '选择 EMU 储能单元'"
+                  clearable
+                  style="width:100%"
+                  @change="onBatchEmuChange"
+                >
+                  <el-option v-for="e in emuNodes" :key="e.id" :label="e.label" :value="e.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="所属 EMU 分组">
+                <el-select
+                  :model-value="batchGroupState.value"
+                  :placeholder="batchGroupPlaceholder"
+                  :disabled="!batchGroupOptions.length"
+                  clearable
+                  style="width:100%"
+                  @change="onBatchGroupChange"
+                >
+                  <el-option v-for="g in batchGroupOptions" :key="g.id" :label="g.label" :value="g.id" />
+                </el-select>
+                <div v-if="!batchGroupOptions.length" class="param-hint">{{ batchGroupHint }}</div>
+              </el-form-item>
+            </template>
+            <p v-else class="empty">所选设备不含 PCS / 断路器 / 电表 / 变压器，无法批量设置单元和组。</p>
+          </el-form>
+        </template>
+        <template v-else-if="selectedNode && selectedTemplate">
           <el-form label-position="top" size="small">
             <el-form-item label="显示名称">
               <el-input v-model="selectedNode.label" @change="onParamEdited" />
@@ -230,15 +211,69 @@
           <p class="empty">已选中连线，按 Delete 可断开。</p>
           <el-button size="small" type="danger" @click="deleteSelected">断开连线</el-button>
         </template>
-        <p v-else class="empty">从左侧拖入设备，或用「标准拓扑向导」一键生成储能 / 光伏径向骨架。</p>
+        <p v-else class="empty">从画布选择设备，或打开储能单元。</p>
+        </div>
+          </el-tab-pane>
+          <el-tab-pane name="emu">
+            <template #label>储能单元</template>
+            <EmuTree
+              :nodes="project.nodes"
+              :selected-ids="selectedNodeIds"
+              @select="onSelectFromTree"
+              @delete-emu="deleteEmu"
+              @focus-device="onFocusFromTree"
+            />
+          </el-tab-pane>
+          <el-tab-pane name="issues">
+            <template #label>
+              <span>校验</span>
+              <el-badge
+                v-if="validationIssues.length"
+                :value="validationIssues.length"
+                :max="99"
+                class="tab-badge"
+              />
+            </template>
+            <div v-if="!validationIssues.length" class="empty">暂无校验问题。保存工程时会自动检查。</div>
+            <el-alert
+              v-else
+              :title="validationMessage || '工程配置不合理'"
+              type="error"
+              :closable="true"
+              show-icon
+              @close="clearValidation"
+            >
+              <ul class="issue-list">
+                <li
+                  v-for="(issue, i) in validationIssues"
+                  :key="i"
+                  class="issue-item"
+                  :class="{ clickable: !!issue.nodeId }"
+                  @click="focusProblem(issue.nodeId)"
+                >
+                  {{ issue.text }}
+                </li>
+              </ul>
+            </el-alert>
+          </el-tab-pane>
+        </el-tabs>
       </aside>
     </div>
 
-    <el-dialog v-model="libDialog" title="存入设备库" width="420px">
+    <el-dialog v-model="libDialog" :title="libDialogTitle" width="420px">
       <el-form label-width="80px" size="small">
         <el-form-item label="名称">
-          <el-input v-model="libName" placeholder="如：1250kW PCS 单元 / 大容量 BMS" />
+          <el-input
+            v-model="libName"
+            :placeholder="savingComposite ? '如：5.5MW 单元馈线' : '如：1250kW PCS 单元 / 大容量 BMS'"
+          />
         </el-form-item>
+        <template v-if="savingComposite">
+          <p class="wizard-desc">将把 {{ compositeTargets.length }} 个设备存成一块组合图元，只保留它们之间的连线。拖入时整组落下；接到母线需再连一次。请不要把电网或站级母线框进去。</p>
+          <ul class="lib-target-list">
+            <li v-for="n in compositeTargets" :key="n.id">{{ n.label }} · {{ templateName(n.templateId) }}</li>
+          </ul>
+        </template>
       </el-form>
       <template #footer>
         <el-button size="small" @click="libDialog = false">取消</el-button>
@@ -281,7 +316,30 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import TopologyCanvas from '@/components/topology/TopologyCanvas.vue'
-import { nodeSize, snapToGrid, templateColor } from '@/components/topology/nodeLayout.js'
+import PalettePanel from '@/components/topology/PalettePanel.vue'
+import EmuTree from '@/components/topology/EmuTree.vue'
+import { nodeSize, snapToGrid } from '@/components/topology/nodeLayout.js'
+import {
+  applyEmuId,
+  applyGroupId,
+  assignableNodes,
+  captureComposite,
+  compositeDropSize,
+  compositeEligibleNodes,
+  instantiateComposite,
+  isCompositeLibraryItem,
+  libraryEligibleNodes,
+  libraryPayloadsFromNodes,
+  mixedParam,
+  toggleNodeSelection,
+  unionIds
+} from '@/components/topology/batchEdit.js'
+import {
+  devicesOfEmu as devicesOfEmuNodes,
+  devicesOfGroup as devicesOfGroupNodes,
+  groupsOfEmu as groupsOfEmuNodes,
+  highlightIdsForSelection
+} from '@/components/topology/emuTree.js'
 import {
   getTopologyTemplates,
   getTopologyProject,
@@ -310,13 +368,14 @@ const project = reactive({
   edges: []
 })
 
-const selectedNodeId = ref(null)
+const selectedNodeIds = ref([])
 const selectedEdgeId = ref(null)
 const linking = ref(null)
 const pointerWorld = ref(null)
 const saving = ref(false)
 const libDialog = ref(false)
 const libName = ref('')
+const libNamePrefix = ref('')
 const savingLib = ref(false)
 const canvasRef = ref(null)
 const connecting = ref(false)
@@ -337,6 +396,13 @@ const wizardPvCount = ref(0)
 const wizardIncludeLoad = ref(true)
 const wizardName = ref('')
 const wizardLoading = ref(false)
+
+const inspectorTab = ref('props')
+const paletteCollapsed = ref(false)
+const isNarrow = ref(false)
+const propsDrawerOpen = ref(true)
+const NARROW_MQ = '(max-width: 1100px)'
+let narrowMq = null
 
 const wizardNamePlaceholder = computed(() => {
   const e = wizardEmuCount.value
@@ -362,8 +428,8 @@ function showConnectFeedback(type, title, detail = '') {
   })
 }
 
-function dropWorldPosition(ev, templateId) {
-  const size = nodeSize(templateId)
+function dropWorldPosition(ev, templateId, sizeOverride) {
+  const size = sizeOverride || nodeSize(templateId)
   const world = canvasRef.value?.clientToWorld?.(ev.clientX, ev.clientY)
   if (!world) {
     return {
@@ -391,26 +457,54 @@ function quickReject(edge) {
   return null
 }
 
-const selectedNode = computed(() => project.nodes.find(n => n.id === selectedNodeId.value) || null)
+const selectedNodeId = computed(() => selectedNodeIds.value[0] || null)
+const selectedNodes = computed(() =>
+  selectedNodeIds.value.map(id => project.nodes.find(n => n.id === id)).filter(Boolean)
+)
+const selectedNode = computed(() => selectedNodes.value.length === 1 ? selectedNodes.value[0] : null)
 const selectedTemplate = computed(() => templates.value.find(t => t.id === selectedNode.value?.templateId) || null)
-const canDelete = computed(() => !!(selectedNodeId.value || selectedEdgeId.value))
+const isMultiSelect = computed(() => selectedNodes.value.length > 1)
+const canDelete = computed(() => !!(selectedNodeIds.value.length || selectedEdgeId.value))
 const canUndo = computed(() => historyPast.value.length > 0)
 const canRedo = computed(() => historyFuture.value.length > 0)
+const libraryTargets = computed(() => libraryEligibleNodes(selectedNodes.value))
+const compositeTargets = computed(() => compositeEligibleNodes(selectedNodes.value))
+const canSaveLibrary = computed(() => libraryTargets.value.length > 0)
+const savingComposite = computed(() => compositeTargets.value.length >= 2)
+const saveLibraryButtonLabel = computed(() => savingComposite.value ? '存为组合图元' : '存入设备库')
+const libDialogTitle = computed(() =>
+  savingComposite.value ? `存为组合图元（${compositeTargets.value.length} 个设备）` : '存入设备库'
+)
+const batchAssignable = computed(() => assignableNodes(selectedNodes.value))
+const batchEmuState = computed(() => mixedParam(batchAssignable.value, 'emuId'))
+const batchGroupState = computed(() => mixedParam(batchAssignable.value, 'groupId'))
+const batchGroupOptions = computed(() => {
+  if (batchEmuState.value.mixed || !batchEmuState.value.value) return []
+  return groupsOfEmu(batchEmuState.value.value)
+})
+const batchGroupPlaceholder = computed(() => {
+  if (batchEmuState.value.mixed) return '请先统一所属单元'
+  if (!batchEmuState.value.value) return '请先选择所属单元'
+  if (batchGroupState.value.mixed) return '多个值'
+  return '选择 EMU 分组（可选）'
+})
+const batchGroupHint = computed(() => {
+  if (batchEmuState.value.mixed) return '所选设备分属不同单元，请先统一所属单元再设分组。'
+  if (!batchEmuState.value.value) return '先选择所属 EMU 储能单元后，才能指定分组。'
+  return '该单元下暂无分组。'
+})
 
-/** EMU 虚拟节点列表（画布不渲染，仅侧栏管理） */
+/** EMU 虚拟节点列表（画布不渲染，由右侧单元树管理） */
 const emuNodes = computed(() => project.nodes.filter(n => n.templateId === 'emu'))
+const propsVisible = computed(() => !isNarrow.value || propsDrawerOpen.value)
+const highlightNodeIds = computed(() => highlightIdsForSelection(project.nodes, selectedNodeId.value))
 
-function pcsCountOfEmu(emuId) {
-  return project.nodes.filter(n => n.templateId === 'pcs' && n.parameters?.emuId === emuId).length
-}
-
-/** 某 EMU 下的分组虚拟节点（画布不渲染，仅侧栏管理） */
 function groupsOfEmu(emuId) {
-  return project.nodes.filter(n => n.templateId === 'emu_group' && n.parameters?.emuId === emuId)
+  return groupsOfEmuNodes(project.nodes, emuId)
 }
 
-function pcsCountOfGroup(groupId) {
-  return project.nodes.filter(n => n.templateId === 'pcs' && n.parameters?.groupId === groupId).length
+function devicesOfEmu(emuId) {
+  return devicesOfEmuNodes(project.nodes, emuId)
 }
 
 /** 当前选中节点的 EMU 分组候选：仅列其所属 EMU 下的分组（未选 EMU 时无候选） */
@@ -419,20 +513,6 @@ const groupOptionsForSelected = computed(() => {
   if (!n || n.templateId === 'emu_group') return []
   return groupsOfEmu(n.parameters?.emuId || '')
 })
-
-/** 归入某 EMU 的设备节点（PCS / 断路器 / 电表 / 变压器） */
-function devicesOfEmu(emuId) {
-  return project.nodes.filter(n => ['pcs', 'ac_breaker', 'ac_meter', 'transformer'].includes(n.templateId) && n.parameters?.emuId === emuId)
-}
-
-/** EMU 绑定的断路器/电表/变压器展示名：单元级优先；仅组级绑定时也视为已绑定（未绑定返回空串） */
-function boundDeviceLabel(emuId, templateId) {
-  const bound = project.nodes.filter(x => x.templateId === templateId && x.parameters?.emuId === emuId)
-  const unitLevel = bound.filter(x => !x.parameters?.groupId)
-  const list = unitLevel.length ? unitLevel : bound
-  if (!list.length) return ''
-  return list.map(n => n.label || n.parameters?.name || n.id).join('、')
-}
 
 /** 属性面板绑定设备视图：仅选中 EMU 虚拟节点时返回（分组/单元级/组内设备分行），否则 null */
 const emuBoundView = computed(() => {
@@ -454,8 +534,7 @@ const emuBoundView = computed(() => {
 
 /** 某分组下绑定的设备（PCS/断路器/电表/变压器） */
 function devicesOfGroup(emuId, groupId) {
-  return project.nodes.filter(x => ['pcs', 'ac_breaker', 'ac_meter', 'transformer'].includes(x.templateId)
-    && x.parameters?.emuId === emuId && x.parameters?.groupId === groupId)
+  return devicesOfGroupNodes(project.nodes, emuId, groupId)
 }
 
 /** 属性面板：选中 EMU 分组时列出组内设备，否则 null */
@@ -487,6 +566,20 @@ function onGroupParamChange(key, value) {
   clearValidation()
 }
 
+function onBatchEmuChange(value) {
+  if (!batchAssignable.value.length) return
+  pushHistory()
+  applyEmuId(batchAssignable.value, value)
+  clearValidation()
+}
+
+function onBatchGroupChange(value) {
+  if (!batchAssignable.value.length) return
+  pushHistory()
+  applyGroupId(batchAssignable.value, value, project.nodes)
+  clearValidation()
+}
+
 /** 解除该 EMU 下全部设备（pcs/ac_breaker/ac_meter/transformer）的 emuId/groupId 归属 */
 function unassignDevicesFromEmu(emuId) {
   for (const n of devicesOfEmu(emuId)) {
@@ -505,13 +598,12 @@ function deleteEmu(id) {
   const bound = devicesOfEmu(id)
   const pcsOrphans = bound.filter(n => n.templateId === 'pcs').length
   unassignDevicesFromEmu(id)
-  if (selectedNodeId.value === id) selectedNodeId.value = null
+  selectedNodeIds.value = selectedNodeIds.value.filter(sid => sid !== id && !removedGroupIds.has(sid))
   clearValidation()
   if (bound.length > 0)
     ElMessage.warning(`已删除 EMU，${pcsOrphans} 台 PCS、${bound.length - pcsOrphans} 台断路器/电表已解除归属，请重新选择所属 EMU 后再保存`)
 }
 
-function colorOf(id) { return templateColor(id) }
 function templateName(id) { return templates.value.find(t => t.id === id)?.name || id }
 function numberStep(def) {
   if (def.key?.toLowerCase().includes('efficiency') || def.key?.toLowerCase().includes('soc')) return 0.01
@@ -561,6 +653,9 @@ function applyProject(p, { resetHistory = false, clearDirty = false } = {}) {
   // 若保留会在保存回放时报「连线端点设备不存在」
   const nodeIds = new Set(project.nodes.map(n => n.id))
   project.edges = (p.edges || []).filter(e => nodeIds.has(e.fromNodeId) && nodeIds.has(e.toNodeId))
+  selectedNodeIds.value = selectedNodeIds.value.filter(id => nodeIds.has(id))
+  if (selectedEdgeId.value && !project.edges.some(e => e.id === selectedEdgeId.value))
+    selectedEdgeId.value = null
   if (resetHistory) {
     historyPast.value = []
     historyFuture.value = []
@@ -637,8 +732,14 @@ function applyValidationResult(validation) {
 
 function focusProblem(nodeId) {
   if (!nodeId) return
-  selectedNodeId.value = nodeId
+  selectedNodeIds.value = [nodeId]
   selectedEdgeId.value = null
+  if (isNarrow.value) propsDrawerOpen.value = true
+}
+
+function openPropsInspector() {
+  inspectorTab.value = 'props'
+  if (isNarrow.value) propsDrawerOpen.value = true
 }
 
 async function confirmDiscardIfDirty(actionLabel = '继续') {
@@ -665,7 +766,7 @@ async function reload() {
   templates.value = tpl
   library.value = lib
   applyProject(proj, { resetHistory: true, clearDirty: true })
-  selectedNodeId.value = null
+  selectedNodeIds.value = []
   selectedEdgeId.value = null
   linking.value = null
   clearValidation()
@@ -717,6 +818,8 @@ async function saveProject() {
   try {
     const validation = await postTopologyValidate(projectPayload())
     if (!applyValidationResult(validation)) {
+      inspectorTab.value = 'issues'
+      if (isNarrow.value) propsDrawerOpen.value = true
       await ElMessageBox.alert(
         validationIssues.value.map(i => i.text).join('\n') || validationMessage.value,
         '无法保存',
@@ -744,7 +847,7 @@ async function saveProject() {
     historyPast.value = []
     historyFuture.value = []
     editHint.value = '已保存'
-    ElMessage.success(`工程「${saved.name}」已保存，可在工程管理 / 系统配置中选用`)
+    ElMessage.success(`工程「${saved.name}」已保存，可在工程配置中选用并应用到仿真`)
   } catch (e) {
     ElMessage.error(e.message || '保存失败')
   } finally {
@@ -775,6 +878,12 @@ function onDrop(ev) {
   } else if (payload.kind === 'library') {
     const item = library.value.find(i => i.id === payload.itemId)
     if (!item) return
+    if (isCompositeLibraryItem(item)) {
+      const size = compositeDropSize(item, n => nodeSize(n.templateId))
+      const { x, y } = dropWorldPosition(ev, item.templateId, size)
+      addFromLibrary(item, x, y)
+      return
+    }
     const { x, y } = dropWorldPosition(ev, item.templateId)
     addFromLibrary(item, x, y)
   }
@@ -795,12 +904,24 @@ function addFromTemplate(t, x = 120, y = 100) {
   if ((t.id === 'pcs' || t.id === 'emu_group') && emuNodes.value.length > 0)
     node.parameters.emuId = emuNodes.value[0].id
   project.nodes.push(node)
-  selectedNodeId.value = node.id
+  selectedNodeIds.value = [node.id]
   selectedEdgeId.value = null
   clearValidation()
 }
 
 function addFromLibrary(item, x = 140, y = 120) {
+  if (isCompositeLibraryItem(item)) {
+    const placed = instantiateComposite(item, { x, y, uid, snap: snapToGrid })
+    if (!placed.nodes.length) return
+    pushHistory()
+    project.nodes.push(...placed.nodes)
+    project.edges.push(...placed.edges)
+    selectedNodeIds.value = placed.nodes.map(n => n.id)
+    selectedEdgeId.value = null
+    clearValidation()
+    ElMessage.success(`已放入组合「${item.name}」（${placed.nodes.length} 个设备）`)
+    return
+  }
   pushHistory()
   const t = templates.value.find(i => i.id === item.templateId)
   const node = {
@@ -813,30 +934,77 @@ function addFromLibrary(item, x = 140, y = 120) {
     parameters: cloneParams({ ...(t?.defaultParameters || {}), ...(item.parameters || {}) })
   }
   project.nodes.push(node)
-  selectedNodeId.value = node.id
+  selectedNodeIds.value = [node.id]
   selectedEdgeId.value = null
   clearValidation()
 }
 
-function onSelectNode(id) {
-  selectedNodeId.value = id
+function onSelectNode(idOrPayload) {
+  selectedEdgeId.value = null
+  if (idOrPayload && typeof idOrPayload === 'object') {
+    const { id, additive } = idOrPayload
+    if (!id) {
+      selectedNodeIds.value = []
+      return
+    }
+    selectedNodeIds.value = additive
+      ? toggleNodeSelection(selectedNodeIds.value, id)
+      : [id]
+    return
+  }
+  selectedNodeIds.value = idOrPayload ? [idOrPayload] : []
+}
+
+function onSelectFromCanvas(payload) {
+  onSelectNode(payload)
+  if (selectedNodeIds.value.length) openPropsInspector()
+}
+
+function onSelectFromTree(id) {
+  onSelectNode(id)
+  openPropsInspector()
+}
+
+function onFocusFromTree(id) {
+  focusProblem(id)
+  openPropsInspector()
+}
+
+function onSelectNodes({ ids, additive }) {
+  selectedEdgeId.value = null
+  const next = Array.isArray(ids) ? ids.filter(Boolean) : []
+  selectedNodeIds.value = additive ? unionIds(selectedNodeIds.value, next) : next
+  if (selectedNodeIds.value.length) openPropsInspector()
+}
+
+function clearSelection() {
+  selectedNodeIds.value = []
   selectedEdgeId.value = null
 }
 
 function onSelectEdge(id) {
   selectedEdgeId.value = id
-  selectedNodeId.value = null
+  selectedNodeIds.value = []
 }
 
-function onMoveNode({ id, x, y }) {
-  const n = project.nodes.find(i => i.id === id)
-  if (!n) return
-  const nx = snapToGrid(x)
-  const ny = snapToGrid(y)
-  if (n.x === nx && n.y === ny) return
+function onMoveCommit(items) {
+  if (!items?.length) return
+  const changed = items.some(it => it.x !== it.fromX || it.y !== it.fromY)
+  if (!changed) return
+  for (const it of items) {
+    const n = project.nodes.find(i => i.id === it.id)
+    if (n) {
+      n.x = it.fromX
+      n.y = it.fromY
+    }
+  }
   pushHistory()
-  n.x = nx
-  n.y = ny
+  for (const it of items) {
+    const n = project.nodes.find(i => i.id === it.id)
+    if (!n) continue
+    n.x = snapToGrid(it.x)
+    n.y = snapToGrid(it.y)
+  }
 }
 
 async function onPortClick({ nodeId, portId }) {
@@ -913,7 +1081,7 @@ async function onPortClick({ nodeId, portId }) {
 }
 
 async function deleteSelected() {
-  if (selectedEdgeId.value) {
+  if (selectedEdgeId.value && !selectedNodeIds.value.length) {
     try {
       const updated = await postTopologyDisconnect({
         project: projectPayload(),
@@ -928,47 +1096,77 @@ async function deleteSelected() {
     }
     return
   }
-  if (selectedNodeId.value) {
-    pushHistory()
-    const id = selectedNodeId.value
-    const removed = project.nodes.find(n => n.id === id)
-    project.edges = project.edges.filter(e => e.fromNodeId !== id && e.toNodeId !== id)
-    project.nodes = project.nodes.filter(n => n.id !== id)
-    // 删除 EMU 分组虚拟节点时解除设备的 groupId 引用
-    if (removed?.templateId === 'emu_group') {
+  if (!selectedNodeIds.value.length) return
+  pushHistory()
+  const ids = new Set(selectedNodeIds.value)
+  const removed = project.nodes.filter(n => ids.has(n.id))
+  project.edges = project.edges.filter(e => !ids.has(e.fromNodeId) && !ids.has(e.toNodeId))
+  project.nodes = project.nodes.filter(n => !ids.has(n.id))
+  let emuWarning = ''
+  for (const item of removed) {
+    if (item.templateId === 'emu_group') {
       for (const n of project.nodes)
-        if (n.parameters?.groupId === id) n.parameters.groupId = ''
+        if (n.parameters?.groupId === item.id) n.parameters.groupId = ''
     }
-    // 删除 EMU 虚拟节点时同步解除其下设备（PCS/断路器/电表）归属
-    if (removed?.templateId === 'emu') {
-      const bound = devicesOfEmu(id)
+    if (item.templateId === 'emu') {
+      const groupIds = new Set(groupsOfEmu(item.id).map(g => g.id))
+      project.nodes = project.nodes.filter(n => !groupIds.has(n.id))
+      const bound = devicesOfEmu(item.id)
       const pcsOrphans = bound.filter(n => n.templateId === 'pcs').length
-      unassignDevicesFromEmu(id)
+      unassignDevicesFromEmu(item.id)
       if (bound.length > 0)
-        ElMessage.warning(`${pcsOrphans} 台 PCS、${bound.length - pcsOrphans} 台断路器/电表已解除归属，请重新选择所属 EMU 后再保存`)
+        emuWarning = `${pcsOrphans} 台 PCS、${bound.length - pcsOrphans} 台断路器/电表已解除归属，请重新选择所属 EMU 后再保存`
     }
-    selectedNodeId.value = null
-    clearValidation()
   }
+  selectedNodeIds.value = []
+  selectedEdgeId.value = null
+  clearValidation()
+  if (emuWarning) ElMessage.warning(emuWarning)
 }
 
 function openSaveLibrary() {
-  if (!selectedNode.value) return
-  libName.value = selectedNode.value.label || '未命名设备'
+  if (!libraryTargets.value.length) return
+  if (savingComposite.value)
+    libName.value = ''
+  else
+    libName.value = libraryTargets.value[0].label || '未命名设备'
+  libNamePrefix.value = ''
   libDialog.value = true
 }
 
 async function saveLibrary() {
-  if (!selectedNode.value) return
+  const targets = libraryTargets.value
+  if (!targets.length) return
   savingLib.value = true
   try {
-    const item = await putTopologyLibrary({
-      name: libName.value || selectedNode.value.label,
-      templateId: selectedNode.value.templateId,
-      parameters: cloneParams(selectedNode.value.parameters)
-    })
+    if (savingComposite.value) {
+      const payload = captureComposite(compositeTargets.value, project.edges, {
+        name: (libName.value || '').trim() || '未命名组合'
+      })
+      if (!payload) {
+        ElMessage.warning('请至少选中 2 个设备再存为组合图元')
+        return
+      }
+      const saved = await putTopologyLibrary(payload)
+      for (const n of compositeTargets.value)
+        n.libraryItemId = saved.id
+      library.value = await getTopologyLibrary()
+      libDialog.value = false
+      ElMessage.success(`组合图元「${saved.name}」已写入设备库，可从左侧整组拖入`)
+      return
+    }
+
+    const payloads = libraryPayloadsFromNodes(targets).map(p => ({
+      ...p,
+      name: libName.value || p.name
+    }))
+    for (const payload of payloads) {
+      const { nodeId, ...item } = payload
+      const saved = await putTopologyLibrary(item)
+      const node = project.nodes.find(n => n.id === nodeId)
+      if (node) node.libraryItemId = saved.id
+    }
     library.value = await getTopologyLibrary()
-    selectedNode.value.libraryItemId = item.id
     libDialog.value = false
     ElMessage.success('已写入设备库')
   } catch (e) {
@@ -1004,7 +1202,7 @@ async function applyWizard() {
     })
     applyProject(scaffolded, { resetHistory: true })
     dirty.value = true
-    selectedNodeId.value = null
+    selectedNodeIds.value = []
     selectedEdgeId.value = null
     linking.value = null
     clearValidation()
@@ -1041,6 +1239,8 @@ function onKey(ev) {
   if (ev.key === 'Escape') {
     linking.value = null
     pointerWorld.value = null
+    if (!selectedEdgeId.value && !selectedNodeIds.value.length) return
+    clearSelection()
     return
   }
   if (ev.key === 'Delete' || ev.key === 'Backspace') {
@@ -1064,6 +1264,16 @@ watch(
   () => { syncEditHintFromRoute() }
 )
 
+function applyNarrow(mq) {
+  isNarrow.value = mq.matches
+  if (mq.matches) {
+    paletteCollapsed.value = true
+    if (!selectedNodeIds.value.length) propsDrawerOpen.value = false
+  } else {
+    propsDrawerOpen.value = true
+  }
+}
+
 onMounted(async () => {
   try {
     await reload()
@@ -1072,11 +1282,17 @@ onMounted(async () => {
   }
   window.addEventListener('keydown', onKey)
   window.addEventListener('beforeunload', onBeforeUnload)
+  if (typeof window.matchMedia === 'function') {
+    narrowMq = window.matchMedia(NARROW_MQ)
+    applyNarrow(narrowMq)
+    narrowMq.addEventListener('change', applyNarrow)
+  }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('beforeunload', onBeforeUnload)
+  narrowMq?.removeEventListener?.('change', applyNarrow)
   linking.value = null
   pointerWorld.value = null
   connecting.value = false
@@ -1101,13 +1317,42 @@ onBeforeUnmount(() => {
 .workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 280px;
+  grid-template-columns: 248px minmax(0, 1fr) 280px;
   gap: 8px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
-.palette, .props { margin-bottom: 0; min-width: 0; min-height: 0; overflow: auto; }
+.workspace.palette-collapsed { grid-template-columns: 52px minmax(0, 1fr) 280px; }
+.workspace.narrow { grid-template-columns: 248px minmax(0, 1fr); }
+.workspace.narrow.palette-collapsed { grid-template-columns: 52px minmax(0, 1fr); }
+.props {
+  margin-bottom: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+}
+.workspace.narrow .props {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 280px;
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .12);
+}
+.props-head { display: flex; justify-content: flex-end; flex-shrink: 0; margin: -4px 0 4px; }
+.inspector-tabs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.inspector-tabs :deep(.el-tabs__header) { margin: 0 0 8px; flex-shrink: 0; }
+.inspector-tabs :deep(.el-tabs__item) { padding: 0 10px; font-size: 13px; }
+.inspector-tabs :deep(.el-tabs__content) { flex: 1; overflow: auto; }
+.inspector-body { padding-bottom: 8px; }
+.tab-badge { margin-left: 4px; }
+.tab-badge :deep(.el-badge__content) { position: relative; transform: none; }
 .canvas-wrap { margin-bottom: 0; padding: 0; overflow: hidden; display: flex; min-width: 0; min-height: 0; position: relative; }
 /* 连线提示浮层：不占工具栏空间，避免右侧状态组宽度变化引起工具栏换行、画布上下抖动 */
 .linking-tip {
@@ -1116,20 +1361,12 @@ onBeforeUnmount(() => {
   background: #fdf6ec; border: 1px solid #faecd8; border-radius: 4px;
   pointer-events: none; box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
 }
-.palette-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 6px;
-  cursor: grab; background: #fafbfc;
+.linking-tip {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10;
+  padding: 4px 12px; font-size: 12px; color: #e6a23c;
+  background: #fdf6ec; border: 1px solid #faecd8; border-radius: 4px;
+  pointer-events: none; box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
 }
-.palette-item:hover { border-color: #c0c4cc; background: #fff; }
-.palette-item.active { border-color: #409eff; background: #ecf5ff; }
-.palette-item .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.palette-item .meta { flex: 1; min-width: 0; }
-.palette-item .name { font-size: 13px; font-weight: 600; color: #303133; }
-.palette-item .desc { font-size: 11px; color: #909399; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.emu-group-row { cursor: pointer; padding-left: 10px; border-radius: 3px; }
-.emu-group-row:hover { color: #0f8a9d; }
-.emu-group-row.active { color: #0f8a9d; font-weight: 600; }
 .empty { font-size: 12px; color: #909399; line-height: 1.5; }
 .param-hint { font-size: 11px; color: #909399; margin-top: 2px; line-height: 1.3; }
 .bound-list { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -1139,8 +1376,13 @@ onBeforeUnmount(() => {
 .issue-item { font-size: 12px; line-height: 1.5; margin-bottom: 4px; }
 .issue-item.clickable { cursor: pointer; color: #c45656; text-decoration: underline; }
 .wizard-desc { font-size: 13px; color: #606266; line-height: 1.5; margin: 0 0 12px; }
-@media (max-width: 1100px) {
-  .workspace { grid-template-columns: 180px minmax(0, 1fr); }
-  .props { display: none; }
+.lib-target-list {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.6;
 }
 </style>
