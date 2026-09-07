@@ -13,15 +13,27 @@ namespace EssSimulator.Web.Topology
         public List<TopologyEdge> Edges { get; set; } = new();
     }
 
-    /// <summary>设备库条目：基于基础模板改参后的可复用设备。</summary>
+    /// <summary>设备库条目：单台改参设备，或由多台设备+内部连线构成的组合图元。</summary>
     public sealed class TopologyLibraryItem
     {
         public string SchemaVersion { get; set; } = "1.0";
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string Name { get; set; } = "未命名设备";
+        /// <summary>device（缺省）或 composite。</summary>
+        public string Kind { get; set; } = "device";
+        /// <summary>单台设备的模板；组合图元用作调色板色点（通常取首个设备模板）。</summary>
         public string TemplateId { get; set; } = "";
         public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
         public Dictionary<string, object?> Parameters { get; set; } = new();
+        /// <summary>组合图元内的设备，坐标相对包围盒左上角。</summary>
+        public List<TopologyNode> Nodes { get; set; } = new();
+        /// <summary>组合图元内部连线（两端都必须在 Nodes 内）。</summary>
+        public List<TopologyEdge> Edges { get; set; } = new();
+
+        [JsonIgnore]
+        public bool IsComposite =>
+            string.Equals(Kind, "composite", StringComparison.OrdinalIgnoreCase)
+            || (Nodes != null && Nodes.Count >= 2);
     }
 
     public sealed class TopologyNode

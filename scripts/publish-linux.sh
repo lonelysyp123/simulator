@@ -10,7 +10,8 @@ CONFIG="${CONFIG:-Debug}"
 OUT="$ROOT/dist/$RID"
 ARCHIVE="$ROOT/dist/EssSimulator-${RID}.tar.gz"
 
-# 设备型号点表（pointmaps/models）随发布携带，运行期按选型解析。
+# 点表：整棵 pointmaps/models 随发布携带。
+# 选型型（emu/bms/em/pv）运行期按选型解析；LC 为片段拼装，不再走型号选型。
 
 RUNTIME_FILES=(
   appsettings.json
@@ -37,13 +38,22 @@ validate_device_models
 cd "$ROOT"
 
 # 构建 B/S 前端（Vue 3 + Vite）到 wwwroot/
+WEB_DIR="$ROOT/Web"
+if [[ ! -d "$WEB_DIR" && -d "$ROOT/web" ]]; then
+  WEB_DIR="$ROOT/web"
+fi
+
 build_frontend() {
   echo "==> Building web frontend (Vue3 + Vite)..."
-  if [[ ! -d "$ROOT/web/node_modules" ]]; then
-    echo "    installing npm dependencies..."
-    (cd "$ROOT/web" && npm install)
+  if [[ ! -d "$WEB_DIR" ]]; then
+    echo "错误: 找不到前端目录 Web/（或 web/）" >&2
+    exit 1
   fi
-  (cd "$ROOT/web" && npm run build)
+  if [[ ! -d "$WEB_DIR/node_modules" ]]; then
+    echo "    installing npm dependencies..."
+    (cd "$WEB_DIR" && npm install)
+  fi
+  (cd "$WEB_DIR" && npm run build)
   echo "    wwwroot/ populated."
 }
 
@@ -53,7 +63,7 @@ echo "==> Cleaning previous output: $OUT"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
-echo "==> Publishing EssSimulator for Linux ($RID, $CONFIG, pointmap model=$DEFAULT_ROOT_MODEL, self-contained)..."
+echo "==> Publishing EssSimulator for Linux ($RID, $CONFIG, self-contained)..."
 dotnet publish EssSimulator.csproj \
   -c "$CONFIG" \
   -r "$RID" \
@@ -73,7 +83,7 @@ rm -f "$ARCHIVE"
 tar -czf "$ARCHIVE" -C "$ROOT/dist" "$(basename "$OUT")"
 
 echo "Done."
-echo "  Point map model: $DEFAULT_ROOT_MODEL"
+echo "  Point maps: pointmaps/models/ (选型型回退 standard；LC 片段拼装)"
 echo "  Folder:  $OUT"
 echo "  Archive: $ARCHIVE"
 echo "  Contents:"

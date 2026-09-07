@@ -22,7 +22,7 @@ namespace EssSimulator.EssSimModelApi.EnergyManagementSystem
         // 直流侧电气参数
         public float BatteryVoltage { get; set; }          // 电池电压
         public float BatteryCurrent { get; set; }          // 电池电流
-        public float BatteryPower { get; set; }            // 电池功率
+        public float BatteryPower { get; set; }            // 电池功率 kW
 
         // 功率相关
         public float ApparentPower { get; set; }            // 视在功率
@@ -91,6 +91,9 @@ namespace EssSimulator.EssSimModelApi.EnergyManagementSystem
         /// <summary>孤岛电压设定（V，线电压 0–690）；离网建压/黑启动由 EMS 调节。</summary>
         public ushort IslandVoltageSetting { get; set; }
 
+        /// <summary>孤岛频率设定（Hz）；0 表示沿用额定频率。</summary>
+        public float IslandFrequencySetting { get; set; }
+
         /// <summary>PCS 内部有效孤岛电压反馈（V），在 IslandVoltageRampDurationMs 内趋近设定值。</summary>
         public float IslandVoltageFeedback { get; set; }
 
@@ -101,6 +104,11 @@ namespace EssSimulator.EssSimModelApi.EnergyManagementSystem
 
         // 状态（由 MapPcsState 按物理仿真态写入，与界面 GetRunPhaseLabel 一致）
         public int OperationStatus { get; set; }   // 1停机 2待机 4充电 5放电 6未知/故障
+
+        /// <summary>PCS 当前故障（emu yc46）：运行状态为故障，或驱动 / BMS 系统故障。</summary>
+        public ushort CurrentFault =>
+            (ushort)((OperationStatus == 6 || DriveFault || BmsSystemFault) ? 1 : 0);
+
         public float PCSActivePowerSetting { get; set; }    //有功率设置
         public float PCSReactivePowerSetting { get; set; }    //无功率设置  
         public float PCSRatePower { get; set; }    //额定功率设置

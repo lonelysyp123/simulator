@@ -119,9 +119,10 @@ public class EmuDeviceCatalogFilterTests
         Assert.False(filter.Allows("emu1.Groups[0].Meters[2].PhaseACurrent"));
         Assert.False(filter.Allows("emu1.Groups[1].Meters[0].PhaseACurrent"));
 
-        // 扁平机组无 Groups 构成：Groups 路径自然拒绝
-        Assert.False(filter.Allows("emu2.Groups[0].PcsList[0].P"));
-        Assert.False(filter.Allows("emu2.Groups[0].TotalActivePower"));
+        // 扁平机组：隐式组 0（与 PcsDataServer 镜像一致），组 1 仍拒绝
+        Assert.True(filter.Allows("emu2.Groups[0].PcsList[0].P"));
+        Assert.True(filter.Allows("emu2.Groups[0].TotalActivePower"));
+        Assert.False(filter.Allows("emu2.Groups[1].PcsList[0].P"));
     }
 
     [Fact]

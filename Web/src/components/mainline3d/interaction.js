@@ -61,7 +61,11 @@ export function createInteraction(camera, domElement, scene, { onBreakerClick, o
       const id = hit.object?.userData?.pickId
       if (!id) continue
       const unitIndex = hit.object.userData.unitIndex
-      onBreakerClick?.({ pickId: id, unitIndex })
+      onBreakerClick?.({
+        pickId: id,
+        unitIndex,
+        layoutItem: hit.object.userData.layoutItem
+      })
       return
     }
 

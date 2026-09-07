@@ -40,18 +40,23 @@ namespace EssSimulator.EssDeviceSimModel
                 if (!unitHvClosed[u])
                     continue;
 
+                double sum690 = 0;
+                int forming = 0;
                 void Accumulate(int pcsIdx)
                 {
                     if (pcsIdx < 0 || pcsIdx >= pcsList.Count) return;
                     var st = pcsList[pcsIdx].GetCurrentState();
-                    if (!EssIslandBusLogic.IsPcsIslandVoltageBuilding(st)) return;
-                    localLv690[u] = Math.Max(localLv690[u], st.AcVoltage);
+                    if (!EssIslandBusLogic.IsPcsIslandVoltageBuilding(st) || st.AcVoltage <= 1.0) return;
+                    sum690 += st.AcVoltage;
+                    forming++;
                     localUnitP[u] += pcsList[pcsIdx].GetGridSideActivePower();
                     localUnitQ[u] += st.ReactivePower;
                 }
 
                 for (int ch = 0; ch < pcsCount; ch++)
                     Accumulate(baseIdx + ch);
+                if (forming > 0)
+                    localLv690[u] = sum690 / forming;
 
                 if (mainBreakerClosed || localLv690[u] <= 0)
                     continue;
@@ -90,7 +95,7 @@ namespace EssSimulator.EssDeviceSimModel
 
                 unitTransformers[u].Update(
                     unitPrimaryV[u], unitSecCurrent, unitPf, unitS, localUnitQ[u], simTime, simStep,
-                    applyReactiveVoltageShift: false);
+                    applyReactiveVoltageShift: true);
             }
 
             ApplyBlackStartStationElectricalLoadAcrossBus(

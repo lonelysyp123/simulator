@@ -4,6 +4,7 @@ using EssSimulator.DataExchange;
 using EssSimulator.DataExchange.Catalog;
 using EssSimulator.DataExchange.Config;
 using EssSimulator.EssSimModelApi;
+using EssSimulator.LocalControl;
 using EssSimulator.Protocol.Modbus;
 using log4net;
 using Microsoft.Extensions.Hosting;
@@ -54,12 +55,16 @@ namespace EssSimulator
                         _manager.RegisterDevice(server, ProtocolDeviceType.Bms, "bms_bank.csv");
                     }
 
-                    // PCS (EMU) Modbus 服务
-                    int unitCount = _cfg.EffectiveEssUnitCount;
-                    for (int u = 0; u < unitCount; u++)
+                    // PCS (EMU) Modbus 服务：一台 PCS 一个 simEmu，点表绑 emuN.PcsList[pcsIndex]
+                    foreach (var ep in EmuProtocolLayout.Enumerate(_cfg))
                     {
-                        string name = $"simEmu{u + 1}";
-                        var pcs = new ModbusSimServer("emu.csv", 0, name, dataExchangeOptions: _dataExchange, essUnits: _cfg.Devices);
+                        string name = ep.ServerName;
+                        var pcs = new ModbusSimServer(
+                            "emu.csv", 0, name,
+                            dataExchangeOptions: _dataExchange,
+                            essUnits: _cfg.Devices,
+                            emuDeviceIdOverride: ep.UnitId,
+                            pcsIndex: ep.PcsIndex0);
                         store.Register(name, pcs);
                         _manager.RegisterDevice(pcs, ProtocolDeviceType.Emu, "emu.csv");
                     }

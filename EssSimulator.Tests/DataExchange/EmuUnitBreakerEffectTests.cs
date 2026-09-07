@@ -14,6 +14,27 @@ namespace EssSimulator.Tests.DataExchange;
 public class EmuUnitBreakerEffectTests : SimulatorHostTestBase
 {
     [Fact]
+    public void TryResolveEmuUnit_PrefersBindingRootOverServerName()
+    {
+        var ctx = new ControlEffectContext
+        {
+            ServerName = "simEmu5",
+            AppliedValue = 1,
+            PreviousValue = 0,
+            Binding = new PointBinding
+            {
+                Entry = new MapEntry { Address = 1003, FunctionCode = 5, ParamName = "yk3", Size = 1, Type = "bool" },
+                ParamName = "yk3",
+                Target = new DataTarget { RootKey = "emu1", PropertyPath = "PcsList[4].pcsOnOffSwitch" },
+                Effect = ControlEffectId.PcsApplyCommands
+            }
+        };
+
+        Assert.True(EmuPcsControlEffect.TryResolveEmuUnit(ctx, out int unit));
+        Assert.Equal(1, unit);
+    }
+
+    [Fact]
     public void OnControlChanged_BreakerClosed_DrivesUnitBreaker_AndSyncsPowerOnOff()
     {
         var (ess, emu) = Build();

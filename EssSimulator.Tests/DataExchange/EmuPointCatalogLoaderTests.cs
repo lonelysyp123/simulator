@@ -36,17 +36,25 @@ public class EmuPointCatalogLoaderTests
         var pointMap = LoadStandardEmuMap();
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simEmu1", new DataExchangeOptions());
 
-        Assert.True(catalog.TelemetryPoints.Count > 40);
-        Assert.True(catalog.ControlPoints.Count >= 10);
+        Assert.True(catalog.TelemetryPoints.Count > 20);
+        Assert.True(catalog.ControlPoints.Count >= 4);
 
-        var startStop = catalog.ControlPoints.First(p => p.ParamName == "yx3");
+        var startStop = catalog.ControlPoints.First(p => p.ParamName == "yk3");
         Assert.Equal("emu1", startStop.Target.RootKey);
         Assert.Equal(ControlSemantics.Hold, startStop.Semantics);
         Assert.Equal(ControlEffectId.PcsApplyCommands, startStop.Effect);
+        Assert.Equal("PcsList[0].pcsOnOffSwitch", startStop.Target.PropertyPath);
 
-        var hvBreaker = catalog.ControlPoints.First(p => p.ParamName == "yx0");
-        Assert.Equal("Breaker.Closed", hvBreaker.Target.PropertyPath);
-        Assert.Equal(ControlEffectId.UnitHighVoltageBreaker, hvBreaker.Effect);
+        Assert.DoesNotContain(catalog.ControlPoints, p => p.ParamName == "yx0");
+        Assert.DoesNotContain(catalog.ControlPoints, p => p.Target.PropertyPath.Contains("Breaker"));
+
+        var islandV = catalog.ControlPoints.First(p => p.ParamName == "yt3");
+        Assert.Equal("PcsList[0].IslandVoltageSetting", islandV.Target.PropertyPath);
+        Assert.Equal(ControlEffectId.PcsApplyCommands, islandV.Effect);
+
+        var islandF = catalog.ControlPoints.First(p => p.ParamName == "yt4");
+        Assert.Equal("PcsList[0].IslandFrequencySetting", islandF.Target.PropertyPath);
+        Assert.Equal(ControlEffectId.PcsApplyCommands, islandF.Effect);
     }
 
     [Fact]
@@ -55,11 +63,11 @@ public class EmuPointCatalogLoaderTests
         var pointMap = LoadStandardEmuMap();
         var options = new DataExchangeOptions
         {
-            ControlSemantics = { ["yx3"] = "Hold" }
+            ControlSemantics = { ["yk3"] = "Hold" }
         };
 
         var catalog = PointCatalogLoader.FromPointMap(pointMap, "simEmu1", options);
-        var startStop = catalog.ControlPoints.First(p => p.ParamName == "yx3");
+        var startStop = catalog.ControlPoints.First(p => p.ParamName == "yk3");
         Assert.Equal(ControlSemantics.Hold, startStop.Semantics);
     }
 
@@ -81,17 +89,19 @@ public class EmuPointCatalogLoaderTests
         var gated = PointCatalogLoader.FromPointMap(pointMap, "simEmu1", new DataExchangeOptions(), units);
         var ungated = PointCatalogLoader.FromPointMap(pointMap, "simEmu1", new DataExchangeOptions());
 
-        // 无门控（legacy / 未传机组构成）保持原绑定
-        Assert.Contains(ungated.ControlPoints, p => p.ParamName == "yx0");
-        Assert.Contains(ungated.ControlPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));
-
-        // 门控：无断路器剔除高压开合（Breaker.Closed）；越界 PCS 剔除；0 号 PCS 保留
-        Assert.DoesNotContain(gated.ControlPoints, p => p.ParamName == "yx0");
-        Assert.DoesNotContain(gated.ControlPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));
-        Assert.DoesNotContain(gated.TelemetryPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));
-        Assert.Contains(gated.ControlPoints, p => p.ParamName == "yx3");
-        Assert.True(gated.TelemetryPoints.Count < ungated.TelemetryPoints.Count);
-        // 被剔除点位保持未绑定语义：默认值表仍完整，寄存器维持默认值
+        Assert.DoesNotContain(ungated.ControlPoints, p => p.ParamName == "yx0");
+        Assert.DoesNotContain(ungated.ControlPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));
+        Assert.Contains(ungated.ControlPoints, p => p.ParamName == "yk3");
+        Assert.Contains(gated.ControlPoints, p => p.ParamName == "yk3");
         Assert.Equal(ungated.DefaultValues.Count, gated.DefaultValues.Count);
+
+        var mapPcs1 = new ModbusPointMap(StandardEmuMapPath(), "simEmu1", emuDeviceIdOverride: 1, pcsIndex: 1);
+        var gatedSecond = PointCatalogLoader.FromPointMap(mapPcs1, "simEmu1", new DataExchangeOptions(), units);
+        var ungatedSecond = PointCatalogLoader.FromPointMap(mapPcs1, "simEmu1", new DataExchangeOptions());
+        Assert.Contains(ungatedSecond.ControlPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));
+        Assert.DoesNotContain(gatedSecond.ControlPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));
+        Assert.DoesNotContain(gatedSecond.TelemetryPoints, p => p.Target.PropertyPath.Contains("PcsList[1]"));
+        Assert.True(gatedSecond.TelemetryPoints.Count < ungatedSecond.TelemetryPoints.Count);
+        Assert.Equal(ungatedSecond.DefaultValues.Count, gatedSecond.DefaultValues.Count);
     }
 }

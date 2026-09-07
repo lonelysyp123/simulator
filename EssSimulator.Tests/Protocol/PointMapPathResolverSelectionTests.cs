@@ -125,7 +125,6 @@ public class PointMapPathResolverSelectionTests : IDisposable
     [InlineData("em.csv", "em")]
     [InlineData("bms_bank.csv", "bms")]
     [InlineData("bms_rack.csv", "bms")]
-    [InlineData("lc.csv", "lc")]
     [InlineData("pv_logger.csv", "pv")]
     [InlineData("pv_apm810.csv", "pv")]
     public void Resolve_RuntimeLogicalName_HitsModelsDirectory(string fileName, string typeId)
@@ -135,6 +134,39 @@ public class PointMapPathResolverSelectionTests : IDisposable
         Assert.EndsWith(fileName, resolved);
         Assert.True(File.Exists(resolved));
         AssertNotRootCopy(resolved, fileName);
+    }
+
+    [Fact]
+    public void Resolve_LcCsv_WithoutExclusiveSelection_Throws()
+    {
+        // 默认 LC 由片段拼装，仓库内无 standard/lc.csv；仅选型互斥整表时 Resolve 才有物理文件。
+        var ex = Assert.Throws<FileNotFoundException>(
+            () => PointMapPathResolver.Resolve("lc.csv"));
+        Assert.Contains("pointmaps/models", ex.Message);
+    }
+
+    [Fact]
+    public void Resolve_LcCsv_WithExclusiveSelection_HitsEmuDir()
+    {
+        try
+        {
+            DeviceModelRegistry.SaveSelection(new DeviceModelSelection
+            {
+                Selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["lc"] = "emu"
+                }
+            });
+
+            var resolved = Path.GetFullPath(PointMapPathResolver.Resolve("lc.csv"));
+            Assert.Contains(Path.Combine("pointmaps", "models", "lc", "emu"), resolved);
+            Assert.EndsWith("lc.csv", resolved);
+            Assert.True(File.Exists(resolved));
+        }
+        finally
+        {
+            CleanupSelection();
+        }
     }
 
     [Fact]

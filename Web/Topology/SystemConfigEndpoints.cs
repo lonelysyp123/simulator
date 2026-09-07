@@ -36,9 +36,15 @@ namespace EssSimulator.Web.Topology
             dm.MapGet("/device-models", () =>
             {
                 var selection = DeviceModelRegistry.LoadSelection();
+                var types = DeviceModelRegistry.ListTypes();
+                foreach (var t in types)
+                {
+                    if (string.Equals(t.Id, "lc", StringComparison.OrdinalIgnoreCase))
+                        t.Models = t.Models.Where(DeviceModelRegistry.IsExclusiveModel).ToList();
+                }
                 return Results.Ok(new
                 {
-                    Types = DeviceModelRegistry.ListTypes(),
+                    Types = types,
                     Selection = selection.Selections,
                     HasSelection = selection.Selections.Count > 0,
                     Pointmaps = BuildPointmapSummary()
@@ -52,7 +58,9 @@ namespace EssSimulator.Web.Topology
                 if (req == null || req.Selections == null || req.Selections.Count == 0)
                     return Results.BadRequest(new SystemApplyResponse { Ok = false, Message = "选型内容为空" });
 
-                var errors = DeviceModelRegistry.ValidateSelection(req.Selections);
+                var cleaned = new Dictionary<string, string>(req.Selections, StringComparer.OrdinalIgnoreCase);
+
+                var errors = DeviceModelRegistry.ValidateSelection(cleaned);
                 if (errors.Count > 0)
                     return Results.BadRequest(new SystemApplyResponse
                     {
@@ -63,7 +71,7 @@ namespace EssSimulator.Web.Topology
 
                 DeviceModelRegistry.SaveSelection(new DeviceModelSelection
                 {
-                    Selections = new Dictionary<string, string>(req.Selections, StringComparer.OrdinalIgnoreCase)
+                    Selections = cleaned
                 });
 
                 if (req.ConfirmRestart)
@@ -257,6 +265,45 @@ namespace EssSimulator.Web.Topology
             var summary = new List<PointmapRuntimeEntry>();
             foreach (var type in DeviceModelRegistry.ListTypes())
             {
+                if (string.Equals(type.Id, "lc", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (selection.Selections.TryGetValue(type.Id, out var lcModelId)
+                        && !string.IsNullOrWhiteSpace(lcModelId))
+                    {
+                        var exclusive = type.Models.FirstOrDefault(m =>
+                            string.Equals(m.Id, lcModelId, StringComparison.OrdinalIgnoreCase)
+                            && DeviceModelRegistry.IsExclusiveModel(m));
+                        if (exclusive != null)
+                        {
+                            summary.Add(new PointmapRuntimeEntry
+                            {
+                                TypeId = type.Id,
+                                TypeName = type.Name,
+                                ModelId = exclusive.Id,
+                                ModelName = exclusive.Name,
+                                Source = "selection"
+                            });
+                            continue;
+                        }
+                    }
+
+                    var fragments = type.Models
+                        .Where(m => !DeviceModelRegistry.IsExclusiveModel(m))
+                        .Select(m => Path.GetFileName(m.Directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)))
+                        .Where(n => !string.IsNullOrWhiteSpace(n))
+                        .ToArray();
+                    summary.Add(new PointmapRuntimeEntry
+                    {
+                        TypeId = type.Id,
+                        TypeName = type.Name,
+                        ModelId = null,
+                        ModelName = fragments.Length > 0
+                            ? string.Join(" / ", fragments) + " 按组展开拼装"
+                            : "按组展开拼装",
+                        Source = "compose"
+                    });
+                    continue;
+                }
                 var entry = new PointmapRuntimeEntry
                 {
                     TypeId = type.Id,

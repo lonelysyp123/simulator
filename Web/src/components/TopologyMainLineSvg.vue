@@ -432,8 +432,9 @@ function pcsChannelOf(card) { return runtimeChannelMaps.value.pcsMap.get(card?.n
 function bmsChannelOf(card) { return runtimeChannelMaps.value.bmsMap.get(card?.num) || null }
 /** 储能支路绑定断路器的运行时状态：优先同索引运行时单元，未命中回落组态静态参数 */
 function emuBreakerLive(u) {
-  const live = (props.snap.units || []).find(x => x.unitIndex === u.index)
-    || (props.snap.units || [])[u.index]
+  const idx = u.unitIndex ?? u.index
+  const live = (props.snap.units || []).find(x => x.unitIndex === idx)
+    || (props.snap.units || [])[idx]
   if (live) {
     return {
       closed: !!live.unitBreakerClosed,

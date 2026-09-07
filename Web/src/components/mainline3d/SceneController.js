@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import { createApp, h, reactive } from 'vue'
 import { buildStation3dLayout, stationKey, paramNum } from './project3dLayout.js'
+import { makeGraph, runtimeUnitIndexOfEmu } from '../topology/topologyMainLineLayout.js'
 import { buildStation, setBreakerVisual, setPvArrayVisual } from './buildMeshes.js'
 import { buildEnvironment } from './environment.js'
 import { updateCableState, tickCable } from './powerFlow.js'
@@ -26,6 +27,21 @@ function fmtHz(v) {
 }
 function fmtBreaker(closed, tripped) {
   return tripped ? '跳闸' : closed ? '合' : '分'
+}
+
+/** 断路器遥信：优先按 emuId 对齐运行时单元，避免馈线序号把分闸画成组态默认「合」。 */
+function liveUnitForBreaker(snap, item) {
+  const emuId = item?.emuId || item?.node?.parameters?.emuId
+  let idx = Number.isFinite(item?.unitIndex) ? item.unitIndex : null
+  if (emuId && snap?.topology?.nodes) {
+    const runtime = runtimeUnitIndexOfEmu(
+      makeGraph(snap.topology.nodes, snap.topology.edges),
+      String(emuId)
+    )
+    if (runtime != null) idx = runtime
+  }
+  if (idx == null) return null
+  return (snap.units || []).find(u => u.unitIndex === idx) || (snap.units || [])[idx] || null
 }
 
 /** PCS 实时有功：优先 ActualActivePowerKw（>0 放电，<0 充电） */
@@ -132,10 +148,14 @@ export class SceneController {
     this._setupGround()
 
     this.interaction = createInteraction(this.camera, this.renderer.domElement, this.scene, {
-      onBreakerClick: ({ pickId, unitIndex }) => {
+      onBreakerClick: ({ pickId, unitIndex, layoutItem }) => {
         if (this.viewMode !== 'station') return
         if (pickId === 'main') this.onEvent('toggle-main-breaker')
-        else if (typeof unitIndex === 'number') this.onEvent('toggle-unit-breaker', unitIndex)
+        else {
+          const live = liveUnitForBreaker(this.snap, layoutItem)
+          const idx = live?.unitIndex ?? unitIndex
+          if (typeof idx === 'number') this.onEvent('toggle-unit-breaker', idx)
+        }
       },
       onDeviceClick: (panelKey) => {
         if (this.viewMode !== 'station') return
@@ -885,9 +905,7 @@ export class SceneController {
 
     for (const br of this.refs.tieBreakers || []) {
       const item = br.userData?.layoutItem || {}
-      const live = item.unitIndex != null
-        ? (snap.units || []).find(u => u.unitIndex === item.unitIndex)
-        : null
+      const live = liveUnitForBreaker(snap, item)
       setBreakerVisual(br, live
         ? { closed: !!live.unitBreakerClosed, tripped: !!live.unitBreakerTripped }
         : {
@@ -1037,9 +1055,7 @@ export class SceneController {
           `${item.label || item.node?.label || '断路器'} ${fmtBreaker(snap.mainBreakerClosed, snap.mainBreakerTripped)}`
         ]
       } else if (kind === 'tie-breaker') {
-        const live = a.unitIndex != null
-          ? (snap.units || []).find(u => u.unitIndex === a.unitIndex)
-          : null
+        const live = liveUnitForBreaker(snap, item)
         const closed = live ? !!live.unitBreakerClosed : !!item.node?.parameters?.closed
         const tripped = live ? !!live.unitBreakerTripped : !!item.node?.parameters?.tripped
         lines = [
@@ -1067,7 +1083,8 @@ export class SceneController {
         const u = (snap.units || []).find(x => x.unitIndex === a.unitIndex)
         lines = [item.text?.[0] || `UNIT ${u?.unitNumber ?? (a.unitIndex ?? 0) + 1}`]
       } else if (kind === 'unit-breaker') {
-        const u = (snap.units || []).find(x => x.unitIndex === a.unitIndex)
+        const u = liveUnitForBreaker(snap, item)
+          || (snap.units || []).find(x => x.unitIndex === a.unitIndex)
         // 组态绑定的真实断路器（如中压三相断路器）显示节点名；合成兑底单元回落「单元断」
         const name = item.label || item.node?.label || '单元断'
         const state = u?.unitBreakerLabel || fmtBreaker(u?.unitBreakerClosed, u?.unitBreakerTripped)

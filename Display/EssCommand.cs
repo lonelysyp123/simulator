@@ -79,7 +79,7 @@ namespace EssSimulator.Display
                 "  - setbmsN soc：须堆电流为 0（待机）；0~1 为标幺，>1 且≤100 按百分比",
                 "  - bmsN fault clear：待机时清除充放电方向内部故障（一次性）；再次超限会重新触发，三级故障会自动下电",
                 "  - setpvN：方阵温度/入射角替代按时刻正弦的辐照，A/B 可分别设定",
-                "  - 同一储能单元内 pcs(2n-1)/pcs(2n) 共用 simEmu{n}，关闭任一路会影响该单元两路 PCS"
+                "  - 每台 PCS 对应独立 simEmu{N}（与 pcsN 1:1），关闭链路只影响该路 PCS"
             }.JoinLines();
         }
 
@@ -521,10 +521,7 @@ namespace EssSimulator.Display
                 int.TryParse(target.AsSpan(3), out int pcsIdx) &&
                 pcsIdx >= 1)
             {
-                var layout = GuiSimDataAccess.GetPcsPerUnit();
-                int emuUnit = PcsUnitLayout.UnitIndexOf(layout, pcsIdx - 1) + 1;
-                int pcsPeer = PcsUnitLayout.BaseIndexOfUnit(layout, emuUnit - 1) + 1;
-                serverName = $"simEmu{emuUnit}";
+                serverName = $"simEmu{pcsIdx}";
                 server = store.Get<ModbusSimServer>(serverName);
                 if (server == null)
                 {
@@ -532,7 +529,7 @@ namespace EssSimulator.Display
                     return false;
                 }
 
-                detail = $"（emu 单元 {emuUnit}，影响 pcs{pcsPeer} 与 pcs{pcsPeer + 1}）";
+                detail = $"（pcs{pcsIdx}）";
                 return true;
             }
 
@@ -602,16 +599,24 @@ namespace EssSimulator.Display
             }
 
             int emu = 1;
-            var layout = GuiSimDataAccess.GetPcsPerUnit();
             while (store.Contains($"simEmu{emu}"))
             {
                 var server = store.Get<ModbusSimServer>($"simEmu{emu}");
-                int pcsA = PcsUnitLayout.BaseIndexOfUnit(layout, emu - 1) + 1;
-                int pcsCount = PcsUnitLayout.CountOfUnit(layout, emu - 1);
-                string pcsLabel = pcsCount == 2
-                    ? $"pcs{pcsA}/pcs{pcsA + 1}"
-                    : $"pcs{pcsA}~pcs{pcsA + Math.Max(0, pcsCount - 1)}";
-                list.Add(BuildLinkStatusDto(pcsLabel, $"simEmu{emu}", server!, $"emu 单元 {emu}", $"pcs{pcsA}"));
+                list.Add(BuildLinkStatusDto($"pcs{emu}", $"simEmu{emu}", server!, "", $"pcs{emu}"));
+                var ied = EssSimulator.Protocol.Iec61850.Iec61850LayerManager.Instance.GetSnapshot()
+                    .FirstOrDefault(s => string.Equals(s.ServerName, $"simEmu{emu}", StringComparison.OrdinalIgnoreCase));
+                if (ied != null)
+                {
+                    list.Add(new LinkStatusDto
+                    {
+                        Label = $"pcs{emu}-61850",
+                        ServerName = $"{ied.ServerName}.iec61850",
+                        Target = $"iec61850-pcs{emu}",
+                        Online = ied.Online,
+                        ListenInfo = $"IEC 61850 MMS {ied.IedName} 端口 {ied.Port}",
+                        Extra = $"客户端 {ied.AssociatedClients}"
+                    });
+                }
                 emu++;
             }
 

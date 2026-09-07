@@ -48,7 +48,7 @@ namespace EssSimulator.EssSimModelApi.EnergyManagementSystem
         // 电池系统信息
         public int TotalBatteryCount { get; set; }         // EMU-电池总数
         public int OnlineBatteryCount { get; set; }        // EMU-在线电池数
-        public float AverageBatterySoc { get; set; }       // EMU-电池平均SOC
+        public float AverageBatterySoc { get; set; }       // EMU-电池平均SOC（0–1）
 
         // PCS状态统计
         public int AlarmPcsCount { get; set; }             // EMU-告警PCS台数

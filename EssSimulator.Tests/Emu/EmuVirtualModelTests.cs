@@ -11,7 +11,7 @@ namespace EssSimulator.Tests.Emu;
 /// EMU 虚拟模型：系统级目标 P/Q 按所属 PCS 台数简单均分，
 /// syst6 系统操作与 syst7 黑启动批量写入语义。
 /// </summary>
-public class EmuVirtualModelTests
+public class EmuVirtualModelTests : SimulatorHostTestBase
 {
     private static EnergyManagementData BuildEmu(int pcsCount)
     {

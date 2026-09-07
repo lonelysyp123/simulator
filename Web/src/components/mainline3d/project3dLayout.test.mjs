@@ -620,6 +620,57 @@ describe('sectional bus breaker in 3d', () => {
     const unitZ = byTemplate(layout, 'pcs')[0].z
     assert.ok(brk[0].z < unitZ, 'stays upstream of the pcs row')
   })
+
+  it('binds two-feeder emu section breakers to runtime unit index', () => {
+    const n = (id, templateId, label, x, y, parameters = {}) =>
+      ({ id, templateId, label, x, y, parameters })
+    const snap = {
+      topology: {
+        nodes: [
+          n('grid', 'grid', '电网', 400, 0, { outputVoltage: 35000 }),
+          n('main', 'ac_bus', '35kV主', 400, 40, { nominalVoltage: 35000 }),
+          n('emu1', 'emu', 'EMU-1', 200, 10),
+          n('brk1', 'ac_breaker', '中压断1', 200, 80, { emuId: 'emu1', closed: true }),
+          n('sub1', 'ac_bus', '35kV-1', 200, 120, { nominalVoltage: 35000 }),
+          n('xf1', 'transformer', '变1', 200, 160, { primaryVoltage: 35000, secondaryVoltage: 690 }),
+          n('lv1', 'ac_bus', '690V-1', 200, 200, { nominalVoltage: 690 }),
+          n('pcs1a', 'pcs', 'PCS1A', 100, 240, { emuId: 'emu1' }),
+          n('dc1a', 'dc_bus', 'DC1A', 100, 280, { nominalVoltage: 800 }),
+          n('pcs1b', 'pcs', 'PCS1B', 300, 240, { emuId: 'emu1' }),
+          n('dc1b', 'dc_bus', 'DC1B', 300, 280, { nominalVoltage: 800 }),
+          n('emu2', 'emu', 'EMU-2', 600, 20),
+          n('brk2', 'ac_breaker', '中压断2', 600, 80, { emuId: 'emu2', closed: true }),
+          n('sub2', 'ac_bus', '35kV-2', 600, 120, { nominalVoltage: 35000 }),
+          n('xf2', 'transformer', '变2', 600, 160, { primaryVoltage: 35000, secondaryVoltage: 690 }),
+          n('lv2', 'ac_bus', '690V-2', 600, 200, { nominalVoltage: 690 }),
+          n('pcs2a', 'pcs', 'PCS2A', 500, 240, { emuId: 'emu2' }),
+          n('dc2a', 'dc_bus', 'DC2A', 500, 280, { nominalVoltage: 800 }),
+          n('pcs2b', 'pcs', 'PCS2B', 700, 240, { emuId: 'emu2' }),
+          n('dc2b', 'dc_bus', 'DC2B', 700, 280, { nominalVoltage: 800 })
+        ],
+        edges: [
+          edge('grid', 'main'),
+          edge('main', 'brk1'), edge('brk1', 'sub1'), edge('sub1', 'xf1'), edge('xf1', 'lv1'),
+          edge('lv1', 'pcs1a'), edge('pcs1a', 'dc1a'),
+          edge('lv1', 'pcs1b'), edge('pcs1b', 'dc1b'),
+          edge('emu1', 'lv1'),
+          edge('main', 'brk2'), edge('brk2', 'sub2'), edge('sub2', 'xf2'), edge('xf2', 'lv2'),
+          edge('lv2', 'pcs2a'), edge('pcs2a', 'dc2a'),
+          edge('lv2', 'pcs2b'), edge('pcs2b', 'dc2b'),
+          edge('emu2', 'lv2')
+        ]
+      },
+      units: [
+        { unitIndex: 0, unitNumber: 1, unitBreakerClosed: true, channels: [{ pcsNumber: 1 }, { pcsNumber: 2 }] },
+        { unitIndex: 1, unitNumber: 2, unitBreakerClosed: false, channels: [{ pcsNumber: 3 }, { pcsNumber: 4 }] }
+      ]
+    }
+    const layout = buildStation3dLayout(snap)
+    const brk2 = layout.items.find(i => i.node?.id === 'brk2')
+    assert.ok(brk2, 'emu2 section breaker drawn')
+    assert.equal(brk2.kind, 'tie-breaker')
+    assert.equal(brk2.unitIndex, 1, 'live telemetry keys off runtime unit 2')
+  })
 })
 
 describe('edge-derived cable redraw', () => {

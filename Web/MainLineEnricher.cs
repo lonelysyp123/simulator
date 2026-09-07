@@ -212,9 +212,9 @@ namespace EssSimulator.Web
                 ActualReactivePowerKvar = pcs?.ReactivePowerKw
                     ?? GuiSimDataAccess.SafeGetDouble(
                         $"ess._pcsList[{channelIndex0}]._currentState.ReactivePower"),
-                EmuUnitNumber = unitIndex0 + 1,
-                ActivePowerYtPoint = slotInUnit0 == 0 ? "yt0" : "yt4",
-                ReactivePowerYtPoint = slotInUnit0 == 0 ? "yt1" : "yt5"
+                EmuUnitNumber = channelIndex0 + 1,
+                ActivePowerYtPoint = "yt0",
+                ReactivePowerYtPoint = "yt1"
             };
         }
 
@@ -392,6 +392,7 @@ namespace EssSimulator.Web
         /// <summary>PCS 实时有功 kW：&gt;0 放电，&lt;0 充电。</summary>
         public double ActualActivePowerKw { get; set; }
         public double ActualReactivePowerKvar { get; set; }
+        /// <summary>对应 simEmu 编号（与全局 PCS 编号 1:1）。</summary>
         public int EmuUnitNumber { get; set; }
         public string ActivePowerYtPoint { get; set; } = "yt0";
         public string ReactivePowerYtPoint { get; set; } = "yt1";

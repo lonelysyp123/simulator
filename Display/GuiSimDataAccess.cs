@@ -1,4 +1,5 @@
 using EssSimulator.Core;
+using EssSimulator.EssDeviceSimModel;
 using log4net;
 
 namespace EssSimulator.Display
@@ -146,13 +147,14 @@ namespace EssSimulator.Display
             }
         }
 
-        /// <summary>读取 EMU Modbus 控制线圈当前值（如 pcs1_startstop），失败时回退仿真 DTO。</summary>
+        /// <summary>读取 EMU Modbus 控制线圈当前值（如 yk3 启停），失败时回退仿真 DTO。</summary>
         public static bool GetEmuPcsStartStopCoil(int unitIndex0, int pcsSlotInUnit0)
         {
-            string paramName = pcsSlotInUnit0 == 0 ? "yx3" : "yx5";
+            const string paramName = "yk3";
+            int global0 = ResolveGlobalPcsIndex(unitIndex0, pcsSlotInUnit0);
             try
             {
-                var server = SimulatorHost.Instance.Get<IModbusRegisterServer>($"simEmu{unitIndex0 + 1}");
+                var server = SimulatorHost.Instance.Get<IModbusRegisterServer>($"simEmu{global0 + 1}");
                 if (server != null)
                 {
                     var raw = server.GetDataObjectByMesurePointName(paramName);
@@ -167,10 +169,18 @@ namespace EssSimulator.Display
             }
             catch (Exception ex)
             {
-                Log.Debug($"GetEmuPcsStartStopCoil 读 Modbus 失败: simEmu{unitIndex0 + 1}.{paramName}", ex);
+                Log.Debug($"GetEmuPcsStartStopCoil 读 Modbus 失败: simEmu{global0 + 1}.{paramName}", ex);
             }
 
             return SafeGetBool($"emu{unitIndex0 + 1}.PcsList[{pcsSlotInUnit0}].pcsOnOffSwitch");
+        }
+
+        private static int ResolveGlobalPcsIndex(int unitIndex0, int pcsSlotInUnit0)
+        {
+            var layout = GetPcsPerUnit();
+            if (layout.Count > 0)
+                return PcsUnitLayout.BaseIndexOfUnit(layout, unitIndex0) + pcsSlotInUnit0;
+            return unitIndex0 * 2 + pcsSlotInUnit0;
         }
     }
 }

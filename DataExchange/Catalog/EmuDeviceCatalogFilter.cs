@@ -101,7 +101,7 @@ namespace EssSimulator.DataExchange.Catalog
 
         /// <summary>
         /// 分组路径门控：Groups[g] 索引须有效；组内 PcsList[i] 要求 i 小于组内 PCS 台数；
-        /// Groups[g].Meters[k] 要求 k 小于该组绑定电表台数；Groups[g].Breaker 要求该组绑定断路器；
+        /// 无 Groups 时视为隐式组 0（整单元 PCS）。Groups[g].Meters[k] / Breaker 按组绑定校验；
         /// 其余组聚合遥测恒允许。
         /// </summary>
         private static bool AllowsGroupPath(EssUnitConfig unit, string path)
@@ -109,11 +109,17 @@ namespace EssSimulator.DataExchange.Catalog
             int close = path.IndexOf(']', 7);
             if (close <= 7 ||
                 !int.TryParse(path[7..close], out int groupIndex) ||
-                groupIndex < 0 || groupIndex >= unit.Groups.Count)
+                groupIndex < 0)
+                return false;
+
+            string rest = path[(close + 1)..];
+            if (!unit.HasGroups)
+                return groupIndex == 0 && AllowsImplicitGroupRest(unit, rest);
+
+            if (groupIndex >= unit.Groups.Count)
                 return false;
 
             var group = unit.Groups[groupIndex];
-            string rest = path[(close + 1)..];
 
             if (rest.StartsWith(".PcsList[", StringComparison.OrdinalIgnoreCase))
             {
@@ -137,6 +143,26 @@ namespace EssSimulator.DataExchange.Catalog
             }
 
             // 组聚合遥测（TotalActivePower 等）：索引有效即允许
+            return rest.Length == 0 || rest.StartsWith(".", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>扁平机组：Groups[0] 对应整单元 PcsCount；无组断路器/组电表。</summary>
+        private static bool AllowsImplicitGroupRest(EssUnitConfig unit, string rest)
+        {
+            if (rest.StartsWith(".PcsList[", StringComparison.OrdinalIgnoreCase))
+            {
+                int indexOpen = rest.IndexOf('[', 8);
+                int indexClose = indexOpen > 0 ? rest.IndexOf(']', indexOpen + 1) : -1;
+                return indexClose > indexOpen
+                    && int.TryParse(rest[(indexOpen + 1)..indexClose], out int pcsIndex)
+                    && pcsIndex >= 0 && pcsIndex < unit.PcsCount;
+            }
+
+            if (rest.Equals(".Breaker", StringComparison.OrdinalIgnoreCase) ||
+                rest.StartsWith(".Breaker.", StringComparison.OrdinalIgnoreCase) ||
+                rest.StartsWith(".Meters[", StringComparison.OrdinalIgnoreCase))
+                return false;
+
             return rest.Length == 0 || rest.StartsWith(".", StringComparison.OrdinalIgnoreCase);
         }
 

@@ -1,4 +1,3 @@
-using System.Linq;
 using EssSimulator.Configuration;
 using EssSimulator.DataExchange;
 using EssSimulator.DataExchange.Catalog;
@@ -9,8 +8,8 @@ using log4net;
 namespace EssSimulator.LocalControl
 {
     /// <summary>
-    /// LocalControl 专用 Modbus TCP 从站：默认只维护 lc.csv 寄存器镜像（纯转发场景）；
-    /// 点表含模型绑定时（如 trina 系统级点表）自动升级为 <see cref="DataExchangeSession"/> 驱动。
+    /// LocalControl 专用 Modbus TCP 从站。
+    /// 默认拼装 LC 片段、由协议桥与 simEmu 抄数/回写；选中互斥 EMU 点表时走 DataExchange。
     /// 传输层由 <see cref="ModbusPortHub"/> 统一提供，可与其它设备共享端口/从站号。
     /// </summary>
     public sealed class LocalControlModbusServer : IModbusRegisterServer, IProtocolLayerServer
@@ -21,19 +20,34 @@ namespace EssSimulator.LocalControl
         private readonly DeviceInfoDto _deviceInfo;
         private readonly ModbusPointMap _pointMap;
         private readonly IModbusSyncBackend _backend;
+        private readonly int _unitIndex0;
 
         /// <summary>
-        /// 构造 LC 从站。<paramref name="firstEmuId"/> 为聚合组首机组号（非空时把点表中的
-        /// emuDeviceId 占位符替换为该机组根路径，LC 控制点作用于首机组 EMU 虚拟模型）。
+        /// 构造 LC 从站。未选互斥型号时按本单元组数拼装片段，遥测/控制由协议桥抄 simEmu；
+        /// 选中 EMU 直控点表时按原 ModelSim 绑定走 DataExchange。
+        /// <paramref name="firstEmuId"/> 为对应储能单元号（emuDeviceId 占位符替换）。
         /// </summary>
         public LocalControlModbusServer(
-            string mapFilePath,
+            int lcGroupCount,
             int modbusPort,
             string serverName,
             int? firstEmuId = null,
-            IReadOnlyList<EssUnitConfig>? essUnits = null)
+            IReadOnlyList<EssUnitConfig>? essUnits = null,
+            DataExchangeOptions? dataExchangeOptions = null,
+            string? selectionRoot = null)
         {
-            _pointMap = new ModbusPointMap(mapFilePath, serverName, clusterCount: 0, emuDeviceIdOverride: firstEmuId);
+            var unit = ResolveEssUnit(essUnits, firstEmuId);
+            int unitPcs = unit == null ? 0 : unit.PcsCount;
+            bool exclusive = DeviceModelRegistry.TryGetExclusiveLcCsv(out _, selectionRoot)
+                && LcLayout.ShouldUseExclusiveEmuMap(unitPcs);
+            _pointMap = ModbusPointMap.ForLocalControl(
+                serverName, lcGroupCount, firstEmuId, selectionRoot: selectionRoot, essUnits: essUnits);
+            if (!exclusive)
+                LcSystemMap.ApplyStartupDefaults(_pointMap.DefaultBuffer);
+            LcGroupCount = Math.Max(1, lcGroupCount);
+            EssUnits = essUnits;
+            EssUnit = unit;
+            _unitIndex0 = firstEmuId is int id && id >= 1 ? id - 1 : 0;
             _deviceInfo = new DeviceInfoDto
             {
                 ip = "0.0.0.0",
@@ -47,36 +61,42 @@ namespace EssSimulator.LocalControl
             _slave = new ModbusTCPSlave(_deviceInfo, _pointMap.RawMaps, rackCount: 0);
             _parser = new ModbusParser(_pointMap.RawMaps);
 
-            if (RequiresDataExchange(_pointMap))
+            if (exclusive)
             {
                 UsesDataExchange = true;
-                var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName, essUnits: essUnits);
-                _backend = new DataExchangeSession(
-                    _slave, _parser, catalog, _deviceInfo, new DataExchangeOptions(), clusterCount: 0);
-                var emuHint = firstEmuId is int id ? $"（首机组 emu{id}）" : string.Empty;
-                _log.Info($"{serverName} 点表含模型绑定，启用 DataExchange 管道{emuHint}");
+                var options = dataExchangeOptions ?? new DataExchangeOptions();
+                var catalog = PointCatalogLoader.FromPointMap(_pointMap, serverName, options, essUnits);
+                _backend = new DataExchangeSession(_slave, _parser, catalog, _deviceInfo, options, clusterCount: 0);
             }
             else
             {
+                UsesDataExchange = false;
                 _backend = new RegisterOnlyBackend(_slave, _parser, _pointMap);
             }
         }
 
+        /// <summary>本从站对应储能单元的组数（扁平机组为 1）。</summary>
+        public int LcGroupCount { get; }
+
+        /// <summary>本从站对应的储能单元配置；无 Devices 回退时为 null。</summary>
+        public EssUnitConfig? EssUnit { get; }
+
+        /// <summary>全部储能单元构成，供按 PCS 解析 simEmu 名。</summary>
+        public IReadOnlyList<EssUnitConfig>? EssUnits { get; }
+
+        /// <summary>本单元内扁平 PCS 下标对应的协议从站名（与 pcs 全局编号 1:1）。</summary>
+        public string EmuServerNameForPcs(int flatPcsIndex) =>
+            EmuProtocolLayout.ServerNameFor(EssUnits, _unitIndex0, flatPcsIndex);
+
         /// <summary>点表含模型绑定、由 DataExchange 管道驱动（桥接引擎应跳过此类设备）。</summary>
         public bool UsesDataExchange { get; }
 
-        /// <summary>点表存在遥测模型绑定或控制模型绑定时需要 DataExchange 驱动。</summary>
-        private static bool RequiresDataExchange(ModbusPointMap pointMap) =>
-            pointMap.DataMaps.Any(m =>
-            {
-                var model = ModbusSimServer.GetModelParam(m.ModelSim);
-                return model != null && !string.IsNullOrWhiteSpace(model.ModelType);
-            })
-            || pointMap.ControlMaps.Any(m =>
-            {
-                var model = ModbusSimServer.GetModelParam(m.ModelSim);
-                return model != null && !string.IsNullOrWhiteSpace(model.Arg1);
-            });
+        private static EssUnitConfig? ResolveEssUnit(IReadOnlyList<EssUnitConfig>? essUnits, int? firstEmuId)
+        {
+            if (essUnits == null || firstEmuId is not int id || id < 1 || id > essUnits.Count)
+                return null;
+            return essUnits[id - 1];
+        }
 
         public string ServerName => _deviceInfo.name ?? string.Empty;
 

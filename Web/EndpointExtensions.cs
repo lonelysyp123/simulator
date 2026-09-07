@@ -2,7 +2,10 @@ using EssSimulator.Configuration;
 using EssSimulator.Core;
 using EssSimulator.Display;
 using EssSimulator.EssSimModelApi.Mappers;
+using EssSimulator.LocalControl;
 using EssSimulator.Web.DroopSlices;
+using EssSimulator.Web.EmsStrategy;
+using EssSimulator.Web.ThirdPartyEms;
 using EssSimulator.Web.Topology;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -155,6 +158,7 @@ namespace EssSimulator.Web
                             .Select(d => new { name = d.Name, port = d.Port, slaveId = d.SlaveId }).ToArray(),
                         emu = snapshot.Where(d => d.Type == EssSimulator.Protocol.Modbus.ProtocolDeviceType.Emu)
                             .Select(d => new { name = d.Name, port = d.Port, slaveId = d.SlaveId }).ToArray(),
+                        iec61850 = EssSimulator.Protocol.Iec61850.Iec61850LayerManager.Instance.GetSnapshot(),
                         lc = snapshot.Where(d => d.Type == EssSimulator.Protocol.Modbus.ProtocolDeviceType.Lc)
                             .Select(d => new { name = d.Name, port = d.Port, slaveId = d.SlaveId }).ToArray(),
                         pv = snapshot.Where(d => d.Type is EssSimulator.Protocol.Modbus.ProtocolDeviceType.PvLogger
@@ -170,8 +174,12 @@ namespace EssSimulator.Web
                     bms = Enumerable.Range(0, c.UnitCount)
                         .Select(i => new { name = $"simBms{i + 1}", port = c.Protocol.BaseBmsModbusPort + i * c.Protocol.BmsPortStep })
                         .ToArray(),
-                    emu = Enumerable.Range(0, c.EffectiveEssUnitCount)
-                        .Select(i => new { name = $"simEmu{i + 1}", port = c.Protocol.BaseEmuModbusPort + i * c.Protocol.EmuPortStep })
+                    emu = EmuProtocolLayout.Enumerate(c)
+                        .Select((ep, i) => new
+                        {
+                            name = ep.ServerName,
+                            port = c.Protocol.BaseEmuModbusPort + i * c.Protocol.EmuPortStep
+                        })
                         .ToArray(),
                     pv = Enumerable.Range(0, c.PvUnitCount)
                         .Select(i => new
@@ -280,9 +288,23 @@ namespace EssSimulator.Web
                 return Results.Ok(exec.Execute(req.Input));
             });
 
-            // 链路控制：POST /api/link/{target}/{state}  （target: em|bms1|pcs1  state: on|off）
+            // 链路控制：POST /api/link/{target}/{state}  （target: em|bms1|pcs1|iec61850-pcs1  state: on|off）
             app.MapPost("/api/link/{target}/{state}", (string target, string state) =>
             {
+                if (Iec61850Endpoints.ResolveEmuName(target) != null
+                    && (target.Contains("iec61850", StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (!EssCommand.TryParseLinkState(state, out var iecEnable, out var iecMsg))
+                        return Results.BadRequest(CommandResult.Fail(iecMsg));
+                    string emuName = Iec61850Endpoints.ResolveEmuName(target)!;
+                    bool iecOk = EssSimulator.Protocol.Iec61850.Iec61850LayerManager.Instance.TrySetOnline(emuName, iecEnable);
+                    if (!iecOk)
+                        return Results.Ok(CommandResult.Fail($"找不到 {emuName} 的 IEC 61850 IED"));
+                    return Results.Ok(CommandResult.Ok(iecEnable
+                        ? $"{emuName} IEC 61850 已上线"
+                        : $"{emuName} IEC 61850 已离线"));
+                }
+
                 if (!EssCommand.TryParseLinkState(state, out var enable, out var msg))
                     return Results.BadRequest(CommandResult.Fail(msg));
                 if (!EssCommand.TryResolveProtocolServer(target, out var server, out var name, out var detail))
@@ -349,6 +371,10 @@ namespace EssSimulator.Web
             app.MapSystemConfigEndpoints();
             // 协议端口：设备端口/从站号配置、热重建
             app.MapProtocolPortEndpoints();
+            app.MapIec61850Endpoints();
+            // 第三方 EMS：直连数据模型
+            app.MapThirdPartyEmsEndpoints();
+            app.MapEmsStrategyEndpoints();
 
             return app;
         }

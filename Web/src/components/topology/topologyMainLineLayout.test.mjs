@@ -382,10 +382,66 @@ describe('buildTopologyMainLineLayout sectional bus breaker', () => {
     assert.equal(tb.id, 'sec')
     assert.equal(tb.emuId, 'emu1', 'emu binding surfaced for live telemetry')
     const u = layout.units.find(x => x.kind === 'emu')
-    assert.equal(tb.unitIndex, u.index, 'tie breaker points at its owning unit')
+    assert.equal(tb.unitIndex, u.unitIndex ?? u.index, 'tie breaker points at its owning unit')
     // 遥信绑定保留，但单元内不再重复绘制、引线段也不因此加高
     assert.equal(u.unitBreakerNode?.id, 'sec')
     assert.equal(u.unitBreakerOnBus, true)
     assert.equal(u.pcsTop, 18, 'unit card is not shifted down by a breaker it does not draw')
+  })
+
+  it('binds section breakers to runtime unit index, not feeder placement order', () => {
+    // 每单元两组独立直流母线 = 两条馈线。馈线按画布 X 排列后 emu2 的第一路是第 3 条（index 2），
+    // 运行时单元号按 EMU 节点 (Y,X) 排序：emu1=0、emu2=1。画面必须绑 1，否则遥信对不上、回退组态「合」。
+    const n = (id, templateId, label, x, y, parameters = {}) =>
+      ({ id, templateId, label, x, y, parameters })
+    const topology = {
+      nodes: [
+        n('grid', 'grid', '电网', 400, 0, { outputVoltage: 35000 }),
+        n('main', 'ac_bus', '35kV主', 400, 40, { nominalVoltage: 35000 }),
+        n('emu1', 'emu', 'EMU-1', 200, 10),
+        n('brk1', 'ac_breaker', '中压断1', 200, 80, { emuId: 'emu1', closed: true }),
+        n('sub1', 'ac_bus', '35kV-1', 200, 120, { nominalVoltage: 35000 }),
+        n('xf1', 'transformer', '变1', 200, 160, { primaryVoltage: 35000, secondaryVoltage: 690 }),
+        n('lv1', 'ac_bus', '690V-1', 200, 200, { nominalVoltage: 690 }),
+        n('pcs1a', 'pcs', 'PCS1A', 100, 240, { emuId: 'emu1' }),
+        n('dc1a', 'dc_bus', 'DC1A', 100, 280, { nominalVoltage: 800 }),
+        n('pcs1b', 'pcs', 'PCS1B', 300, 240, { emuId: 'emu1' }),
+        n('dc1b', 'dc_bus', 'DC1B', 300, 280, { nominalVoltage: 800 }),
+        n('emu2', 'emu', 'EMU-2', 600, 20),
+        n('brk2', 'ac_breaker', '中压断2', 600, 80, { emuId: 'emu2', closed: true }),
+        n('sub2', 'ac_bus', '35kV-2', 600, 120, { nominalVoltage: 35000 }),
+        n('xf2', 'transformer', '变2', 600, 160, { primaryVoltage: 35000, secondaryVoltage: 690 }),
+        n('lv2', 'ac_bus', '690V-2', 600, 200, { nominalVoltage: 690 }),
+        n('pcs2a', 'pcs', 'PCS2A', 500, 240, { emuId: 'emu2' }),
+        n('dc2a', 'dc_bus', 'DC2A', 500, 280, { nominalVoltage: 800 }),
+        n('pcs2b', 'pcs', 'PCS2B', 700, 240, { emuId: 'emu2' }),
+        n('dc2b', 'dc_bus', 'DC2B', 700, 280, { nominalVoltage: 800 })
+      ],
+      edges: [
+        edge('grid', 'main'),
+        edge('main', 'brk1'), edge('brk1', 'sub1'), edge('sub1', 'xf1'), edge('xf1', 'lv1'),
+        edge('lv1', 'pcs1a'), edge('pcs1a', 'dc1a'),
+        edge('lv1', 'pcs1b'), edge('pcs1b', 'dc1b'),
+        edge('emu1', 'lv1'),
+        edge('main', 'brk2'), edge('brk2', 'sub2'), edge('sub2', 'xf2'), edge('xf2', 'lv2'),
+        edge('lv2', 'pcs2a'), edge('pcs2a', 'dc2a'),
+        edge('lv2', 'pcs2b'), edge('pcs2b', 'dc2b'),
+        edge('emu2', 'lv2')
+      ]
+    }
+
+    const layout = buildTopologyMainLineLayout(topology)
+    assert.equal(layout.units.filter(u => u.kind === 'emu').length, 4, 'two feeders per emu')
+    assert.ok(layout.units.filter(u => u.emu?.id === 'emu2').every(u => u.index >= 2),
+      'emu2 feeders are later in canvas order')
+
+    const brk2 = layout.tieBreakers.find(b => b.id === 'brk2')
+    assert.ok(brk2, 'emu2 section breaker present')
+    assert.equal(brk2.unitIndex, 1, 'runtime unit 2, not feeder index 2')
+    assert.ok(layout.units.filter(u => u.emu?.id === 'emu2').every(u => u.unitIndex === 1),
+      'every emu2 feeder shares runtime unitIndex 1')
+
+    const brk1 = layout.tieBreakers.find(b => b.id === 'brk1')
+    assert.equal(brk1?.unitIndex, 0)
   })
 })

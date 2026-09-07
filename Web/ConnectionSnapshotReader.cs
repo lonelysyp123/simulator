@@ -12,6 +12,7 @@ namespace EssSimulator.Web
         public List<ServerListenDto> Servers { get; set; } = new();
         public List<ClientConnectDto> Clients { get; set; } = new();
         public List<LinkStatusDto> LinkStatus { get; set; } = new();
+        public List<Iec61850ListenDto> Iec61850Servers { get; set; } = new();
     }
 
     public sealed class NetworkInterfaceDto
@@ -30,6 +31,16 @@ namespace EssSimulator.Web
     {
         public string Client { get; set; } = "";
         public string State { get; set; } = "";
+    }
+
+    public sealed class Iec61850ListenDto
+    {
+        public string Server { get; set; } = "";
+        public string IedName { get; set; } = "";
+        public int Port { get; set; }
+        public bool Online { get; set; }
+        public int AssociatedClients { get; set; }
+        public string ListenInfo { get; set; } = "";
     }
 
     public static class ConnectionSnapshotReader
@@ -78,12 +89,27 @@ namespace EssSimulator.Web
             }
 
             dto.LinkStatus = EssCommand.BuildAllLinkStatus();
+            foreach (var ied in EssSimulator.Protocol.Iec61850.Iec61850LayerManager.Instance.GetSnapshot())
+            {
+                dto.Iec61850Servers.Add(new Iec61850ListenDto
+                {
+                    Server = ied.ServerName,
+                    IedName = ied.IedName,
+                    Port = ied.Port,
+                    Online = ied.Online,
+                    AssociatedClients = ied.AssociatedClients,
+                    ListenInfo = ied.GoosePublishing
+                        ? $"IEC 61850 MMS {ied.IedName} :{ied.Port} GOOSE 客户端 {ied.AssociatedClients}"
+                        : $"IEC 61850 MMS {ied.IedName} :{ied.Port} 客户端 {ied.AssociatedClients}"
+                });
+            }
             return dto;
         }
 
         private static (int, int) ServerSortKey(string name)
         {
             if (name.StartsWith("simBms")) return (0, ExtractTrailingNumber(name));
+            if (name.StartsWith("simEmu") && name.EndsWith(".iec61850")) return (1, ExtractTrailingNumber(name.Replace(".iec61850", "")));
             if (name.StartsWith("simEmu")) return (1, ExtractTrailingNumber(name));
             if (name == "simEm") return (2, 0);
             if (name.StartsWith("simLc")) return (3, ExtractTrailingNumber(name));

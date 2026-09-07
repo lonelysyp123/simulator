@@ -108,7 +108,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 _network.SystemFrequencyHz);
 
             SetAcInput(_network.MainBreaker.Primary, gridVoltage, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
-            SetAcInput(_network.MainBreaker.Secondary, secCurrent, ThreePhaseConnection.Star, context);
+            SetAcInput(_network.MainBreaker.Secondary, _network.MainBreaker.ReferToRated(secCurrent), ThreePhaseConnection.Star, context);
             _network.MainBreaker.Step(context, step);
 
             double downstreamV = _network.MainBreaker.SwitchState.IsClosed
@@ -178,7 +178,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                     _network.SystemFrequencyHz);
 
                 SetAcInput(unitBreaker.Primary, bus35V, ThreePhaseConnection.Star, context, _network.SystemFrequencyHz);
-                SetAcInput(unitBreaker.Secondary, unitCurrent, ThreePhaseConnection.Star, context);
+                SetAcInput(unitBreaker.Secondary, unitBreaker.ReferToRated(unitCurrent), ThreePhaseConnection.Star, context);
                 unitBreaker.Step(context, step);
 
                 double primaryV = unitClosed ? bus35V : 0;

@@ -99,20 +99,30 @@ namespace EssSimulator.Protocol.Modbus
             return CoerceNumeric(d, clrType, roundInteger: true);
         }
 
-        private static object CoerceNumeric(double d, string clrType, bool roundInteger) =>
-            clrType switch
+        private static object CoerceNumeric(double d, string clrType, bool roundInteger)
+        {
+            if (roundInteger && clrType is not ("System.Single" or "System.Double" or "System.Boolean"))
             {
-                "System.Int16" => Convert.ToInt16(roundInteger ? Math.Round(d) : d),
-                "System.UInt16" => Convert.ToUInt16(roundInteger ? Math.Round(d) : d),
-                "System.Int32" => Convert.ToInt32(roundInteger ? Math.Round(d) : d),
-                "System.UInt32" => Convert.ToUInt32(roundInteger ? Math.Round(d) : d),
-                "System.Int64" => Convert.ToInt64(roundInteger ? Math.Round(d) : d),
-                "System.UInt64" => Convert.ToUInt64(roundInteger ? Math.Round(d) : d),
+                if (double.IsNaN(d) || double.IsInfinity(d))
+                    d = 0;
+                else
+                    d = Math.Round(d);
+            }
+
+            return clrType switch
+            {
+                "System.Int16" => Convert.ToInt16(Math.Clamp(d, short.MinValue, short.MaxValue)),
+                "System.UInt16" => Convert.ToUInt16(Math.Clamp(d, ushort.MinValue, ushort.MaxValue)),
+                "System.Int32" => Convert.ToInt32(Math.Clamp(d, int.MinValue, int.MaxValue)),
+                "System.UInt32" => Convert.ToUInt32(Math.Clamp(d, uint.MinValue, uint.MaxValue)),
+                "System.Int64" => Convert.ToInt64(Math.Clamp(d, long.MinValue, long.MaxValue)),
+                "System.UInt64" => Convert.ToUInt64(Math.Clamp(d, ulong.MinValue, (double)ulong.MaxValue)),
                 "System.Single" => Convert.ToSingle(d),
                 "System.Double" => d,
                 "System.Boolean" => d != 0,
                 _ => d
             };
+        }
 
         private static bool ToBoolean(object value) =>
             value switch

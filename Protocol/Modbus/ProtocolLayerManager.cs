@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using EssSimulator.Configuration;
+using EssSimulator.Protocol.Iec61850;
 using log4net;
 
 namespace EssSimulator.Protocol.Modbus
@@ -297,6 +298,20 @@ namespace EssSimulator.Protocol.Modbus
             }
 
             reg.Server.Reconfigure(entry.Port, entry.SlaveId);
+
+            if (reg.Type == ProtocolDeviceType.Emu
+                && !ProtocolBindings.Load().Allows(reg.Server.ServerName, Iec61850Protocols.Modbus)
+                && reg.Server is ModbusSimServer emu)
+            {
+                reg.Started = emu.StartDataPathOnly();
+                if (!reg.Started)
+                    reg.Errors.Add("内部点影子启动失败，详见日志");
+                UpdateListenInfo(reg, entry, started: false);
+                if (reg.Started)
+                    SimServer.serverListenInfo[reg.Server.ServerName] = "内部寄存器（未监听 Modbus TCP）";
+                return;
+            }
+
             reg.Started = reg.Server.Start();
             if (!reg.Started)
                 reg.Errors.Add("Modbus 监听启动失败（端口可能被占用），详见日志");
@@ -330,7 +345,9 @@ namespace EssSimulator.Protocol.Modbus
             {
                 try
                 {
-                    loaded[entry.Name] = new ModbusPointMap(entry.PointMapFile, entry.Name, entry.RackCount);
+                    loaded[entry.Name] = entry.Type == ProtocolDeviceType.Lc
+                        ? ModbusPointMap.ForLocalControl(entry.Name, entry.LcGroupCount)
+                        : new ModbusPointMap(entry.PointMapFile, entry.Name, entry.RackCount);
                 }
                 catch (Exception ex)
                 {

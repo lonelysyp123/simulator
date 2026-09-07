@@ -24,6 +24,25 @@ function paramStr(node, key, fallback = '') {
   return String(v)
 }
 
+/**
+ * 运行时单元号：与 TopologyRuntimeConverter 一致，含 PCS 的 EMU 按画布 (Y,X) 排序。
+ * 馈线排布序号（placement index）会因每单元多组直流母线而错位，不能用来对遥信。
+ */
+export function runtimeUnitIndexOfEmu(graph, emuId) {
+  if (!emuId || !graph?.nodes) return null
+  const emus = graph.nodes
+    .filter(n => n.templateId === 'emu')
+    .sort((a, b) => (a.y - b.y) || (a.x - b.x) || String(a.id).localeCompare(String(b.id)))
+  let runtime = 0
+  for (const e of emus) {
+    const hasPcs = graph.nodes.some(n => n.templateId === 'pcs' && paramStr(n, 'emuId') === e.id)
+    if (!hasPcs) continue
+    if (e.id === emuId) return runtime
+    runtime++
+  }
+  return null
+}
+
 function splitCount(n) {
   const total = Math.max(0, Math.round(Number(n) || 0))
   const a = Math.ceil(total / 2)
@@ -316,6 +335,7 @@ function expandFeederUnit(opts) {
     // 同 emu 多支路时按序逐个认领，2D 母线挂件不重复绘制
     const emuId = paramStr(pcsNodes[0], 'emuId')
     const emu = emuId ? graph.byId.get(emuId) || null : null
+    const unitIndex = runtimeUnitIndexOfEmu(graph, emuId) ?? index
     const pickBound = tpl => {
       if (!emuId) return null
       const claimed = boundClaim || new Set()
@@ -425,7 +445,7 @@ function expandFeederUnit(opts) {
 
     return {
       unit: {
-        index, kind, cx, originY, xfmrId,
+        index, unitIndex, kind, cx, originY, xfmrId,
         busCx: busCx ?? cx,
         emu,
         pcsNodes,
@@ -945,7 +965,7 @@ export function buildTopologyMainLineLayout(topology) {
   for (const tb of scene.tieBreakers) {
     if (!tb.emuId) continue
     const owner = unitLayouts.find(u => u.emu?.id === tb.emuId)
-    if (owner) tb.unitIndex = owner.index
+    if (owner) tb.unitIndex = owner.unitIndex ?? owner.index
   }
 
   const yUnitTop = unitLayouts[0]?.originY ?? yRoot

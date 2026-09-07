@@ -80,6 +80,28 @@ public class ModbusFloatCodecTests
         Assert.Equal(value, Convert.ToInt32(Convert.ToDouble(decoded)));
     }
 
+    [Fact]
+    public void Encode_int16_saturates_instead_of_throwing()
+    {
+        var entry = new MapEntry
+        {
+            FunctionCode = 4,
+            Address = 16,
+            Type = "int16",
+            Size = 16,
+            ParamName = "unit_param16",
+            Scale = 1
+        };
+
+        var encoded = ModbusPointCodec.Encode(50_000, entry, applyScale: true);
+        var decoded = ModbusPointCodec.Decode(encoded, entry);
+        Assert.Equal(short.MaxValue, Convert.ToInt32(Convert.ToDouble(decoded)));
+
+        encoded = ModbusPointCodec.Encode(-40_000, entry, applyScale: true);
+        decoded = ModbusPointCodec.Decode(encoded, entry);
+        Assert.Equal(short.MinValue, Convert.ToInt32(Convert.ToDouble(decoded)));
+    }
+
     private static MapEntry FloatPoint(string name) => new()
     {
         FunctionCode = 4,

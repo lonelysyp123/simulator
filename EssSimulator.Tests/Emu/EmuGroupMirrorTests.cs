@@ -77,7 +77,9 @@ public class EmuGroupMirrorTests
         var emu = PcsDataServer.BuildEmuMirror(unit, new PcsPhysicalConfig());
 
         Assert.Equal(2, emu.PcsList.Count);
-        Assert.Empty(emu.Groups);
+        Assert.Single(emu.Groups);
+        Assert.Same(emu.PcsList[0], emu.Groups[0].PcsList[0]);
+        Assert.Same(emu.PcsList[1], emu.Groups[0].PcsList[1]);
         Assert.Single(emu.Transformers);
     }
 

@@ -78,6 +78,12 @@ public class MainLineEnricherTests : SimulatorHostTestBase
         var unit = Assert.Single(vm.Units);
         Assert.Equal(4, unit.Channels.Count);
         Assert.Equal(new[] { 1, 2, 3, 4 }, unit.Channels.Select(c => c.PcsNumber).ToArray());
+        Assert.Equal(new[] { 1, 2, 3, 4 }, unit.Channels.Select(c => c.EmuUnitNumber).ToArray());
+        Assert.All(unit.Channels, c =>
+        {
+            Assert.Equal("yt0", c.ActivePowerYtPoint);
+            Assert.Equal("yt1", c.ReactivePowerYtPoint);
+        });
         Assert.Equal(new[] { 0, 1, 2, 3 }, unit.Channels.Select(c => c.SlotInUnit).ToArray());
         Assert.Equal(4, unit.PcsChannels.Count);
     }

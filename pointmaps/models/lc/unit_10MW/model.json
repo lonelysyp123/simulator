@@ -1,0 +1,6 @@
+{
+  "id": "unit",
+  "name": "中压系统-pcs unit部分（10MW）",
+  "description": "LC 片段：单组直流通道有功/无功遥测，按组序号 n 展开；仅适用于组内不超过 4 台 PCS。",
+  "maxPcsPerGroup": 4
+}

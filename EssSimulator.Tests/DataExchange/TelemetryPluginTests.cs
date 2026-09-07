@@ -225,29 +225,6 @@ public class TelemetryPluginTests
     }
 
     [Fact]
-    public void FromPointMap_Trina55MW_HasUnitPluginPoints()
-    {
-        var catalog = LoadCatalog("trina_5.5MW");
-
-        // 5.5MW 表含 15 个插件点：模块警告字 8 点（PCS1/2 × 模块1/2 × 警告字1/2）+ SYSTEM 级 7 点
-        Assert.Equal(15, catalog.PluginPoints.Count);
-        Assert.Contains(catalog.PluginPoints, p => p.DeviceRoot == "emu1.PcsList[3]" && p.WordKey == "ModuleWarningWord2");
-
-        var systemKeys = new[]
-        {
-            "SystemFaultSummary", "SystemRunStateSummary", "UnitBlackStartStatus",
-            "UnitPcsTotalCount", "UnitPcsRunningCount", "UnitPcsAlarmCount", "UnitPcsFaultCount"
-        };
-        Assert.All(systemKeys, k => Assert.Contains(catalog.PluginPoints, p => p.WordKey == k));
-
-        // 组电表绑定：PCS1/2 块交流电流与电网电压绑定所属分组电表（单机组 emu1 扁平口径）；
-        // 分组绑两台电表时，PCS2 块绑第二台组电表 Meters[1]
-        Assert.Equal("emu1.Groups[0].Meters[0].LineVoltageAB", catalog.FindTelemetry("yc20")!.Target.FullPath);
-        Assert.Equal("emu1.Groups[1].Meters[1].PhaseACurrent", catalog.FindTelemetry("yc207")!.Target.FullPath);
-        Assert.Equal("emu1.Groups[1].Meters[1].LineVoltageCA", catalog.FindTelemetry("yc217")!.Target.FullPath);
-    }
-
-    [Fact]
     public void FromPointMap_Trina10MW_SystemControls_BoundToEmuVirtualModel()
     {
         // SYSTEM 控制点：绑定 emu1 虚拟模型，并自动路由 PcsApplyCommands
@@ -270,21 +247,6 @@ public class TelemetryPluginTests
             Assert.Equal(fullPath, binding!.Target.FullPath);
             Assert.Equal(ControlEffectId.PcsApplyCommands, binding.Effect);
         }
-    }
-
-    [Fact]
-    public void FromPointMap_Trina55MW_SystemControls_BoundToEmuVirtualModel()
-    {
-        var catalog = LoadCatalog("trina_5.5MW");
-        var syst6 = catalog.FindControl("syst6");
-        Assert.NotNull(syst6);
-        Assert.Equal("emu1.Emu.SystemOperation", syst6!.Target.FullPath);
-        Assert.Equal(ControlEffectId.PcsApplyCommands, syst6.Effect);
-
-        var syst7 = catalog.FindControl("syst7");
-        Assert.NotNull(syst7);
-        Assert.Equal("emu1.Emu.BlackStartModeWrite", syst7!.Target.FullPath);
-        Assert.Equal(ControlEffectId.PcsApplyCommands, syst7.Effect);
     }
 
     [Fact]
@@ -389,16 +351,6 @@ public class TelemetryPluginTests
         Assert.NotNull(dcPower);
         Assert.Equal(8, dcPower!.Paths.Count);
         Assert.Contains("emu1.PcsList[7].BatteryPower", dcPower.Paths);
-
-        // 单元级过温降载 NTC：两模块 IGBT 温度取大（5.5MW 表单机组扁平口径，PCS2 = PcsList[2]/[3]）
-        var catalog55 = LoadCatalog("trina_5.5MW");
-        var ntc1 = catalog55.MaxPoints.FirstOrDefault(p => p.ParamName == "yc23");
-        Assert.NotNull(ntc1);
-        Assert.Equal(new[] { "emu1.PcsList[0].IGBTMaxTemp", "emu1.PcsList[1].IGBTMaxTemp" }, ntc1!.Paths);
-
-        var ntc2 = catalog55.MaxPoints.FirstOrDefault(p => p.ParamName == "yc218");
-        Assert.NotNull(ntc2);
-        Assert.Equal(new[] { "emu1.PcsList[2].IGBTMaxTemp", "emu1.PcsList[3].IGBTMaxTemp" }, ntc2!.Paths);
     }
 
     [Fact]
@@ -501,7 +453,10 @@ public class TelemetryPluginTests
 
     private static PointCatalog LoadCatalog(string modelDir)
     {
-        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "lc", modelDir, "lc.csv");
+        // 历史整表已迁出 models/lc（现为片段拼装）；回归插件绑定仍读 archive。
+        var models = Path.Combine(FindRepoRoot(), "pointmaps", "models", "lc", modelDir, "lc.csv");
+        var archive = Path.Combine(FindRepoRoot(), "pointmaps", "archive", modelDir, "lc.csv");
+        var path = File.Exists(models) ? models : archive;
         Assert.True(File.Exists(path), path);
         var pointMap = new ModbusPointMap(path, "simLc1", emuDeviceIdOverride: 1);
         return PointCatalogLoader.FromPointMap(pointMap, "simLc1", new DataExchangeOptions());

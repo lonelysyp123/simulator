@@ -87,6 +87,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             if (ess._mainTransformer._currentState.PrimaryVoltage > 1.0)
                 ess._mainTransformer.Update(0, 0, powerFactor, apparentKva, sec.ReactivePowerKvar, simTime, step, applyReactiveVoltageShift: false);
             ess._mainTransformer.OverrideSecondaryVoltage(0);
+            ess._mainTransformer.WriteDeenergizedPorts();
         }
 
         private static void ApplyUnitBranchesFromNetwork(

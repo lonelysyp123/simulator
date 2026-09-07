@@ -84,13 +84,57 @@
         </el-table-column>
       </el-table>
     </div>
+
+    <div class="card">
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>PCS IEC 61850</span>
+        <span>
+          <el-button size="small" type="primary" :loading="saving61850" :disabled="!dirty61850" @click="save61850">保存并生效</el-button>
+          <el-button size="small" text @click="reload61850">刷新</el-button>
+        </span>
+      </div>
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom:8px"
+        title="每台 PCS 可同时开 Modbus 与 IEC 61850。仅开 61850 时不监听 Modbus TCP，内部点影子与 LC 抄数仍保留。默认 MMS 端口 8102 起。"
+      />
+      <el-table :data="iec61850Rows" size="small" border stripe>
+        <el-table-column prop="name" label="设备" width="130" />
+        <el-table-column prop="iedName" label="IED" width="140" />
+        <el-table-column label="MMS 端口" width="150">
+          <template #default="{ row }">
+            <el-input-number v-model="row.port" :min="1" :max="65535" :step="1" size="small" controls-position="right" style="width:120px" @change="mark61850Dirty" />
+          </template>
+        </el-table-column>
+        <el-table-column label="Modbus" width="100" align="center">
+          <template #default="{ row }">
+            <el-checkbox v-model="row.modbus" @change="mark61850Dirty" />
+          </template>
+        </el-table-column>
+        <el-table-column label="IEC 61850" width="110" align="center">
+          <template #default="{ row }">
+            <el-checkbox v-model="row.iec61850" @change="mark61850Dirty" />
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag v-if="!row.registered" type="info" size="small">未启用</el-tag>
+            <el-tag v-else :type="row.online ? 'success' : 'danger'" size="small">{{ row.online ? '在线' : '离线' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="clients" label="关联客户端" width="110" />
+      </el-table>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import {
-  getProtocolPorts, putProtocolPorts, postProtocolPortsApply, postProtocolPortsReset
+  getProtocolPorts, putProtocolPorts, postProtocolPortsApply, postProtocolPortsReset,
+  getIec61850, putProtocolBindings
 } from '@/services/api.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -99,6 +143,9 @@ const overridesError = ref('')
 const dirty = ref(false)
 const saving = ref(false)
 const applying = ref(false)
+const iec61850Rows = ref([])
+const dirty61850 = ref(false)
+const saving61850 = ref(false)
 
 const TYPE_LABELS = {
   0: 'BMS 电池',
@@ -152,8 +199,68 @@ async function reload() {
     devices.value = data.devices || []
     overridesError.value = data.overridesError || ''
     dirty.value = false
+    await reload61850()
   } catch (e) {
     ElMessage.error(e.message)
+  }
+}
+
+function mark61850Dirty() { dirty61850.value = true }
+
+async function reload61850() {
+  try {
+    const data = await getIec61850()
+    const live = new Map((data.devices || []).map(d => [d.serverName, d]))
+    const emuDevices = devices.value.filter(d => d.type === 1 || d.name?.startsWith('simEmu'))
+    const names = new Set([
+      ...emuDevices.map(d => d.name),
+      ...(data.devices || []).map(d => d.serverName),
+      ...(data.bindings || []).map(b => b.name)
+    ])
+    iec61850Rows.value = [...names].sort().map(name => {
+      const ied = live.get(name)
+      const binding = (data.bindings || []).find(b => b.name === name)
+      const protocols = binding?.protocols || ied?.protocols || ['modbus', 'iec61850']
+      return {
+        name,
+        iedName: ied?.iedName || '',
+        port: binding?.iec61850Port || ied?.port || 8102,
+        modbus: protocols.includes('modbus'),
+        iec61850: protocols.includes('iec61850'),
+        registered: !!ied,
+        online: !!ied?.online,
+        clients: ied?.associatedClients ?? 0
+      }
+    })
+    dirty61850.value = false
+  } catch (e) {
+    console.warn(e)
+  }
+}
+
+async function save61850() {
+  const invalid = iec61850Rows.value.find(r => !r.modbus && !r.iec61850)
+  if (invalid) {
+    ElMessage.error(`${invalid.name} 至少选择一种协议`)
+    return
+  }
+  saving61850.value = true
+  try {
+    const entries = iec61850Rows.value.map(r => ({
+      name: r.name,
+      protocols: [
+        ...(r.modbus ? ['modbus'] : []),
+        ...(r.iec61850 ? ['iec61850'] : [])
+      ],
+      iec61850Port: r.port
+    }))
+    const resp = await putProtocolBindings(entries, true)
+    ElMessage.success(resp.message || '已保存')
+    await reload()
+  } catch (e) {
+    ElMessage.error(e.message)
+  } finally {
+    saving61850.value = false
   }
 }
 

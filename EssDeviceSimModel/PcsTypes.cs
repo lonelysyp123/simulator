@@ -32,7 +32,9 @@ namespace EssSimulator.EssDeviceSimModel
         /// <summary>闭环调压：追踪设定，可因限流导致母线电压滞后。</summary>
         VoltageRegulating = 3,
         /// <summary>母线已达标，稳态构网。</summary>
-        Synchronized = 4
+        Synchronized = 4,
+        /// <summary>活母线上跟网（PQ），不注入 V/f 电压源。</summary>
+        Following = 5
     }
 
     public class PcsConfiguration
@@ -95,6 +97,7 @@ namespace EssSimulator.EssDeviceSimModel
         public double IslandVoltageEffectiveV { get; set; }
         public bool BlackStartEnabled { get; set; }
         public BlackStartPhase BlackStartPhase { get; set; }
+        public double FormingPhaseRad { get; set; }
 
         // 暂态保护状态（模型内部，暂不映射到 EMU 协议）
         public double DvDt { get; set; }              // 电压变化率(V/s)

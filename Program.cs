@@ -112,14 +112,11 @@ namespace EssSimulator
         private static async Task WaitForSimulatorReadyAsync(SimulatorConfig cfg, CancellationToken cancellationToken)
         {
             int expectedBmsCount = cfg.UnitCount;
-            int expectedEmuCount = cfg.EffectiveEssUnitCount;
+            int expectedEmuCount = EmuProtocolLayout.Count(cfg);
             int expectedPvCount = cfg.PvUnitCount * 2; // Logger + 电表
             int expectedLcCount = 0;
-            if (cfg.Protocol.EnableLocalControl && expectedEmuCount > 0)
-            {
-                int emuPerGroup = Math.Max(1, cfg.Protocol.LocalControlEmuPerGroup);
-                expectedLcCount = (int)Math.Ceiling(expectedEmuCount / (double)emuPerGroup);
-            }
+            if (cfg.Protocol.EnableLocalControl && cfg.EffectiveEssUnitCount > 0)
+                expectedLcCount = cfg.EffectiveEssUnitCount;
             int expectedServerCount = expectedBmsCount + expectedEmuCount + expectedPvCount + expectedLcCount + 1;
             var timeout = TimeSpan.FromSeconds(60);
             var start = DateTime.UtcNow;
@@ -190,6 +187,20 @@ namespace EssSimulator
                 string overrideMark = entry.IsDefault ? string.Empty : "（手动覆盖）";
                 string rackMark = entry.RackCount > 0 ? $"，簇从站号 {entry.SlaveId + 1}-{entry.SlaveId + entry.RackCount}" : string.Empty;
                 log.Info($"{entry.Name,-12}: Modbus TCP 端口 {entry.Port}，从站号 {entry.SlaveId}{rackMark}{overrideMark}");
+            }
+
+            var bindings = EssSimulator.Protocol.Iec61850.ProtocolBindings.Load();
+            var emuEndpoints = EmuProtocolLayout.Enumerate(cfg);
+            for (int i = 0; i < emuEndpoints.Count; i++)
+            {
+                var ep = emuEndpoints[i];
+                if (!bindings.Allows(ep.ServerName, EssSimulator.Protocol.Iec61850.Iec61850Protocols.Iec61850))
+                    continue;
+                int port = bindings.PortOverride(ep.ServerName)
+                           ?? EssSimulator.Protocol.Iec61850.ProtocolBindings.DefaultIec61850Port(
+                               ep.SimIndex1Based, cfg.Protocol.BaseEmuIec61850Port, cfg.Protocol.EmuIec61850PortStep);
+                string ied = EssSimulator.Protocol.Iec61850.Iec61850Mapping.IedNameFor(ep.ServerName);
+                log.Info($"{ep.ServerName,-12}: IEC 61850 MMS {ied} 端口 {port}");
             }
             log.Info("=======================");
         }
@@ -415,6 +426,8 @@ namespace EssSimulator
             builder.Services.AddSingleton<PcsDataServer>();
             builder.Services.AddSingleton<EmDataService>();
             builder.Services.AddSingleton<ProtocolProjectionService>();
+            builder.Services.AddSingleton<EssSimulator.EmsStrategy.Adapter.EmsStrategyRuntime>();
+            builder.Services.AddSingleton<EssSimulator.EmsStrategy.Adapter.EmsStrategyPlantAdapter>();
 
             bool enableLocalControl = builder.Configuration.GetSection(SimulatorConfig.Section)
                 .GetSection(nameof(SimulatorConfig.Protocol))
@@ -425,9 +438,11 @@ namespace EssSimulator
             }
 
             builder.Services.AddHostedService<ModbusHostedService>();
+            builder.Services.AddHostedService<EssSimulator.Protocol.Iec61850.Iec61850HostedService>();
 
             // Web 层服务
             builder.Services.AddSingleton<WebCommandExecutor>();
+            builder.Services.AddSingleton<EssSimulator.Web.ThirdPartyEms.ThirdPartyEmsSession>();
             builder.Services.AddSingleton<EssSimulator.Web.DroopSlices.DroopSliceStore>();
             builder.Services.AddSingleton<EssSimulator.Web.Topology.TopologyStore>();
             builder.Services.AddHostedService<SnapshotService>();
@@ -438,7 +453,9 @@ namespace EssSimulator
             // 确保切片 Store 在控制管道写入前完成静态挂载
             _ = app.Services.GetRequiredService<EssSimulator.Web.DroopSlices.DroopSliceStore>();
             // 协议镜像投影挂到 PlantEngine.Step 末尾（不再各自 100ms 循环）
-            _ = app.Services.GetRequiredService<ProtocolProjectionService>();
+            var proto = app.Services.GetRequiredService<ProtocolProjectionService>();
+            var emsAdapter = app.Services.GetRequiredService<EssSimulator.EmsStrategy.Adapter.EmsStrategyPlantAdapter>();
+            AfterPlantStep.Current = new CompositeAfterPlantStep(emsAdapter, proto);
 
             var simCfg = app.Services.GetRequiredService<IOptions<SimulatorConfig>>().Value;
             BlackStartSafety.Register(app.Services.GetRequiredService<IHostApplicationLifetime>());

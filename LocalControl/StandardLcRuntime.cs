@@ -1,42 +1,19 @@
+using EssSimulator.Core;
+using EssSimulator.DataExchange.Adapters;
+using EssSimulator.DataExchange.Plugins;
 using log4net;
 
 namespace EssSimulator.LocalControl
 {
     /// <summary>
-    /// 基础 LC 运行时：在 simLc* 与 simEmu* 寄存器之间按点名聚合与分发，不触碰物理仿真。
+    /// 基础 LC 运行时：在 simLc* 与 simEmu* 寄存器之间按组×槽位抄数/回写。
     /// </summary>
-    internal sealed class StandardLcRuntime : LcRuntimeBase
+    internal class StandardLcRuntime : LcRuntimeBase
     {
         private readonly Dictionary<string, double> _controlShadow = new();
-
-        /// <summary>EMU 点名（对应 emu.csv）——遥测读取与控制下发共用。</summary>
-        private const string EmuPcs1Vab = "yc20";
-        private const string EmuPcs1Vbc = "yc21";
-        private const string EmuPcs1Vca = "yc22";
-        private const string EmuPcs1Freq = "yc23";
-        private const string EmuPcs1Status = "yc44";
-        private const string EmuPcs1Alarm = "yc45";
-        private const string EmuPcs1Fault = "yc46";
-        private const string EmuPcs1BlackStart = "yx2";
-        private const string EmuPcs1StartStop = "yx3";
-        private const string EmuPcs1ActivePower = "yt0";
-        private const string EmuPcs1ReactivePower = "yt1";
-        private const string EmuPcs1IslandV = "yt3";
-
-        private const string EmuPcs2Vab = "yc47";
-        private const string EmuPcs2Vbc = "yc48";
-        private const string EmuPcs2Vca = "yc49";
-        private const string EmuPcs2Freq = "yc50";
-        private const string EmuPcs2Status = "yc71";
-        private const string EmuPcs2Alarm = "yc72";
-        private const string EmuPcs2Fault = "yc73";
-        private const string EmuPcs2BlackStart = "yx4";
-        private const string EmuPcs2StartStop = "yx5";
-        private const string EmuPcs2ActivePower = "yt4";
-        private const string EmuPcs2ReactivePower = "yt5";
-        private const string EmuPcs2IslandV = "yt7";
-
-        private const string EmuHvBreaker = "yx0";
+        private readonly TrinaEmuFaultWordPlugin _warningWords = new();
+        private readonly ReflectionSimulationAdapter _sim = new();
+        private LcBmsBankParams? _bmsBank;
 
         public StandardLcRuntime(ILog log) : base(log) { }
 
@@ -55,238 +32,582 @@ namespace EssSimulator.LocalControl
                 return;
 
             string lcName = lc.ServerName;
-            SyncTelemetry(resolveEmu, lc, lcIdx, emuPerGroup, emuCount);
-            ApplyControls(resolveEmu, lc, lcName, lcIdx, emuPerGroup, emuCount);
+            SyncTelemetry(resolveEmu, lc, lcIdx);
+            ApplyControls(resolveEmu, lc, lcName, lcIdx);
             CollectExtra(resolveEmu, lc, lcIdx, emuPerGroup, emuCount);
         }
 
         private void SyncTelemetry(
             Func<string, ModbusSimServer?> resolveEmu,
             LocalControlModbusServer lc,
-            int lcIdx,
-            int emuPerGroup,
-            int emuCount)
+            int lcIdx)
         {
-            int startEmu = lcIdx * emuPerGroup;
-            bool anyFault = false;
-            bool allBlackStart = true;
-            bool allHvClosed = true;
+            int groups = Math.Max(1, lc.LcGroupCount);
+            var unit = lc.EssUnit;
+            int unitId = lcIdx + 1;
 
-            for (int localPcs = 0; localPcs < 8; localPcs++)
+            for (int n = 1; n <= groups; n++)
             {
-                int emuOffset = localPcs / 2;
-                int emuIndex = startEmu + emuOffset;
-                if (emuIndex >= emuCount)
+                int pcsInGroup = LcLayout.PcsCountInGroup(unit, n - 1);
+                for (int k = 0; k < LcLayout.TemplateSlotsPerGroup; k++)
                 {
-                    WritePcsTelemetryDefaults(lc, localPcs);
-                    allBlackStart = false;
-                    allHvClosed = false;
-                    continue;
+                    if (k >= pcsInGroup)
+                    {
+                        WritePcsTelemetryDefaults(lc, n, k);
+                        continue;
+                    }
+
+                    int flat = LcPcsIndex.Flat(unit, n - 1, k);
+                    var emu = resolveEmu(lc.EmuServerNameForPcs(flat));
+                    if (emu == null || !emu.IsDataPathReady)
+                    {
+                        WritePcsTelemetryDefaults(lc, n, k);
+                        continue;
+                    }
+
+                    var snap = ReadChannel(emu);
+
+                    bool isOn = ModbusValueConverter.ToDouble(snap.StartStop) != 0;
+                    var mappedStatus = MapRunStatus(
+                        snap.Status,
+                        isOn,
+                        ModbusValueConverter.ToDouble(snap.MeasP),
+                        ModbusValueConverter.ToDouble(snap.MeasQ));
+
+                    lc.SetDataStoreByMesurePointName(LcChannelMap.Fault(n, k), snap.Fault);
+                    lc.SetDataStoreByMesurePointName(LcChannelMap.Alarm(n, k), snap.Alarm);
+                    lc.SetDataStoreByMesurePointName(LcChannelMap.Status(n, k), mappedStatus);
+                    lc.SetDataStoreByMesurePointName(LcChannelMap.Freq(n, k), snap.Freq);
+                    lc.SetDataStoreByMesurePointName(LcChannelMap.Vab(n, k), snap.Vab);
+                    lc.SetDataStoreByMesurePointName(LcChannelMap.Vbc(n, k), snap.Vbc);
+                    lc.SetDataStoreByMesurePointName(LcChannelMap.Vca(n, k), snap.Vca);
+                    WriteExtraChannelTelemetry(lc, n, k, snap.MeasP, snap.MeasQ);
                 }
 
-                var emu = resolveEmu($"simEmu{emuIndex + 1}");
-                if (emu == null || !emu.IsOnline)
-                {
-                    WritePcsTelemetryDefaults(lc, localPcs);
-                    allBlackStart = false;
-                    allHvClosed = false;
-                    continue;
-                }
-
-                bool slot0 = (localPcs % 2) == 0;
-                string faultParam = slot0 ? EmuPcs1Fault : EmuPcs2Fault;
-                string alarmParam = slot0 ? EmuPcs1Alarm : EmuPcs2Alarm;
-                string statusParam = slot0 ? EmuPcs1Status : EmuPcs2Status;
-                string freqParam = slot0 ? EmuPcs1Freq : EmuPcs2Freq;
-                string vabParam = slot0 ? EmuPcs1Vab : EmuPcs2Vab;
-                string vbcParam = slot0 ? EmuPcs1Vbc : EmuPcs2Vbc;
-                string vcaParam = slot0 ? EmuPcs1Vca : EmuPcs2Vca;
-                string blackStartParam = slot0 ? EmuPcs1BlackStart : EmuPcs2BlackStart;
-
-                int faultLc = localPcs < 4 ? 4 + localPcs : 32 + (localPcs - 4);
-                int alarmLc = localPcs < 4 ? 8 + localPcs : 36 + (localPcs - 4);
-                int statusLc = localPcs < 4 ? 12 + localPcs : 40 + (localPcs - 4);
-                int freqLc = localPcs < 4 ? 16 + localPcs : 44 + (localPcs - 4);
-                int vBaseLc = (localPcs < 4 ? 20 : 48) + (localPcs % 4) * 3;
-
-                var faultVal = ReadParamOrDefault(emu, faultParam);
-                var alarmVal = ReadParamOrDefault(emu, alarmParam);
-                var statusVal = ReadParamOrDefault(emu, statusParam);
-                var freqVal = ReadParamOrDefault(emu, freqParam);
-                var vabVal = ReadParamOrDefault(emu, vabParam);
-                var vbcVal = ReadParamOrDefault(emu, vbcParam);
-                var vcaVal = ReadParamOrDefault(emu, vcaParam);
-                var blackStartVal = ReadParamOrDefault(emu, blackStartParam);
-                var hvBreakerVal = ReadParamOrDefault(emu, EmuHvBreaker);
-
-                anyFault |= ModbusValueConverter.ToDouble(faultVal) != 0;
-                allBlackStart &= ModbusValueConverter.ToDouble(blackStartVal) != 0;
-                allHvClosed &= ModbusValueConverter.ToDouble(hvBreakerVal) != 0;
-
-                lc.SetDataStoreByMesurePointName($"param{faultLc}", faultVal);
-                lc.SetDataStoreByMesurePointName($"param{alarmLc}", alarmVal);
-                lc.SetDataStoreByMesurePointName($"param{statusLc}", statusVal);
-                lc.SetDataStoreByMesurePointName($"param{freqLc}", freqVal);
-                lc.SetDataStoreByMesurePointName($"param{vBaseLc}", vabVal);
-                lc.SetDataStoreByMesurePointName($"param{vBaseLc + 1}", vbcVal);
-                lc.SetDataStoreByMesurePointName($"param{vBaseLc + 2}", vcaVal);
+                SyncUnitFragment(lc, unit, unitId, n, pcsInGroup);
             }
 
-            lc.SetDataStoreByMesurePointName("param1", anyFault ? 1 : 0);
-            lc.SetDataStoreByMesurePointName("param2", allBlackStart ? 1 : 0);
-            lc.SetDataStoreByMesurePointName("param3", allHvClosed ? 0xAA : 0xEE);
+            SyncSystemFragment(lc, unitId);
+            SyncMvFragment(lc, unitId);
+            SyncBmsFragment(resolveEmu, lc, lcIdx);
         }
+
+        /// <summary>
+        /// 系统片段：本单元 emuN 虚拟模型 + 实际 PcsList 台数求和；
+        /// 插件点复用 <see cref="TrinaEmuFaultWordPlugin"/>（deviceRoot = emuN）。
+        /// </summary>
+        private void SyncSystemFragment(LocalControlModbusServer lc, int unitId)
+        {
+            LcSystemEmuSnap emuSnap = default;
+            IReadOnlyList<LcSystemPcsSnap> pcs = Array.Empty<LcSystemPcsSnap>();
+            LcSystemPluginSnap plugins = default;
+            {
+                string root = $"emu{unitId}";
+                object hvBreaker = ReadPath($"{root}.Breaker.Closed");
+                var ess = SimulatorHost.Instance.TryGetEss();
+                if (ess != null)
+                    hvBreaker = ess.IsUnitBreakerClosed(unitId - 1)
+                        ? LcSystemMap.HvBreakerClosed
+                        : LcSystemMap.HvBreakerOpen;
+                emuSnap = new LcSystemEmuSnap(
+                    ReadPath($"{root}.Emu.AverageBatterySoc"),
+                    ReadPath($"{root}.Emu.MaxChargePower"),
+                    ReadPath($"{root}.Emu.MaxDischargePower"),
+                    ReadPath($"{root}.Emu.OutputActivePower"),
+                    ReadPath($"{root}.Emu.OutputReactivePower"),
+                    hvBreaker);
+                pcs = ReadUnitPcs(unitId);
+                plugins = new LcSystemPluginSnap(
+                    ComputePlugin(TrinaEmuFaultWordPlugin.SystemFaultSummaryKey, root),
+                    ComputePlugin(TrinaEmuFaultWordPlugin.SystemRunStateSummaryKey, root),
+                    ComputePlugin(TrinaEmuFaultWordPlugin.UnitBlackStartStatusKey, root),
+                    ComputePlugin(TrinaEmuFaultWordPlugin.UnitPcsTotalCountKey, root),
+                    ComputePlugin(TrinaEmuFaultWordPlugin.UnitPcsRunningCountKey, root),
+                    ComputePlugin(TrinaEmuFaultWordPlugin.UnitPcsAlarmCountKey, root),
+                    ComputePlugin(TrinaEmuFaultWordPlugin.UnitPcsFaultCountKey, root));
+            }
+
+            var bms = ReadUnitBms(unitId, pcs.Count);
+            var groups = ReadUnitGroups(lc.EssUnit, pcs);
+            foreach (var (param, value) in LcSystemTelemetry.Collect(emuSnap, pcs, plugins, bms, groups, live: true))
+                lc.SetDataStoreByMesurePointName(param, value);
+        }
+
+        /// <summary>
+        /// BMS 段：按组抄对应 <c>simBms*</c> 的 bank 寄存器（bms_bank.csv），再折成 LC bmsyc*。
+        /// 不读仿真对象，BMS 离线时该组写 0。组内多堆按电压/SOC 平均、电流功率求和、故障字或运算。
+        /// </summary>
+        private void SyncBmsFragment(
+            Func<string, ModbusSimServer?> resolveBms,
+            LocalControlModbusServer lc,
+            int lcIdx)
+        {
+            int groups = Math.Max(1, lc.LcGroupCount);
+            for (int n = 1; n <= groups; n++)
+            {
+                var names = LcBmsLayout.ServerNamesForGroup(lc.EssUnits, lcIdx, lc.EssUnit, n);
+                var snaps = new List<LcBmsBankSnap>(names.Count);
+                foreach (var name in names)
+                {
+                    var bms = resolveBms(name);
+                    if (bms is { IsOnline: true })
+                        snaps.Add(ReadBmsBank(bms));
+                }
+
+                LcBmsBankSnap? snap = snaps.Count == 0 ? null : LcBmsTelemetry.Aggregate(snaps);
+                foreach (var (param, value) in LcBmsTelemetry.Collect(n, snap))
+                    lc.SetDataStoreByMesurePointName(param, value);
+            }
+        }
+
+        private LcBmsBankParams BmsBank => _bmsBank ??= LcBmsBankMap.FromSelected();
+
+        private LcBmsBankSnap ReadBmsBank(ModbusSimServer bms) => new()
+        {
+            Voltage = ReadParamOrDefault(bms, BmsBank.Voltage),
+            Current = ReadParamOrDefault(bms, BmsBank.Current),
+            Soc = ReadParamOrDefault(bms, BmsBank.Soc),
+            Soh = ReadParamOrDefault(bms, BmsBank.Soh),
+            Insulation = ReadParamOrDefault(bms, BmsBank.Insulation),
+            ChargeRemainKwh = ReadParamOrDefault(bms, BmsBank.ChargeRemain),
+            DischargeRemainKwh = ReadParamOrDefault(bms, BmsBank.DischargeRemain),
+            MaxChargeCurrent = ReadParamOrDefault(bms, BmsBank.MaxChargeCurrent),
+            MaxDischargeCurrent = ReadParamOrDefault(bms, BmsBank.MaxDischargeCurrent),
+            ClusterCurrentDiff = ReadParamOrDefault(bms, BmsBank.ClusterCurrentDiff),
+            ClusterVoltageDiff = ReadParamOrDefault(bms, BmsBank.ClusterVoltageDiff),
+            MaxCellVoltageRack = ReadParamOrDefault(bms, BmsBank.MaxCellVoltageRack),
+            MaxCellVoltagePack = ReadParamOrDefault(bms, BmsBank.MaxCellVoltagePack),
+            MaxCellVoltageCell = ReadParamOrDefault(bms, BmsBank.MaxCellVoltageCell),
+            MaxCellVoltage = ReadParamOrDefault(bms, BmsBank.MaxCellVoltage),
+            MinCellVoltageRack = ReadParamOrDefault(bms, BmsBank.MinCellVoltageRack),
+            MinCellVoltagePack = ReadParamOrDefault(bms, BmsBank.MinCellVoltagePack),
+            MinCellVoltageCell = ReadParamOrDefault(bms, BmsBank.MinCellVoltageCell),
+            MinCellVoltage = ReadParamOrDefault(bms, BmsBank.MinCellVoltage),
+            AvgCellVoltage = ReadParamOrDefault(bms, BmsBank.AvgCellVoltage),
+            MaxCellTempRack = ReadParamOrDefault(bms, BmsBank.MaxCellTempRack),
+            MaxCellTempPack = ReadParamOrDefault(bms, BmsBank.MaxCellTempPack),
+            MaxCellTempCell = ReadParamOrDefault(bms, BmsBank.MaxCellTempCell),
+            MaxCellTemp = ReadParamOrDefault(bms, BmsBank.MaxCellTemp),
+            MinCellTempRack = ReadParamOrDefault(bms, BmsBank.MinCellTempRack),
+            MinCellTempPack = ReadParamOrDefault(bms, BmsBank.MinCellTempPack),
+            MinCellTempCell = ReadParamOrDefault(bms, BmsBank.MinCellTempCell),
+            MinCellTemp = ReadParamOrDefault(bms, BmsBank.MinCellTemp),
+            AvgCellTemp = ReadParamOrDefault(bms, BmsBank.AvgCellTemp),
+            ChargeEnergyKwh = ReadParamOrDefault(bms, BmsBank.ChargeEnergy),
+            DischargeEnergyKwh = ReadParamOrDefault(bms, BmsBank.DischargeEnergy),
+            OnlineClusters = ReadParamOrDefault(bms, BmsBank.OnlineClusters),
+            TotalClusters = ReadParamOrDefault(bms, BmsBank.TotalClusters),
+            MinParallelClusters = ReadParamOrDefault(bms, BmsBank.MinParallelClusters),
+            DischargePowerKw = ReadParamOrDefault(bms, BmsBank.DischargePower),
+            ChargePowerKw = ReadParamOrDefault(bms, BmsBank.ChargePower),
+            ProtectionSummary = ReadParamOrDefault(bms, BmsBank.ProtectionSummary),
+            AlarmSummary = ReadParamOrDefault(bms, BmsBank.AlarmSummary),
+            FaultSummary = ReadParamOrDefault(bms, BmsBank.FaultSummary),
+            PcsFaultStatus = ReadParamOrDefault(bms, BmsBank.PcsFaultStatus),
+            ClusterDropFault = ReadParamOrDefault(bms, BmsBank.ClusterDropFault),
+            BlackStartEnter = ReadParamOrDefault(bms, BmsBank.BlackStartEnter),
+            BlackStartStatus = ReadParamOrDefault(bms, BmsBank.BlackStartStatus),
+            GridConnectStatus = ReadParamOrDefault(bms, BmsBank.GridConnect),
+            RunMode = ReadParamOrDefault(bms, BmsBank.RunMode),
+            ChargeDischarge = ReadParamOrDefault(bms, BmsBank.ChargeDischarge),
+            Heartbeat = ReadParamOrDefault(bms, BmsBank.Heartbeat)
+        };
+
+        /// <summary>MV 电表段：优先抄本单元电表（馈线/PCS 母线），没有 EMU 镜像时回退 PCC。</summary>
+        private void SyncMvFragment(LocalControlModbusServer lc, int unitId)
+        {
+            LcMvMeterSnap? snap = null;
+            var emu = SimulatorHost.Instance.TryGetEmu(unitId);
+            if (emu != null)
+            {
+                snap = LcMvTelemetry.FromUnitMeter(emu.ElectricityMeter);
+            }
+            else
+            {
+                var ess = SimulatorHost.Instance.TryGetEss();
+                if (ess != null)
+                    snap = LcMvTelemetry.FromPcc(
+                        ess.ElectricalNetwork.PccMeter,
+                        ess.ElectricalNetwork.SystemFrequencyHz);
+            }
+
+            foreach (var (param, value) in LcMvTelemetry.Collect(snap))
+                lc.SetDataStoreByMesurePointName(param, value);
+        }
+
+        private static LcSystemPcsSnap[] ReadUnitPcs(int unitId)
+        {
+            int count = (int)Math.Max(0, Math.Round(ModbusValueConverter.ToDouble(ReadPath($"emu{unitId}.PcsList.Count"))));
+            var list = new LcSystemPcsSnap[count];
+            for (int i = 0; i < count; i++)
+            {
+                list[i] = new LcSystemPcsSnap(
+                    ReadDto(unitId, i, "PowerFactor"),
+                    ReadDto(unitId, i, "ApparentPower"),
+                    ReadDto(unitId, i, "BatteryPower"),
+                    ReadDto(unitId, i, "BatteryCurrent"),
+                    ReadDto(unitId, i, "Frequency"),
+                    ReadDto(unitId, i, "BatteryVoltage"),
+                    ReadDto(unitId, i, "PCSRatePower"),
+                    ReadDto(unitId, i, "OperationStatus"),
+                    ReadDto(unitId, i, "AlarmSummary1"));
+            }
+
+            return list;
+        }
+
+        private static LcSystemBmsSnap[] ReadUnitBms(int unitId, int pcsCount)
+        {
+            int baseIdx = 0;
+            for (int u = 1; u < unitId; u++)
+                baseIdx += (int)Math.Max(0, Math.Round(ModbusValueConverter.ToDouble(ReadPath($"emu{u}.PcsList.Count"))));
+
+            var store = SimulatorHost.Instance;
+            var list = new List<LcSystemBmsSnap>(pcsCount);
+            for (int i = 0; i < pcsCount; i++)
+            {
+                int id = baseIdx + i + 1;
+                if (!store.Contains($"bms{id}"))
+                    continue;
+                string stack = $"bms{id}.BatteryStacks[0]";
+                list.Add(new LcSystemBmsSnap(
+                    ReadPath($"{stack}.NominalEnergyKWh"),
+                    ReadPath($"{stack}.SOH"),
+                    ReadPath($"{stack}.AvailableChargeCapacity"),
+                    ReadPath($"{stack}.AvailableDischargeCapacity"),
+                    ReadPath($"{stack}.BMSFaultSummary"),
+                    ReadPath($"{stack}.BMSAlarmSummary"),
+                    ReadPath($"{stack}.OperationStatus")));
+            }
+
+            return list.ToArray();
+        }
+
+        private static LcSystemGroupSnap[] ReadUnitGroups(
+            EssSimulator.Configuration.EssUnitConfig? unit,
+            IReadOnlyList<LcSystemPcsSnap> pcs)
+        {
+            int groups = Math.Max(1, LcLayout.GroupCount(unit));
+            var snaps = new LcSystemGroupSnap[groups];
+            int offset = 0;
+            for (int g = 0; g < groups; g++)
+            {
+                int nPcs = LcLayout.PcsCountInGroup(unit, g);
+                bool faulted = false;
+                for (int k = 0; k < nPcs; k++)
+                {
+                    int idx = offset + k;
+                    if (idx < pcs.Count &&
+                        (int)Math.Round(ModbusValueConverter.ToDouble(pcs[idx].OperationStatus ?? 0)) == 6)
+                        faulted = true;
+                }
+
+                snaps[g] = new LcSystemGroupSnap(nPcs > 0, faulted);
+                offset += nPcs;
+            }
+
+            return snaps;
+        }
+
+        /// <summary>
+        /// 10MW 单元片段：n 为组序号，模块1/2 为该组第 1/2 条 PCS 支路。
+        /// 模块母线电压由该支路 PCS 交流三线电压等效；电感电流 R/S/T 为该支路 PCS 交流三相电流幅值。
+        /// 交流电流 R/S/T、电网有功/无功为两模块 PCS 交流侧合计；电网线电压为两模块交流线电压平均。
+        /// 组内超过 4 条支路时点表不含本段，本方法写点会被忽略。
+        /// </summary>
+        private void SyncUnitFragment(
+            LocalControlModbusServer lc,
+            EssSimulator.Configuration.EssUnitConfig? unit,
+            int unitId,
+            int n,
+            int pcsInGroup)
+        {
+            LcUnitModuleSnap? m1 = pcsInGroup > 0
+                ? ReadUnitModule(unitId, LcPcsIndex.Flat(unit, n - 1, 0))
+                : null;
+            LcUnitModuleSnap? m2 = pcsInGroup > 1
+                ? ReadUnitModule(unitId, LcPcsIndex.Flat(unit, n - 1, 1))
+                : null;
+
+            foreach (var (param, value) in LcUnitTelemetry.Collect(n, m1, m2))
+                lc.SetDataStoreByMesurePointName(param, value);
+        }
+
+        private LcUnitModuleSnap ReadUnitModule(int unitId, int flatPcsIndex) =>
+            new(
+                ReadDto(unitId, flatPcsIndex, "BatteryVoltage"),
+                ReadDto(unitId, flatPcsIndex, "BatteryCurrent"),
+                ReadDto(unitId, flatPcsIndex, "LineVoltageAB"),
+                ReadDto(unitId, flatPcsIndex, "LineVoltageBC"),
+                ReadDto(unitId, flatPcsIndex, "LineVoltageCA"),
+                ReadDto(unitId, flatPcsIndex, "PhaseACurrent"),
+                ReadDto(unitId, flatPcsIndex, "PhaseBCurrent"),
+                ReadDto(unitId, flatPcsIndex, "PhaseCCurrent"),
+                ReadDto(unitId, flatPcsIndex, "BatteryPower"),
+                ReadDto(unitId, flatPcsIndex, "IGBTMaxTemp"),
+                ReadDto(unitId, flatPcsIndex, "AvailableCapacity"),
+                ReadDto(unitId, flatPcsIndex, "PCSRatePower"),
+                ComputeModuleWarning(unitId, flatPcsIndex, "ModuleWarningWord1"),
+                ComputeModuleWarning(unitId, flatPcsIndex, "ModuleWarningWord2"),
+                ReadDto(unitId, flatPcsIndex, "ActivePower"),
+                ReadDto(unitId, flatPcsIndex, "ReactivePower"));
+
+        private object ComputeModuleWarning(int unitId, int flatPcsIndex, string wordKey) =>
+            ComputePlugin(wordKey, $"emu{unitId}.PcsList[{flatPcsIndex}]");
+
+        private object ComputePlugin(string wordKey, string deviceRoot)
+        {
+            try
+            {
+                return _warningWords.Compute(wordKey, deviceRoot, _sim) ?? 0;
+            }
+            catch (Exception ex)
+            {
+                Log.Debug($"ComputePlugin {wordKey} {deviceRoot} 失败，回退 0", ex);
+                return 0;
+            }
+        }
+
+        private static object ReadPath(string path)
+        {
+            try
+            {
+                return SimServer.GetExtIfVariableVal(path) ?? 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private ChannelSnapshot ReadChannel(ModbusSimServer emu)
+        {
+            var proto = EmuPcsChannel.Slot0;
+            return new ChannelSnapshot(
+                ReadParamOrDefault(emu, proto.Fault),
+                ReadParamOrDefault(emu, proto.Alarm),
+                ReadParamOrDefault(emu, proto.Status),
+                ReadParamOrDefault(emu, proto.Freq),
+                ReadParamOrDefault(emu, proto.Vab),
+                ReadParamOrDefault(emu, proto.Vbc),
+                ReadParamOrDefault(emu, proto.Vca),
+                ReadParamOrDefault(emu, proto.BlackStart),
+                ReadParamOrDefault(emu, proto.StartStop),
+                ReadParamOrDefault(emu, proto.MeasActivePower),
+                ReadParamOrDefault(emu, proto.MeasReactivePower));
+        }
+
+        private readonly record struct ChannelSnapshot(
+            object Fault, object Alarm, object Status, object Freq,
+            object Vab, object Vbc, object Vca,
+            object BlackStart, object StartStop, object MeasP, object MeasQ);
 
         private void ApplyControls(
             Func<string, ModbusSimServer?> resolveEmu,
             LocalControlModbusServer lc,
             string lcName,
-            int lcIdx,
-            int emuPerGroup,
-            int emuCount)
+            int lcIdx)
         {
-            int startEmu = lcIdx * emuPerGroup;
+            if (EssSimulator.Core.ExternalControlGate.IsBlocked)
+                return;
+            int groups = Math.Max(1, lc.LcGroupCount);
+            var unit = lc.EssUnit;
+            int unitId = lcIdx + 1;
 
-            for (int localPcs = 0; localPcs < 8; localPcs++)
+            for (int n = 1; n <= groups; n++)
             {
-                int emuOffset = localPcs / 2;
-                int emuIndex = startEmu + emuOffset;
-                if (emuIndex >= emuCount)
-                    continue;
-
-                var emu = resolveEmu($"simEmu{emuIndex + 1}");
-                if (emu == null || !emu.IsOnline)
-                    continue;
-
-                bool slot0 = (localPcs % 2) == 0;
-                string startStopTarget = slot0 ? EmuPcs1StartStop : EmuPcs2StartStop;
-                string pTarget = slot0 ? EmuPcs1ActivePower : EmuPcs2ActivePower;
-                string qTarget = slot0 ? EmuPcs1ReactivePower : EmuPcs2ReactivePower;
-                string islandVTarget = slot0 ? EmuPcs1IslandV : EmuPcs2IslandV;
-
-                int startStopLc = localPcs < 4 ? 60 + localPcs : 80 + (localPcs - 4);
-                int pLc = localPcs < 4 ? 64 + localPcs : 84 + (localPcs - 4);
-                int qLc = localPcs < 4 ? 68 + localPcs : 88 + (localPcs - 4);
-                int islandVLc = localPcs < 4 ? 72 + localPcs : 92 + (localPcs - 4);
-
-                ForwardWhenChanged(lc, lcName, $"param{startStopLc}", emu, startStopTarget, asBool: true);
-                ForwardWhenChanged(lc, lcName, $"param{pLc}", emu, pTarget, asBool: false);
-                ForwardWhenChanged(lc, lcName, $"param{qLc}", emu, qTarget, asBool: false);
-                ForwardWhenChanged(lc, lcName, $"param{islandVLc}", emu, islandVTarget, asBool: false);
+                int pcsInGroup = LcLayout.PcsCountInGroup(unit, n - 1);
+                for (int k = 0; k < LcLayout.TemplateSlotsPerGroup && k < pcsInGroup; k++)
+                {
+                    int flat = LcPcsIndex.Flat(unit, n - 1, k);
+                    var emu = resolveEmu(lc.EmuServerNameForPcs(flat));
+                    if (emu != null && emu.IsDataPathReady)
+                    {
+                        var proto = EmuPcsChannel.Slot0;
+                        ForwardWhenChanged(lc, lcName, LcChannelMap.StartStop(n, k), emu, proto.StartStop, asBool: true);
+                        ForwardWhenChanged(lc, lcName, LcChannelMap.ActivePowerSet(n, k), emu, proto.ActivePowerSet, asBool: false);
+                        ForwardWhenChanged(lc, lcName, LcChannelMap.ReactivePowerSet(n, k), emu, proto.ReactivePowerSet, asBool: false);
+                        ForwardWhenChanged(lc, lcName, LcChannelMap.IslandV(n, k), emu, proto.IslandV, asBool: false);
+                        ForwardWhenChanged(lc, lcName, LcChannelMap.IslandF(n, k), emu, proto.IslandF, asBool: false);
+                    }
+                    else
+                    {
+                        ForwardWhenChangedDto(lc, lcName, LcChannelMap.StartStop(n, k), unitId, flat, "pcsOnOffSwitch", asBool: true);
+                        ForwardWhenChangedDto(lc, lcName, LcChannelMap.ActivePowerSet(n, k), unitId, flat, "PCSActivePowerSetting", asBool: false);
+                        ForwardWhenChangedDto(lc, lcName, LcChannelMap.ReactivePowerSet(n, k), unitId, flat, "PCSReactivePowerSetting", asBool: false);
+                        ForwardWhenChangedDto(lc, lcName, LcChannelMap.IslandV(n, k), unitId, flat, "IslandVoltageSetting", asBool: false);
+                        ForwardWhenChangedDto(lc, lcName, LcChannelMap.IslandF(n, k), unitId, flat, "IslandFrequencySetting", asBool: false);
+                    }
+                }
             }
 
-            ApplyGlobalBlackStartControl(resolveEmu, lc, lcName, startEmu, emuPerGroup, emuCount);
-            ApplyGlobalHvBreakerControl(resolveEmu, lc, lcName, startEmu, emuPerGroup, emuCount);
+            ApplyGlobalBlackStartControl(resolveEmu, lc, lcName, lcIdx);
+            ApplySystemEmuControls(lc, lcName, unitId);
+            ApplySystemRestartControl(lc, lcName, unitId);
+            ApplyMvHvBreakerControl(lc, lcName, unitId);
+        }
+
+        /// <summary>syst4/5/6/1010/1011 写入 emuN.Emu.*；syst7 由黑启动批量路径同时写 BlackStartModeWrite。</summary>
+        private void ApplySystemEmuControls(LocalControlModbusServer lc, string lcName, int unitId)
+        {
+            foreach (var binding in LcSystemMap.EmuControls)
+            {
+                if (binding.Param == LcSystemMap.BlackStartWrite)
+                    continue;
+                ForwardWhenChangedEmu(lc, lcName, binding.Param, unitId, binding.EmuField, binding.AsBool);
+            }
+        }
+
+        /// <summary>syst1399 写 0xAA 视为单元复位脉冲：等同 syst6=6（全部停机清故障），写完回 0。</summary>
+        private void ApplySystemRestartControl(LocalControlModbusServer lc, string lcName, int unitId)
+        {
+            const string lcParam = LcSystemMap.Restart;
+            string key = $"{lcName}:{lcParam}";
+            if (!_controlShadow.ContainsKey(key))
+                _controlShadow[key] = 0;
+
+            if (!TryReadChangedControl(lc, lcName, lcParam, asBool: false, out _, out var current))
+                return;
+
+            if (!LcSystemTelemetry.IsRestartPulse(current))
+            {
+                UpdateControlShadow(lcName, lcParam, current);
+                return;
+            }
+
+            Log.Info($"[LC-Change] {lcName}.{lcParam}: restart pulse 0xAA");
+            WriteEmu(unitId, "SystemOperation", 6);
+            try { lc.SetDataStoreByMesurePointName(lcParam, 0); }
+            catch { /* 脉冲回零失败可忽略 */ }
+            UpdateControlShadow(lcName, lcParam, 0);
+        }
+
+        /// <summary>mv_param1 写 AA/EE 驱动本单元高压断路器；非法值回退 LC 寄存器。</summary>
+        private void ApplyMvHvBreakerControl(LocalControlModbusServer lc, string lcName, int unitId)
+        {
+            const string lcParam = LcMvMap.HvBreakerCommand;
+            PrimeMvHvBreakerShadow(lc, lcName, unitId);
+            if (!TryReadChangedControl(lc, lcName, lcParam, asBool: false, out var prev, out var current))
+                return;
+
+            if (!LcMvControl.TryApply(unitId, current, out var normalized, out var message))
+            {
+                double fallback = double.IsNaN(prev) ? LcMvControl.Encode(true) : prev;
+                Log.Warn($"[LC-Change] {lcName}.{lcParam}: 拒绝 {ModbusValueConverter.FormatControlValue(current)}，回退 {ModbusValueConverter.FormatControlValue(fallback)} ({message})");
+                try { lc.SetDataStoreByMesurePointName(lcParam, fallback); }
+                catch { /* 回退失败可忽略 */ }
+                UpdateControlShadow(lcName, lcParam, fallback);
+                return;
+            }
+
+            Log.Info(
+                $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prev)} -> {ModbusValueConverter.FormatControlValue(normalized)} ({message})");
+            try { lc.SetDataStoreByMesurePointName(lcParam, normalized); }
+            catch { /* 规范化写回失败可忽略 */ }
+            UpdateControlShadow(lcName, lcParam, normalized);
+        }
+
+        private void PrimeMvHvBreakerShadow(LocalControlModbusServer lc, string lcName, int unitId)
+        {
+            const string lcParam = LcMvMap.HvBreakerCommand;
+            string key = $"{lcName}:{lcParam}";
+            if (_controlShadow.ContainsKey(key))
+                return;
+
+            bool closed = ModbusValueConverter.ToDouble(ReadPath($"emu{unitId}.Breaker.Closed")) != 0;
+            double val = LcMvControl.Encode(closed);
+            _controlShadow[key] = val;
+            try { lc.SetDataStoreByMesurePointName(lcParam, val); }
+            catch { /* 首轮对齐失败可忽略 */ }
         }
 
         private void ApplyGlobalBlackStartControl(
             Func<string, ModbusSimServer?> resolveEmu,
             LocalControlModbusServer lc,
             string lcName,
-            int startEmu,
-            int emuPerGroup,
-            int emuCount)
+            int lcIdx)
         {
-            const string lcParam = "param100";
-            PrimeGlobalBlackStartShadow(resolveEmu, lc, lcName, startEmu, emuPerGroup, emuCount);
+            const string lcParam = LcSystemMap.BlackStartWrite;
+            PrimeGlobalBlackStartShadow(resolveEmu, lc, lcName, lcIdx);
             if (!TryReadChangedControl(lc, lcName, lcParam, asBool: true, out var prevBlackStart, out var blackStartGlobal))
                 return;
 
             Log.Info(
                 $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevBlackStart)} -> {ModbusValueConverter.FormatControlValue(blackStartGlobal)}");
 
-            bool success = true;
-            int endEmu = Math.Min(emuCount, startEmu + emuPerGroup);
-            for (int emuIndex = startEmu; emuIndex < endEmu; emuIndex++)
+            bool success = WriteEmu(lcIdx + 1, "BlackStartModeWrite", blackStartGlobal);
+            var unit = lc.EssUnit;
+            int groups = Math.Max(1, lc.LcGroupCount);
+            for (int n = 1; n <= groups; n++)
             {
-                var emu = resolveEmu($"simEmu{emuIndex + 1}");
-                if (emu == null || !emu.IsOnline)
-                    continue;
-
-                success &= TryPublishControlWithLog(emu, EmuPcs1BlackStart, blackStartGlobal, asBool: true, $"{lcName}.{lcParam}");
-                success &= TryPublishControlWithLog(emu, EmuPcs2BlackStart, blackStartGlobal, asBool: true, $"{lcName}.{lcParam}");
+                int pcsInGroup = LcLayout.PcsCountInGroup(unit, n - 1);
+                for (int k = 0; k < pcsInGroup; k++)
+                {
+                    int flat = LcPcsIndex.Flat(unit, n - 1, k);
+                    var emu = resolveEmu(lc.EmuServerNameForPcs(flat));
+                    if (emu != null && emu.IsDataPathReady)
+                    {
+                        success &= TryPublishControlWithLog(
+                            emu, EmuPcsChannel.Slot0.BlackStart, blackStartGlobal, asBool: true, $"{lcName}.{lcParam}");
+                    }
+                    else
+                    {
+                        success &= LcPcsDtoCommand.WriteAndApply(lcIdx + 1, flat, "BlackStartEnabled", blackStartGlobal != 0);
+                    }
+                }
             }
 
             if (success)
                 UpdateControlShadow(lcName, lcParam, blackStartGlobal);
         }
 
-        private void ApplyGlobalHvBreakerControl(
-            Func<string, ModbusSimServer?> resolveEmu,
-            LocalControlModbusServer lc,
-            string lcName,
-            int startEmu,
-            int emuPerGroup,
-            int emuCount)
+        private void WritePcsTelemetryDefaults(LocalControlModbusServer lc, int n, int k)
         {
-            const string lcParam = "param101";
-            PrimeGlobalHvBreakerShadow(resolveEmu, lc, lcName, startEmu, emuPerGroup, emuCount);
-            if (!TryReadChangedControl(lc, lcName, lcParam, asBool: false, out var prevHvCmd, out var hvRawCmd))
-                return;
-
-            if (!ModbusValueConverter.TryNormalizeHvBreakerCommand(hvRawCmd, out var hvCmd, out var hvClosed))
-            {
-                RevertInvalidHvBreakerCommand(lc, lcName, prevHvCmd);
-                return;
-            }
-
-            Log.Info(
-                $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevHvCmd)} -> {ModbusValueConverter.FormatControlValue(hvCmd)}");
-
-            bool success = true;
-            int endEmu = Math.Min(emuCount, startEmu + emuPerGroup);
-            for (int emuIndex = startEmu; emuIndex < endEmu; emuIndex++)
-            {
-                var emu = resolveEmu($"simEmu{emuIndex + 1}");
-                if (emu == null || !emu.IsOnline)
-                    continue;
-
-                success &= TryPublishControlWithLog(
-                    emu,
-                    EmuHvBreaker,
-                    hvClosed ? 1 : 0,
-                    asBool: true,
-                    $"{lcName}.{lcParam}");
-            }
-
-            if (success)
-                UpdateControlShadow(lcName, lcParam, hvCmd);
+            lc.SetDataStoreByMesurePointName(LcChannelMap.Fault(n, k), 0);
+            lc.SetDataStoreByMesurePointName(LcChannelMap.Alarm(n, k), 0);
+            lc.SetDataStoreByMesurePointName(LcChannelMap.Status(n, k), 0);
+            lc.SetDataStoreByMesurePointName(LcChannelMap.Freq(n, k), 0);
+            lc.SetDataStoreByMesurePointName(LcChannelMap.Vab(n, k), 0);
+            lc.SetDataStoreByMesurePointName(LcChannelMap.Vbc(n, k), 0);
+            lc.SetDataStoreByMesurePointName(LcChannelMap.Vca(n, k), 0);
+            WriteExtraChannelTelemetry(lc, n, k, 0, 0);
         }
 
-        private void RevertInvalidHvBreakerCommand(LocalControlModbusServer lc, string lcName, double prevHvCmd)
-        {
-            if (double.IsNaN(prevHvCmd))
-                return;
+        /// <summary>
+        /// group/lc.csv 的 pcs 运行状态透传 emu yc44（1停机 2待机 4充电 5放电 6故障）。
+        /// 黑启动直流通道的 0/1/2 编码见 <see cref="DcChannelRunStatus"/>，不用于本组点。
+        /// </summary>
+        protected virtual object MapRunStatus(object emuStatus, bool isOn, double activePower, double reactivePower) =>
+            emuStatus;
 
+        /// <summary>把 EMU 实测有功/无功抄到 group 片段点 group_param102+。</summary>
+        protected virtual void WriteExtraChannelTelemetry(
+            LocalControlModbusServer lc,
+            int n,
+            int k,
+            object activePower,
+            object reactivePower)
+        {
+            lc.SetDataStoreByMesurePointName(LcChannelMap.ExtraActivePower(n, k), activePower);
+            lc.SetDataStoreByMesurePointName(LcChannelMap.ExtraReactivePower(n, k), reactivePower);
+        }
+
+        private static object ReadDto(int unitId, int flatPcsIndex, string field)
+        {
             try
             {
-                lc.SetDataStoreByMesurePointName("param101", prevHvCmd);
+                return SimServer.GetExtIfVariableVal($"emu{unitId}.PcsList[{flatPcsIndex}].{field}") ?? 0;
             }
-            catch (Exception ex)
+            catch
             {
-                Log.Warn($"{lcName}.param101 回退写入失败", ex);
+                return 0;
             }
-        }
-
-        private static void WritePcsTelemetryDefaults(LocalControlModbusServer lc, int localPcs)
-        {
-            int faultLc = localPcs < 4 ? 4 + localPcs : 32 + (localPcs - 4);
-            int alarmLc = localPcs < 4 ? 8 + localPcs : 36 + (localPcs - 4);
-            int statusLc = localPcs < 4 ? 12 + localPcs : 40 + (localPcs - 4);
-            int freqLc = localPcs < 4 ? 16 + localPcs : 44 + (localPcs - 4);
-            int vBaseLc = (localPcs < 4 ? 20 : 48) + (localPcs % 4) * 3;
-
-            lc.SetDataStoreByMesurePointName($"param{faultLc}", 0);
-            lc.SetDataStoreByMesurePointName($"param{alarmLc}", 0);
-            lc.SetDataStoreByMesurePointName($"param{statusLc}", 0);
-            lc.SetDataStoreByMesurePointName($"param{freqLc}", 0);
-            lc.SetDataStoreByMesurePointName($"param{vBaseLc}", 0);
-            lc.SetDataStoreByMesurePointName($"param{vBaseLc + 1}", 0);
-            lc.SetDataStoreByMesurePointName($"param{vBaseLc + 2}", 0);
         }
 
         private object ReadParamOrDefault(ModbusSimServer server, string paramName)
         {
+            if (string.IsNullOrWhiteSpace(paramName))
+                return 0;
             try
             {
                 return server.GetDataObjectByMesurePointName(paramName) ?? 0;
@@ -295,6 +616,83 @@ namespace EssSimulator.LocalControl
             {
                 Log.Debug($"ReadParamOrDefault 读取 {paramName} 失败，回退 0", ex);
                 return 0;
+            }
+        }
+
+        private void ForwardWhenChangedDto(
+            LocalControlModbusServer lc,
+            string lcName,
+            string lcParam,
+            int unitId,
+            int flatPcsIndex,
+            string dtoField,
+            bool asBool)
+        {
+            if (!TryReadChangedControl(lc, lcName, lcParam, asBool, out var prevValue, out var currentValue))
+                return;
+
+            Log.Info(
+                $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevValue)} -> {ModbusValueConverter.FormatControlValue(currentValue)}");
+
+            object published = asBool ? currentValue != 0 : currentValue;
+            bool success;
+            if (double.IsNaN(prevValue))
+            {
+                var targetValue = ModbusValueConverter.ToDouble(ReadDto(unitId, flatPcsIndex, dtoField));
+                targetValue = asBool ? (targetValue != 0 ? 1 : 0) : targetValue;
+                success = Math.Abs(targetValue - currentValue) < 1e-9 ||
+                          LcPcsDtoCommand.WriteAndApply(unitId, flatPcsIndex, dtoField, published);
+            }
+            else
+            {
+                success = LcPcsDtoCommand.WriteAndApply(unitId, flatPcsIndex, dtoField, published);
+            }
+
+            if (success)
+                UpdateControlShadow(lcName, lcParam, currentValue);
+        }
+
+        private void ForwardWhenChangedEmu(
+            LocalControlModbusServer lc,
+            string lcName,
+            string lcParam,
+            int unitId,
+            string emuField,
+            bool asBool)
+        {
+            if (!TryReadChangedControl(lc, lcName, lcParam, asBool, out var prevValue, out var currentValue))
+                return;
+
+            Log.Info(
+                $"[LC-Change] {lcName}.{lcParam}: {ModbusValueConverter.FormatControlValue(prevValue)} -> {ModbusValueConverter.FormatControlValue(currentValue)}");
+
+            object published = asBool ? currentValue != 0 : currentValue;
+            bool success;
+            if (double.IsNaN(prevValue))
+            {
+                var targetValue = ModbusValueConverter.ToDouble(ReadPath($"emu{unitId}.Emu.{emuField}"));
+                targetValue = asBool ? (targetValue != 0 ? 1 : 0) : targetValue;
+                success = Math.Abs(targetValue - currentValue) < 1e-9 ||
+                          WriteEmu(unitId, emuField, published);
+            }
+            else
+            {
+                success = WriteEmu(unitId, emuField, published);
+            }
+
+            if (success)
+                UpdateControlShadow(lcName, lcParam, currentValue);
+        }
+
+        private static bool WriteEmu(int unitId, string field, object value)
+        {
+            try
+            {
+                return SimServer.SetExtIfVariableVal($"emu{unitId}.Emu.{field}", value);
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -333,64 +731,39 @@ namespace EssSimulator.LocalControl
             Func<string, ModbusSimServer?> resolveEmu,
             LocalControlModbusServer lc,
             string lcName,
-            int startEmu,
-            int emuPerGroup,
-            int emuCount)
+            int lcIdx)
         {
-            const string lcParam = "param100";
+            const string lcParam = LcSystemMap.BlackStartWrite;
             string key = $"{lcName}:{lcParam}";
             if (_controlShadow.ContainsKey(key))
                 return;
 
             bool enabled = true;
-            int endEmu = Math.Min(emuCount, startEmu + emuPerGroup);
-            for (int emuIndex = startEmu; emuIndex < endEmu; emuIndex++)
+            bool any = false;
+            var unit = lc.EssUnit;
+            int groups = Math.Max(1, lc.LcGroupCount);
+            for (int n = 1; n <= groups && enabled; n++)
             {
-                var emu = resolveEmu($"simEmu{emuIndex + 1}");
-                if (emu == null || !emu.IsOnline)
+                int pcsInGroup = LcLayout.PcsCountInGroup(unit, n - 1);
+                for (int k = 0; k < pcsInGroup && enabled; k++)
                 {
-                    enabled = false;
-                    break;
-                }
+                    int flat = LcPcsIndex.Flat(unit, n - 1, k);
+                    var pcsEmu = resolveEmu(lc.EmuServerNameForPcs(flat));
+                    if (pcsEmu == null || !pcsEmu.IsDataPathReady)
+                    {
+                        enabled = false;
+                        break;
+                    }
 
-                enabled &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, EmuPcs1BlackStart)) != 0;
-                enabled &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, EmuPcs2BlackStart)) != 0;
+                    any = true;
+                    enabled = ModbusValueConverter.ToDouble(
+                        ReadParamOrDefault(pcsEmu, EmuPcsChannel.Slot0.BlackStart)) != 0;
+                }
             }
+
+            enabled = any && enabled;
 
             double val = enabled ? 1 : 0;
-            _controlShadow[key] = val;
-            try { lc.SetDataStoreByMesurePointName(lcParam, val); }
-            catch { /* 首轮对齐失败可忽略 */ }
-        }
-
-        private void PrimeGlobalHvBreakerShadow(
-            Func<string, ModbusSimServer?> resolveEmu,
-            LocalControlModbusServer lc,
-            string lcName,
-            int startEmu,
-            int emuPerGroup,
-            int emuCount)
-        {
-            const string lcParam = "param101";
-            string key = $"{lcName}:{lcParam}";
-            if (_controlShadow.ContainsKey(key))
-                return;
-
-            bool closed = true;
-            int endEmu = Math.Min(emuCount, startEmu + emuPerGroup);
-            for (int emuIndex = startEmu; emuIndex < endEmu; emuIndex++)
-            {
-                var emu = resolveEmu($"simEmu{emuIndex + 1}");
-                if (emu == null || !emu.IsOnline)
-                {
-                    closed = false;
-                    break;
-                }
-
-                closed &= ModbusValueConverter.ToDouble(ReadParamOrDefault(emu, EmuHvBreaker)) != 0;
-            }
-
-            double val = closed ? 0xAA : 0xEE;
             _controlShadow[key] = val;
             try { lc.SetDataStoreByMesurePointName(lcParam, val); }
             catch { /* 首轮对齐失败可忽略 */ }
