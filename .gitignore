@@ -464,5 +464,18 @@ wwwroot/
 # 发布技能目录（外部来源，不纳入版本管理）
 .publish/
 
-# 设备型号选型（运行期由系统配置页写入）
+# Cursor 本机规则与设置（不入库）。仓库用 .cursorignore 控制 Agent 索引范围。
+.cursor/
+
+# 本地提示词草稿（复制到其它对话用，不是产品代码）
+CSharp仿真策略迁移提示词.md
+
+# 组态：工程库、设备库、当前画布、工程模式与应用后的 overlay 均入库
+# （组态界面编辑的实际工程，需合并到 develop）：
+#   configs/topology/projects/*.json
+#   configs/topology/library/*.json
+#   configs/topology/project.json
+#   configs/topology/runtime-mode.json
+#   configs/topology/generated/runtime-overlay.json
+# 仅忽略本机设备型号选型（每人/每台机器可能不同，由工程配置页写入）
 configs/topology/device-models.json
