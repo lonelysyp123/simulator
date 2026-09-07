@@ -3,7 +3,9 @@ using EssSimulator.EmsStrategy.Application;
 namespace EssSimulator.EmsStrategy.Domain.Algorithms;
 
 /// <summary>
-/// 站级有功/无功分配到 PCS 支路。SOC 均衡开：按 SOC 能力加权；关：均分后把超限余量二次分配。
+/// 站级有功/无功分配到 PCS 支路。
+/// 分配关：有功/无功均分到可运行支路（有功超限再二次分配）。
+/// 分配开：无功按剩余 Q 容量加权；SOC 均衡开则有功按 SOC 加权，否则有功均分。
 /// </summary>
 public static class PowerDistributor
 {
@@ -60,7 +62,7 @@ public static class PowerDistributor
             foreach (var b in eligible)
                 alloc[b.Index] = 0;
 
-            if (cfg.SocBalance)
+            if (cfg.Enabled && cfg.SocBalance)
                 AllocateWeighted(plantActiveKw, eligible, cfg, alloc);
             else
                 AllocateEqualThenRedistribute(plantActiveKw, eligible, alloc);
@@ -82,7 +84,7 @@ public static class PowerDistributor
         }
 
         if (applyReactive)
-            MergeReactive(commands, branches, plantReactiveKvar);
+            MergeReactive(commands, branches, plantReactiveKvar, cfg);
 
         return commands;
     }
@@ -90,7 +92,8 @@ public static class PowerDistributor
     private static void MergeReactive(
         BranchCommand[] commands,
         IReadOnlyList<PcsBranchState> branches,
-        double plantReactiveKvar)
+        double plantReactiveKvar,
+        DistributionConfig cfg)
     {
         var eligible = new List<int>();
         for (int i = 0; i < branches.Count; i++)
@@ -103,20 +106,57 @@ public static class PowerDistributor
         if (eligible.Count == 0)
             return;
 
-        double each = plantReactiveKvar / eligible.Count;
-        foreach (int i in eligible)
+        if (!cfg.Enabled)
         {
+            double each = plantReactiveKvar / eligible.Count;
+            for (int n = 0; n < eligible.Count; n++)
+            {
+                int i = eligible[n];
+                var p = commands[i];
+                commands[i] = new BranchCommand
+                {
+                    Index = p.Index,
+                    UnitIndex0 = p.UnitIndex0,
+                    PcsIndexInUnit = p.PcsIndexInUnit,
+                    ActivePowerKw = p.ActivePowerKw,
+                    ReactivePowerKvar = each
+                };
+            }
+            return;
+        }
+
+        double totalOmega = 0;
+        var omega = new double[eligible.Count];
+        for (int n = 0; n < eligible.Count; n++)
+        {
+            int i = eligible[n];
             var b = branches[i];
-            var p = commands[i];
             double s = Math.Max(b.RatedKw, 1);
-            double qMax = Math.Sqrt(Math.Max(0, s * s - p.ActivePowerKw * p.ActivePowerKw));
+            omega[n] = RemainingAxis(s, b.MeasuredActiveKw);
+            totalOmega += omega[n];
+        }
+
+        double absTarget = Math.Abs(plantReactiveKvar);
+        bool inductive = plantReactiveKvar > 0;
+        if (totalOmega <= 1e-9)
+            return;
+
+        for (int n = 0; n < eligible.Count; n++)
+        {
+            int i = eligible[n];
+            var p = commands[i];
+            double val = absTarget >= totalOmega
+                ? omega[n]
+                : omega[n] * (absTarget / totalOmega);
+            if (!inductive)
+                val = -val;
             commands[i] = new BranchCommand
             {
                 Index = p.Index,
                 UnitIndex0 = p.UnitIndex0,
                 PcsIndexInUnit = p.PcsIndexInUnit,
                 ActivePowerKw = p.ActivePowerKw,
-                ReactivePowerKvar = Math.Clamp(each, -qMax, qMax)
+                ReactivePowerKvar = val
             };
         }
     }
@@ -212,7 +252,19 @@ public static class PowerDistributor
             maxDis = 0;
         if (b.ChargeProhibited)
             maxChg = 0;
+        double pFromS = RemainingAxis(Math.Max(b.RatedKw, 1), b.MeasuredReactiveKvar);
+        maxDis = Math.Min(maxDis, pFromS);
+        maxChg = Math.Min(maxChg, pFromS);
         return Math.Clamp(p, -maxChg, maxDis);
+    }
+
+    private static double RemainingAxis(double rated, double other)
+    {
+        double s2 = rated * rated;
+        double o2 = other * other;
+        if (o2 >= s2)
+            return 0;
+        return Math.Sqrt(s2 - o2);
     }
 
     private static double MaxDischarge(PcsBranchState b)

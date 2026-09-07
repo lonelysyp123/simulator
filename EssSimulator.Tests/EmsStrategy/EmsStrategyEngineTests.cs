@@ -96,4 +96,25 @@ public class EmsStrategyEngineTests
         engine.Step(TimeSpan.FromMilliseconds(200));
         Assert.Equal(ActionState.Reset, engine.GetSnapshot().FrequencyAction);
     }
+
+    [Fact]
+    public void UpdateConfig_KpChange_DoesNotResetFrequencyAction()
+    {
+        var cfg = EmsStrategyConfig.CreateDefault();
+        cfg.Enabled = true;
+        cfg.Slope.Enabled = false;
+        cfg.ActivePid.DeadbandKw = 0;
+        cfg.ActivePid.Discretization = PidDiscretization.Dt;
+        var engine = new EmsStrategyEngine();
+        engine.Initialize(cfg);
+        engine.UpdateMeasurements(Meas(49.7));
+        engine.Step(TimeSpan.FromMilliseconds(200));
+        Assert.Equal(ActionState.Action, engine.GetSnapshot().FrequencyAction);
+
+        cfg.ActivePid.Kp = 2;
+        engine.UpdateConfig(cfg);
+        engine.UpdateMeasurements(Meas(49.7));
+        engine.Step(TimeSpan.FromMilliseconds(200));
+        Assert.Equal(ActionState.Action, engine.GetSnapshot().FrequencyAction);
+    }
 }

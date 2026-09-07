@@ -1,29 +1,39 @@
-# LC 中压点表归属与运行时继承
+# 电站 EMS 策略参数热更新
 
-## Phase 1: 点表归到 LC
-- [x] Task 1: 把 5.5MW / 10MW 点表迁到 LC 型号目录（emu.csv → lc.csv）
-- [x] Task 2: 组态自动选型改打 LC，并迁移过期 emu=trina_* 选型
-- [x] Task 3: 测试与说明改读 `models/lc/{id}/lc.csv`
+> 已确认：改参立刻 `UpdateConfig`，并写回与启动加载同一份 `ems-strategy.json`。不合 tab、不改公式。
+> LC 中压方案已归档：`tasks/lc-mv-pointmap.md` / `tasks/todo-lc-mv-pointmap.md`。
 
-## Checkpoint: Phase 1
-- [x] 系统配置页 LC 能选 5.5MW/10MW，EMU 只剩 standard
-- [x] 全量 `dotnet test EssSimulator.Tests` 绿
-- [ ] 与人确认：standard LC 桥接与迁表前一致
+## 已确认
+- [x] 热更新 = 引擎立刻换参 + 落盘（运行目录，与 Load 同路径）
+- [x] PATCH 嵌套覆盖，禁止残缺 body 整表替换
+- [x] 参数变更不 Reset PI/ACTION；仅模式切换 Reset
+- [x] 快照轮询与表单草稿分离；参数按卡「应用」
 
-## Phase 2: LC 运行时基类
-- [x] Task 4: 抽出 LcRuntimeBase 与选型工厂，standard 行为不变
-- [x] Task 5: ModelBoundLcRuntime — ModelSim 点表走 DataExchange，跳过点名桥
+## Phase 1: Foundation
+- [x] Task 1: 配置落盘（可注入路径；占用失败不写盘）
+- [x] Task 2: PATCH 嵌套覆盖全部参数对象 + Patcher 单测
 
-## Checkpoint: Phase 2
-- [ ] standard LC：写 param60 仍能启动 PCS1（需重启后手工确认）
-- [ ] 5.5MW LC：写 syst6=3 启动该机组全部模块（契约测试已钉 syst6 绑定；需重启后手工确认）
-- [x] 全量测试绿
+## Checkpoint: Foundation
+- [x] 不经 UI 也能 POST 嵌套对象热更新并写 JSON
+- [x] 改 Kp 不 Reset 积分（断言钉住）
+- [x] `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~EmsStrategy"`
+- [ ] 与人工确认后再做页面（已按开工继续做完页面）
 
-## Phase 3: 中压子类与扩展点
-- [x] Task 6: Trina55 / Trina10 子类（可增采集、可覆写控制）
-- [x] Task 7: 文档与系统配置文案
+## Phase 2: Core Features
+- [x] Task 3: 快照/草稿分离 + 斜率 / PID / 视在参数卡
+- [x] Task 4: 一次调频 / 惯量 / 下垂明细参数卡
+- [x] Task 5: 功率分配、计划曲线、恒压与远程设定
+
+## Checkpoint: Core Features
+- [ ] 公共算法与辅助服务均可在页面整定
+- [ ] 应用后无需重启；刷新/重启值仍在
+- [ ] 空曲线 + 曲线模式仍 WAIT
+- [ ] 第三方占用时应用失败有提示
+
+## Phase 3: Polish
+- [x] Task 6: 折叠默认、脏标记、SystemSwitch / 有功无功使能
 
 ## Checkpoint: Complete
-- [x] Phase 1–3 任务验收标准均满足（手工联调项除外）
-- [x] `dotnet test EssSimulator.Tests` 与 `dotnet build ./EssSimulator.csproj` 通过
-- [x] 未做项已明确排除：CSV extends 合并、标准 LC 全面 ModelSim 化、改 PlantEngine、多 csproj
+- [x] 斜率、PID、视在、分配、曲线、调频/惯量/下垂均可热更新并落盘（代码已接；需浏览器点选确认）
+- [x] 未做：合 tab、改公式、参数进组态、双写仓库 JSON
+- [ ] Ready for review

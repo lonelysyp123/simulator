@@ -18,6 +18,8 @@
   "VoltageKp": 0.5,
   "ApparentRatedKva": 5000,
   "PlantRatedKw": 5000,
+  "ApparentLimitEnabled": true,
+  "DampEnabled": true,
   "Slope": {
     "Enabled": false,
     "RiseKwPerSec": 100,
@@ -29,6 +31,7 @@
     "FallKwPerSec": 100
   },
   "ActivePid": {
+    "Enabled": true,
     "Kp": 0.4,
     "Ki": 0.05,
     "Kb": 0.5,
@@ -39,6 +42,7 @@
     "Discretization": "CompatiblePeriod"
   },
   "ReactivePid": {
+    "Enabled": true,
     "Kp": 0.4,
     "Ki": 0.05,
     "Kb": 0.5,
@@ -92,9 +96,8 @@
     "MaxAbsorbKvar": 5000,
     "LimitCoefficient": 1
   },
-  "ActiveCurve": { "Mode": "Weekday", "Points": [] },
-  "ReactiveCurve": { "Mode": "Weekday", "Points": [] },
   "Distribution": {
+    "Enabled": true,
     "SocBalance": false,
     "SocMin": 0.1,
     "SocMax": 0.9

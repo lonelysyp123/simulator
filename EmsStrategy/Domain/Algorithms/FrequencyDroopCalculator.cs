@@ -47,7 +47,7 @@ public static class FrequencyDroopCalculator
         bool under = frequencyHz < f0;
         double fSpan = under ? f0 - db1 : f0 + db1;
         double pStart = 0;
-        double droop = Math.Max(1e-6, cfg.DroopPercent);
+        double droop = InnerDroop(cfg, under);
 
         if (cfg.SegmentCount >= 5)
         {
@@ -58,7 +58,7 @@ public static class FrequencyDroopCalculator
             {
                 pStart = SegmentDelta(fSpan, fBreak, f0, pRated, droop);
                 fSpan = fBreak;
-                droop = Math.Max(1e-6, cfg.Droop2Percent);
+                droop = OuterDroop(cfg, under);
             }
         }
 
@@ -71,5 +71,17 @@ public static class FrequencyDroopCalculator
 
     /// <summary>ΔP = (f_span − f) / f0 × P_rated / droop × 100</summary>
     private static double SegmentDelta(double fSpan, double f, double f0, double pRated, double droopPercent) =>
-        (fSpan - f) / f0 * pRated / droopPercent * 100.0;
+        (fSpan - f) / f0 * pRated / Math.Max(1e-6, droopPercent) * 100.0;
+
+    private static double InnerDroop(PrimaryFrequencyConfig cfg, bool under)
+    {
+        double specific = under ? cfg.UnderDroopPercent : cfg.OverDroopPercent;
+        return Math.Max(1e-6, specific > 0 ? specific : cfg.DroopPercent);
+    }
+
+    private static double OuterDroop(PrimaryFrequencyConfig cfg, bool under)
+    {
+        double specific = under ? cfg.UnderDroop2Percent : cfg.OverDroop2Percent;
+        return Math.Max(1e-6, specific > 0 ? specific : cfg.Droop2Percent);
+    }
 }

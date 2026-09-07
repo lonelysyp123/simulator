@@ -28,36 +28,39 @@ public class SlopeLimiterTests
     {
         var s = new SlopeLimiter();
         s.Configure(false, 10, 10);
-        Assert.Equal(80, s.Step(80, TimeSpan.FromSeconds(1)));
+        Assert.Equal(80, s.Step(80, 0, TimeSpan.FromSeconds(1)));
     }
 
     [Fact]
-    public void Rise_LimitedByRate()
+    public void Rise_FromMeasure_UsesKwPerMin()
     {
-        var s = new SlopeLimiter();
-        s.Configure(true, riseKwPerSec: 10, fallKwPerSec: 20);
-        Assert.Equal(10, s.Step(100, TimeSpan.FromSeconds(1)));
-        Assert.Equal(20, s.Step(100, TimeSpan.FromSeconds(1)));
+        // C: period_min = 1000/60000, Δ = 60 kW/min * 1/60 = 1 kW
+        double y = SlopeLimiter.Calculate(100, 60, 60, TimeSpan.FromSeconds(1), measure: 0);
+        Assert.Equal(1, y, 6);
     }
 
     [Fact]
-    public void Fall_LimitedByRate()
+    public void SameSignDown_UsesFallRate()
     {
-        var s = new SlopeLimiter();
-        s.Configure(true, 10, 20);
-        s.Reset(100);
-        Assert.Equal(80, s.Step(0, TimeSpan.FromSeconds(1)));
+        double y = SlopeLimiter.Calculate(10, 60, 120, TimeSpan.FromSeconds(1), measure: 100);
+        Assert.Equal(98, y, 6);
     }
 
     [Fact]
     public void ZeroCross_DoesNotJumpSignInOneSlowStep()
     {
-        var s = new SlopeLimiter();
-        s.Configure(true, 20, 20);
-        s.Reset(50);
-        double next = s.Step(-50, TimeSpan.FromSeconds(1));
-        Assert.Equal(30, next);
+        double next = SlopeLimiter.Calculate(-50, 60, 60, TimeSpan.FromSeconds(1), measure: 50);
+        Assert.Equal(49, next, 6);
         Assert.True(next > 0);
+    }
+
+    [Fact]
+    public void Step_UsesMeasurementNotInternalState()
+    {
+        var s = new SlopeLimiter();
+        s.Configure(true, 60, 60);
+        Assert.Equal(1, s.Step(100, measure: 0, TimeSpan.FromSeconds(1)), 6);
+        Assert.Equal(2, s.Step(100, measure: 1, TimeSpan.FromSeconds(1)), 6);
     }
 }
 
@@ -113,6 +116,116 @@ public class PidControllerTests
         Assert.Equal(0, pid.Step(10, TimeSpan.FromSeconds(1)));
         Assert.Equal(10, pid.Step(10, TimeSpan.FromSeconds(1), force: true));
     }
+
+    [Fact]
+    public void CompatiblePeriod_FirstTick55ThenDeadbandHolds()
+    {
+        var pid = new PidController();
+        pid.Configure(new PidConfig
+        {
+            Kp = 0.4,
+            Ki = 0.05,
+            Kb = 0.5,
+            Period = TimeSpan.FromMilliseconds(3000),
+            DeadbandKw = 5,
+            OutMinKw = -5000,
+            OutMaxKw = 5000,
+            Discretization = PidDiscretization.CompatiblePeriod
+        });
+
+        double u0 = pid.Compute(100, measure: 0, realValue: 0, TimeSpan.FromSeconds(3));
+        Assert.Equal(55, u0, 6);
+        Assert.Equal(15, pid.Integral, 6);
+
+        double uHold = pid.Compute(100, measure: 95, realValue: 95, TimeSpan.FromSeconds(3));
+        Assert.Equal(55, uHold, 6);
+        Assert.Equal(15, pid.Integral, 6);
+    }
+
+    [Fact]
+    public void CompatiblePeriod_NextTickAddsPAndDeltaIToLastOutput()
+    {
+        var pid = new PidController();
+        pid.Configure(new PidConfig
+        {
+            Kp = 0.4,
+            Ki = 0.05,
+            Kb = 0.5,
+            Period = TimeSpan.FromMilliseconds(3000),
+            DeadbandKw = 0,
+            OutMinKw = -5000,
+            OutMaxKw = 5000,
+            Discretization = PidDiscretization.CompatiblePeriod
+        });
+
+        double u0 = pid.Compute(100, measure: 0, realValue: 0, TimeSpan.FromSeconds(3));
+        Assert.Equal(55, u0, 6);
+
+        // e=50, P=20, ΔI = 0.05*3*50 − 0.5*(55−50) = 5 → u = 55+20+5 = 80
+        double u1 = pid.Compute(100, measure: 50, realValue: 50, TimeSpan.FromSeconds(3));
+        Assert.Equal(80, u1, 6);
+        Assert.Equal(20, pid.Integral, 6);
+    }
+
+    [Fact]
+    public void CompatiblePeriod_Kp08_DeadbandHoldsLastCommand()
+    {
+        var pid = new PidController();
+        pid.Configure(new PidConfig
+        {
+            Kp = 0.8,
+            Ki = 0.05,
+            Kb = 0.5,
+            Period = TimeSpan.FromMilliseconds(3000),
+            DeadbandKw = 5,
+            OutMinKw = -5000,
+            OutMaxKw = 5000,
+            Discretization = PidDiscretization.CompatiblePeriod
+        });
+
+        double u0 = pid.Compute(100, measure: 0, realValue: 0, TimeSpan.FromSeconds(3));
+        Assert.Equal(95, u0, 6);
+
+        double uHold = pid.Compute(100, measure: 95, realValue: 95, TimeSpan.FromSeconds(3));
+        Assert.Equal(95, uHold, 6);
+        Assert.Equal(15, pid.Integral, 6);
+    }
+
+    [Fact]
+    public void PCompute_MatchesC()
+    {
+        var pid = new PidController();
+        pid.Configure(new PidConfig
+        {
+            Kp = 0.5,
+            OutMinKw = 0,
+            OutMaxKw = 70000
+        });
+        double u = pid.PCompute(35000, 34000);
+        Assert.Equal(34500, u, 6);
+    }
+
+    [Fact]
+    public void Configure_DoesNotResetIntegral()
+    {
+        var pid = new PidController();
+        var cfg = new PidConfig
+        {
+            Kp = 0,
+            Ki = 1,
+            Period = TimeSpan.FromSeconds(1),
+            OutMinKw = -100,
+            OutMaxKw = 100,
+            Discretization = PidDiscretization.Dt
+        };
+        pid.Configure(cfg);
+        pid.Step(10, TimeSpan.FromSeconds(1));
+        Assert.Equal(10, pid.Integral, 3);
+        cfg.Kp = 2;
+        pid.Configure(cfg);
+        Assert.Equal(10, pid.Integral, 3);
+        Assert.Equal(2, pid.Kp);
+    }
 }
 
 public class ApparentPowerLimiterTests
@@ -120,14 +233,37 @@ public class ApparentPowerLimiterTests
     [Fact]
     public void LimitsActiveByOtherAxis()
     {
-        double p = ApparentPowerLimiter.LimitActive(100, 60, 100);
+        double p = ApparentPowerLimiter.LimitGrid(100, 60, 100);
         Assert.Equal(80, p, 5);
     }
 
     [Fact]
     public void OtherAxisAtRated_ForcesZero()
     {
-        Assert.Equal(0, ApparentPowerLimiter.LimitActive(50, 100, 100));
+        Assert.Equal(0, ApparentPowerLimiter.LimitGrid(50, 100, 100));
         Assert.Equal(0, ApparentPowerLimiter.LimitReactive(50, 100, 100));
+    }
+
+    [Fact]
+    public void Damp_HalvesStepWhenCircleExceeded()
+    {
+        // measured 80, limited 100, slope target 100, other 0, S=90 → 100²>90², damp
+        double y = ApparentPowerLimiter.Damp(80, 100, 100, 0, 90);
+        Assert.Equal(90, y, 5);
+    }
+
+    [Fact]
+    public void Damp_SkipsWhenAlreadyInsideCircle()
+    {
+        double y = ApparentPowerLimiter.Damp(0, 50, 50, 0, 100);
+        Assert.Equal(50, y, 5);
+    }
+
+    [Fact]
+    public void OpenLimit_PredictsGridFromStorageDelta()
+    {
+        // grid 80, other 0, target storage 50, storage meas 0, S=100 → predict 130, clip storage
+        double y = ApparentPowerLimiter.LimitOpen(80, 0, 50, 0, 100);
+        Assert.Equal(20, y, 5);
     }
 }

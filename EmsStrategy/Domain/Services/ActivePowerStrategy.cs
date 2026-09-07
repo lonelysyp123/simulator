@@ -5,7 +5,7 @@ namespace EssSimulator.EmsStrategy.Domain.Services;
 
 /// <summary>
 /// 有功策略：开环不做并网点 PI、不叠加调频/惯量；闭环合成 P_base+ΔP_freq+ΔP_inertia。
-/// 惯量 ACTION 且配置闭锁时跳过一次调频。曲线未命中 WAIT，输出 0。
+/// 惯量 ACTION 且配置闭锁时跳过一次调频。
 /// </summary>
 public sealed class ActivePowerStrategy
 {
@@ -22,13 +22,11 @@ public sealed class ActivePowerStrategy
     private double _lastTarget;
     private double _lastBeforeLimit;
     private double _lastAfterLimit;
-    private bool _curveWait;
 
     public ActionState FrequencyAction => _pfr.State;
     public double FrequencyDeltaKw => _pfr.State == ActionState.Action ? _pfr.Output : 0;
     public ActionState InertiaAction => _inertia.State;
     public double InertiaDeltaKw => _inertia.State == ActionState.Action ? _inertia.Output : 0;
-    public bool CurveWait => _curveWait;
     public double LastPiOutput => _lastPi;
     public double LastPBase => _lastPBase;
     public double LastTarget => _lastTarget;
@@ -56,10 +54,9 @@ public sealed class ActivePowerStrategy
         _lastTarget = 0;
         _lastBeforeLimit = 0;
         _lastAfterLimit = 0;
-        _curveWait = false;
     }
 
-    public double Step(EmsStrategyConfig config, PlantMeasurements meas, TimeSpan dt)
+    public double Step(EmsStrategyConfig config, PlantMeasurements meas, TimeSpan dt, double otherAxisTarget = 0)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(meas);
@@ -73,50 +70,37 @@ public sealed class ActivePowerStrategy
         ApplyConfig(config);
 
         if (config.ActiveMode == ActiveMode.OpenLoopFixed)
-            return StepOpenLoop(config, meas, dt);
+            return StepOpenLoop(config, meas, dt, otherAxisTarget);
 
-        return StepCloseLoop(config, meas, dt);
+        return StepCloseLoop(config, meas, dt, otherAxisTarget);
     }
 
-    private double StepOpenLoop(EmsStrategyConfig config, PlantMeasurements meas, TimeSpan dt)
+    private double StepOpenLoop(EmsStrategyConfig config, PlantMeasurements meas, TimeSpan dt, double otherAxisTarget)
     {
         double set = ResolveFixedSetpoint(config);
-        _curveWait = false;
         _lastPBase = set;
         _pfr.Reset();
         _inertia.Reset();
         _lastTarget = set;
-        double sloped = _slope.Step(set, dt);
+        double storageP = SumMeasuredActive(meas);
+        double sloped = _slope.Step(set, storageP, dt);
         _lastBeforeLimit = sloped;
-        double limited = ApparentPowerLimiter.LimitActive(sloped, meas.PccReactivePowerKvar, config.ApparentRatedKva);
-        _lastAfterLimit = limited;
-        _lastPi = limited;
-        return limited;
+        double limited = config.ApparentLimitEnabled
+            ? ApparentPowerLimiter.LimitOpen(
+                meas.PccActivePowerKw, meas.PccReactivePowerKvar, sloped, storageP, config.ApparentRatedKva)
+            : sloped;
+        double damped = config.DampEnabled
+            ? ApparentPowerLimiter.DampOpen(
+                storageP, limited, meas.PccActivePowerKw, otherAxisTarget, config.ApparentRatedKva)
+            : limited;
+        _lastAfterLimit = damped;
+        _lastPi = damped;
+        return damped;
     }
 
-    private double StepCloseLoop(EmsStrategyConfig config, PlantMeasurements meas, TimeSpan dt)
+    private double StepCloseLoop(EmsStrategyConfig config, PlantMeasurements meas, TimeSpan dt, double otherAxisTarget)
     {
-        double curveP = 0;
-        if (config.ActiveMode == ActiveMode.CloseLoopCurve
-            && !CurveScheduler.TryGetPower(meas.SimTime, config.ActiveCurve, out curveP))
-        {
-            _curveWait = true;
-            _pfr.Reset();
-            _inertia.Reset();
-            _lastPBase = 0;
-            _lastTarget = 0;
-            _lastBeforeLimit = 0;
-            _lastAfterLimit = 0;
-            _lastPi = 0;
-            _slope.Reset();
-            _pi.Reset();
-            return 0;
-        }
-
-        _curveWait = false;
-        double pBase = config.ActiveMode == ActiveMode.CloseLoopCurve
-            ? curveP
-            : ResolveFixedSetpoint(config);
+        double pBase = ResolveFixedSetpoint(config);
         double rated = config.PlantRatedKw > 0 ? config.PlantRatedKw : SumRated(meas);
         var inertiaCfg = config.Inertia ?? new InertiaConfig();
         var pfrCfg = config.PrimaryFrequency;
@@ -184,13 +168,27 @@ public sealed class ActivePowerStrategy
         _lastTarget = target;
 
         bool auxJump = Math.Abs(freqDelta - prevFreq) > 1e-6 || Math.Abs(inertiaDelta - prevInr) > 1e-6;
-        double sloped = _slope.Step(target, dt);
+        double sloped = _slope.Step(target, meas.PccActivePowerKw, dt);
         _lastBeforeLimit = sloped;
-        double limited = ApparentPowerLimiter.LimitActive(sloped, meas.PccReactivePowerKvar, config.ApparentRatedKva);
-        _lastAfterLimit = limited;
+        double limited = config.ApparentLimitEnabled
+            ? ApparentPowerLimiter.LimitGrid(sloped, meas.PccReactivePowerKvar, config.ApparentRatedKva)
+            : sloped;
+        double damped = config.DampEnabled
+            ? ApparentPowerLimiter.Damp(
+                meas.PccActivePowerKw, limited, sloped, otherAxisTarget, config.ApparentRatedKva)
+            : limited;
+        _lastAfterLimit = damped;
 
-        double error = limited - meas.PccActivePowerKw;
-        _lastPi = _pi.Step(error, dt, force: auxJump);
+        double storageP = SumMeasuredActive(meas);
+        if (config.ActivePid.Enabled)
+        {
+            _lastPi = _pi.Compute(damped, meas.PccActivePowerKw, storageP, dt, force: auxJump);
+        }
+        else
+        {
+            _pi.Reset();
+            _lastPi = damped;
+        }
         return _lastPi;
     }
 
@@ -199,6 +197,14 @@ public sealed class ActivePowerStrategy
 
     private static bool IsReverse(double scheduleDelta, double freqDelta) =>
         scheduleDelta * freqDelta < -1e-9;
+
+    private static double SumMeasuredActive(PlantMeasurements meas)
+    {
+        double s = 0;
+        foreach (var b in meas.Branches)
+            s += b.MeasuredActiveKw;
+        return s;
+    }
 
     private static double SumRated(PlantMeasurements meas)
     {

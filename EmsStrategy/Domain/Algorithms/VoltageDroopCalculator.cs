@@ -3,8 +3,9 @@ using EssSimulator.EmsStrategy.Application;
 namespace EssSimulator.EmsStrategy.Domain.Algorithms;
 
 /// <summary>
-/// 下垂调压。ΔQ = q_start + (u_span − u) / u0 × Q_rated / droop × 100，
-/// k1/k2 对应内/外段 droop 百分数。状态机复用 <see cref="AuxActionMachine"/>。
+/// 下垂调压，复刻 <c>ReactivePowerCtrl_QV_Droop</c>：
+/// ΔQ = q_start + k · (U_span − U)，k 为 kvar/V（配置字段名仍是 K1Percent/K2Percent）。
+/// VoltageCurveType=0 从死区边沿起算；=1 从额定电压起算。
 /// </summary>
 public static class VoltageDroopCalculator
 {
@@ -41,33 +42,46 @@ public static class VoltageDroopCalculator
             return 0;
 
         double u0 = cfg.RatedVoltageV <= 0 ? 35000 : cfg.RatedVoltageV;
-        double qRated = plantRatedKvar > 0 ? plantRatedKvar : 1;
         double db1 = DeadbandV(cfg);
-        bool under = voltageV < u0;
-        double uSpan = under ? u0 - db1 : u0 + db1;
+        double db2 = OuterDeadbandV(cfg);
+        bool five = cfg.SegmentCount >= 5;
+        bool fromRated = cfg.VoltageCurveType != 0;
+        bool outer = voltageV < u0 - db2 || voltageV > u0 + db2;
+        double k = five && outer ? cfg.K2Percent : cfg.K1Percent;
         double qStart = 0;
-        double droop = Math.Max(1e-6, cfg.K1Percent);
+        double uSpan = u0;
 
-        if (cfg.SegmentCount >= 5)
+        if (five)
         {
-            double db2 = OuterDeadbandV(cfg);
-            double uBreak = under ? u0 - db2 : u0 + db2;
-            bool outer = under ? voltageV < u0 - db2 : voltageV > u0 + db2;
-            if (outer)
+            if (!fromRated && voltageV < u0 - db1 && voltageV >= u0 - db2)
+                uSpan = u0 - db1;
+            if (!fromRated && voltageV > u0 + db1 && voltageV <= u0 + db2)
+                uSpan = u0 + db1;
+            if (voltageV < u0 - db2)
             {
-                qStart = SegmentDelta(uSpan, uBreak, u0, qRated, droop);
-                uSpan = uBreak;
-                droop = Math.Max(1e-6, cfg.K2Percent);
+                uSpan = u0 - db2;
+                qStart = fromRated ? cfg.K1Percent * db2 : cfg.K1Percent * (db2 - db1);
+            }
+            if (voltageV > u0 + db2)
+            {
+                uSpan = u0 + db2;
+                qStart = fromRated ? -cfg.K1Percent * db2 : -cfg.K1Percent * (db2 - db1);
             }
         }
+        else
+        {
+            if (voltageV < u0 - db1 && !fromRated)
+                uSpan = u0 - db1;
+            if (voltageV > u0 + db1 && !fromRated)
+                uSpan = u0 + db1;
+        }
 
-        double raw = qStart + SegmentDelta(uSpan, voltageV, u0, qRated, droop);
+        double raw = qStart + k * (uSpan - voltageV);
         double coef = Math.Clamp(cfg.LimitCoefficient, 0, 10);
         double maxOut = Math.Max(0, cfg.MaxOutputKvar) * coef;
         double maxAbs = Math.Max(0, cfg.MaxAbsorbKvar) * coef;
-        return Math.Clamp(raw, -maxAbs, maxOut);
+        if (raw < -0.01)
+            return -Math.Min(-raw, maxAbs);
+        return Math.Min(raw, maxOut);
     }
-
-    private static double SegmentDelta(double uSpan, double u, double u0, double qRated, double droopPercent) =>
-        (uSpan - u) / u0 * qRated / droopPercent * 100.0;
 }

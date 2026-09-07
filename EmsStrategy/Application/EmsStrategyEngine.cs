@@ -20,6 +20,7 @@ public sealed class EmsStrategyEngine : IEmsStrategyEngine
     public void Initialize(EmsStrategyConfig config)
     {
         _config = config.Clone();
+        EmsStrategyConfig.NormalizeModes(_config);
         _active.ApplyConfig(_config);
         _reactive.ApplyConfig(_config);
         _active.Reset();
@@ -31,6 +32,7 @@ public sealed class EmsStrategyEngine : IEmsStrategyEngine
     public void UpdateConfig(EmsStrategyConfig config)
     {
         var next = config.Clone();
+        EmsStrategyConfig.NormalizeModes(next);
         bool modeChanged = next.ActiveMode != _config.ActiveMode || next.ReactiveMode != _config.ReactiveMode;
         _config = next;
         _active.ApplyConfig(_config);
@@ -60,8 +62,8 @@ public sealed class EmsStrategyEngine : IEmsStrategyEngine
             return _output;
         }
 
-        double pCmd = _config.ActiveEnable ? _active.Step(_config, _meas, dt) : 0;
-        double qCmd = _config.ReactiveEnable ? _reactive.Step(_config, _meas, dt) : 0;
+        double pCmd = _config.ActiveEnable ? _active.Step(_config, _meas, dt, _reactive.LastTarget) : 0;
+        double qCmd = _config.ReactiveEnable ? _reactive.Step(_config, _meas, dt, _active.LastTarget) : 0;
         if (!_config.ActiveEnable)
             _active.Reset();
         if (!_config.ReactiveEnable)
@@ -85,7 +87,6 @@ public sealed class EmsStrategyEngine : IEmsStrategyEngine
             BeforeLimitKw = _active.LastBeforeLimit,
             AfterLimitKw = _active.LastAfterLimit,
             PiOutputKw = _active.LastPiOutput,
-            CurveWait = _active.CurveWait || _reactive.CurveWait,
             OutputEnabled = true,
             Branches = branches
         };
@@ -118,7 +119,6 @@ public sealed class EmsStrategyEngine : IEmsStrategyEngine
         PiOutputKw = _output.PiOutputKw,
         BeforeLimitKw = _output.BeforeLimitKw,
         AfterLimitKw = _output.AfterLimitKw,
-        CurveWait = _output.CurveWait,
         Branches = _output.Branches
     };
 

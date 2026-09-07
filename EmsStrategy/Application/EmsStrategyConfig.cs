@@ -24,8 +24,12 @@ public sealed class EmsStrategyConfig
     public double PfSign { get; set; } = 1;
     public double VoltageSetV { get; set; } = 35000;
     public double VoltageKp { get; set; } = 0.5;
+    /// <summary>恒压调差系数 Voltage_Fixed_K：Qset = (u_out − Umeas)·K + Qmeas。</summary>
+    public double VoltageFixedK { get; set; } = 1;
     public double ApparentRatedKva { get; set; } = 5000;
     public double PlantRatedKw { get; set; } = 5000;
+    public bool ApparentLimitEnabled { get; set; } = true;
+    public bool DampEnabled { get; set; } = true;
 
     public SlopeConfig Slope { get; set; } = new();
     public SlopeConfig ReactiveSlope { get; set; } = new();
@@ -34,9 +38,17 @@ public sealed class EmsStrategyConfig
     public PrimaryFrequencyConfig PrimaryFrequency { get; set; } = new();
     public InertiaConfig Inertia { get; set; } = new();
     public VoltageDroopConfig VoltageDroop { get; set; } = new();
-    public CurveConfig ActiveCurve { get; set; } = new();
-    public CurveConfig ReactiveCurve { get; set; } = new();
     public DistributionConfig Distribution { get; set; } = new();
+
+    /// <summary>旧 JSON 的 CloseLoopCurve 落地为 CloseLoopFixed。</summary>
+    public static void NormalizeModes(EmsStrategyConfig cfg)
+    {
+        ArgumentNullException.ThrowIfNull(cfg);
+        if (cfg.ActiveMode == ActiveMode.CloseLoopCurve)
+            cfg.ActiveMode = ActiveMode.CloseLoopFixed;
+        if (cfg.ReactiveMode == ReactiveMode.CloseLoopCurve)
+            cfg.ReactiveMode = ReactiveMode.CloseLoopFixed;
+    }
 
     public static EmsStrategyConfig CreateDefault() => new()
     {
@@ -57,8 +69,11 @@ public sealed class EmsStrategyConfig
         PfSign = 1,
         VoltageSetV = 35000,
         VoltageKp = 0.5,
+        VoltageFixedK = 1,
         ApparentRatedKva = 5000,
         PlantRatedKw = 5000,
+        ApparentLimitEnabled = true,
+        DampEnabled = true,
         Slope = new SlopeConfig
         {
             Enabled = false,
@@ -67,6 +82,7 @@ public sealed class EmsStrategyConfig
         },
         ActivePid = new PidConfig
         {
+            Enabled = true,
             Kp = 0.4,
             Ki = 0.05,
             Kb = 0.5,
@@ -95,11 +111,10 @@ public sealed class EmsStrategyConfig
         },
         Inertia = new InertiaConfig(),
         VoltageDroop = new VoltageDroopConfig(),
-        ActiveCurve = new CurveConfig(),
-        ReactiveCurve = new CurveConfig(),
         ReactiveSlope = new SlopeConfig { Enabled = false, RiseKwPerSec = 100, FallKwPerSec = 100 },
         ReactivePid = new PidConfig
         {
+            Enabled = true,
             Kp = 0.4,
             Ki = 0.05,
             Kb = 0.5,
@@ -111,6 +126,7 @@ public sealed class EmsStrategyConfig
         },
         Distribution = new DistributionConfig
         {
+            Enabled = true,
             SocBalance = false,
             SocMin = 0.1,
             SocMax = 0.9
@@ -136,81 +152,41 @@ public sealed class EmsStrategyConfig
         PfSign = PfSign,
         VoltageSetV = VoltageSetV,
         VoltageKp = VoltageKp,
+        VoltageFixedK = VoltageFixedK,
         ApparentRatedKva = ApparentRatedKva,
         PlantRatedKw = PlantRatedKw,
-        Slope = new SlopeConfig
-        {
-            Enabled = Slope.Enabled,
-            RiseKwPerSec = Slope.RiseKwPerSec,
-            FallKwPerSec = Slope.FallKwPerSec
-        },
-        ActivePid = new PidConfig
-        {
-            Kp = ActivePid.Kp,
-            Ki = ActivePid.Ki,
-            Kb = ActivePid.Kb,
-            Period = ActivePid.Period,
-            DeadbandKw = ActivePid.DeadbandKw,
-            OutMinKw = ActivePid.OutMinKw,
-            OutMaxKw = ActivePid.OutMaxKw,
-            Discretization = ActivePid.Discretization
-        },
-        PrimaryFrequency = new PrimaryFrequencyConfig
-        {
-            Enabled = PrimaryFrequency.Enabled,
-            RatedFrequencyHz = PrimaryFrequency.RatedFrequencyHz,
-            Deadband1Percent = PrimaryFrequency.Deadband1Percent,
-            Deadband2Percent = PrimaryFrequency.Deadband2Percent,
-            DroopPercent = PrimaryFrequency.DroopPercent,
-            Droop2Percent = PrimaryFrequency.Droop2Percent,
-            SegmentCount = PrimaryFrequency.SegmentCount,
-            OverFreqEnable = PrimaryFrequency.OverFreqEnable,
-            UnderFreqEnable = PrimaryFrequency.UnderFreqEnable,
-            ControlCycle = PrimaryFrequency.ControlCycle,
-            ResetTime = PrimaryFrequency.ResetTime,
-            MaxOutputKw = PrimaryFrequency.MaxOutputKw,
-            MaxAbsorbKw = PrimaryFrequency.MaxAbsorbKw,
-            LimitCoefficient = PrimaryFrequency.LimitCoefficient
-        },
+        ApparentLimitEnabled = ApparentLimitEnabled,
+        DampEnabled = DampEnabled,
+        Slope = (Slope ?? new SlopeConfig()).Clone(),
+        ActivePid = (ActivePid ?? new PidConfig()).Clone(),
+        PrimaryFrequency = (PrimaryFrequency ?? new PrimaryFrequencyConfig()).Clone(),
         Inertia = (Inertia ?? new InertiaConfig()).Clone(),
         VoltageDroop = (VoltageDroop ?? new VoltageDroopConfig()).Clone(),
-        ActiveCurve = (ActiveCurve ?? new CurveConfig()).Clone(),
-        ReactiveCurve = (ReactiveCurve ?? new CurveConfig()).Clone(),
-        ReactiveSlope = new SlopeConfig
-        {
-            Enabled = (ReactiveSlope ?? Slope).Enabled,
-            RiseKwPerSec = (ReactiveSlope ?? Slope).RiseKwPerSec,
-            FallKwPerSec = (ReactiveSlope ?? Slope).FallKwPerSec
-        },
-        ReactivePid = new PidConfig
-        {
-            Kp = (ReactivePid ?? ActivePid).Kp,
-            Ki = (ReactivePid ?? ActivePid).Ki,
-            Kb = (ReactivePid ?? ActivePid).Kb,
-            Period = (ReactivePid ?? ActivePid).Period,
-            DeadbandKw = (ReactivePid ?? ActivePid).DeadbandKw,
-            OutMinKw = (ReactivePid ?? ActivePid).OutMinKw,
-            OutMaxKw = (ReactivePid ?? ActivePid).OutMaxKw,
-            Discretization = (ReactivePid ?? ActivePid).Discretization
-        },
-        Distribution = new DistributionConfig
-        {
-            SocBalance = Distribution.SocBalance,
-            SocMin = Distribution.SocMin,
-            SocMax = Distribution.SocMax
-        }
+        ReactiveSlope = (ReactiveSlope ?? Slope ?? new SlopeConfig()).Clone(),
+        ReactivePid = (ReactivePid ?? ActivePid ?? new PidConfig()).Clone(),
+        Distribution = (Distribution ?? new DistributionConfig()).Clone()
     };
 }
 
 public sealed class SlopeConfig
 {
     public bool Enabled { get; set; }
+    /// <summary>JSON 名沿用 RiseKwPerSec，语义是 C 的 kW/min。</summary>
     public double RiseKwPerSec { get; set; } = 100;
+    /// <summary>JSON 名沿用 FallKwPerSec，语义是 C 的 kW/min。</summary>
     public double FallKwPerSec { get; set; } = 100;
+
+    public SlopeConfig Clone() => new()
+    {
+        Enabled = Enabled,
+        RiseKwPerSec = RiseKwPerSec,
+        FallKwPerSec = FallKwPerSec
+    };
 }
 
 public sealed class PidConfig
 {
+    public bool Enabled { get; set; } = true;
     public double Kp { get; set; } = 0.4;
     public double Ki { get; set; } = 0.05;
     public double Kb { get; set; } = 0.5;
@@ -219,6 +195,19 @@ public sealed class PidConfig
     public double OutMinKw { get; set; } = -5000;
     public double OutMaxKw { get; set; } = 5000;
     public PidDiscretization Discretization { get; set; } = PidDiscretization.CompatiblePeriod;
+
+    public PidConfig Clone() => new()
+    {
+        Enabled = Enabled,
+        Kp = Kp,
+        Ki = Ki,
+        Kb = Kb,
+        Period = Period,
+        DeadbandKw = DeadbandKw,
+        OutMinKw = OutMinKw,
+        OutMaxKw = OutMaxKw,
+        Discretization = Discretization
+    };
 }
 
 public sealed class PrimaryFrequencyConfig
@@ -229,6 +218,12 @@ public sealed class PrimaryFrequencyConfig
     public double Deadband2Percent { get; set; } = 0.5;
     public double DroopPercent { get; set; } = 3;
     public double Droop2Percent { get; set; } = 5;
+    /// <summary>过频 droop%；0 表示沿用 DroopPercent。</summary>
+    public double OverDroopPercent { get; set; }
+    /// <summary>欠频 droop%；0 表示沿用 DroopPercent。</summary>
+    public double UnderDroopPercent { get; set; }
+    public double OverDroop2Percent { get; set; }
+    public double UnderDroop2Percent { get; set; }
     public int SegmentCount { get; set; } = 3;
     public bool OverFreqEnable { get; set; } = true;
     public bool UnderFreqEnable { get; set; } = true;
@@ -237,13 +232,44 @@ public sealed class PrimaryFrequencyConfig
     public double MaxOutputKw { get; set; } = 5000;
     public double MaxAbsorbKw { get; set; } = 5000;
     public double LimitCoefficient { get; set; } = 1;
+
+    public PrimaryFrequencyConfig Clone() => new()
+    {
+        Enabled = Enabled,
+        RatedFrequencyHz = RatedFrequencyHz,
+        Deadband1Percent = Deadband1Percent,
+        Deadband2Percent = Deadband2Percent,
+        DroopPercent = DroopPercent,
+        Droop2Percent = Droop2Percent,
+        OverDroopPercent = OverDroopPercent,
+        UnderDroopPercent = UnderDroopPercent,
+        OverDroop2Percent = OverDroop2Percent,
+        UnderDroop2Percent = UnderDroop2Percent,
+        SegmentCount = SegmentCount,
+        OverFreqEnable = OverFreqEnable,
+        UnderFreqEnable = UnderFreqEnable,
+        ControlCycle = ControlCycle,
+        ResetTime = ResetTime,
+        MaxOutputKw = MaxOutputKw,
+        MaxAbsorbKw = MaxAbsorbKw,
+        LimitCoefficient = LimitCoefficient
+    };
 }
 
 public sealed class DistributionConfig
 {
+    public bool Enabled { get; set; } = true;
     public bool SocBalance { get; set; }
     public double SocMin { get; set; } = 0.1;
     public double SocMax { get; set; } = 0.9;
+
+    public DistributionConfig Clone() => new()
+    {
+        Enabled = Enabled,
+        SocBalance = SocBalance,
+        SocMin = SocMin,
+        SocMax = SocMax
+    };
 }
 
 public sealed class InertiaConfig
@@ -282,6 +308,8 @@ public sealed class VoltageDroopConfig
     public double Deadband2Percent { get; set; } = 1.5;
     public double K1Percent { get; set; } = 4;
     public double K2Percent { get; set; } = 6;
+    /// <summary>0=从死区边沿起算（C 曲线1）；1=从额定电压起算（C 曲线2）。</summary>
+    public int VoltageCurveType { get; set; }
     public int SegmentCount { get; set; } = 3;
     public bool OverVoltEnable { get; set; } = true;
     public bool UnderVoltEnable { get; set; } = true;
@@ -299,6 +327,7 @@ public sealed class VoltageDroopConfig
         Deadband2Percent = Deadband2Percent,
         K1Percent = K1Percent,
         K2Percent = K2Percent,
+        VoltageCurveType = VoltageCurveType,
         SegmentCount = SegmentCount,
         OverVoltEnable = OverVoltEnable,
         UnderVoltEnable = UnderVoltEnable,
@@ -307,33 +336,5 @@ public sealed class VoltageDroopConfig
         MaxOutputKvar = MaxOutputKvar,
         MaxAbsorbKvar = MaxAbsorbKvar,
         LimitCoefficient = LimitCoefficient
-    };
-}
-
-public sealed class CurvePointConfig
-{
-    public int? Weekday { get; set; }
-    public string? Date { get; set; }
-    public string Start { get; set; } = "00:00:00";
-    public string End { get; set; } = "24:00:00";
-    public double Power { get; set; }
-}
-
-public sealed class CurveConfig
-{
-    public CurveMatchMode Mode { get; set; } = CurveMatchMode.Weekday;
-    public List<CurvePointConfig> Points { get; set; } = new();
-
-    public CurveConfig Clone() => new()
-    {
-        Mode = Mode,
-        Points = Points.Select(p => new CurvePointConfig
-        {
-            Weekday = p.Weekday,
-            Date = p.Date,
-            Start = p.Start,
-            End = p.End,
-            Power = p.Power
-        }).ToList()
     };
 }

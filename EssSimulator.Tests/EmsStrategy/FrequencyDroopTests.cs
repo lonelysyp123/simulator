@@ -43,6 +43,16 @@ public class FrequencyDroopTests
     }
 
     [Fact]
+    public void OverDroopOverride_ChangesMagnitude()
+    {
+        var cfg = DefaultCfg();
+        cfg.OverDroopPercent = 6;
+        double with3 = FrequencyDroopCalculator.ComputeDeltaKw(50.2, 5000, DefaultCfg());
+        double with6 = FrequencyDroopCalculator.ComputeDeltaKw(50.2, 5000, cfg);
+        Assert.Equal(with3 / 2.0, with6, 5);
+    }
+
+    [Fact]
     public void OverFreq_NegativeDelta()
     {
         var cfg = DefaultCfg();

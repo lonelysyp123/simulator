@@ -1,243 +1,210 @@
-# Implementation Plan: LC 中压点表归属与运行时继承
+# Implementation Plan: 电站 EMS 策略参数热更新
 
 ## Overview
 
-5.5MW / 10MW 点表不是 EMU 单元协议，而是中压系统（LocalControl）协议：SYSTEM 段地址与基础 `lc.csv` 同源（如 107 故障总、170 黑启动状态、171 高压开关、7 黑启动写入），再按场景加模块遥测、改控制编码。本计划把这两张表迁到 `pointmaps/models/lc/`，EMU 只保留 `standard`；LC 运行时做成基类 + 子类：基础 LC 继续按点名桥接 `simEmu`，中压子类按点表 ModelSim 把仿真模型采集进本机 LC Modbus，并允许重写控制。不改径向电气、不拆 csproj。
+电站策略的斜率、PID、视在限幅、功率分配、计划曲线，以及一次调频 / 惯量 / 下垂调压的明细参数，已经在引擎和 `configs/ems-strategy.json` 里跑，页面只露出模式开关与本地 P/Q。本计划把这些参数接到 Web：**改完立即 `UpdateConfig`（不重启）**，并写回与启动加载同一份 JSON。不改控制律公式、不合并第三方遥控 tab、不把两套下发合成一套。
+
+上一份 `tasks/plan.md`（LC 中压点表）已归档到 `tasks/lc-mv-pointmap.md`。
 
 ## Architecture Decisions
 
-- **点表身份**：`trina_5.5MW` / `trina_10MW` 的完整 CSV 放到 `pointmaps/models/lc/{id}/lc.csv`（由 `emu.csv` 改名）。`pointmaps/models/emu/` 只留 `standard`（单机组 PCS 直控 `yx`/`yt`/`yc`）。
-- **不做 CSV 文件合并继承**：中压表与基础 LC 在 107/170/171/7 等地址重叠，但 PCS 控制从 `27200` 启停换成 `syst6`（3/4/5/6）等，不能按行拼表。每个 LC 型号一份完整 `lc.csv`；「继承」落在 C# 运行时，不落在 CSV 拼接。
-- **采集路径跟 ModelSim，写到本机 LC Modbus**：有绑定的点走已有 DataExchange（模型 → `simLc*` 寄存器），不新做一套去轮询 `simEmu` 寄存器。无绑定的基础 LC 仍用现有桥：按 ParamName 从 `simEmu*` 抄数、回写控制。
-- **运行时继承（与点表选型挂钩）**：
-  ```
-  LcRuntimeBase          周期、影子、解析 simEmu/simLc、写 LC 寄存器
-    └── StandardLcRuntime    现 LocalControlBridgeEngine（param → yx/yt/yc）
-    └── ModelBoundLcRuntime  点表含 ModelSim：跳过点名桥，交给 DataExchange
-          └── Trina55MwLcRuntime   4 模块 / 2 台 PCS 块口径
-          └── Trina10MwLcRuntime   8 模块 / 4 台 PCS 块口径
-  ```
-  子类默认**不调用**基类点名桥（点名不同，叠跑会把电压写成 0、控制静默失败）。基类提供可复用工具；子类可增加采集源、可 override 控制。
-- **自动选型改打 LC**：组态 2/4/8 台 PCS → `lc` 的 `standard` / `trina_5.5MW` / `trina_10MW`。**不再改 `emu` 选型**。若 `device-models.json` 里 `emu` 仍是已搬走的 trina id，迁到 `lc` 并把 `emu` 回 `standard`。
-- **现成能力复用**：`LocalControlModbusServer` 在点表有 ModelSim 时已启用 DataExchange 且桥接 `UsesDataExchange` 早退；`PointCatalogLoader` / 插件 / `EmuSystemOperationApplier` 已把 `simLc` 当 EMU 同构。迁表后中压 LC 的 syst6/syst7/syst1010 应直接生效，本计划补的是归属、工厂与子类扩展点，而不是再写一套总控语义。
-- **不做**：把 5.5/10MW 继续挂在 `simEmu`；CSV `extends` 合并；改 PlantEngine；把标准 LC 的 param 全部补上 ModelSim（可后续另开）。
+- **热更新 = 引擎立刻换参 + 落盘。** 沿用已有 `EmsStrategyRuntime.TryReplace` → `Engine.UpdateConfig`。成功后写入 `AppContext.BaseDirectory/configs/ems-strategy.json`（与 `LoadFileOrDefault` 同路径）。重启读到的就是上次页面应用的值。
+- **参数变更不复位控制状态。** 现逻辑：仅有功/无功**模式切换**时 `Reset` PI / ACTION。改死区、Kp、斜率、曲线点只 `Configure`，积分与调频 ACTION 继续。开关类（调频/惯量/下垂使能）同样不强制 Reset，由 `Step` 按新开关跳过或清增量。
+- **HTTP 做嵌套覆盖，不当残缺体整表替换。** 现前端 `POST /api/ems-strategy` 只发几个标量。若改成「反序列化成完整 Config 再替换」，缺字段会掉回默认、冲掉 JSON 里的 PID。`EmsStrategyPatchRequest` 增加可空嵌套对象（`Slope`、`ActivePid`、`PrimaryFrequency`…）；服务端 `Clone` 当前配置再覆盖非空字段。占用仍走 `/enable`。
+- **快照轮询与表单草稿分离。** 现页每秒 `GET` 后 `applyStatus` 会覆盖输入。参数卡用本地 draft；1s 只刷新 snapshot。每张卡「应用」提交对应嵌套对象（避免每个 spinner 写盘）。
+- **周期字段维持 TimeSpan JSON（`00:00:01`）。** 前端从 GET 原样带回；不新增平行 `*Ms` DTO，避免两套单位。
+- **`Enabled` 一并落盘。** 文件里 `Enabled: true` 时启动会 `SyncGate` 占用，与「配置即真源」一致。第三方占用时 `TryReplace`/`TrySetEnabled` 仍 409。
+- **不做：** 改调频/惯量/分配公式；合 EMS tab；把参数写进组态工程；双写仓库源文件（只写运行目录；`PreserveNewest` 下输出文件更新后重建不会被仓库旧文件盖掉）。
 
 ## 依赖图
 
 ```
-trina CSV 从 emu/ 迁到 lc/（完整 lc.csv）
+可注入路径的 Persist（与 Load 同文件）
     │
-    ├── 自动选型改写 lc；清理过期 emu=trina_* 选型
-    │
-    └── 测试与文档改读 lc/{id}/lc.csv
+    └── Patch 嵌套覆盖（Clone + 非空字段）
             │
-            └── LcRuntimeBase + 工厂（standard 行为不变）
+            ├── 公共算法卡：斜率 / PID / 视在额定
+            │
+            ├── 辅助服务卡：调频 / 惯量 / 下垂明细
+            │
+            └── 分配 + 曲线表 + 恒压/远程等漏掉的运行量
                     │
-                    ├── ModelBound 子类：跳过点名桥，DataExchange 写 LC Modbus
-                    │
-                    └── Trina55 / Trina10 子类：控制/采集扩展点 + 契约测试
+                    └── 折叠、模式联动禁用、脏标记
 ```
+
+实现顺序自下而上：先落盘与覆盖语义（无 UI 也能用 POST 热更新），再按垂直切片补页面，每一刀都能在不重启的仿真里改参见快照。
 
 ## Task List
 
-### Phase 1: 点表归到 LC
+### Phase 1: Foundation
 
-### Task 1: 把 5.5MW / 10MW 点表迁到 LC 型号目录
+### Task 1: 配置落盘（与 Load 同路径）
 
-**Description:** 将 `pointmaps/models/emu/trina_5.5MW/`、`trina_10MW/` 整目录迁到 `pointmaps/models/lc/`，CSV 从 `emu.csv` 改名为 `lc.csv`（内容与 ModelSim 不动）。更新两份 `model.json` 的 description：明确这是中压 LC/MV-EMS 点表，挂在 `simLc*`，绑定仍指向 `emuDeviceId.*`。EMU 侧只保留 `standard`。
+**Description:** 给 `EmsStrategyRuntime` 可注入配置路径（默认仍是 `BaseDirectory/configs/ems-strategy.json`）。`TryReplace` / `TrySetEnabled` 在引擎更新成功后，用现有 JSON 选项（含枚举字符串）写回该文件。失败的占用（第三方挡住）不得写盘。抽出 `Save` 便于单测用临时文件，不碰仓库 `configs/ems-strategy.json`。
 
 **Acceptance criteria:**
-- [ ] 仓库中不存在 `pointmaps/models/emu/trina_5.5MW` 与 `trina_10MW`
-- [ ] `pointmaps/models/lc/trina_5.5MW/lc.csv`、`lc/trina_10MW/lc.csv` 存在且 ParamName/ModelSim 与迁前一致
-- [ ] `DeviceModelRegistry.ListTypes` 下 `lc` 含 `standard`、`trina_5.5MW`、`trina_10MW`；`emu` 只含 `standard`
+- [ ] `TryReplace` 成功后临时路径文件可反序列化为相同斜率/PID/调频字段
+- [ ] `TrySetEnabled(true)` 在第三方占用失败时文件内容不变
+- [ ] 默认路径与 `LoadFileOrDefault` 一致
 
 **Verification:**
-- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~DeviceModelRegistry"`
+- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~EmsStrategyRuntime"`
 - [ ] Build succeeds: `dotnet build ./EssSimulator.csproj`
 
 **Dependencies:** None
 
 **Files likely touched:**
-- `pointmaps/models/emu/trina_5.5MW/**`（删除）
-- `pointmaps/models/emu/trina_10MW/**`（删除）
-- `pointmaps/models/lc/trina_5.5MW/lc.csv`、`model.json`
-- `pointmaps/models/lc/trina_10MW/lc.csv`、`model.json`
-
-**Estimated scope:** Small: 1-2 files（实为目录搬迁）
-
-### Task 2: 组态自动选型改打 LC，并迁移过期 emu 选型
-
-**Description:** 将 `EmuPointMapAutoSelect` 改为（或替换为）`LcPointMapAutoSelect`：2/4/8 台 PCS 分别选 LC 的 `standard` / `trina_5.5MW` / `trina_10MW`，写入 `selections["lc"]`，不改 `selections["emu"]`。若已有 `emu=trina_5.5MW|trina_10MW`，一次迁移：`lc` 设为该 id，`emu` 改为 `standard`。工程保存/应用入口改调新 API。
-
-**Acceptance criteria:**
-- [ ] 4 台 PCS 保存工程后 `lc=trina_5.5MW`，`emu` 保持原值（测例里可预置 `standard`）
-- [ ] 2 台 PCS → `lc=standard`；8 台 → `lc=trina_10MW`
-- [ ] 预置 `emu=trina_10MW` 时，迁移后 `lc=trina_10MW` 且 `emu=standard`
-- [ ] 其它 PCS 数量仍不改选型
-
-**Verification:**
-- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~PointMapAutoSelect|FullyQualifiedName~LcPointMapAutoSelect|FullyQualifiedName~EmuPointMapAutoSelect"`
-- [ ] Build succeeds: `dotnet build ./EssSimulator.csproj`
-
-**Dependencies:** Task 1
-
-**Files likely touched:**
-- `Web/Topology/EmuPointMapAutoSelect.cs`（改名或薄封装）
-- `Web/Topology/TopologyEndpoints.cs`、`SystemConfigEndpoints.cs`
-- `EssSimulator.Tests/Topology/EmuPointMapAutoSelectTests.cs`
-
-**Estimated scope:** Medium: 3-5 files
-
-### Task 3: 测试与说明改读 LC 路径
-
-**Description:** `TelemetryPluginTests.LoadCatalog` 改为加载 `pointmaps/models/lc/{id}/lc.csv`，目录编译用 `simLc1`（`emuDeviceId` → `emu1` 的替换结果应与现断言相同）。其它仍指向 `emu/standard/emu.csv` 的测试不动。`pointmaps/README.md` 写清：EMU 只有 standard；中压 5.5/10MW 是 LC 型号；自动选型改 `lc`。
-
-**Acceptance criteria:**
-- [ ] 插件/sum/max/syst* 绑定断言在 `simLc1` + 新路径下全部通过
-- [ ] 无测试再读 `models/emu/trina_*`
-- [ ] README 不再把 5.5/10MW 列为 EMU 型号
-
-**Verification:**
-- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~TelemetryPlugin|FullyQualifiedName~PointMapPathResolver|FullyQualifiedName~DeviceModelRegistry"`
-- [ ] Build succeeds: `dotnet build ./EssSimulator.csproj`
-
-**Dependencies:** Task 1
-
-**Files likely touched:**
-- `EssSimulator.Tests/DataExchange/TelemetryPluginTests.cs`
-- `pointmaps/README.md`
+- `EmsStrategy/Adapter/EmsStrategyRuntime.cs`
+- `EssSimulator.Tests/EmsStrategy/EmsStrategyRuntimeTests.cs`（新建）
 
 **Estimated scope:** Small: 1-2 files
 
-### Checkpoint: Phase 1
+### Task 2: PATCH 嵌套覆盖全部参数对象
 
-- [ ] 系统配置页 LC 能选到 5.5MW/10MW，EMU 只剩标准版
-- [ ] 全量 `dotnet test EssSimulator.Tests` 绿
-- [ ] 与人确认：未改运行时前，standard LC 桥接行为与迁表前一致（中压表尚未经工厂启用也可先用 DataExchange 早退路径）
-
-### Phase 2: LC 运行时基类
-
-### Task 4: 抽出 LcRuntimeBase 与选型工厂，standard 行为不变
-
-**Description:** 把 `LocalControlBridgeEngine` 收成 `StandardLcRuntime : LcRuntimeBase`。`LcRuntimeBase` 持有周期入口、控制影子、读/写 LC 与解析 `simEmu*` 的工具方法；`SyncTelemetry` / `ApplyControls` 标 virtual。`LcRuntimeFactory.Create(lcModelId)`：`standard`（及未知 id）→ `StandardLcRuntime`。`LocalControlHostedService` 按当前 LC 选型为每个 `simLc*` 建 runtime。本任务不改桥接点名映射。
+**Description:** 把 `ApplyPatch` 抽成可单测的覆盖器：在当前 `Clone()` 上写入 `EmsStrategyPatchRequest` 里非空的标量与嵌套对象（`Slope`、`ReactiveSlope`、`ActivePid`、`ReactivePid`、`PrimaryFrequency`、`Inertia`、`VoltageDroop`、`ActiveCurve`、`ReactiveCurve`、`Distribution`，以及 `ApparentRatedKva`、`PlantRatedKw`、`VoltageSetV`、`VoltageKp`、`PfSign`、`SystemSwitch`、`ActiveEnable`、`ReactiveEnable`、`LocalRemote`、`RemoteReactiveSetKvar`）。嵌套对象整段替换该子树（一次应用一张卡），不是字段级 merge。现有标量补丁行为保持，旧页面不发嵌套对象时 PID 不被清掉。
 
 **Acceptance criteria:**
-- [ ] LC 选型为 `standard` 时，启停/P·Q/孤岛电压/黑启动/高压开关仍按原 param→yx/yt 转发
-- [ ] 工厂对未知型号回退 `StandardLcRuntime`
-- [ ] 无新的对外协议行为
+- [ ] 只 PATCH `ActivePid.Kp` 所在对象时，未出现在 body 的 `PrimaryFrequency.DroopPercent` 保持原值
+- [ ] 提交完整 `PrimaryFrequency` 后死区/droop/周期进入 `runtime.Config`，随后 `Step` 使用新死区（可沿用现有调频测例注入 config）
+- [ ] 旧标量 PATCH（`localActiveSetKw`、`primaryFrequencyEnabled`）仍有效
 
 **Verification:**
-- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~LocalControl|FullyQualifiedName~ModbusValueConverter|FullyQualifiedName~LcRuntime"`
+- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~EmsStrategy"`
 - [ ] Build succeeds: `dotnet build ./EssSimulator.csproj`
 
-**Dependencies:** None（可与 Phase 1 并行，合入须在 Task 5 之前）
+**Dependencies:** Task 1
 
 **Files likely touched:**
-- `LocalControl/LocalControlBridgeEngine.cs`
-- `LocalControl/LcRuntimeBase.cs`（新）
-- `LocalControl/StandardLcRuntime.cs`（新，或原文件改名）
-- `LocalControl/LcRuntimeFactory.cs`（新）
-- `LocalControl/LocalControlHostedService.cs`
-- `EssSimulator.Tests/LocalControl/`（工厂 + 行为钉）
+- `Web/EmsStrategy/EmsStrategyEndpoints.cs`
+- `EmsStrategy/Application/EmsStrategyConfigPatcher.cs`（新建，或放在 Endpoints 旁并 InternalsVisible）
+- `EssSimulator.Tests/EmsStrategy/EmsStrategyConfigPatcherTests.cs`（新建）
 
 **Estimated scope:** Medium: 3-5 files
 
-### Task 5: ModelBoundLcRuntime — ModelSim 点表走 DataExchange，跳过点名桥
+### Checkpoint: Foundation
 
-**Description:** 增加 `ModelBoundLcRuntime`：`RunCycle` 不再按 `yx3`/`yc20` 抄 `simEmu`。点表含 ModelSim 时继续用现有 `LocalControlModbusServer` DataExchange：遥测从绑定路径采集并写入本机 LC Modbus；控制由目录效果落到 `emu{n}.Emu.*` / PCS。`UsesDataExchange` 早退与子类 skip-bridge 对齐，避免双写。工厂：`trina_5.5MW` / `trina_10MW` → 对应中压子类（本任务可先都指向 `ModelBoundLcRuntime`，Task 6 再拆子类）。
+- [ ] 不经 UI，用测试或手动 POST 嵌套对象即可热更新并写到运行目录 JSON
+- [ ] 模式未变时改 Kp 不 Reset 积分（现 `PidController.Configure` 行为，补一条断言钉住）
+- [ ] `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~EmsStrategy"` 绿
+- [ ] 与人工确认后再做页面
+
+### Phase 2: Core Features
+
+### Task 3: 快照与草稿分离 + 斜率 / PID / 视在参数卡
+
+**Description:** `EmsStrategyView` 1s 轮询只更新 snapshot 与 `gateOwner`/`enabled`（enabled 以服务端为准，本地开关仍走 `/enable`）。模式与本地 P/Q/PF 保持现有即时 PATCH。新增可折叠卡：有功/无功斜率、有功/无功 PID、视在额定与站额定。卡内为 draft，点「应用」POST 对应嵌套对象。第三方占用时卡禁用。
 
 **Acceptance criteria:**
-- [ ] LC=trina_5.5MW 时写 `syst6=3` 使该 LC 首机组全部 PCS `pcsOnOffSwitch=true`（不要求存在 `yx3`）
-- [ ] 同场景写 `syst7=1` 批量打开所属 PCS 黑启动
-- [ ] LC 寄存器 `sysyc104` 等能从模型刷新（SOC 等已绑定点）
-- [ ] LC=standard 时仍走点名桥，不受影响
+- [ ] 打开 PID 卡改 Kp 未点应用时，轮询不会把输入复原
+- [ ] 应用后 GET 的 `config.activePid.kp` 与文件（运行目录）一致，快照下一拍起用新 PI（闭环模式）
+- [ ] 斜率使能可从页面打开；默认仍关闭，与 JSON 一致
 
 **Verification:**
-- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~LcRuntime|FullyQualifiedName~TelemetryPlugin|FullyQualifiedName~DeviceControlFacade|FullyQualifiedName~Emu"`
+- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~EmsStrategy"`
 - [ ] Build succeeds: `dotnet build ./EssSimulator.csproj`
-- [ ] Manual check: 选型 LC=trina_5.5MW、EMU=standard、EnableLocalControl=true，重启后对 LC 端口写 syst6，主接线 PCS 启动
+- [ ] Manual check: 策略页改 Kp 点应用，无需重启；刷新页值仍在
 
-**Dependencies:** Task 1, Task 4
+**Dependencies:** Task 2
 
 **Files likely touched:**
-- `LocalControl/ModelBoundLcRuntime.cs`（新）
-- `LocalControl/LcRuntimeFactory.cs`
-- `LocalControl/LocalControlModbusServer.cs`（仅必要时对齐注释/早退）
-- `EssSimulator.Tests/LocalControl/`（中压控制/遥测契约）
+- `Web/src/views/EmsStrategyView.vue`
+- `Web/src/styles/app.css`（仅补参数卡间距，若现有 card 够用则不动）
+
+**Estimated scope:** Small: 1-2 files
+
+### Task 4: 一次调频 / 惯量 / 下垂明细参数卡
+
+**Description:** 在现有三个使能开关下增加明细 draft：调频（额定 f、死区%、droop、段数、过/欠频、周期、复归、限幅）；惯量（Tj、幅度/速率死区、频率范围、闭锁调频、周期/复归）；下垂（额定 U、k1/k2、死区、段数、过/欠压、限幅、周期）。「应用」提交整段 `PrimaryFrequency` / `Inertia` / `VoltageDroop`（含当前 Enabled，避免覆盖开关）。开环有功时调频/惯量卡禁用；下垂卡在无功非闭环固定/曲线时禁用（与现开关规则一致）。
+
+**Acceptance criteria:**
+- [ ] 页面能改调频 droop 与死区并热更新；快照在越死区后 ΔP 与新参数相符（可用已有电网频率入口做手工确认）
+- [ ] 只应用惯量卡时，调频 JSON 段不被默认值覆盖
+- [ ] 使能开关仍即时 PATCH `*Enabled`，与卡内 Enabled 不打架（应用卡时带上开关当前值）
+
+**Verification:**
+- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~EmsStrategy"`
+- [ ] Build succeeds: `dotnet build ./EssSimulator.csproj`
+- [ ] Manual check: 改死区后不用重启，ACTION 文案/ΔP 随新死区变化
+
+**Dependencies:** Task 3
+
+**Files likely touched:**
+- `Web/src/views/EmsStrategyView.vue`
+
+**Estimated scope:** Small: 1-2 files（若单文件过大则抽 `EmsStrategyAuxParams.vue`，仍 ≤2）
+
+### Task 5: 功率分配、计划曲线、恒压与远程设定
+
+**Description:** 补三块：① `Distribution`（SOC 均衡开关、SOC 上下限），应用后支路表分配权重变化可在快照表观察；② 有功/无功曲线：匹配模式（星期/日期）+ 点表增删（Weekday/Date、Start、End、Power），应用 `ActiveCurve`/`ReactiveCurve`；选「闭环曲线」且无命中点时沿用现有 WAIT 告警；③ 恒压模式启用 `VoltageSetV`/`VoltageKp`；本地/远程切换与远程 P/Q 设定（现 PATCH 已有部分标量，页面补齐）。
+
+**Acceptance criteria:**
+- [ ] 增加一条覆盖当前时刻的有功曲线点并应用后，WAIT 消失且站级 P 指令跟曲线功率（斜率关闭时）
+- [ ] SOC 均衡打开后 GET `config.distribution.socBalance === true`
+- [ ] 无功恒压可改 `VoltageSetV` 并出现在 GET config 中
+
+**Verification:**
+- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~EmsStrategy"`
+- [ ] Build succeeds: `dotnet build ./EssSimulator.csproj`
+- [ ] Manual check: 曲线模式加当前时段点 → 应用 → WAIT 消失；重启后点还在
+
+**Dependencies:** Task 3
+
+**Files likely touched:**
+- `Web/src/views/EmsStrategyView.vue`
+- `Web/src/views/EmsStrategyView.vue` 若过大则 `EmsStrategyCurveEditor.vue` + 主视图
 
 **Estimated scope:** Medium: 3-5 files
 
-### Checkpoint: Phase 2
+### Checkpoint: Core Features
 
-- [ ] standard LC：mbpoll 写 param60 仍能启动 PCS1
-- [ ] 5.5MW LC：mbpoll 写 syst6=3 启动该机组全部模块；simEmu 仍是 standard 点表
-- [ ] 全量测试绿
+- [ ] 电站策略页能整定提示词要求的公共算法与辅助服务参数
+- [ ] 应用后无需重启；刷新/重启（读运行目录 JSON）值仍在
+- [ ] 空曲线 + 曲线模式仍 WAIT
+- [ ] 第三方占用时参数应用失败有明确提示
 
-### Phase 3: 中压子类与扩展点
+### Phase 3: Polish
 
-### Task 6: Trina55 / Trina10 子类：可增采集、可覆写控制
+### Task 6: 折叠默认、脏标记与主机/分轴使能
 
-**Description:** `Trina55MwLcRuntime` / `Trina10MwLcRuntime` 继承 `ModelBoundLcRuntime`。基类提供 `CollectExtra` / `ApplyControls` 虚方法：子类可增加采集设备（例如额外电表、以后的 BMS），也可覆写总控（相对标准 LC 的逐 PCS 启停）。本任务用测试钉住差异：5.5MW 目录含 PcsList[0..3] 绑定、10MW 含 PcsList[0..7]；工厂按型号返回对应子类。不在本任务里新加真实设备点（CSV 已含模块遥测）。
-
-**Acceptance criteria:**
-- [ ] `LcRuntimeFactory.Create("trina_5.5MW")` 的运行时类型为 `Trina55MwLcRuntime`
-- [ ] `Create("trina_10MW")` → `Trina10MwLcRuntime`
-- [ ] 虚方法存在且中压子类不调用 `StandardLcRuntime` 的点名桥
-- [ ] 5.5MW 目录编译在 PcsCount=2 的机组上按现有 `EmuDeviceCatalogFilter` 剔除 PcsList[2]/[3]（门控行为保持）
-
-**Verification:**
-- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~LcRuntime|FullyQualifiedName~EmuDeviceCatalogFilter|FullyQualifiedName~TelemetryPlugin"`
-- [ ] Build succeeds: `dotnet build ./EssSimulator.csproj`
-
-**Dependencies:** Task 5
-
-**Files likely touched:**
-- `LocalControl/Trina55MwLcRuntime.cs`、`Trina10MwLcRuntime.cs`（新）
-- `LocalControl/LcRuntimeFactory.cs`
-- `EssSimulator.Tests/LocalControl/`
-
-**Estimated scope:** Small: 1-2 files（加测试则为 Medium）
-
-### Task 7: 文档与系统配置文案
-
-**Description:** 同步 `pointmaps/README.md`、`docs/系统设计说明.md`（及用户手册里把 5.5/10MW 写成 EMU 的句子）：LC 是中压系统点表，可按场景换型号；EMU 是单元直控；自动选型改 LC。系统配置页说明不强制改 Vue 结构，只改会误导的文案（若有「EMU 5.5MW」字样）。
+**Description:** 参数卡默认折叠，运行条（模式、本地 P/Q、三个辅助开关、快照）默认展开。未应用的 draft 显示脏标记；离开卡前提示。补 `SystemSwitch`、`ActiveEnable`、`ReactiveEnable`（影响是否对外输出）。不把 `BypassMasterCheck` 做成显眼开关（仿真默认真，避免误关导致全 0）。文案标明放电为正。
 
 **Acceptance criteria:**
-- [ ] 文档不再把 trina_5.5MW/10MW 称为 EMU 点表
-- [ ] 写明采集：ModelSim → 模型 → 写入 simLc Modbus；标准 LC 仍点名桥接 simEmu
+- [ ] 首次进入策略页，明细参数是折叠的，模式与快照可见
+- [ ] 改了 PID 未应用时有脏标记；应用后清除
+- [ ] 关闭有功使能后站级 P 指令为 0（与引擎 `ActiveEnable` 语义一致）
 
 **Verification:**
+- [ ] Tests pass: `dotnet test EssSimulator.Tests --filter "FullyQualifiedName~EmsStrategy"`
 - [ ] Build succeeds: `dotnet build ./EssSimulator.csproj`
-- [ ] Manual check: README 与系统配置页描述一致
+- [ ] Manual check: 折叠/脏标记/有功使能联调
 
-**Dependencies:** Task 2, Task 6
+**Dependencies:** Task 4, Task 5
 
 **Files likely touched:**
-- `pointmaps/README.md`
-- `docs/系统设计说明.md`
-- `docs/用户手册.md`（仅相关句）
-- `Web/src/views/SystemConfigView.vue`（仅误导文案时）
+- `Web/src/views/EmsStrategyView.vue`
+- `Web/src/styles/app.css`
 
 **Estimated scope:** Small: 1-2 files
 
 ### Checkpoint: Complete
 
-- [ ] Phase 1–3 验收标准均满足
-- [ ] `dotnet test EssSimulator.Tests` 与 `dotnet build ./EssSimulator.csproj` 通过
-- [ ] 未做项已明确：CSV extends 合并、标准 LC 全面 ModelSim 化、PlantEngine、多 csproj
+- [ ] 提示词中的斜率、PID、视在、分配、曲线、调频/惯量/下垂均可在页面热更新并落盘
+- [ ] 算法测试集与新增 Runtime/Patcher 测试通过
+- [ ] 未做项已排除：合 tab、改公式、参数进组态工程、双写仓库 JSON
+- [ ] Ready for review
 
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| 迁表后仍有代码/脚本按 `emu/trina_*/emu.csv` 加载 | 启动失败或测红 | Task 3 先全库搜路径；发布脚本只认 models 目录扫描 |
-| ModelBound 与点名桥双写 | 中压 LC 遥测被桥接写成 0 | 子类不调用基类 SyncTelemetry；沿用 UsesDataExchange 早退 |
-| 现场 `emu=trina_*` 选型残留 | simEmu 找不到点表 | Task 2 启动/保存时迁移到 lc |
-| 多机组 + 中压单机点表 | 第二台 emu 的模块不在 emu1 绑定里 | 保持现有 firstEmuId；多中压系统仍是多 simLc，每路绑本组首机组 |
-| 标准 LC 与中压 LC 控制语义不同（0/1 vs 3/4/5/6） | 联调脚本写错点 | 文档 + Task 5 契约测试钉住 syst6 |
+| 整表反序列化冲掉未提交字段 | High | 嵌套覆盖 + 单测「只改 Pid 不动调频」 |
+| 1s GET 覆盖正在编辑的数字 | High | 轮询与 draft 分离（Task 3 最先做 UI） |
+| 每个 spinner 写盘/热更新 | Med | 按卡「应用」，不按控件即时 POST 嵌套对象 |
+| 改死区时调频正 ACTION | Med | 不 Reset；下一拍用新死区，可能提前复归。文档化，不擅自清 ACTION |
+| 开发时改仓库 JSON、运行改 bin JSON 两套 | Med | 只约定运行目录为真源；任务说明里写明 |
+| `EmsStrategyView.vue` 膨胀 | Med | Task 4/5 超 400 行再抽子组件，单任务仍 ≤5 文件 |
+| `Enabled: true` 落盘导致下次启动直接占用 | Low | 接受；顶栏可释放。第三方已占用则启动 `TryOccupy` 失败，策略实际不启用 |
 
 ## Open Questions
 
-- 多储能单元（例如 2×5.5MW）时，是否仍按 `LocalControlEmuPerGroup` 切多路 `simLc`（每路一张中压表绑本组 `emu{n}`）？默认保持现状。
-- 以后若只要「在标准 LC 上加几个电表点」，再考虑 `model.json` 的 `extends` + 增量 CSV；本期 5.5/10MW 用完整表。
-- 插件类名 `TrinaEmuFaultWordPlugin` 是否改名：本期不动，避免无行为 diff。
+- 无。热更新与落盘已由本次需求确认。`BypassMasterCheck` 不进主界面。

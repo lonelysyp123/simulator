@@ -52,7 +52,6 @@ public sealed class EmsControlOutput
     public ActionState DroopAction { get; init; }
     public double QBaseKvar { get; init; }
     public double PlantReactiveTargetKvar { get; init; }
-    public bool CurveWait { get; init; }
     public double PBaseKw { get; init; }
     public double BeforeLimitKw { get; init; }
     public double AfterLimitKw { get; init; }
@@ -82,7 +81,6 @@ public sealed class EmsStrategySnapshot
     public double QBaseKvar { get; init; }
     public double PlantReactiveTargetKvar { get; init; }
     public double PlantReactiveCommandKvar { get; init; }
-    public bool CurveWait { get; init; }
     public double PlantActiveTargetKw { get; init; }
     public double PlantActiveCommandKw { get; init; }
     public double PiOutputKw { get; init; }

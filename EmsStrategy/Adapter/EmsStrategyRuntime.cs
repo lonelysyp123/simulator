@@ -6,7 +6,7 @@ using EssSimulator.EmsStrategy.Domain;
 
 namespace EssSimulator.EmsStrategy.Adapter;
 
-/// <summary>策略运行时：配置热更新、占用闸门、引擎单例。</summary>
+/// <summary>策略运行时：配置热更新、占用闸门、引擎单例、成功后落盘。</summary>
 public sealed class EmsStrategyRuntime
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -17,14 +17,22 @@ public sealed class EmsStrategyRuntime
     };
 
     private readonly object _gate = new();
+    private readonly string? _persistPath;
+
     public IEmsStrategyEngine Engine { get; }
 
-    public EmsStrategyRuntime() : this(new EmsStrategyEngine(), LoadFileOrDefault()) { }
+    /// <summary>与 <see cref="LoadFileOrDefault"/> 读取的同一路径。</summary>
+    public static string DefaultConfigPath =>
+        Path.Combine(AppContext.BaseDirectory, "configs", "ems-strategy.json");
 
-    public EmsStrategyRuntime(IEmsStrategyEngine engine, EmsStrategyConfig? config = null)
+    public EmsStrategyRuntime() : this(new EmsStrategyEngine(), LoadFileOrDefault(), DefaultConfigPath) { }
+
+    public EmsStrategyRuntime(IEmsStrategyEngine engine, EmsStrategyConfig? config = null, string? persistPath = null)
     {
         Engine = engine ?? throw new ArgumentNullException(nameof(engine));
+        _persistPath = persistPath;
         var cfg = (config ?? EmsStrategyConfig.CreateDefault()).Clone();
+        EmsStrategyConfig.NormalizeModes(cfg);
         Engine.Initialize(cfg);
         lock (_gate)
         {
@@ -69,10 +77,29 @@ public sealed class EmsStrategyRuntime
             ExternalControlGate.Release(ExternalControlOwner.EmsStrategy);
         }
 
+        EmsStrategyConfig.NormalizeModes(next);
         Engine.UpdateConfig(next);
         Config = next;
+        PersistLocked();
         error = "";
         return true;
+    }
+
+    private void PersistLocked()
+    {
+        if (string.IsNullOrWhiteSpace(_persistPath))
+            return;
+        try
+        {
+            string? dir = Path.GetDirectoryName(_persistPath);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+            File.WriteAllText(_persistPath, JsonSerializer.Serialize(Config, JsonOptions));
+        }
+        catch
+        {
+            // 引擎已热更新；落盘失败不回滚占用。
+        }
     }
 
     private static void SyncGate(bool enabled)
@@ -85,14 +112,16 @@ public sealed class EmsStrategyRuntime
 
     public static EmsStrategyConfig LoadFileOrDefault()
     {
-        string path = Path.Combine(AppContext.BaseDirectory, "configs", "ems-strategy.json");
+        string path = DefaultConfigPath;
         if (!File.Exists(path))
             return EmsStrategyConfig.CreateDefault();
         try
         {
             string json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<EmsStrategyConfig>(json, JsonOptions)
-                   ?? EmsStrategyConfig.CreateDefault();
+            var cfg = JsonSerializer.Deserialize<EmsStrategyConfig>(json, JsonOptions)
+                      ?? EmsStrategyConfig.CreateDefault();
+            EmsStrategyConfig.NormalizeModes(cfg);
+            return cfg;
         }
         catch
         {

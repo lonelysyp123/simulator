@@ -69,4 +69,65 @@ public class ActivePowerStrategyTests
         s.Step(cfg, Meas(49.8), TimeSpan.FromMilliseconds(200));
         Assert.Equal(0, s.LastPBase, 5);
     }
+
+    [Fact]
+    public void PidDisabled_PassesDampedTargetThrough()
+    {
+        var cfg = EmsStrategyConfig.CreateDefault();
+        cfg.Enabled = true;
+        cfg.LocalActiveSetKw = 250;
+        cfg.Slope.Enabled = false;
+        cfg.ApparentLimitEnabled = false;
+        cfg.DampEnabled = false;
+        cfg.PrimaryFrequency.Enabled = false;
+        cfg.Inertia.Enabled = false;
+        cfg.ActivePid.Enabled = false;
+        var s = new ActivePowerStrategy();
+        double y = s.Step(cfg, Meas(50), TimeSpan.FromMilliseconds(200));
+        Assert.Equal(250, y, 5);
+        Assert.Equal(250, s.LastAfterLimit, 5);
+    }
+
+    [Fact]
+    public void ApparentLimitDisabled_DoesNotClipToCircle()
+    {
+        var cfg = EmsStrategyConfig.CreateDefault();
+        cfg.Enabled = true;
+        cfg.LocalActiveSetKw = 1000;
+        cfg.ApparentRatedKva = 100;
+        cfg.Slope.Enabled = false;
+        cfg.ApparentLimitEnabled = false;
+        cfg.DampEnabled = false;
+        cfg.PrimaryFrequency.Enabled = false;
+        cfg.Inertia.Enabled = false;
+        cfg.ActivePid.Enabled = false;
+        var s = new ActivePowerStrategy();
+        Assert.Equal(1000, s.Step(cfg, Meas(50), TimeSpan.FromMilliseconds(200)), 5);
+
+        cfg.ApparentLimitEnabled = true;
+        s.Reset();
+        Assert.Equal(100, s.Step(cfg, Meas(50), TimeSpan.FromMilliseconds(200)), 5);
+    }
+
+    [Fact]
+    public void DampDisabled_SkipsHalfFactor()
+    {
+        var cfg = EmsStrategyConfig.CreateDefault();
+        cfg.Enabled = true;
+        cfg.LocalActiveSetKw = 1000;
+        cfg.ApparentRatedKva = 5000;
+        cfg.Slope.Enabled = false;
+        cfg.ApparentLimitEnabled = true;
+        cfg.DampEnabled = false;
+        cfg.PrimaryFrequency.Enabled = false;
+        cfg.Inertia.Enabled = false;
+        cfg.ActivePid.Enabled = false;
+        var s = new ActivePowerStrategy();
+        var meas = Meas(50);
+        Assert.Equal(1000, s.Step(cfg, meas, TimeSpan.FromMilliseconds(200), otherAxisTarget: 5000), 5);
+
+        cfg.DampEnabled = true;
+        s.Reset();
+        Assert.Equal(500, s.Step(cfg, meas, TimeSpan.FromMilliseconds(200), otherAxisTarget: 5000), 5);
+    }
 }

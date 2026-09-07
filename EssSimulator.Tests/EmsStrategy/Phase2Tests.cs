@@ -22,40 +22,6 @@ public class PfToReactiveConverterTests
     }
 }
 
-public class CurveSchedulerTests
-{
-    [Fact]
-    public void WeekdayHit_ReturnsPower()
-    {
-        var monday = new DateTime(2026, 9, 7, 10, 0, 0); // Monday
-        var cfg = new CurveConfig
-        {
-            Mode = CurveMatchMode.Weekday,
-            Points =
-            {
-                new CurvePointConfig { Weekday = (int)DayOfWeek.Monday, Start = "08:00:00", End = "12:00:00", Power = 400 }
-            }
-        };
-        Assert.True(CurveScheduler.TryGetPower(monday, cfg, out double p));
-        Assert.Equal(400, p);
-    }
-
-    [Fact]
-    public void Miss_ReturnsWait()
-    {
-        var t = new DateTime(2026, 9, 7, 18, 0, 0);
-        var cfg = new CurveConfig
-        {
-            Mode = CurveMatchMode.Weekday,
-            Points =
-            {
-                new CurvePointConfig { Weekday = (int)DayOfWeek.Monday, Start = "08:00:00", End = "12:00:00", Power = 400 }
-            }
-        };
-        Assert.False(CurveScheduler.TryGetPower(t, cfg, out _));
-    }
-}
-
 public class InertiaCalculatorTests
 {
     [Fact]
@@ -101,7 +67,7 @@ public class InertiaCalculatorTests
 public class VoltageDroopTests
 {
     [Fact]
-    public void UnderVoltage_PositiveDeltaQ()
+    public void UnderVoltage_MatchesCKvarPerVoltFromDeadband()
     {
         var cfg = new VoltageDroopConfig
         {
@@ -109,14 +75,34 @@ public class VoltageDroopTests
             Deadband1Percent = 0.5,
             K1Percent = 4,
             SegmentCount = 3,
+            VoltageCurveType = 0,
             UnderVoltEnable = true,
             OverVoltEnable = true,
             MaxOutputKvar = 5000,
             MaxAbsorbKvar = 5000,
             LimitCoefficient = 1
         };
-        double dq = VoltageDroopCalculator.ComputeDeltaKvar(34000, 5000, cfg);
-        Assert.True(dq > 0);
+        // db1=175 V, Uspan=34825, ΔQ=4*(34825-34000)=3300
+        Assert.Equal(3300, VoltageDroopCalculator.ComputeDeltaKvar(34000, 5000, cfg), 6);
+    }
+
+    [Fact]
+    public void FromRatedCurve_UsesU0AsSpan()
+    {
+        var cfg = new VoltageDroopConfig
+        {
+            RatedVoltageV = 35000,
+            Deadband1Percent = 0.5,
+            K1Percent = 4,
+            SegmentCount = 3,
+            VoltageCurveType = 1,
+            UnderVoltEnable = true,
+            OverVoltEnable = true,
+            MaxOutputKvar = 5000,
+            MaxAbsorbKvar = 5000,
+            LimitCoefficient = 1
+        };
+        Assert.Equal(4000, VoltageDroopCalculator.ComputeDeltaKvar(34000, 5000, cfg), 6);
     }
 
     [Fact]
@@ -145,6 +131,26 @@ public class ReactivePowerStrategyTests
     }
 
     [Fact]
+    public void VoltageFixed_MapsPControlToQ()
+    {
+        var cfg = EmsStrategyConfig.CreateDefault();
+        cfg.ReactiveMode = ReactiveMode.VoltageFixed;
+        cfg.VoltageSetV = 35000;
+        cfg.VoltageKp = 0.5;
+        cfg.VoltageFixedK = 1;
+        cfg.ReactiveSlope.Enabled = false;
+        cfg.ReactivePid.DeadbandKw = 0;
+        cfg.ReactivePid.Kp = 1;
+        cfg.ReactivePid.Ki = 0;
+        cfg.ReactivePid.Discretization = PidDiscretization.Dt;
+        var s = new ReactivePowerStrategy();
+        var meas = new PlantMeasurements { PccLineVoltageV = 34000, PccReactivePowerKvar = 100 };
+        s.Step(cfg, meas, TimeSpan.FromMilliseconds(200));
+        // u_out = 34000 + 0.5*1000 = 34500; Q = (34500-34000)*1 + 100 = 600
+        Assert.Equal(600, s.LastQBase, 5);
+    }
+
+    [Fact]
     public void PowerFactor_SetsQFromP()
     {
         var cfg = EmsStrategyConfig.CreateDefault();
@@ -165,24 +171,6 @@ public class ReactivePowerStrategyTests
 
 public class ActivePowerPhase2Tests
 {
-    [Fact]
-    public void CurveMiss_OutputsZeroAndWaits()
-    {
-        var cfg = EmsStrategyConfig.CreateDefault();
-        cfg.ActiveMode = ActiveMode.CloseLoopCurve;
-        cfg.ActiveCurve.Points.Add(new CurvePointConfig
-        {
-            Weekday = (int)DayOfWeek.Sunday,
-            Start = "00:00:00",
-            End = "01:00:00",
-            Power = 800
-        });
-        var s = new ActivePowerStrategy();
-        double y = s.Step(cfg, new PlantMeasurements { SimTime = new DateTime(2026, 9, 7, 10, 0, 0), FrequencyHz = 50 }, TimeSpan.FromMilliseconds(200));
-        Assert.Equal(0, y);
-        Assert.True(s.CurveWait);
-    }
-
     [Fact]
     public void InertiaLock_SkipsPrimaryFrequency()
     {
