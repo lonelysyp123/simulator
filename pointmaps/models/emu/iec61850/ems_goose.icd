@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <SCL xmlns="http://www.iec.ch/61850/2003/SCL" version="2007" revision="B">
-  <Header id="TRNA_PCS" nameStructure="IEDName" version="1.0" revision="1" toolID="EssSimulator"/>
-  <IED name="TEMPLATE" type="TRNA_PCS" manufacturer="Trina" desc="PCS IED template (one PCS per IED)">
+  <Header id="EMS_GOOSE" nameStructure="IEDName" version="1.0" revision="1" toolID="EssSimulator"/>
+  <IED name="EMS_PCS01" type="EMS_PCS" manufacturer="Trina" desc="External GOOSE publisher for EssSimulator ingress; AppID 0x2000+N (PCS1=0x2001)">
     <Services>
       <DynAssociation/>
       <GetDirectory/>
@@ -11,6 +11,7 @@
       <ConfReportControl max="4" bufConf="false"/>
       <GetCBValues/>
       <ConfLNs fixPrefix="true" fixLnInst="true"/>
+      <GOOSE max="1"/>
     </Services>
     <AccessPoint name="S1">
       <Server>
@@ -25,11 +26,21 @@
               <FCDA ldInst="PCS" lnClass="MMDC" lnInst="1" doName="Vol" daName="mag.f" fc="MX"/>
               <FCDA ldInst="PCS" lnClass="GGIO" lnInst="1" doName="IntIn1" daName="stVal" fc="ST"/>
             </DataSet>
+            <DataSet name="dsGoose">
+              <FCDA ldInst="PCS" lnClass="GGIO" lnInst="1" doName="SPCSO2" daName="stVal" fc="ST"/>
+              <FCDA ldInst="PCS" lnClass="GGIO" lnInst="1" doName="SPCSO1" daName="stVal" fc="ST"/>
+              <FCDA ldInst="PCS" lnClass="DRCC" lnInst="1" doName="OutWSet" daName="setMag.f" fc="SP"/>
+              <FCDA ldInst="PCS" lnClass="DRCC" lnInst="1" doName="OutVarSet" daName="setMag.f" fc="SP"/>
+              <FCDA ldInst="PCS" lnClass="DRCC" lnInst="1" doName="OutPFSet" daName="setMag.f" fc="SP"/>
+              <FCDA ldInst="PCS" lnClass="DRCC" lnInst="1" doName="OutVSet" daName="setMag.f" fc="SP"/>
+              <FCDA ldInst="PCS" lnClass="DRCC" lnInst="1" doName="OutHzSet" daName="setMag.f" fc="SP"/>
+            </DataSet>
             <ReportControl name="URCB1" datSet="dsMX" intgPd="1000" confRev="1" buffered="false" bufTime="0" indexed="true">
               <TrgOps dchg="true" qchg="false" dupd="false" period="true" gi="true"/>
               <OptFields seqNum="true" timeStamp="true" dataSet="true" reasonCode="true" dataRef="true" entryID="true"/>
               <RptEnabled max="4"/>
             </ReportControl>
+            <GSEControl name="GoCB1" datSet="dsGoose" confRev="1" appID="EMS_PCS01PCS/LLN0.GoCB1" type="GOOSE"/>
           </LN0>
           <LN lnClass="LPHD" inst="1" lnType="LPHD_1"/>
           <LN lnClass="MMXU" inst="1" lnType="MMXU_1" desc="AC measurements"/>
@@ -45,6 +56,20 @@
       </Server>
     </AccessPoint>
   </IED>
+  <Communication>
+    <SubNetwork name="GSE" type="8-MMS">
+      <ConnectedAP iedName="EMS_PCS01" apName="S1">
+        <GSE ldInst="PCS" cbName="GoCB1">
+          <Address>
+            <P type="MAC-Address">01-0C-CD-01-00-01</P>
+            <P type="APPID">2001</P>
+          </Address>
+          <MinTime unit="s" multiplier="m">200</MinTime>
+          <MaxTime unit="s" multiplier="m">3000</MaxTime>
+        </GSE>
+      </ConnectedAP>
+    </SubNetwork>
+  </Communication>
   <DataTypeTemplates>
     <LNodeType id="LLN0_PCS" lnClass="LLN0">
       <DO name="Mod" type="INC_Mod"/>

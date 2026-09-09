@@ -93,6 +93,7 @@ case "$PLATFORM" in
   windows)
     cp -f "$ROOT/scripts/windows/start.bat" "$OUT/start.bat"
     cp -f "$ROOT/scripts/windows/README-Windows.txt" "$OUT/README-Windows.txt"
+    copy_iec61850_windows_native "$OUT"
     ;;
   linux)
     cp -f "$ROOT/scripts/linux/start.sh" "$OUT/start.sh"

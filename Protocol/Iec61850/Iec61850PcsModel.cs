@@ -13,6 +13,8 @@ namespace EssSimulator.Protocol.Iec61850
         public const string UrcbName = "URCB1";
         public const string GooseDataSetName = "dsGoose";
         public const string GoCbName = "GoCB1";
+        /// <summary>入向订阅 AppID 基数（PCS1 = 0x2001）。</summary>
+        public const int DefaultSubscribeAppIdBase = 0x2000;
         /// <summary>CDC_CTL_MODEL_DIRECT_NORMAL（iec61850_cdc.h）。</summary>
         public const uint DirectNormal = 1;
 
@@ -122,7 +124,7 @@ namespace EssSimulator.Protocol.Iec61850
                 50,
                 1000);
 
-            AttachGooseControl(built, lln0, iedName, mapping);
+            built.GooseEntryCount = mapping.GooseEntries.Count;
             return built;
         }
 
@@ -169,40 +171,17 @@ namespace EssSimulator.Protocol.Iec61850
             return true;
         }
 
-        private static void AttachGooseControl(
-            Iec61850PcsModel built, LogicalNode lln0, string iedName, Iec61850Mapping mapping)
-        {
-            var gooseEntries = mapping.GooseEntries;
-            built.GooseEntryCount = gooseEntries.Count;
-            if (gooseEntries.Count == 0)
-                return;
+        internal static string IngressGoCbRefMms(int simIndex) =>
+            $"EMS_PCS{Math.Max(1, simIndex):D2}{Iec61850Mapping.LogicalDeviceName}/LLN0$GO${GoCbName}";
 
-            var gooseSet = new DataSet(GooseDataSetName, lln0);
-            foreach (var entry in gooseEntries)
-            {
-                string? variable = ToDataSetVariable(entry);
-                if (variable != null)
-                    _ = new DataSetEntry(gooseSet, variable, -1, null);
-            }
+        internal static string LocalGoCbRef(string iedName) =>
+            iedName + Iec61850Mapping.LogicalDeviceName + "/LLN0." + GoCbName;
 
-            int simIndex = SimIndexFromIedName(iedName);
-            var gcb = new GSEControlBlock(
-                GoCbName,
-                lln0,
-                iedName + Iec61850Mapping.LogicalDeviceName + "/LLN0." + GoCbName,
-                GooseDataSetName,
-                1,
-                false,
-                200,
-                3000);
-            gcb.AddPhyComAddress(new PhyComAddress
-            {
-                vlanPriority = 4,
-                vlanId = 0,
-                appId = (ushort)(0x1000 + simIndex),
-                dstAddress = new byte[] { 0x01, 0x0C, 0xCD, 0x01, 0x00, (byte)Math.Clamp(simIndex, 1, 255) }
-            });
-        }
+        internal static string LocalGoCbRefMms(string iedName) =>
+            iedName + Iec61850Mapping.LogicalDeviceName + "/LLN0$GO$" + GoCbName;
+
+        internal static ushort SubscribeAppId(int simIndex, int appIdBase) =>
+            (ushort)(appIdBase + Math.Max(1, simIndex));
 
         internal static int SimIndexFromIedName(string iedName)
         {

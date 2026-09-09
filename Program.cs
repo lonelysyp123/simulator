@@ -477,6 +477,37 @@ namespace EssSimulator
                 catch { /* 推送失败忽略 */ }
             };
 
+            EssSimulator.Protocol.Iec61850.Iec61850TrafficLog.MessageAppended += msg =>
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await hub.Clients.Group(RealtimeChannels.Iec61850)
+                            .SendAsync(RealtimeMethods.ReceiveIec61850Message, new
+                            {
+                                msg.Id,
+                                utc = msg.Utc.ToString("o"),
+                                localTime = msg.Utc.ToLocalTime().ToString("HH:mm:ss.fff"),
+                                msg.Direction,
+                                msg.Protocol,
+                                server = msg.ServerName,
+                                iedName = msg.IedName,
+                                appId = msg.AppId,
+                                goCbRef = msg.GoCbRef,
+                                stNum = msg.StNum,
+                                sqNum = msg.SqNum,
+                                isTest = msg.IsTest,
+                                msg.Result,
+                                msg.Summary,
+                                writes = msg.Writes,
+                                values = msg.Values
+                            });
+                    }
+                    catch { /* ignore */ }
+                });
+            };
+
             // 中间件
             app.UseCors();
             app.UseMiddleware<EssSimulator.Web.ApiKeyAuthMiddleware>();

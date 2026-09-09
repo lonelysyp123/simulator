@@ -53,4 +53,4 @@ yt0,PCS/DRCC1.OutWSet.setMag.f,APC,SP,1,1,PCS有功功率设置值,goose
 yt1,PCS/DRCC1.OutVarSet.setMag.f,APC,SP,1,1,PCS无功设置值,goose
 yt2,PCS/DRCC1.OutPFSet.setMag.f,APC,SP,1,1,PCS功率因数设置值,goose
 yt3,PCS/DRCC1.OutVSet.setMag.f,APC,SP,1,1,PCS孤岛电压设定V,goose
-yt4,PCS/DRCC1.OutHzSet.setMag.f,APC,SP,100,PCS孤岛频率设定Hz,goose
+yt4,PCS/DRCC1.OutHzSet.setMag.f,APC,SP,1,100,PCS孤岛频率设定Hz,goose

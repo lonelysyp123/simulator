@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using EssSimulator.DataExchange.Adapters;
 using IEC61850.Common;
+using IEC61850.GOOSE.Subscriber;
 using IEC61850.Server;
 using log4net;
 
@@ -23,7 +24,7 @@ namespace EssSimulator.Protocol.Iec61850
     }
 
     /// <summary>
-    /// 一台 PCS 一个 libiec61850 MMS IED：动态模型、Get/Set、Direct-operate、URCB；yk/yt 走 GOOSE。
+    /// 一台 PCS 一个 libiec61850 MMS IED：动态模型、Get/Set、Direct-operate、URCB；yk/yt 只订阅入向 GOOSE 遥控，不发布。
     /// </summary>
     public sealed class Iec61850IedServer : IDisposable
     {
@@ -31,11 +32,15 @@ namespace EssSimulator.Protocol.Iec61850
 
         private readonly Iec61850Mapping _mapping;
         private readonly Iec61850PcsModel _model;
+        private readonly Iec61850GooseIngress _ingress;
         private readonly Dictionary<IntPtr, Iec61850MapEntry> _attrToMap = new();
         private IedServer? _server;
         private IProtocolPointStore? _store;
         private Action<string, object>? _writeControl;
         private Func<string, object?>? _readPoint;
+        private GooseSubscriber? _gooseSubscriber;
+        private GooseListener? _gooseListener;
+        private Iec61850GooseReceiverHost? _gooseHost;
         private int _seqNum;
         private int _inNativeCallback;
         private bool _disposed;
@@ -48,6 +53,7 @@ namespace EssSimulator.Protocol.Iec61850
             IedName = Iec61850Mapping.IedNameFor(serverName);
             _mapping = mapping;
             _model = Iec61850PcsModel.Build(IedName, mapping);
+            _ingress = new Iec61850GooseIngress(_mapping.GooseEntries, IedName);
             foreach (var pair in _model.LeafByParam)
             {
                 if (_mapping.ByParam.TryGetValue(pair.Key, out var entry))
@@ -66,9 +72,12 @@ namespace EssSimulator.Protocol.Iec61850
         public int Port { get; private set; }
         public bool IsOnline { get; private set; }
         public string? IcdPath { get; init; }
-        /// <summary>空=按操作系统选网卡；<c>none</c> 只建 GoCB 不发二层帧。</summary>
+        /// <summary>空=按操作系统选网卡供入向订阅；<c>none</c> 不收二层 GOOSE。</summary>
         public string? GooseInterfaceId { get; init; }
-        public bool GoosePublishing { get; private set; }
+        public bool GooseSubscribing { get; private set; }
+        public ushort? GooseSubscribeAppId { get; private set; }
+        public uint? LastGooseStNum => _ingress.LastStNum;
+        public DateTime? LastGooseUtc => _ingress.LastAcceptedUtc;
 
         public int AssociatedClients => _server?.GetNumberOfOpenConnections() ?? 0;
         internal int SpcHandlerCount => _model.ControlDoByParam.Count;
@@ -113,7 +122,7 @@ namespace EssSimulator.Protocol.Iec61850
                         LogServiceEnabled = false,
                         ReportBufferSizeForURCBs = 65535,
                         MaxMmsConnections = 8,
-                        UseIntegratedGoosePublisher = true
+                        UseIntegratedGoosePublisher = false
                     };
                     _server = new IedServer(_model.Model, config);
                     _server.SetServerIdentity("TrinaStorage", "EssSimulator-PCS", "1.0");
@@ -121,18 +130,11 @@ namespace EssSimulator.Protocol.Iec61850
                     RegisterHandlers(_server);
                 }
 
-                string? gooseIface = ResolveGooseInterface(GooseInterfaceId);
-                if (gooseIface != null)
-                    _server.SetGooseInterfaceId(gooseIface);
-
                 PushAllFromShadow();
                 _server.Start(Port);
                 IsOnline = _server.IsRunning();
                 if (IsOnline)
-                {
                     Log.Info($"[IEC61850] {ServerName} IED {IedName} 监听 MMS 端口 {Port}");
-                    TryEnableGoosePublishing();
-                }
                 else
                     Log.Error($"[IEC61850] {ServerName} IedServer.Start({Port}) 后未处于运行状态");
                 return IsOnline;
@@ -147,10 +149,8 @@ namespace EssSimulator.Protocol.Iec61850
 
         public void Stop()
         {
+            UnbindGooseSubscribe();
             IsOnline = false;
-            GoosePublishing = false;
-            try { _server?.DisableGoosePublishing(); }
-            catch (Exception ex) { Log.Warn($"[IEC61850] {ServerName} DisableGoosePublishing 异常", ex); }
             try { _server?.Stop(); }
             catch (Exception ex) { Log.Warn($"[IEC61850] {ServerName} Stop 异常", ex); }
         }
@@ -261,26 +261,182 @@ namespace EssSimulator.Protocol.Iec61850
             return true;
         }
 
-        private void TryEnableGoosePublishing()
+        internal bool TryBindGooseSubscribe(
+            Iec61850GooseReceiverHost host,
+            string iface,
+            ushort appId,
+            string? goCbRefFilter,
+            out string error)
         {
-            if (_server == null || _model.GooseEntryCount == 0)
-                return;
-            if (ResolveGooseInterface(GooseInterfaceId) == null)
-                return;
+            error = string.Empty;
+            UnbindGooseSubscribe();
+            if (_model.GooseEntryCount == 0)
+            {
+                error = "无 GOOSE 点";
+                return false;
+            }
 
             try
             {
-                _server.UseGooseVlanTag(null!, Iec61850PcsModel.GoCbName, false);
-                _server.EnableGoosePublishing();
-                GoosePublishing = true;
-                Log.Info($"[IEC61850] {ServerName} GOOSE 发布已启用 GoCB={Iec61850PcsModel.GoCbName} iface={ResolveGooseInterface(GooseInterfaceId)}");
+                // 绝不可传 null（macOS 上 GooseSubscriber_create(null) 会 SIGSEGV）。
+                // 空串 + setObserver = 只按 AppID 匹配（libiec61850 goose_observer 用法）。
+                bool matchAnyGoCb = string.IsNullOrWhiteSpace(goCbRefFilter);
+                string goCbRef = matchAnyGoCb ? "" : goCbRefFilter!.Trim();
+                var subscriber = new GooseSubscriber(goCbRef);
+                GC.SuppressFinalize(subscriber);
+                if (matchAnyGoCb && !Iec61850Native.TrySetGooseSubscriberObserver(subscriber))
+                {
+                    error = "无法启用 GooseSubscriber observer";
+                    subscriber.Dispose();
+                    return false;
+                }
+                subscriber.SetAppId(appId);
+                _gooseListener = OnGooseReceived;
+                subscriber.SetListener(_gooseListener, this);
+                if (!host.TryAdd(iface, subscriber, out error))
+                {
+                    subscriber.Dispose();
+                    _gooseListener = null;
+                    return false;
+                }
+
+                _gooseSubscriber = subscriber;
+                _gooseHost = host;
+                GooseSubscribeAppId = appId;
+                GooseSubscribing = host.IsRunning;
+                Log.Info($"[IEC61850] {ServerName} GOOSE 订阅 AppID=0x{appId:X4} iface={iface}");
+                return true;
             }
             catch (Exception ex)
             {
-                GoosePublishing = false;
-                Log.Warn($"[IEC61850] {ServerName} GOOSE 发布未启用（需要原始以太网权限）", ex);
+                error = ex.Message;
+                Log.Warn($"[IEC61850] {ServerName} GOOSE 订阅未挂上", ex);
+                UnbindGooseSubscribe();
+                return false;
             }
         }
+
+        internal void MarkGooseSubscribing(bool running) => GooseSubscribing = running && _gooseSubscriber != null;
+
+        internal void UnbindGooseSubscribe()
+        {
+            GooseSubscribing = false;
+            GooseSubscribeAppId = null;
+            var sub = _gooseSubscriber;
+            var host = _gooseHost;
+            _gooseSubscriber = null;
+            _gooseHost = null;
+            _gooseListener = null;
+            host?.Remove(sub);
+        }
+
+        internal bool TryApplyGoose(
+            uint stNum,
+            bool isTest,
+            string? goCbRef,
+            IReadOnlyList<object?> values,
+            out string skipReason)
+        {
+            if (!_ingress.TryAccept(stNum, isTest, goCbRef, values, out var writes, out skipReason))
+                return false;
+
+            foreach (var pair in writes)
+            {
+                if (!_mapping.ByParam.TryGetValue(pair.Key, out var entry))
+                    continue;
+                TryWrite(entry, pair.Value, out _);
+            }
+
+            return true;
+        }
+
+        private void OnGooseReceived(GooseSubscriber subscriber, object parameter)
+        {
+            Interlocked.Increment(ref _inNativeCallback);
+            try
+            {
+                var values = Iec61850GooseIngress.FromDataset(subscriber.GetDataSetValues());
+                uint stNum = subscriber.GetStNum();
+                uint sqNum = subscriber.GetSqNum();
+                bool isTest = subscriber.IsTest();
+                string? goCbRef = subscriber.GetGoCbRef();
+                bool ok = _ingress.TryAccept(stNum, isTest, goCbRef, values, out var writes, out var reason);
+                if (ok)
+                {
+                    foreach (var pair in writes)
+                    {
+                        if (!_mapping.ByParam.TryGetValue(pair.Key, out var entry))
+                            continue;
+                        TryWrite(entry, pair.Value, out _);
+                    }
+                }
+
+                string result = ok ? "applied" : (string.IsNullOrEmpty(reason) ? "error" : $"skip:{reason}");
+                string writeSummary = writes.Count > 0
+                    ? string.Join(" ", writes.Select(kv => $"{kv.Key}={FormatTrafficValue(kv.Value)}"))
+                    : "";
+                string summary = ok
+                    ? $"GOOSE stNum={stNum} sqNum={sqNum} {writeSummary}".Trim()
+                    : $"GOOSE stNum={stNum} sqNum={sqNum} {reason}";
+
+                var valueMap = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                var goose = _mapping.GooseEntries;
+                for (int i = 0; i < values.Count && i < goose.Count; i++)
+                    valueMap[goose[i].ParamName] = values[i];
+
+                Iec61850TrafficLog.Append(new Iec61850TrafficMessage
+                {
+                    Direction = "ingress",
+                    Protocol = "goose",
+                    ServerName = ServerName,
+                    IedName = IedName,
+                    AppId = GooseSubscribeAppId,
+                    GoCbRef = goCbRef,
+                    StNum = stNum,
+                    SqNum = sqNum,
+                    IsTest = isTest,
+                    Result = result,
+                    Summary = summary,
+                    Writes = writes.Count > 0
+                        ? writes.ToDictionary(kv => kv.Key, kv => (object?)kv.Value, StringComparer.OrdinalIgnoreCase)
+                        : null,
+                    Values = valueMap.Count > 0 ? valueMap : null
+                });
+
+                if (!ok && !string.IsNullOrEmpty(reason) && reason is not "stNum")
+                    Log.Info($"[IEC61850] {ServerName} 忽略入向 GOOSE: {reason} stNum={stNum} goCb={goCbRef}");
+                else if (ok)
+                    Log.Info($"[IEC61850] {ServerName} 入向 GOOSE 已应用 stNum={stNum}");
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"[IEC61850] {ServerName} 入向 GOOSE 处理失败", ex);
+                Iec61850TrafficLog.Append(new Iec61850TrafficMessage
+                {
+                    Direction = "ingress",
+                    Protocol = "goose",
+                    ServerName = ServerName,
+                    IedName = IedName,
+                    AppId = GooseSubscribeAppId,
+                    Result = "error",
+                    Summary = $"GOOSE 处理异常: {ex.Message}"
+                });
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _inNativeCallback);
+            }
+        }
+
+        private static string FormatTrafficValue(object value) =>
+            value switch
+            {
+                bool b => b ? "true" : "false",
+                float f => f.ToString("G", CultureInfo.InvariantCulture),
+                double d => d.ToString("G", CultureInfo.InvariantCulture),
+                IFormattable fmt => fmt.ToString(null, CultureInfo.InvariantCulture) ?? "",
+                _ => value?.ToString() ?? ""
+            };
 
         internal static string? ResolveGooseInterface(string? configured)
         {

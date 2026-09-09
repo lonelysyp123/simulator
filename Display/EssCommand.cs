@@ -614,7 +614,7 @@ namespace EssSimulator.Display
                         Target = $"iec61850-pcs{emu}",
                         Online = ied.Online,
                         ListenInfo = $"IEC 61850 MMS {ied.IedName} 端口 {ied.Port}",
-                        Extra = $"客户端 {ied.AssociatedClients}"
+                        Extra = Extra61850(ied)
                     });
                 }
                 emu++;
@@ -637,6 +637,20 @@ namespace EssSimulator.Display
             }
 
             return list;
+        }
+
+        private static string Extra61850(EssSimulator.Protocol.Iec61850.Iec61850DeviceSnapshot ied)
+        {
+            var parts = new List<string> { $"客户端 {ied.AssociatedClients}" };
+            if (!string.IsNullOrWhiteSpace(ied.GooseInterface))
+                parts.Add($"网卡 {ied.GooseInterface}");
+            if (ied.GooseSubscribing)
+                parts.Add(ied.GooseSubscribeAppId.HasValue
+                    ? $"GOOSE订 0x{ied.GooseSubscribeAppId.Value:X4}"
+                    : "GOOSE订");
+            else if (!string.IsNullOrWhiteSpace(ied.GooseSubscribeSkip))
+                parts.Add($"GOOSE订关 {ied.GooseSubscribeSkip}");
+            return string.Join(" ", parts);
         }
 
         private static LinkStatusDto BuildLinkStatusDto(string label, string serverName, ModbusSimServer server, string extra, string target)

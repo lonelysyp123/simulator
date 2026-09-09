@@ -98,7 +98,7 @@
         :closable="false"
         show-icon
         style="margin-bottom:8px"
-        title="每台 PCS 可同时开 Modbus 与 IEC 61850。仅开 61850 时不监听 Modbus TCP，内部点影子与 LC 抄数仍保留。默认 MMS 端口 8102 起。"
+        title="每台 PCS 可同时开 Modbus 与 IEC 61850。仅开 61850 时不监听 Modbus TCP，内部点影子与 LC 抄数仍保留。默认 MMS 端口 8102 起。入向 GOOSE 是二层组播，不是按 IP 订阅：网卡须与发布端同一网段（appsettings EmuIec61850GooseInterface），AppID 为 0x2000+N（PCS1=0x2001=8193）。外部用 ems_goose.icd 发布即可遥控 yk/yt。"
       />
       <el-table :data="iec61850Rows" size="small" border stripe>
         <el-table-column prop="name" label="设备" width="130" />

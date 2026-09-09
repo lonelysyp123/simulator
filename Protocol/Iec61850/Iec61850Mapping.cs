@@ -14,7 +14,7 @@ namespace EssSimulator.Protocol.Iec61850
         public int CtlModel { get; init; }
         public double Scale { get; init; } = 1;
         public string Description { get; init; } = string.Empty;
-        /// <summary><c>mms</c>（URCB）或 <c>goose</c>（GoCB）。缺省按 ParamName 前缀 yk/yt 推断。</summary>
+        /// <summary><c>mms</c>（URCB）或 <c>goose</c>（入向遥控订阅）。缺省按 ParamName 前缀 yk/yt 推断。</summary>
         public string Transport { get; init; } = "mms";
 
         public bool IsControllable => CtlModel > 0;
@@ -34,6 +34,7 @@ namespace EssSimulator.Protocol.Iec61850
         public const string RelativeDir = "pointmaps/models/emu/iec61850";
         public const string MappingFileName = "mapping.csv";
         public const string IcdFileName = "pcs.icd";
+        public const string IngressIcdFileName = "ems_goose.icd";
 
         public IReadOnlyList<Iec61850MapEntry> Entries { get; }
         public IReadOnlyDictionary<string, Iec61850MapEntry> ByParam { get; }

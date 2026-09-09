@@ -10,5 +10,6 @@ EssSimulator - Windows 快速说明
 3. 等待协议服务就绪后使用 GUI 或 Modbus 联调
 
 默认 Modbus 端口：电表 1500，BMS1 1501，EMU1 1601（详见 README.txt）
+IEC 61850：需 iec61850.dll 与 EssSimulator.exe 同目录；默认 MMS 端口从 8102 起。
 
 详细说明见 README.txt；技术手册见 docs/用户手册.md（若已随包提供）

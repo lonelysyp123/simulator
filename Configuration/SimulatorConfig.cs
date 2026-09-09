@@ -161,9 +161,21 @@ namespace EssSimulator.Configuration
         public int EmuIec61850PortStep { get; set; } = 1;
 
         /// <summary>
-        /// GOOSE 网卡名。空=按 OS 默认（macOS en0 / Windows 0）；<c>none</c> 只建 GoCB 不发二层帧。
+        /// GOOSE 网卡名。空=按 OS 默认（macOS en0 / Windows 0）；<c>none</c> 不收二层 GOOSE。
         /// </summary>
         public string? EmuIec61850GooseInterface { get; set; }
+
+        /// <summary>是否订阅入向 GOOSE（外部 IED 遥控 yk/yt）。</summary>
+        public bool EmuIec61850GooseSubscribe { get; set; } = true;
+
+        /// <summary>入向 GOOSE AppID 基数，PCS N 使用 base+N（默认 0x2000）。</summary>
+        public int EmuIec61850GooseSubscribeAppIdBase { get; set; } = 0x2000;
+
+        /// <summary>
+        /// 入向 GoCbRef。空=按台使用 <c>EMS_PCSxxPCS/LLN0$GO$GoCB1</c>（与 ems_goose.icd 一致）。
+        /// 勿依赖「仅 AppID」：macOS 上空 GoCbRef/observer 路径不稳定。
+        /// </summary>
+        public string? EmuIec61850GooseSubscribeGoCbRef { get; set; }
 
         /// <summary>电表 Modbus TCP 端口</summary>
         public int EmModbusPort { get; set; } = 1500;

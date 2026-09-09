@@ -79,14 +79,62 @@ public class Iec61850MappingTests
     }
 
     [Fact]
-    public void Icd_ContainsGooseControl()
+    public void Icd_DeviceDoesNotPublishGoose()
     {
         var icd = File.ReadAllText(Path.Combine(FindRepoRoot(), "pointmaps", "models", "emu", "iec61850", "pcs.icd"));
-        Assert.Contains("GoCB1", icd, StringComparison.Ordinal);
-        Assert.Contains("dsGoose", icd, StringComparison.Ordinal);
+        Assert.DoesNotContain("GSEControl", icd, StringComparison.Ordinal);
+        Assert.DoesNotContain("GoCB1", icd, StringComparison.Ordinal);
+        Assert.DoesNotContain("dsGoose", icd, StringComparison.Ordinal);
+        Assert.DoesNotContain("<GOOSE", icd, StringComparison.Ordinal);
         Assert.Contains("SPCSO2", icd, StringComparison.Ordinal);
         Assert.Contains("OutWSet", icd, StringComparison.Ordinal);
-        Assert.DoesNotContain("<GOOSE max=\"0\"", icd, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void IngressIcd_PublishesSubscribeAppId()
+    {
+        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "emu", "iec61850", Iec61850Mapping.IngressIcdFileName);
+        Assert.True(File.Exists(path));
+        var icd = File.ReadAllText(path);
+        Assert.Contains("EMS_PCS01", icd, StringComparison.Ordinal);
+        Assert.Contains("2001", icd, StringComparison.Ordinal);
+        Assert.Contains("dsGoose", icd, StringComparison.Ordinal);
+        Assert.Contains("SPCSO1", icd, StringComparison.Ordinal);
+        Assert.Contains("OutHzSet", icd, StringComparison.Ordinal);
+        Assert.Equal((ushort)0x2001, Iec61850PcsModel.SubscribeAppId(1, Iec61850PcsModel.DefaultSubscribeAppIdBase));
+    }
+
+    [Fact]
+    public void Icd_StructAttributesResolveToDaType()
+    {
+        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "emu", "iec61850", "pcs.icd");
+        var doc = System.Xml.Linq.XDocument.Load(path);
+        System.Xml.Linq.XNamespace ns = "http://www.iec.ch/61850/2003/SCL";
+        var daTypes = doc.Descendants(ns + "DAType")
+            .Select(e => (string?)e.Attribute("id"))
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.Ordinal);
+        var doTypes = doc.Descendants(ns + "DOType")
+            .Select(e => (string?)e.Attribute("id"))
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Contains("CMV", daTypes);
+        Assert.DoesNotContain("CMV", doTypes);
+        Assert.Contains("DEL", doTypes);
+        Assert.Contains("WYE", doTypes);
+
+        var missing = new List<string>();
+        foreach (var el in doc.Descendants().Where(e => e.Name.LocalName is "DA" or "BDA"))
+        {
+            if (!string.Equals((string?)el.Attribute("bType"), "Struct", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var typeId = (string?)el.Attribute("type");
+            if (string.IsNullOrWhiteSpace(typeId) || !daTypes.Contains(typeId))
+                missing.Add($"{el.Name.LocalName} {el.Attribute("name")} type={typeId}");
+        }
+
+        Assert.Empty(missing);
     }
 
     [Fact]

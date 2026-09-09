@@ -9,19 +9,16 @@
     </div>
 
     <div class="card">
-      <p class="card-title">IEC 61850 IED 监听</p>
-      <el-table :data="data?.iec61850Servers || []" size="small" border stripe>
-        <el-table-column prop="server" label="服务" width="140" />
-        <el-table-column prop="iedName" label="IED" width="140" />
-        <el-table-column prop="port" label="MMS 端口" width="110" />
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.online ? 'success' : 'danger'" size="small">{{ row.online ? '在线' : '离线' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="associatedClients" label="关联客户端" width="120" />
-        <el-table-column prop="listenInfo" label="监听" />
-      </el-table>
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <span>IEC 61850</span>
+        <el-button type="primary" size="small" @click="$router.push('/iec61850')">打开 IEC 61850</el-button>
+      </div>
+      <p class="muted" style="margin:0 0 8px;font-size:13px">
+        {{ data?.iec61850Summary?.headline || '加载中…' }}
+      </p>
+      <p class="muted" style="margin:0;font-size:12px">
+        详细 IED 状态、GOOSE 入向报文与解码请到「IEC 61850」页；端口开关在「协议端口」。
+      </p>
     </div>
 
     <div class="card">
@@ -93,3 +90,7 @@ onMounted(async () => {
   } catch { /* ignore */ }
 })
 </script>
+
+<style scoped>
+.muted { color: #909399; }
+</style>

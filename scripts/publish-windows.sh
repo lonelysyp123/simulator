@@ -73,6 +73,10 @@ dotnet publish EssSimulator.csproj \
 
 copy_runtime_files
 
+cp -f "$ROOT/lib61850/native/win-x64/iec61850.dll" "$OUT/iec61850.dll"
+mkdir -p "$OUT/runtimes/win-x64/native"
+cp -f "$ROOT/lib61850/native/win-x64/iec61850.dll" "$OUT/runtimes/win-x64/native/iec61850.dll"
+
 cp "$ROOT/scripts/windows/start.bat" "$OUT/start.bat"
 cp "$ROOT/scripts/windows/README-Windows.txt" "$OUT/README-Windows.txt"
 

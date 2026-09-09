@@ -27,6 +27,7 @@ const routes = [
   { path: '/ems-strategy', redirect: '/ems/strategy' },
   { path: '/droop-slices', name: 'droop-slices', component: () => import('./views/DroopSlicesView.vue'), meta: { title: '白盒切片' } },
   { path: '/connections', name: 'connections', component: () => import('./views/ConnectionsView.vue'), meta: { title: '连接信息' } },
+  { path: '/iec61850', name: 'iec61850', component: () => import('./views/Iec61850View.vue'), meta: { title: 'IEC 61850' } },
   { path: '/protocol-ports', name: 'protocol-ports', component: () => import('./views/ProtocolPortsView.vue'), meta: { title: '协议端口' } },
   { path: '/third-party-ems', name: 'third-party-ems', component: () => import('./views/ThirdPartyEmsView.vue'), meta: { title: '第三方 EMS', standalone: true } }
 ]

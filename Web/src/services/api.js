@@ -84,6 +84,12 @@ export async function postProtocolPortsReset(rebuild = false) {
 }
 
 export async function getIec61850() { return (await api.get('/iec61850')).data }
+export async function getIec61850Messages(server, limit = 200) {
+  return (await api.get('/iec61850/messages', { params: { server: server || undefined, limit } })).data
+}
+export async function clearIec61850Messages() {
+  return (await api.post('/iec61850/messages/clear')).data
+}
 export async function getProtocolBindings() { return (await api.get('/iec61850/bindings')).data }
 export async function putProtocolBindings(entries, rebuild = true) {
   return (await api.put('/iec61850/bindings', { entries, rebuild })).data

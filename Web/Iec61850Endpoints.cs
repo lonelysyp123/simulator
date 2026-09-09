@@ -42,6 +42,23 @@ namespace EssSimulator.Web
                 });
             });
 
+            g.MapGet("/messages", (string? server, int? limit) =>
+            {
+                var list = Iec61850TrafficLog.Snapshot(server, limit ?? 200);
+                return Results.Ok(new
+                {
+                    capacity = Iec61850TrafficLog.Capacity,
+                    count = list.Count,
+                    messages = list.Select(ToDto)
+                });
+            });
+
+            g.MapPost("/messages/clear", () =>
+            {
+                Iec61850TrafficLog.Clear();
+                return Results.Ok(new { ok = true });
+            });
+
             g.MapPut("/bindings", (ProtocolBindingsChangeRequest req, IOptions<SimulatorConfig> cfg) =>
             {
                 if (req?.Entries == null)
@@ -116,5 +133,25 @@ namespace EssSimulator.Web
 
             return null;
         }
+
+        private static object ToDto(Iec61850TrafficMessage m) => new
+        {
+            m.Id,
+            utc = m.Utc.ToString("o"),
+            localTime = m.Utc.ToLocalTime().ToString("HH:mm:ss.fff"),
+            m.Direction,
+            m.Protocol,
+            server = m.ServerName,
+            iedName = m.IedName,
+            appId = m.AppId,
+            goCbRef = m.GoCbRef,
+            stNum = m.StNum,
+            sqNum = m.SqNum,
+            isTest = m.IsTest,
+            m.Result,
+            m.Summary,
+            writes = m.Writes,
+            values = m.Values
+        };
     }
 }

@@ -154,7 +154,7 @@ public class Iec61850IedServerTests
     }
 
     [Fact]
-    public void TcpClient_GooseControlBlockIsVisible()
+    public void TcpClient_DeviceHasNoGooseControlBlock()
     {
         var mapping = Iec61850Mapping.Load(MappingPath());
         using var ied = new Iec61850IedServer("simEmu1", 0, mapping) { GooseInterfaceId = "none" };
@@ -166,11 +166,33 @@ public class Iec61850IedServerTests
 
         string lln0 = $"{ied.IedName}PCS/LLN0";
         var dataSets = client.GetLogicalNodeDirectory(lln0, ACSIClass.ACSI_CLASS_DATA_SET);
-        Assert.Contains(dataSets, n => n.Contains(Iec61850PcsModel.GooseDataSetName, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(dataSets, n => n.Contains(Iec61850PcsModel.GooseDataSetName, StringComparison.OrdinalIgnoreCase));
 
         var gocbs = client.GetLogicalNodeDirectory(lln0, ACSIClass.ACSI_CLASS_GoCB);
-        Assert.Contains(gocbs, n => n.Contains(Iec61850PcsModel.GoCbName, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(gocbs, n => n.Contains(Iec61850PcsModel.GoCbName, StringComparison.OrdinalIgnoreCase));
 
         client.Abort();
+    }
+
+    [Fact]
+    public void ApplyGoose_WritesYkAndYtThroughControlCallback()
+    {
+        var mapping = Iec61850Mapping.Load(MappingPath());
+        var writes = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        using var ied = new Iec61850IedServer("simEmu1", 0, mapping) { GooseInterfaceId = "none" };
+        ied.Attach(_ => null, (name, value) => writes[name] = value);
+
+        var values = new object?[] { true, true, 80.0, -5.0, 0.99, 690.0, 50.02 };
+        Assert.True(ied.TryApplyGoose(1, false, "EMS_PCS01PCS/LLN0.GoCB1", values, out var reason), reason);
+        Assert.Equal(1, Convert.ToDouble(writes["yk2"]));
+        Assert.Equal(1, Convert.ToDouble(writes["yk3"]));
+        Assert.Equal(80.0, Convert.ToDouble(writes["yt0"]));
+        Assert.Equal(50.02, Convert.ToDouble(writes["yt4"]), 3);
+        Assert.Equal(1u, ied.LastGooseStNum);
+
+        Assert.False(ied.TryApplyGoose(1, false, "EMS_PCS01PCS/LLN0.GoCB1", values, out reason));
+        Assert.Equal("stNum", reason);
+        Assert.False(ied.TryApplyGoose(2, false, Iec61850PcsModel.LocalGoCbRef(ied.IedName), values, out reason));
+        Assert.Equal("local-gocb", reason);
     }
 }
