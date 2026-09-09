@@ -11,5 +11,6 @@ EssSimulator - Windows 快速说明
 
 默认 Modbus 端口：电表 1500，BMS1 1501，EMU1 1601（详见 README.txt）
 IEC 61850：需 iec61850.dll 与 EssSimulator.exe 同目录；默认 MMS 端口从 8102 起。
+设备侧为 MMS 服务端 + GOOSE 订户（不发 GOOSE）；入向须与发布端同一二层网卡（见 appsettings EmuIec61850GooseInterface）。
 
 详细说明见 README.txt；技术手册见 docs/用户手册.md（若已随包提供）

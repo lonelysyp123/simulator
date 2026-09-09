@@ -114,6 +114,21 @@
 - `Simulator.Protocol.BaseEmuModbusPort` / `EmuPortStep`（int）
   - **作用**：EMU（每储能单元一个从站）起始端口与步长。
 
+- `Simulator.Protocol.BaseEmuIec61850Port` / `EmuIec61850PortStep`（int，默认 `8102` / `1`）
+  - **作用**：PCS IEC 61850 MMS 起始端口与步长。第 N 台 = `Base + (N-1) × Step`（也可由 `configs/protocol-bindings.json` 覆盖）。
+
+- `Simulator.Protocol.EmuIec61850GooseInterface`（string?）
+  - **作用**：入向 GOOSE 二层网卡名。空=按 OS 默认（macOS `en0` / Windows `0` / Linux `eth0`）；`none`/`off`=不收二层 GOOSE。须与外部发布端同一二层网段。
+
+- `Simulator.Protocol.EmuIec61850GooseSubscribe`（bool，默认 `true`）
+  - **作用**：是否订阅入向 GOOSE（外部 EMS/IED 遥控 yk/yt）。仿真器**不发布**设备侧 GOOSE。
+
+- `Simulator.Protocol.EmuIec61850GooseSubscribeAppIdBase`（int，默认 `0x2000`）
+  - **作用**：入向 AppID 基数；PCS N 使用 `base+N`（PCS1=`0x2001`=8193）。
+
+- `Simulator.Protocol.EmuIec61850GooseSubscribeGoCbRef`（string?）
+  - **作用**：入向 GoCbRef 过滤。空=按台使用默认 `EMS_PCSxxPCS/LLN0$GO$GoCB1`（与 `ems_goose.icd` 一致）。
+
 - `Simulator.Protocol.EmModbusPort`（int）
   - **作用**：并网电表（`simEm`）Modbus TCP 端口。
 

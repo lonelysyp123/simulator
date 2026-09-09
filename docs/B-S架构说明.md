@@ -1,6 +1,6 @@
 # B/S 架构说明
 
-仿真模拟器已由原 **控制台 TUI（Spectre.Console）** 改造为 **B/S 架构**：后端为 ASP.NET Core + SignalR 单进程服务，前端为 Vue 3 单页应用。仿真核心、Modbus 协议、DataExchange 管道全部保留并复用。
+仿真模拟器已由原 **控制台 TUI（Spectre.Console）** 改造为 **B/S 架构**：后端为 ASP.NET Core + SignalR 单进程服务，前端为 Vue 3 单页应用。仿真核心、Modbus / IEC 61850 协议、DataExchange 管道全部保留并复用。
 
 ## 一、架构总览
 
@@ -9,8 +9,8 @@
    │  HTTP/REST  +  WebSocket(SignalR)
    ▼
 Kestrel（ASP.NET Core）
-   ├── Minimal API  (/api/*)        状态查询 / 命令执行 / 链路控制
-   ├── SignalR Hub  (/hub/realtime) 实时推送主接线/BMS/单体/连接/日志/告警
+   ├── Minimal API  (/api/*)        状态查询 / 命令执行 / 链路控制 / IEC 61850
+   ├── SignalR Hub  (/hub/realtime) 实时推送主接线/BMS/单体/连接/日志/告警/IEC61850
    └── 静态文件     (wwwroot/)      前端构建产物
    │
    ▼（同进程托管）
@@ -18,11 +18,13 @@ IHost BackgroundServices
    ├── EnergyStorageSystem    仿真主循环
    ├── BmsDataService / BmsLinkService / PcsDataServer / EmDataService
    ├── ModbusHostedService    Modbus TCP 从站（对外）
+   ├── Iec61850HostedService  MMS IED + 入向 GOOSE 订户
    ├── SnapshotService        周期采样 → SignalR 推送
    └── LogHubDispatcher       log4net 日志 → SignalR 推送
    │
    ▼
 Modbus TCP（simEm / simBms{N} / simEmu{N}）  ← EMS/测试工具接入
+IEC 61850 MMS（默认 8102 起）+ L2 GOOSE 订阅 ← IEDScout 等
 ```
 
 ## 二、配置
@@ -95,6 +97,10 @@ cd Web && npm install && npm run dev
 | GET | `/api/system/config` | 工程模式与 overlay 状态 |
 | POST | `/api/system/apply` | 应用组态工程并可选重启 |
 | GET | `/api/protocol` | Modbus 端口表 |
+| GET | `/api/iec61850` | IEC 61850 IED 快照与协议绑定 |
+| GET | `/api/iec61850/messages` | GOOSE/系统报文环形缓冲（可按 `server` 过滤） |
+| POST | `/api/iec61850/messages/clear` | 清空报文环 |
+| GET/PUT | `/api/iec61850/bindings` | 按台 Modbus/IEC61850 开关（`configs/protocol-bindings.json`） |
 | GET | `/api/autotest` | autotest.json 测试用例列表 |
 | GET | `/api/pointmaps` | 各 sim 设备点表（DataMaps/ControlMaps） |
 | POST | `/api/command` | 通用命令执行，body: `{"input":"esscmd link status"}` |
@@ -113,7 +119,8 @@ cd Web && npm install && npm run dev
 |------|------|------|
 | `mainline` | `ReceiveMainLine` | 主接线快照 |
 | `battery.{unit}` | `ReceiveBattery` | 指定舱电池总览 |
-| `connections` | `ReceiveConnections` | 连接/链路快照 |
+| `connections` | `ReceiveConnections` | 连接/链路快照（含 IEC 61850 摘要） |
+| `iec61850` | `ReceiveIec61850Message` | GOOSE 入向/系统事件报文 |
 | `logs` | `ReceiveLog` | 日志条目（log4net ≥ INFO） |
 | `cmdprogress` | `ReceiveCommandProgress` | dpctest 执行进度 |
 | （全局） | `ReceiveAlert` | 严重告警（黑启动联锁等） |
@@ -129,7 +136,9 @@ cd Web && npm install && npm run dev
 | `/thresholds` `/alarms` | BMS 门限 / 设备告警 |
 | `/command` | 命令输入 |
 | `/droop-slices` | 白盒切片（`AllowDroopSlices`） |
-| `/connections` | 连接与链路 |
+| `/connections` | 连接与链路（IEC 61850 仅摘要，详情进 `/iec61850`） |
+| `/iec61850` | IEC 61850：IED 总览、GOOSE 入向报文与解码 |
+| `/protocol-ports` | 按台协议端口（Modbus / IEC 61850 开关） |
 
 ## 七、文件结构
 

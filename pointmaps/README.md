@@ -22,6 +22,7 @@ EMU 始终使用单元直控点表（`emu/standard`）。
 pointmaps/models/
   bms/          type.json + standard/ g2_pro/ g2_4mwh/（bms_bank.csv + bms_rack.csv）
   emu/          type.json + standard/（emu.csv，单元 PCS 直控）
+                + iec61850/（拼装片段：pcs.icd / ems_goose.icd / mapping.csv，不进选型）
   em/           type.json + standard/（em.csv）
   lc/           type.json + 拼装片段（system / group / bms / mv / unit_10MW）+ 互斥 emu/
   pv/           type.json + standard/（pv_logger.csv + pv_apm810.csv）
@@ -31,6 +32,17 @@ pointmaps/models/
 - `model.json`：`{ id, name, description }`，型号展示名与说明。
 - 新增型号：在对应设备类型目录下新建子目录，放入点表文件与 `model.json` 即可被自动识别，无需改代码。
 
+### EMU IEC 61850 片段（`emu/iec61850/`）
+
+拼装型片段（`role=fragment`），不进入设备选型；运行时由 `Protocol/Iec61850` 加载：
+
+| 文件 | 用途 |
+|------|------|
+| `pcs.icd` | 仿真器 MMS IED 模型（设备侧，无 GSE 发布） |
+| `ems_goose.icd` | **外部** GOOSE 发布端 ICD（IEDScout 等导入后发布） |
+| `mapping.csv` | ParamName ↔ ObjectRef；`Transport=goose` 行为入向遥控点 |
+
+AppID：PCS N = `0x2000+N`（PCS1=`0x2001`）。联调见 [用户手册 §5.1](../docs/用户手册.md#51-iec-61850mms--入向-goose)。
 ## LC 中压系统级点位语义（trina_5.5MW / trina_10MW 的 lc.csv SYSTEM 段）
 
 中压 LC 挂在 `simLc*`，系统级点位绑定到所属机组 `emuN.Emu.*` 后由均分派发/批量语义生效：

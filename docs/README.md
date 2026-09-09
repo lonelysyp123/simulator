@@ -7,15 +7,15 @@
 |------|------|------|
 | [系统设计说明](./系统设计说明.md) | 开发、架构 | 技术栈、分层、数据流、设计原则 |
 | [B/S 架构说明](./B-S架构说明.md) | 开发 | Web 后端、Vue 前端、HTTP/SignalR |
-| [用户手册](./用户手册.md) | EMS/BMS 联调、测试 | 安装启动、浏览器界面、Modbus、联调流程 |
+| [用户手册](./用户手册.md) | EMS/BMS 联调、测试 | 安装启动、浏览器界面、Modbus、IEC 61850 GOOSE、联调流程 |
 | [项目编译说明](./项目编译说明.md) | 构建、发布 | 开发/商业脚本、dist、档位差异 |
 | [产品分档与交付边界](./产品分档与交付边界.md) | 销售、交付、发布 | 社区版 / 商业版 / 定制版 / 演示版 |
 | [授权说明](./授权说明.md) | 交付、运维 | 机器码、`license.txt` 签发与校验 |
 | [充值版授权网关约定](./充值版授权网关约定.md) | 运维、接入方 | 仓外计费/鉴权（旧名「充值版」现映射为商业版托管） |
 | [测试报告](./测试报告.md) | 测试、QA | 性能与 DataExchange 手动测试记录 |
 | [指令详细说明](./指令详细说明.md) | 联调、测试 | esscmd / dpc / breaker / dpctest |
-| [appsettings 字段说明](./appsettings.explained.md) | 开发、集成 | `appsettings.json` 各配置段 |
-| [点位表版本说明](../pointmaps/README.md) | 联调、发布 | common / lc / battery |
+| [appsettings 字段说明](./appsettings.explained.md) | 开发、集成 | `appsettings.json` 各配置段（含 IEC 61850 / GOOSE） |
+| [点位表版本说明](../pointmaps/README.md) | 联调、发布 | models 选型；含 `emu/iec61850` 片段 |
 
 ## 产品与演示
 
