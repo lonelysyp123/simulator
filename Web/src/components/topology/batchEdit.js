@@ -2,7 +2,7 @@
 
 export const LIBRARY_STRIP_KEYS = ['emuId', 'groupId']
 
-export const ASSIGNABLE_TEMPLATES = new Set(['pcs', 'ac_breaker', 'ac_meter', 'transformer'])
+export const ASSIGNABLE_TEMPLATES = new Set(['pcs', 'ac_breaker', 'ac_meter', 'transformer', 'split_transformer'])
 
 export const VIRTUAL_TEMPLATES = new Set(['emu', 'emu_group'])
 

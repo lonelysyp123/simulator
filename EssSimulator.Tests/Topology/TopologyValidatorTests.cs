@@ -809,6 +809,74 @@ public class TopologyValidatorTests
         Assert.Equal("PV_BUS_MISMATCH", save.Code);
     }
 
+    [Fact]
+    public void Split_transformer_requires_emu_and_rejects_more_than_two_on_same_emu()
+    {
+        var p = Energized35kVPlant(
+            Node("split1", "split_transformer", "双耳1"),
+            Node("busL", "ac_bus", "左耳690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+            Node("busR", "ac_bus", "右耳690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }));
+
+        Assert.True(Connect(p, Edge("split1", "pri_a", "bus35", "a2")).Ok);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("SPLIT_XFMR_EMU_REQUIRED", save.Code);
+
+        p.Nodes.First(n => n.Id == "split1").Parameters["emuId"] = "role_emu";
+        p.Nodes.Add(Node("split2", "split_transformer", "双耳2",
+            new Dictionary<string, object?> { ["emuId"] = "role_emu" }));
+        save = Save(p);
+        Assert.True(save.Ok, save.Message);
+
+        p.Nodes.Add(Node("split3", "split_transformer", "双耳3",
+            new Dictionary<string, object?> { ["emuId"] = "role_emu" }));
+        save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("SPLIT_XFMR_EMU_DUPLICATE", save.Code);
+    }
+
+    [Fact]
+    public void Split_transformer_rejects_both_ears_on_same_bus()
+    {
+        var p = Energized35kVPlant(
+            Node("split1", "split_transformer", "双耳1",
+                new Dictionary<string, object?> { ["emuId"] = "role_emu" }),
+            Node("bus690", "ac_bus", "690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }));
+
+        Assert.True(Connect(p, Edge("split1", "pri_a", "bus35", "a2")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_l_a", "bus690", "a")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_r_b", "bus690", "b")).Ok);
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("SPLIT_XFMR_EARS_SAME_BUS", save.Code);
+    }
+
+    [Fact]
+    public void Split_transformer_energizes_both_ear_buses()
+    {
+        var p = Energized35kVPlant(
+            Node("split1", "split_transformer", "双耳1",
+                new Dictionary<string, object?> { ["emuId"] = "role_emu" }),
+            Node("busL", "ac_bus", "左耳690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+            Node("busR", "ac_bus", "右耳690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }));
+
+        Assert.True(Connect(p, Edge("split1", "pri_a", "bus35", "a2")).Ok);
+        Assert.True(Connect(p, Edge("split1", "pri_b", "bus35", "b2")).Ok);
+        Assert.True(Connect(p, Edge("split1", "pri_c", "bus35", "c2")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_l_a", "busL", "a")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_l_b", "busL", "b")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_l_c", "busL", "c")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_r_a", "busR", "a")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_r_b", "busR", "b")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_r_c", "busR", "c")).Ok);
+
+        TopologyValidator.RefreshAcBusEnergization(p);
+        Assert.True(TopologyParamHelper.GetDouble(p.Nodes.First(n => n.Id == "busL").Parameters, "nominalVoltage") > 0);
+        Assert.True(TopologyParamHelper.GetDouble(p.Nodes.First(n => n.Id == "busR").Parameters, "nominalVoltage") > 0);
+        var save = Save(p);
+        Assert.True(save.Ok, save.Message);
+    }
+
     private static TopologyProject Energized35kVPlant(params TopologyNode[] extra)
     {
         var p = new TopologyProject

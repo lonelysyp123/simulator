@@ -62,12 +62,18 @@ public class DeviceModelRegistryTests
         var lcIds = byId["lc"].Models.Select(m => m.Id).ToList();
         Assert.Contains("system", lcIds);
         Assert.Contains("group", lcIds);
-        Assert.Contains("unit", lcIds);
+        Assert.Contains("unit_10MW", lcIds);
+        Assert.Contains("unit_5.5MW", lcIds);
         Assert.Contains("mv", lcIds);
         Assert.Contains("emu", lcIds);
         Assert.DoesNotContain("trina_10MW", lcIds);
-        var unitLc = byId["lc"].Models.First(m => m.Id == "unit");
-        Assert.Equal(4, unitLc.MaxPcsPerGroup);
+        Assert.DoesNotContain("unit", lcIds);
+        var unit10 = byId["lc"].Models.First(m => m.Id == "unit_10MW");
+        var unit55 = byId["lc"].Models.First(m => m.Id == "unit_5.5MW");
+        Assert.Equal(2, unit10.PairCount);
+        Assert.Equal(1, unit55.PairCount);
+        Assert.Equal(0, unit10.MaxPcsPerGroup);
+        Assert.Equal(0, unit55.MaxPcsPerGroup);
         var emuLc = byId["lc"].Models.First(m => m.Id == "emu");
         Assert.True(DeviceModelRegistry.IsExclusiveModel(emuLc));
         Assert.All(byId["lc"].Models, m =>

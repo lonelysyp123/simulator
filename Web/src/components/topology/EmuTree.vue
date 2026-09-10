@@ -12,7 +12,7 @@
         @click="emit('select', emu.id)"
       >
         <span class="name">{{ emu.label }}</span>
-        <span class="count">PCS×{{ emu.pcsCount }}</span>
+        <span class="count">支路×{{ emu.pcsCount }}</span>
         <el-button link type="danger" size="small" @click.stop="emit('delete-emu', emu.id)">删</el-button>
       </div>
       <div
@@ -23,7 +23,7 @@
         @click.stop="emit('select', g.id)"
       >
         <span class="name">└ {{ g.label }}</span>
-        <span class="count">PCS×{{ g.pcsCount }}</span>
+        <span class="count">支路×{{ g.pcsCount }}</span>
       </div>
       <div
         v-for="b in emu.bindings"

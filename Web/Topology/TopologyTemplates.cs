@@ -8,12 +8,41 @@ namespace EssSimulator.Web.Topology
         public static TopologyTemplate? Get(string id) =>
             All.FirstOrDefault(t => string.Equals(t.Id, id, StringComparison.OrdinalIgnoreCase));
 
+        public const string TransformerId = "transformer";
+        public const string SplitTransformerId = "split_transformer";
+        /// <summary>每个 EMU 可绑定的双耳变压器上限（对应 4 台 PCS / 2 台箱变）。</summary>
+        public const int MaxSplitTransformersPerEmu = 2;
+
+        public static bool IsTransformerLike(string? templateId) =>
+            string.Equals(templateId, TransformerId, StringComparison.OrdinalIgnoreCase)
+            || IsSplitTransformer(templateId);
+
+        public static bool IsSplitTransformer(string? templateId) =>
+            string.Equals(templateId, SplitTransformerId, StringComparison.OrdinalIgnoreCase);
+
+        public static bool IsSplitLeftEarPort(string? portId) =>
+            portId != null && portId.StartsWith("ear_l_", StringComparison.OrdinalIgnoreCase);
+
+        public static bool IsSplitRightEarPort(string? portId) =>
+            portId != null && portId.StartsWith("ear_r_", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// 交流快捷成组键。双耳变压器左右耳同在下侧，须各自成组；其余端口回落为空串，仍按 Side 分组。
+        /// </summary>
+        public static string AcPhaseBundleKey(string? portId)
+        {
+            if (IsSplitLeftEarPort(portId)) return "ear_l";
+            if (IsSplitRightEarPort(portId)) return "ear_r";
+            return "";
+        }
+
         private static IReadOnlyList<TopologyTemplate> BuildAll() => new List<TopologyTemplate>
         {
             BuildGrid(),
             BuildAcBus(),
             BuildAcBreaker(),
             BuildTransformer(),
+            BuildSplitTransformer(),
             BuildAcMeter(),
             BuildLoad(),
             BuildEmu(),
@@ -158,6 +187,55 @@ namespace EssSimulator.Web.Topology
         };
 
         /// <summary>
+        /// 双耳变压器（分裂绕组箱变）：高压一组三相，低压左右耳各一组三相。
+        /// 须绑定 EMU；每 EMU 至多 2 台。不做无功不平衡保护。
+        /// </summary>
+        private static TopologyTemplate BuildSplitTransformer() => new()
+        {
+            Id = SplitTransformerId,
+            Name = "双耳变压器",
+            Category = "变电",
+            Description = "高压一侧、低压左右两耳（分裂绕组）。两耳须接到不同 690V 母线，禁止共母线；须归属 EMU，每个储能单元至多 2 台。",
+            IsVoltageSource = false,
+            Ports =
+            {
+                new() { Id = "pri_a", Label = "H-A", Kind = "ac_phase", Phase = "A", Side = "top", Offset = 0.2, VoltageParam = "primaryVoltage", IsVoltageSourcePort = false },
+                new() { Id = "pri_b", Label = "H-B", Kind = "ac_phase", Phase = "B", Side = "top", Offset = 0.5, VoltageParam = "primaryVoltage", IsVoltageSourcePort = false },
+                new() { Id = "pri_c", Label = "H-C", Kind = "ac_phase", Phase = "C", Side = "top", Offset = 0.8, VoltageParam = "primaryVoltage", IsVoltageSourcePort = false },
+                new() { Id = "ear_l_a", Label = "左-A", Kind = "ac_phase", Phase = "A", Side = "bottom", Offset = 0.15, VoltageParam = "secondaryVoltage", IsVoltageSourcePort = true },
+                new() { Id = "ear_l_b", Label = "左-B", Kind = "ac_phase", Phase = "B", Side = "bottom", Offset = 0.25, VoltageParam = "secondaryVoltage", IsVoltageSourcePort = true },
+                new() { Id = "ear_l_c", Label = "左-C", Kind = "ac_phase", Phase = "C", Side = "bottom", Offset = 0.35, VoltageParam = "secondaryVoltage", IsVoltageSourcePort = true },
+                new() { Id = "ear_r_a", Label = "右-A", Kind = "ac_phase", Phase = "A", Side = "bottom", Offset = 0.65, VoltageParam = "secondaryVoltage", IsVoltageSourcePort = true },
+                new() { Id = "ear_r_b", Label = "右-B", Kind = "ac_phase", Phase = "B", Side = "bottom", Offset = 0.75, VoltageParam = "secondaryVoltage", IsVoltageSourcePort = true },
+                new() { Id = "ear_r_c", Label = "右-C", Kind = "ac_phase", Phase = "C", Side = "bottom", Offset = 0.85, VoltageParam = "secondaryVoltage", IsVoltageSourcePort = true }
+            },
+            Parameters =
+            {
+                new() { Key = "primaryVoltage", Label = "一次（上）线电压", Type = "number", Unit = "V", Min = 100 },
+                new() { Key = "secondaryVoltage", Label = "二次（耳）线电压", Type = "number", Unit = "V", Min = 100 },
+                new() { Key = "ratedPowerKva", Label = "额定容量（总）", Type = "number", Unit = "kVA", Min = 1, Description = "两耳合计；默认 6300 kVA，单耳一半" },
+                new() { Key = "splitRatio", Label = "分裂比（左耳）", Type = "number", Min = 0.1, Max = 0.9, Description = "左耳容量占比，默认 0.5" },
+                new() { Key = "impedancePercent", Label = "穿越短路阻抗", Type = "number", Unit = "%", Min = 0.1 },
+                new() { Key = "splitImpedancePercent", Label = "分裂阻抗", Type = "number", Unit = "%", Min = 0.1, Description = "两低压绕组之间的阻抗，用于估算环流" },
+                new() { Key = "noLoadLossW", Label = "空载损耗", Type = "number", Unit = "W", Min = 0 },
+                new() { Key = "loadLossW", Label = "负载损耗", Type = "number", Unit = "W", Min = 0 },
+                new() { Key = "emuId", Label = "所属 EMU 储能单元", Type = "emu_select", Description = "必选；本双耳变压器归入该 EMU，作为其单元箱变；每个 EMU 至多 2 台" },
+                new() { Key = "groupId", Label = "所属 EMU 分组", Type = "group_select", Description = "可选；选择后本变压器归入该 EMU 分组（须先选所属 EMU）" }
+            },
+            DefaultParameters = new Dictionary<string, object?>
+            {
+                ["primaryVoltage"] = 35000d,
+                ["secondaryVoltage"] = 690d,
+                ["ratedPowerKva"] = 6300d,
+                ["splitRatio"] = 0.5d,
+                ["impedancePercent"] = 6d,
+                ["splitImpedancePercent"] = 8d,
+                ["noLoadLossW"] = 80d,
+                ["loadLossW"] = 400d
+            }
+        };
+
+        /// <summary>
         /// 三相电表：上方三相拐角在模型层同时表示 PT 与 CT（统一测量抽头）。
         /// 属性中仍分别配置 PT 变比与 CT 变比；连线只需接母线三相一次即可同时取得电压与电流。
         /// </summary>
@@ -250,7 +328,7 @@ namespace EssSimulator.Web.Topology
             Id = "emu",
             Name = "EMU 储能单元",
             Category = "储能",
-            Description = "虚拟储能单元：拖入后画布不显示图形，在左侧「EMU 储能单元」列表中管理；PCS 变流器、断路器、电表通过其「所属 EMU 储能单元」下拉框归入本单元（断路器/电表各至多 1 台）。",
+            Description = "虚拟储能单元：拖入后画布不显示图形，在左侧「EMU 储能单元」列表中管理；PCS 变流器支路、断路器、电表通过其「所属 EMU 储能单元」下拉框归入本单元（断路器/电表各至多 1 台）。",
             IsVoltageSource = false,
             IsVirtual = true,
             Parameters =
@@ -278,7 +356,7 @@ namespace EssSimulator.Web.Topology
             Id = "emu_group",
             Name = "EMU 分组",
             Category = "储能",
-            Description = "EMU 内协议分组（虚拟）：拖入后画布不显示图形，在左侧「EMU 储能单元」列表中管理；PCS 变流器、断路器、电表通过其「所属 EMU 分组」下拉框归入本组（组级断路器至多 1 台，电表可多台）。",
+            Description = "EMU 内 PCS 组（虚拟）：拖入后画布不显示图形，在左侧「EMU 储能单元」列表中管理；PCS 变流器支路、断路器、电表通过其「所属 EMU 分组」下拉框归入本组（组级断路器至多 1 台，电表可多台）。",
             IsVoltageSource = false,
             IsVirtual = true,
             Parameters =
@@ -293,15 +371,15 @@ namespace EssSimulator.Web.Topology
         };
 
         /// <summary>
-        /// PCS 变流器：独立设备节点，上三相 AC 接集电母线，下正/负 DC 接 BMS（或直流母线）；
-        /// 通过 emuId 下拉框归入某个 EMU 虚拟储能单元。
+        /// PCS 变流器支路：一台 PCS 由两条支路组成；本节点是一条支路。
+        /// 上三相 AC 接集电母线，下正/负 DC 接 BMS（或直流母线）；通过 emuId 归入 EMU。
         /// </summary>
         private static TopologyTemplate BuildPcs() => new()
         {
             Id = "pcs",
-            Name = "PCS 变流器",
+            Name = "PCS 变流器支路",
             Category = "储能",
-            Description = "单台变流器：上三相 AC 接入 35kV 集电母线，下正/负两路 DC 接 BMS 电池堆（可经直流母线）；在参数中选择所属 EMU 储能单元。",
+            Description = "PCS 的一条变流器支路（两条支路组成一台 PCS）：上三相 AC 接入 35kV 集电母线，下正/负两路 DC 接 BMS 电池堆（可经直流母线）；在参数中选择所属 EMU 储能单元。",
             IsVoltageSource = false,
             Ports =
             {
@@ -313,8 +391,8 @@ namespace EssSimulator.Web.Topology
             },
             Parameters =
             {
-                new() { Key = "emuId", Label = "所属 EMU 储能单元", Type = "emu_select", Description = "选择后本 PCS 归入该 EMU 虚拟单元" },
-                new() { Key = "groupId", Label = "所属 EMU 分组", Type = "group_select", Description = "可选；选择后本 PCS 支路归入该 EMU 分组（须先选所属 EMU；未选时 PCS 直挂 EMU）" },
+                new() { Key = "emuId", Label = "所属 EMU 储能单元", Type = "emu_select", Description = "选择后本支路归入该 EMU 虚拟单元" },
+                new() { Key = "groupId", Label = "所属 EMU 分组", Type = "group_select", Description = "可选；选择后本 PCS 支路归入该 PCS 组（须先选所属 EMU；未选时支路直挂 EMU）" },
                 new() { Key = "acVoltage", Label = "交流侧线电压", Type = "number", Unit = "V", Min = 100, Description = "接入 AC 母线侧额定，默认 35kV" },
                 new() { Key = "pcsRatedPowerKw", Label = "PCS 额定功率", Type = "number", Unit = "kW" },
                 new() { Key = "pcsMaxPowerKw", Label = "PCS 最大功率", Type = "number", Unit = "kW" },
@@ -331,7 +409,7 @@ namespace EssSimulator.Web.Topology
                 ["pcsEfficiency"] = 0.99d,
                 ["dcVoltageMin"] = 1000d,
                 ["dcVoltageMax"] = 1500d,
-                ["name"] = "PCS变流器"
+                ["name"] = "PCS变流器支路"
             }
         };
 

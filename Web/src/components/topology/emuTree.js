@@ -5,7 +5,8 @@ import { ASSIGNABLE_TEMPLATES } from './batchEdit.js'
 export const BIND_ROLES = [
   { templateId: 'ac_breaker', role: '断路器' },
   { templateId: 'ac_meter', role: '电表' },
-  { templateId: 'transformer', role: '变压器' }
+  { templateId: 'transformer', role: '变压器' },
+  { templateId: 'split_transformer', role: '双耳变压器' }
 ]
 
 function nodeLabel(n) {

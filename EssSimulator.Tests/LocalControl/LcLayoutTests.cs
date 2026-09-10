@@ -37,6 +37,33 @@ public class LcLayoutTests
     }
 
     [Fact]
+    public void ExpandGroupCount_AtLeastTwoPcsGroups()
+    {
+        Assert.Equal(2, LcLayout.PcsGroupsPerEmu);
+        Assert.Equal(2, LcLayout.ExpandGroupCount(null));
+        Assert.Equal(2, LcLayout.ExpandGroupCount(new EssUnitConfig { Name = "flat" }));
+        var two = new EssUnitConfig
+        {
+            Groups =
+            {
+                new EmuGroupConfig { Pcs = { new PcsDeviceConfig() } },
+                new EmuGroupConfig { Pcs = { new PcsDeviceConfig() } }
+            }
+        };
+        Assert.Equal(2, LcLayout.ExpandGroupCount(two));
+        var three = new EssUnitConfig
+        {
+            Groups =
+            {
+                new EmuGroupConfig { Pcs = { new PcsDeviceConfig() } },
+                new EmuGroupConfig { Pcs = { new PcsDeviceConfig() } },
+                new EmuGroupConfig { Pcs = { new PcsDeviceConfig() } }
+            }
+        };
+        Assert.Equal(3, LcLayout.ExpandGroupCount(three));
+    }
+
+    [Fact]
     public void MaxGroupCount_IsTwenty()
     {
         Assert.Equal(20, LcLayout.MaxGroupCount);

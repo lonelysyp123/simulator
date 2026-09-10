@@ -11,6 +11,8 @@ namespace EssSimulator.EssDeviceSimModel.Model
         public const string LegacyAfterMainBreaker = "BUS_MAIN_SEC";
 
         public static string Unit690(int unitIndex) => $"BUS_690_U{unitIndex}";
+        public static string Unit690Left(int unitIndex) => $"BUS_690_U{unitIndex}_L";
+        public static string Unit690Right(int unitIndex) => $"BUS_690_U{unitIndex}_R";
 
         /// <summary>把历史别名收成规范 Id；空或未知 Id 原样返回。</summary>
         public static string Canonicalize(string? busId)
@@ -29,6 +31,27 @@ namespace EssSimulator.EssDeviceSimModel.Model
             if (string.IsNullOrWhiteSpace(busId) || !busId.StartsWith(prefix, StringComparison.Ordinal))
                 return false;
             return int.TryParse(busId.AsSpan(prefix.Length), out unitIndex) && unitIndex >= 0;
+        }
+
+        public static bool TryParseUnit690Ear(string busId, out int unitIndex, out bool rightEar)
+        {
+            unitIndex = -1;
+            rightEar = false;
+            const string prefix = "BUS_690_U";
+            if (string.IsNullOrWhiteSpace(busId) || !busId.StartsWith(prefix, StringComparison.Ordinal))
+                return false;
+            var rest = busId.AsSpan(prefix.Length);
+            if (rest.EndsWith("_L", StringComparison.Ordinal))
+            {
+                rightEar = false;
+                return int.TryParse(rest[..^2], out unitIndex) && unitIndex >= 0;
+            }
+            if (rest.EndsWith("_R", StringComparison.Ordinal))
+            {
+                rightEar = true;
+                return int.TryParse(rest[..^2], out unitIndex) && unitIndex >= 0;
+            }
+            return false;
         }
     }
 }

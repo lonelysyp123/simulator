@@ -5,23 +5,28 @@ namespace EssSimulator.LocalControl
     /// <summary>
     /// 扫描 <c>pointmaps/models/lc/*/</c> 下互补片段（跳过 <c>role=exclusive</c> 互斥整表），
     /// 按组展开后拼成一张 LC 点表。地址或 ParamName 冲突则失败。
+    /// unit 片段的展开次数取 <c>model.json</c> 的 <c>pairCount</c>，不跟随组数。
     /// </summary>
     internal static class LcPointMapComposer
     {
         public const string LcTypeDir = "lc";
 
-        public static List<string> ListFragmentPaths(string modelsRoot, int maxPcsPerGroup = 0)
+        public static List<string> ListFragmentPaths(string modelsRoot, int maxPcsPerGroup = 0) =>
+            ListFragmentModels(modelsRoot, maxPcsPerGroup)
+                .Select(m => Path.Combine(m.Directory, "lc.csv"))
+                .ToList();
+
+        internal static List<DeviceModelInfo> ListFragmentModels(string modelsRoot, int maxPcsPerGroup = 0)
         {
             var lcRoot = Path.Combine(modelsRoot, LcTypeDir);
             if (!Directory.Exists(lcRoot))
-                return new List<string>();
+                return new List<DeviceModelInfo>();
 
             return DeviceModelRegistry.ListModels(lcRoot)
                 .Where(m => !DeviceModelRegistry.IsExclusiveModel(m))
                 .Where(m => m.MaxPcsPerGroup <= 0 || maxPcsPerGroup <= 0 || maxPcsPerGroup <= m.MaxPcsPerGroup)
-                .Select(m => Path.Combine(m.Directory, "lc.csv"))
-                .Where(File.Exists)
-                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .Where(m => File.Exists(Path.Combine(m.Directory, "lc.csv")))
+                .OrderBy(m => m.Directory, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
@@ -38,16 +43,18 @@ namespace EssSimulator.LocalControl
                 throw new InvalidOperationException(
                     $"LC 组数 {groupCount} 超过安全上限 {LcLayout.MaxGroupCount}（组≥21 时单元遥测与组遥测、组遥控与 mv_param1 地址重叠）");
 
-            var paths = ListFragmentPaths(modelsRoot, maxPcsPerGroup);
-            if (paths.Count == 0)
+            var models = ListFragmentModels(modelsRoot, maxPcsPerGroup);
+            if (models.Count == 0)
                 throw new InvalidOperationException($"未找到 LC 片段: {Path.Combine(modelsRoot, LcTypeDir)}");
 
             var merged = new List<MapEntry>();
             var origins = new List<(string Fragment, MapEntry Entry)>();
-            foreach (var path in paths)
+            foreach (var model in models)
             {
-                string fragment = Path.GetFileName(Path.GetDirectoryName(path)!) ?? path;
-                var expanded = LcPointMapExpander.ExpandFile(path, groupCount);
+                string fragment = Path.GetFileName(model.Directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+                    ?? model.Id;
+                int expandN = model.PairCount > 0 ? model.PairCount : groupCount;
+                var expanded = LcPointMapExpander.ExpandFile(Path.Combine(model.Directory, "lc.csv"), expandN);
                 foreach (var entry in expanded)
                 {
                     merged.Add(entry);

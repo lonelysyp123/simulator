@@ -103,7 +103,7 @@
             </g>
 
             <g v-for="(xf, xfIndex) in layout.transformers" :key="`xfmr-${xf.id}`">
-              <TransformerSymbol :x="xf.x" :y="xf.y + xf.span / 2" />
+              <TransformerSymbol :x="xf.x" :y="xf.y + xf.span / 2" :windings="xf.windings || 2" />
               <text
                 :x="xf.labelSide === 'left' ? xf.x - 22 : xf.x + 22"
                 :y="xf.y + 14"
@@ -143,6 +143,12 @@
               <text :x="load.x + 16" :y="load.busY + load.stub + 42" class="value-text">
                 Q {{ fmtKvar(li === 0 ? snap.loadReactivePowerKvar : null) }}
               </text>
+            </g>
+
+            <g v-for="u in layout.unknowns" :key="`unk-${u.id}`">
+              <rect :x="u.x - 32" :y="u.y" width="64" :height="u.h" rx="4" class="meter-box" />
+              <text :x="u.x" :y="u.y + 28" text-anchor="middle" class="label-text">{{ u.label }}</text>
+              <text :x="u.x" :y="u.y + 48" text-anchor="middle" class="value-text">{{ u.node?.templateId }}</text>
             </g>
           </g>
 
@@ -334,6 +340,7 @@ const layout = computed(() => {
     transformers: l.transformers || l.stationXfmrs || [],
     meters: l.meters || [],
     loads: l.loads || [],
+    unknowns: l.unknowns || [],
     stemBreakers: l.stemBreakers || [],
     tieBreakers: l.tieBreakers || []
   }
@@ -477,15 +484,22 @@ function busTelemetry(bus) {
   return ''
 }
 const TransformerSymbol = defineComponent({
-  props: { x: Number, y: Number, scale: { type: Number, default: 1 } },
+  props: { x: Number, y: Number, scale: { type: Number, default: 1 }, windings: { type: Number, default: 2 } },
   setup(p) {
     return () => {
       const r = 9 * (p.scale || 1)
       const gap = 7 * (p.scale || 1)
-      return h('g', { transform: `translate(${p.x}, ${p.y})` }, [
-        h('circle', { cx: 0, cy: -gap, r, fill: 'none', stroke: '#000', 'stroke-width': 2 }),
-        h('circle', { cx: 0, cy: gap, r, fill: 'none', stroke: '#000', 'stroke-width': 2 })
-      ])
+      const circles = p.windings >= 3
+        ? [
+            h('circle', { cx: 0, cy: -gap, r, fill: 'none', stroke: '#000', 'stroke-width': 2 }),
+            h('circle', { cx: -r * 0.85, cy: gap, r: r * 0.85, fill: 'none', stroke: '#000', 'stroke-width': 2 }),
+            h('circle', { cx: r * 0.85, cy: gap, r: r * 0.85, fill: 'none', stroke: '#000', 'stroke-width': 2 })
+          ]
+        : [
+            h('circle', { cx: 0, cy: -gap, r, fill: 'none', stroke: '#000', 'stroke-width': 2 }),
+            h('circle', { cx: 0, cy: gap, r, fill: 'none', stroke: '#000', 'stroke-width': 2 })
+          ]
+      return h('g', { transform: `translate(${p.x}, ${p.y})` }, circles)
     }
   }
 })

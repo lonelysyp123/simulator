@@ -94,11 +94,10 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 return Quantities(v, cur.LineCurrentA, cur.PhaseAngleDeg, v > 1.0 ? systemFrequencyHz : 0);
             }
 
-            if (RuntimeBusIds.TryParseUnit690(busId, out int unit)
-                && unit >= 0 && unit < network.UnitTransformers.Count)
+            var unitQty = Unit690Port(network, busId);
+            if (unitQty != null)
             {
-                var raw = network.UnitTransformers[unit].Secondary.Output.Ac?.Internal
-                    ?? new AcInternalQuantities();
+                var raw = unitQty;
                 return Quantities(raw.LineVoltageV, raw.LineCurrentA, raw.PhaseAngleDeg,
                     raw.LineVoltageV > 1.0 ? systemFrequencyHz : 0);
             }
@@ -132,12 +131,26 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                     ?? network.Load.Port.Output.Ac?.Internal
                     ?? new AcInternalQuantities();
 
+            return Unit690Port(network, busId) ?? new AcInternalQuantities();
+        }
+
+        private static AcInternalQuantities? Unit690Port(ElectricalNetwork network, string busId)
+        {
+            if (RuntimeBusIds.TryParseUnit690Ear(busId, out int earUnit, out bool rightEar)
+                && earUnit >= 0 && earUnit < network.DualEarTransformers.Count
+                && network.DualEarTransformers[earUnit] != null)
+            {
+                var dual = network.DualEarTransformers[earUnit]!;
+                return (rightEar ? dual.SecondaryRight : dual.SecondaryLeft).Output.Ac?.Internal
+                    ?? new AcInternalQuantities();
+            }
+
             if (RuntimeBusIds.TryParseUnit690(busId, out int unit)
                 && unit >= 0 && unit < network.UnitTransformers.Count)
                 return network.UnitTransformers[unit].Secondary.Output.Ac?.Internal
                     ?? new AcInternalQuantities();
 
-            return new AcInternalQuantities();
+            return null;
         }
 
         private static AcInternalQuantities Quantities(

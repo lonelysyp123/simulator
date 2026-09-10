@@ -70,5 +70,21 @@ namespace EssSimulator.EssDeviceSimModel.Devices
 
         public static TransformerDevice Create(string deviceId, TransformerDeviceConfig config) =>
             new(deviceId, config);
+
+        public static DualEarTransformerConfig CreateDualEarConfig(SplitTransformerRuntimeConfig cfg) =>
+            new()
+            {
+                RatedPowerKva = cfg.RatedPowerKva > 1 ? cfg.RatedPowerKva : 6300,
+                PrimaryNominalLineVoltageV = cfg.PrimaryVoltage > 1 ? cfg.PrimaryVoltage : 35000,
+                SecondaryNominalLineVoltageV = cfg.SecondaryVoltage > 1 ? cfg.SecondaryVoltage : 690,
+                NoLoadLossKw = cfg.NoLoadLoss / 1000.0,
+                LoadLossKw = cfg.LoadLoss / 1000.0,
+                ImpedancePercent = cfg.ImpedancePercent > 0.1 ? cfg.ImpedancePercent : 6,
+                SplitImpedancePercent = cfg.SplitImpedancePercent > 0.1 ? cfg.SplitImpedancePercent : 8,
+                SplitRatio = cfg.SplitRatio is > 0.1 and < 0.9 ? cfg.SplitRatio : 0.5
+            };
+
+        public static DualEarTransformerDevice CreateDualEar(string deviceId, SplitTransformerRuntimeConfig cfg) =>
+            new(deviceId, CreateDualEarConfig(cfg));
     }
 }

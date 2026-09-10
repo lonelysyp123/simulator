@@ -130,11 +130,21 @@ namespace EssSimulator.EssDeviceSimModel.Solver
                 bool gridAvailable = mainClosed && lv690 > pcsCfg.AcVoltageNominal * 0.1;
 
                 double gridFreq = network.SystemFrequencyHz;
+                var split = u < network.DualEarTransformers.Count ? network.DualEarTransformers[u] : null;
                 for (int ch = 0; ch < count; ch++)
                 {
                     int idx = baseIdx + ch;
-                    if (idx < ess._pcsList.Count)
-                        ess._pcsList[idx].UpdateGridState(lv690, gridFreq, gridAvailable);
+                    if (idx >= ess._pcsList.Count)
+                        continue;
+                    double chV = lv690;
+                    if (split != null)
+                    {
+                        var assignment = u < network.SplitEarAssignments.Count ? network.SplitEarAssignments[u] : null;
+                        bool right = assignment != null && assignment.RightChannels.Contains(idx);
+                        chV = (right ? split.SecondaryRight : split.SecondaryLeft).Output.Ac?.Internal.LineVoltageV ?? lv690;
+                    }
+                    bool chGrid = mainClosed && chV > pcsCfg.AcVoltageNominal * 0.1;
+                    ess._pcsList[idx].UpdateGridState(chV, gridFreq, chGrid);
                 }
             }
         }

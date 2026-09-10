@@ -104,6 +104,7 @@ public sealed class EmsStrategyEngine : IEmsStrategyEngine
         PccActivePowerKw = _meas.PccActivePowerKw,
         PccReactivePowerKvar = _meas.PccReactivePowerKvar,
         PccLineVoltageV = _meas.PccLineVoltageV,
+        StationBus35LineVoltageV = _meas.StationBus35LineVoltageV,
         PBaseKw = _output.PBaseKw,
         QBaseKvar = _output.QBaseKvar,
         FrequencyDeltaKw = _output.FrequencyDeltaKw,

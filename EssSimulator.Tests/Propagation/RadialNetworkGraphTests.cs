@@ -51,4 +51,44 @@ public class RadialNetworkGraphTests
 
         Assert.Same(graph.BusAfterMainBreaker, graph.FindBus(RuntimeBusIds.LegacyAfterMainBreaker));
     }
+
+    [Fact]
+    public void Split_transformer_creates_left_and_right_690_buses()
+    {
+        var simCfg = new SimulatorConfig
+        {
+            Devices =
+            {
+                new EssUnitConfig
+                {
+                    Pcs = { new EssSimulator.Configuration.PcsDeviceConfig(), new EssSimulator.Configuration.PcsDeviceConfig() },
+                    Bms = { new BmsDeviceConfig(), new BmsDeviceConfig() },
+                    SplitTransformer = new SplitTransformerRuntimeConfig
+                    {
+                        Present = true,
+                        LeftEarPcsIndices = { 0 },
+                        RightEarPcsIndices = { 1 }
+                    }
+                }
+            }
+        };
+        var pcsCfg = new PcsPhysicalConfig();
+        var pccCfg = new PccConfig();
+        var network = NetworkTopologyBuilder.Build(
+            simCfg,
+            pcsCfg,
+            new TransformerConfig(),
+            new UnitTransformerConfig(),
+            new LoadConfig(),
+            pccCfg,
+            pcsPerUnit: new[] { 2 });
+        var graph = new RadialNetworkGraph(network, pccCfg, pcsCfg);
+
+        Assert.NotNull(network.DualEarTransformers[0]);
+        Assert.Equal(RuntimeBusIds.Unit690Left(0), graph.UnitBuses690[0].BusId);
+        Assert.Equal(RuntimeBusIds.Unit690Right(0), graph.ExtraUnitBuses690[0].BusId);
+        Assert.Same(graph.UnitBuses690[0], graph.Bus690ForPcsChannel(0));
+        Assert.Same(graph.ExtraUnitBuses690[0], graph.Bus690ForPcsChannel(1));
+        Assert.Same(graph.ExtraUnitBuses690[0], graph.FindBus(RuntimeBusIds.Unit690Right(0)));
+    }
 }

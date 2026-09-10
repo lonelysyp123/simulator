@@ -14,8 +14,11 @@
 按 **设备类型 → 设备型号 → 点表文件** 组织，运行期在系统配置界面选型，
 持久化到 `configs/topology/device-models.json`，重启后生效：
 
-LC 默认由 `models/lc/` 下互补片段按组拼装（`system` / `group` / `bms` / `mv` / `unit_10MW` 等），
-不是按 PCS 台数互斥选型。`unit_10MW` 的 `maxPcsPerGroup=4`：组内支路超过 4 条时跳过该片段。
+LC 默认由 `models/lc/` 下互补片段按组拼装（`system` / `group` / `bms` / `mv` /
+`unit_5.5MW` / `unit_10MW`），不是按支路数互斥选型。两段 unit 窗口**始终共存**：
+`n` 是 EMU 内 PCS 组号；`unit_10MW` 展开 n=1,2（基址 2600）；`unit_5.5MW` 只展开 n=1
+（基址 5000，只覆盖第一个 PCS 组）。模块 1/2 是该组第一台 PCS 的两条支路。
+组态画布 `pcs` 节点是 PCS 变流器支路（两条支路组成一台 PCS）。
 EMU 始终使用单元直控点表（`emu/standard`）。
 
 ```
@@ -24,7 +27,7 @@ pointmaps/models/
   emu/          type.json + standard/（emu.csv，单元 PCS 直控）
                 + iec61850/（拼装片段：pcs.icd / ems_goose.icd / mapping.csv，不进选型）
   em/           type.json + standard/（em.csv）
-  lc/           type.json + 拼装片段（system / group / bms / mv / unit_10MW）+ 互斥 emu/
+  lc/           type.json + 拼装片段（system / group / bms / mv / unit_5.5MW / unit_10MW）+ 互斥 emu/
   pv/           type.json + standard/（pv_logger.csv + pv_apm810.csv）
 ```
 

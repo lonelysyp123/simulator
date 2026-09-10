@@ -306,7 +306,9 @@ public sealed class VoltageDroopConfig
     public double RatedVoltageV { get; set; } = 35000;
     public double Deadband1Percent { get; set; } = 0.5;
     public double Deadband2Percent { get; set; } = 1.5;
+    /// <summary>内段下垂系数 %（4 表示 4%，与一次调频 DroopPercent 同口径）。</summary>
     public double K1Percent { get; set; } = 4;
+    /// <summary>五段外段下垂系数 %。</summary>
     public double K2Percent { get; set; } = 6;
     /// <summary>0=从死区边沿起算（C 曲线1）；1=从额定电压起算（C 曲线2）。</summary>
     public int VoltageCurveType { get; set; }

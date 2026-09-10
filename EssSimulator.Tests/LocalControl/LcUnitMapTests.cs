@@ -57,6 +57,26 @@ public class LcUnitMapTests
         Assert.All(rows, r => Assert.Equal("0", r.ModelSim));
     }
 
+    [Fact]
+    public void FiveFiveMw_AddressBase5000_PairCount1()
+    {
+        Assert.Equal(5000, LcUnitMap.FiveFiveMw.AddressBase);
+        Assert.Equal(1, LcUnitMap.FiveFiveMw.PairCount);
+        Assert.Equal("unit1_param0", LcUnitMap.FiveFiveMw.Param(1, 0));
+        Assert.Equal(5000, LcUnitMap.FiveFiveMw.Address(1, 0));
+        Assert.Equal(2, LcUnitMap.TenMw.PairCount);
+    }
+
+    [Fact]
+    public void FiveFiveMw_ExpandedCsv_OnlyN1()
+    {
+        var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "lc", "unit_5.5MW", "lc.csv");
+        var entries = LcPointMapExpander.ExpandFile(path, 1);
+        Assert.Contains(entries, e => e.ParamName == "unit1_param0" && e.Address == 5000);
+        Assert.DoesNotContain(entries, e => e.Address == 5600);
+        Assert.DoesNotContain(entries, e => e.Address == 2600);
+    }
+
     private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -104,6 +124,19 @@ public class LcUnitTelemetryTests
         Assert.Equal(689d, Convert.ToDouble(pts[LcUnitMap.GridVoltageTr(2)]));
         Assert.Equal(3, pts[LcUnitMap.WarningWord1(2, 0)]);
         Assert.Equal(8, pts[LcUnitMap.WarningWord2(2, 1)]);
+    }
+
+    [Fact]
+    public void Collect_FiveFiveMw_WritesUnit1Param()
+    {
+        var m1 = new LcUnitModuleSnap(700, 11, 690, 690, 690, 1, 2, 3, 100, 40, 50, 2750, 3, 4, 50, 10);
+        var pts = LcUnitTelemetry.Collect(LcUnitMap.FiveFiveMw, 1, m1, null)
+            .ToDictionary(p => p.Param, p => p.Value);
+
+        Assert.Equal(700, pts[LcUnitMap.FiveFiveMw.BatteryVoltage(1, 0)]);
+        Assert.Equal(0, pts[LcUnitMap.FiveFiveMw.BatteryVoltage(1, 1)]);
+        Assert.Equal(100d, Convert.ToDouble(pts[LcUnitMap.FiveFiveMw.BatteryPowerTotal(1)]));
+        Assert.DoesNotContain(pts.Keys, k => k.StartsWith("unit_param", StringComparison.Ordinal));
     }
 
     [Fact]

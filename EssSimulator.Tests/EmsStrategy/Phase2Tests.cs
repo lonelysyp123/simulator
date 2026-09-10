@@ -66,43 +66,39 @@ public class InertiaCalculatorTests
 
 public class VoltageDroopTests
 {
-    [Fact]
-    public void UnderVoltage_MatchesCKvarPerVoltFromDeadband()
+    private static VoltageDroopConfig DefaultCfg() => new()
     {
-        var cfg = new VoltageDroopConfig
-        {
-            RatedVoltageV = 35000,
-            Deadband1Percent = 0.5,
-            K1Percent = 4,
-            SegmentCount = 3,
-            VoltageCurveType = 0,
-            UnderVoltEnable = true,
-            OverVoltEnable = true,
-            MaxOutputKvar = 5000,
-            MaxAbsorbKvar = 5000,
-            LimitCoefficient = 1
-        };
-        // db1=175 V, Uspan=34825, ΔQ=4*(34825-34000)=3300
-        Assert.Equal(3300, VoltageDroopCalculator.ComputeDeltaKvar(34000, 5000, cfg), 6);
+        RatedVoltageV = 35000,
+        Deadband1Percent = 0.5,
+        Deadband2Percent = 1.5,
+        K1Percent = 4,
+        K2Percent = 6,
+        SegmentCount = 3,
+        VoltageCurveType = 0,
+        UnderVoltEnable = true,
+        OverVoltEnable = true,
+        MaxOutputKvar = 5000,
+        MaxAbsorbKvar = 5000,
+        LimitCoefficient = 1
+    };
+
+    private static double Segment(double uSpan, double u, double u0, double qRated, double k) =>
+        (uSpan - u) / u0 * qRated / k * 100.0;
+
+    [Fact]
+    public void UnderVoltage_MatchesPercentDroopFromDeadband()
+    {
+        var cfg = DefaultCfg();
+        // db1=175 V, Uspan=34825, ΔQ=(34825-34000)/35000*5000/4*100
+        Assert.Equal(Segment(34825, 34000, 35000, 5000, 4), VoltageDroopCalculator.ComputeDeltaKvar(34000, 5000, cfg), 6);
     }
 
     [Fact]
     public void FromRatedCurve_UsesU0AsSpan()
     {
-        var cfg = new VoltageDroopConfig
-        {
-            RatedVoltageV = 35000,
-            Deadband1Percent = 0.5,
-            K1Percent = 4,
-            SegmentCount = 3,
-            VoltageCurveType = 1,
-            UnderVoltEnable = true,
-            OverVoltEnable = true,
-            MaxOutputKvar = 5000,
-            MaxAbsorbKvar = 5000,
-            LimitCoefficient = 1
-        };
-        Assert.Equal(4000, VoltageDroopCalculator.ComputeDeltaKvar(34000, 5000, cfg), 6);
+        var cfg = DefaultCfg();
+        cfg.VoltageCurveType = 1;
+        Assert.Equal(Segment(35000, 34000, 35000, 5000, 4), VoltageDroopCalculator.ComputeDeltaKvar(34000, 5000, cfg), 6);
     }
 
     [Fact]
@@ -111,6 +107,48 @@ public class VoltageDroopTests
         var cfg = new VoltageDroopConfig { RatedVoltageV = 35000, Deadband1Percent = 1 };
         Assert.False(VoltageDroopCalculator.IsOutsideDeadband(35000, cfg));
         Assert.Equal(0, VoltageDroopCalculator.ComputeDeltaKvar(35000, 5000, cfg));
+    }
+
+    [Fact]
+    public void OverVoltage_NegativeDelta()
+    {
+        var cfg = DefaultCfg();
+        double dq = VoltageDroopCalculator.ComputeDeltaKvar(36000, 5000, cfg);
+        Assert.True(dq < 0);
+        Assert.Equal(Segment(35175, 36000, 35000, 5000, 4), dq, 6);
+    }
+
+    [Fact]
+    public void PlantRating_ScalesOutput()
+    {
+        var cfg = DefaultCfg();
+        cfg.MaxOutputKvar = 20000;
+        cfg.MaxAbsorbKvar = 20000;
+        double at5 = VoltageDroopCalculator.ComputeDeltaKvar(34000, 5000, cfg);
+        double at10 = VoltageDroopCalculator.ComputeDeltaKvar(34000, 10000, cfg);
+        Assert.Equal(at5 * 2, at10, 6);
+    }
+
+    [Fact]
+    public void FiveSegment_OuterUsesSecondDroop()
+    {
+        var cfg = DefaultCfg();
+        cfg.SegmentCount = 5;
+        double inner = VoltageDroopCalculator.ComputeDeltaKvar(34700, 5000, cfg);
+        double outer = VoltageDroopCalculator.ComputeDeltaKvar(34000, 5000, cfg);
+        Assert.True(inner > 0);
+        Assert.True(outer > inner);
+        double db2 = 35000 * 1.5 / 100.0;
+        double atBreak = VoltageDroopCalculator.ComputeDeltaKvar(35000 - db2, 5000, cfg);
+        Assert.True(outer > atBreak);
+    }
+
+    [Fact]
+    public void SelectMeasuredVoltage_Prefers35kVWhenRatedIs35kV()
+    {
+        Assert.Equal(34000, VoltageDroopCalculator.SelectMeasuredVoltage(220000, 34000, 35000), 6);
+        Assert.Equal(220000, VoltageDroopCalculator.SelectMeasuredVoltage(220000, 34000, 220000), 6);
+        Assert.Equal(220000, VoltageDroopCalculator.SelectMeasuredVoltage(220000, 0, 35000), 6);
     }
 }
 
@@ -128,6 +166,29 @@ public class ReactivePowerStrategyTests
         double y = s.Step(cfg, new PlantMeasurements { PccLineVoltageV = 30000, PccActivePowerKw = 0 }, TimeSpan.FromMilliseconds(200));
         Assert.Equal(300, y, 5);
         Assert.Equal(ActionState.Reset, s.DroopAction);
+    }
+
+    [Fact]
+    public void CloseLoopDroop_UsesStationBusWhenRatedIs35kV()
+    {
+        var cfg = EmsStrategyConfig.CreateDefault();
+        cfg.ReactiveMode = ReactiveMode.CloseLoopFixed;
+        cfg.VoltageDroop.Enabled = true;
+        cfg.ReactiveSlope.Enabled = false;
+        cfg.ReactivePid.Enabled = false;
+        var s = new ReactivePowerStrategy();
+        s.Step(cfg, new PlantMeasurements
+        {
+            PccLineVoltageV = 220000,
+            StationBus35LineVoltageV = 34000,
+            PccReactivePowerKvar = 0
+        }, TimeSpan.FromMilliseconds(200));
+        Assert.Equal(ActionState.Action, s.DroopAction);
+        Assert.True(s.DroopDeltaKvar > 0);
+        Assert.Equal(
+            VoltageDroopCalculator.ComputeDeltaKvar(34000, cfg.PlantRatedKw, cfg.VoltageDroop),
+            s.DroopDeltaKvar,
+            5);
     }
 
     [Fact]

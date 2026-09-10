@@ -848,6 +848,11 @@ const TEMPLATE_MODELS = {
     if (item.panelKey) tagPanelPick(g, item.panelKey)
     return g
   },
+  split_transformer: (item) => {
+    const g = createTransformer(item.scale ?? 1, { boxType: !!item.boxType })
+    if (item.panelKey) tagPanelPick(g, item.panelKey)
+    return g
+  },
   ac_bus: (item) => (item.kind === 'bus-bar' ? createBusBar(item) : createBusNode(0, item.y ?? Y.cable, 0, {
     radius: item.radius ?? 0.24,
     label: item.node?.label || '',

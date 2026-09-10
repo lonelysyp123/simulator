@@ -64,6 +64,11 @@
             <circle :cx="sizeOf(node).w / 2" cy="42" r="14" />
             <circle :cx="sizeOf(node).w / 2" cy="78" r="14" />
           </g>
+          <g v-if="node.templateId === 'split_transformer'" fill="none" stroke="#fff" stroke-width="2">
+            <circle :cx="sizeOf(node).w / 2" cy="38" r="14" />
+            <circle :cx="sizeOf(node).w * 0.28" cy="82" r="12" />
+            <circle :cx="sizeOf(node).w * 0.72" cy="82" r="12" />
+          </g>
           <g v-if="node.templateId === 'pv_unit'" fill="none" stroke="#fff" stroke-width="1.6">
             <rect :x="sizeOf(node).w * 0.22" y="28" :width="sizeOf(node).w * 0.56" height="36" rx="2" />
             <line :x1="sizeOf(node).w * 0.22" y1="40" :x2="sizeOf(node).w * 0.78" y2="40" />
@@ -271,6 +276,9 @@ function voltageHint(node) {
   }
   if (node.templateId === 'transformer') {
     return `${formatVoltage(p.primaryVoltage)}/${formatVoltage(p.secondaryVoltage)}`
+  }
+  if (node.templateId === 'split_transformer') {
+    return `${formatVoltage(p.primaryVoltage)}/${formatVoltage(p.secondaryVoltage)} · 双耳`
   }
   if (node.templateId === 'emu') return formatVoltage(p.acVoltage)
   if (node.templateId === 'pv_unit') {

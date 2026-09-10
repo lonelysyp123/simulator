@@ -111,7 +111,11 @@ public class LcPointMapComposerTests : IDisposable
         Assert.Contains("bmsyc38001", names);
         Assert.Contains("bmsyc38074", names);
         Assert.Contains("unit_param0", names);
+        Assert.Contains("unit1_param0", names);
         Assert.Contains(map, e => e.ParamName == "unit_param0" && e.Address == LcUnitMap.AddressBase);
+        Assert.Contains(map, e => e.ParamName == "unit_param600" && e.Address == LcUnitMap.Address(2, 0));
+        Assert.Contains(map, e => e.ParamName == "unit1_param0" && e.Address == LcUnitMap.FiveFiveMw.AddressBase);
+        Assert.DoesNotContain(map, e => e.Address == LcUnitMap.FiveFiveMw.Address(2, 0));
         Assert.DoesNotContain("param1", names);
         Assert.DoesNotContain("yx0", names);
         Assert.DoesNotContain("yt0", names);
@@ -120,15 +124,18 @@ public class LcPointMapComposerTests : IDisposable
     }
 
     [Fact]
-    public void Compose_FourPcsPerGroup_IncludesUnit10MwFragment()
+    public void Compose_UnitFragments_AlwaysCoexist_RegardlessOfPcsCount()
     {
         var models = Path.Combine(FindRepoRoot(), "pointmaps", "models");
         var four = LcPointMapComposer.Compose(models, groupCount: 1, maxPcsPerGroup: 4);
         var two = LcPointMapComposer.Compose(models, groupCount: 1, maxPcsPerGroup: 2);
         var five = LcPointMapComposer.Compose(models, groupCount: 1, maxPcsPerGroup: 5);
         Assert.Contains(four, e => e.ParamName == "unit_param0" && e.Address == LcUnitMap.AddressBase);
+        Assert.Contains(four, e => e.ParamName == "unit1_param0" && e.Address == LcUnitMap.FiveFiveMw.AddressBase);
         Assert.Contains(two, e => e.ParamName == "unit_param0");
-        Assert.DoesNotContain(five, e => e.ParamName == "unit_param0");
+        Assert.Contains(two, e => e.ParamName == "unit1_param0");
+        Assert.Contains(five, e => e.ParamName == "unit_param0");
+        Assert.Contains(five, e => e.ParamName == "unit1_param0");
         Assert.Contains(four, e => e.ParamName == "sysyc107");
         Assert.Contains(four, e => e.ParamName == "sysyc228");
     }
@@ -155,7 +162,9 @@ public class LcPointMapComposerTests : IDisposable
         Assert.Contains(g2, e => e.Address == 17500);
         Assert.Contains(g1, e => e.Address == 17200);
         Assert.Contains(g1, e => e.Address == LcUnitMap.AddressBase && e.ParamName == "unit_param0");
-        Assert.DoesNotContain(g1, e => e.Address == LcUnitMap.Address(2, 0));
+        Assert.Contains(g1, e => e.Address == LcUnitMap.Address(2, 0) && e.ParamName == "unit_param600");
+        Assert.Contains(g1, e => e.Address == LcUnitMap.FiveFiveMw.AddressBase && e.ParamName == "unit1_param0");
+        Assert.DoesNotContain(g1, e => e.Address == LcUnitMap.FiveFiveMw.Address(2, 0));
         Assert.Contains(g2, e => e.Address == LcUnitMap.Address(2, 0) && e.ParamName == "unit_param600");
         Assert.DoesNotContain(g1, e => e.Address == 38200);
         Assert.Contains(g2, e => e.Address == 38200 && e.ParamName == "bmsyc38200");

@@ -79,7 +79,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
         private void Phase1CollectLeafPower(DeviceStepContext context)
         {
             _graph.Bus35.ResetPowerAggregation();
-            foreach (var bus690 in _graph.UnitBuses690)
+            foreach (var bus690 in _graph.AllUnit690Buses)
                 bus690.ResetPowerAggregation();
         }
 
@@ -88,7 +88,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
         {
             _graph.Bus35.CollectFromContributors(context);
 
-            foreach (var bus690 in _graph.UnitBuses690)
+            foreach (var bus690 in _graph.AllUnit690Buses)
             {
                 bus690.CollectFromContributors(context);
                 _graph.Bus35.AddPower(bus690.TotalActivePowerKw, bus690.TotalReactivePowerKvar);
@@ -176,7 +176,6 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
 
                 bool unitClosed = _network.UnitBreakers[u].SwitchState.IsClosed
                     && !_network.UnitBreakers[u].SwitchState.IsTripped;
-                double bus690V = _graph.UnitBuses690[u].LineVoltageV;
                 bool gridAvailable = context.MainBreakerClosed && unitClosed;
 
                 var (baseChannel, pcsCount) = PcsUnitLayout.RangeOfUnit(_network.PcsPerUnit, u);
@@ -186,7 +185,8 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                     if (idx >= _network.PcsDevices.Count)
                         continue;
 
-                    SolvePcsBmsPair(context, step, idx, bus690V, gridAvailable);
+                    double bus690V = _graph.Bus690ForPcsChannel(idx).LineVoltageV;
+                    SolvePcsBmsPair(context, step, idx, bus690V, gridAvailable && bus690V > 1.0);
                 }
             }
         }
@@ -236,11 +236,37 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
 
             for (int u = 0; u < _graph.UnitBuses690.Count; u++)
             {
-                if (u >= _network.UnitBreakers.Count || u >= _network.UnitTransformers.Count)
+                if (u >= _network.UnitBreakers.Count)
                     continue;
 
                 bool unitClosed = _network.UnitBreakers[u].SwitchState.IsClosed
                     && !_network.UnitBreakers[u].SwitchState.IsTripped;
+                var dual = u < _network.DualEarTransformers.Count ? _network.DualEarTransformers[u] : null;
+                if (dual != null)
+                {
+                    var left = _graph.UnitBuses690[u];
+                    var right = _graph.FindBus(RuntimeBusIds.Unit690Right(u));
+                    var leftCurrent = unitClosed && bus35V > 1.0
+                        ? AcQuantityConverter.FromLineVoltageAndPower(
+                            left.LineVoltageV, left.TotalActivePowerKw, left.TotalReactivePowerKvar,
+                            ThreePhaseConnection.Star, _network.SystemFrequencyHz)
+                        : new AcInternalQuantities();
+                    var rightCurrent = unitClosed && bus35V > 1.0 && right != null
+                        ? AcQuantityConverter.FromLineVoltageAndPower(
+                            right.LineVoltageV, right.TotalActivePowerKw, right.TotalReactivePowerKvar,
+                            ThreePhaseConnection.Star, _network.SystemFrequencyHz)
+                        : new AcInternalQuantities();
+
+                    PropagationPortBinding.SetAcVoltageInput(dual.Primary, unitClosed ? bus35V : 0, ThreePhaseConnection.Star);
+                    PropagationPortBinding.SetAcQuantitiesInput(dual.SecondaryLeft, leftCurrent);
+                    PropagationPortBinding.SetAcQuantitiesInput(dual.SecondaryRight, rightCurrent);
+                    dual.Step(context, step);
+                    continue;
+                }
+
+                if (u >= _network.UnitTransformers.Count)
+                    continue;
+
                 var bus690 = _graph.UnitBuses690[u];
                 var unitCurrent = unitClosed && bus35V > 1.0
                     && (bus690.TotalLineCurrentA > 1e-6 || Math.Abs(bus690.TotalPhaseAngleDeg) > 1e-6)

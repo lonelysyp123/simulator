@@ -133,18 +133,31 @@ namespace EssSimulator.Web.Topology
                 overlay.Notes.Add($"电表抽头 {sourceBusId} · {ptPri / 1000:0.#} kV / {ctPri:0.#} A（二次固定 {PtSecondaryV:0}V / {CtSecondaryA:0}A）");
             }
 
-            // 单元变取首个 EMU 参数；PCS 额定取首台 PCS；仅有光伏时用光伏箱变/逆变器参数
+            // 单元变取首个 EMU 参数；若该 EMU 有双耳箱变则用其电压/容量
             var firstPcs = emusWithPcs.SelectMany(g => g.Pcs).FirstOrDefault();
             if (emusWithPcs.Count > 0)
             {
                 var emuSource = emusWithPcs[0].Emu;
                 var pcsSource = firstPcs!;
-                overlay.UnitTransformer = new UnitTransformerConfig
-                {
-                    PrimaryVoltage = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfPrimaryV", 35000),
-                    SecondaryVoltage = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfSecondaryV", 690),
-                    RatedPower = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfRatedKva", 6300)
-                };
+                var firstSplit = project.Nodes.FirstOrDefault(n =>
+                    TopologyTemplates.IsSplitTransformer(n.TemplateId) &&
+                    TopologyParamHelper.GetString(n.Parameters, "emuId") == emuSource.Id);
+                overlay.UnitTransformer = firstSplit != null
+                    ? new UnitTransformerConfig
+                    {
+                        PrimaryVoltage = TopologyParamHelper.GetDouble(firstSplit.Parameters, "primaryVoltage", 35000),
+                        SecondaryVoltage = TopologyParamHelper.GetDouble(firstSplit.Parameters, "secondaryVoltage", 690),
+                        RatedPower = TopologyParamHelper.GetDouble(firstSplit.Parameters, "ratedPowerKva", 6300),
+                        ImpedancePercent = TopologyParamHelper.GetDouble(firstSplit.Parameters, "impedancePercent", 6),
+                        NoLoadLoss = TopologyParamHelper.GetDouble(firstSplit.Parameters, "noLoadLossW", 80),
+                        LoadLoss = TopologyParamHelper.GetDouble(firstSplit.Parameters, "loadLossW", 400)
+                    }
+                    : new UnitTransformerConfig
+                    {
+                        PrimaryVoltage = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfPrimaryV", 35000),
+                        SecondaryVoltage = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfSecondaryV", 690),
+                        RatedPower = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfRatedKva", 6300)
+                    };
                 overlay.Pcs = new PcsPhysicalConfig
                 {
                     RatedPower = TopologyParamHelper.GetDouble(pcsSource.Parameters, "pcsRatedPowerKw", 1250),
@@ -152,7 +165,7 @@ namespace EssSimulator.Web.Topology
                     Efficiency = TopologyParamHelper.GetDouble(pcsSource.Parameters, "pcsEfficiency", 0.99),
                     DcVoltageRangeMin = TopologyParamHelper.GetDouble(pcsSource.Parameters, "dcVoltageMin", 1000),
                     DcVoltageRangeMax = TopologyParamHelper.GetDouble(pcsSource.Parameters, "dcVoltageMax", 1500),
-                    AcVoltageNominal = TopologyParamHelper.GetDouble(emuSource.Parameters, "unitXfSecondaryV", 690)
+                    AcVoltageNominal = overlay.UnitTransformer.SecondaryVoltage
                 };
             }
             else if (pvUnits.Count > 0)
@@ -232,6 +245,17 @@ namespace EssSimulator.Web.Topology
                     ? null
                     : TopologyElectricalMapper.ResolveMeterSourceBusId(project, unitMeter);
 
+                var splitXfmr = project.Nodes.FirstOrDefault(n =>
+                    TopologyTemplates.IsSplitTransformer(n.TemplateId) &&
+                    TopologyParamHelper.GetString(n.Parameters, "emuId") == emu.Id);
+                if (splitXfmr != null)
+                {
+                    unit.UnitTransformerName = NodeDisplayName(splitXfmr);
+                    unit.SplitTransformer = ToSplitRuntime(project, splitXfmr, group.Pcs);
+                    overlay.Notes.Add(
+                        $"{unit.Name}: 双耳变压器「{unit.UnitTransformerName}」· 左耳 支路×{unit.SplitTransformer.LeftEarPcsIndices.Count} · 右耳 支路×{unit.SplitTransformer.RightEarPcsIndices.Count}");
+                }
+
                 var usedBms = new HashSet<string>(StringComparer.Ordinal);
                 int linkedBms = 0;
                 int pcsSeq = 0;
@@ -297,9 +321,9 @@ namespace EssSimulator.Web.Topology
 
                 overlay.EssUnits.Add(unit);
                 string groupSummary = unit.HasGroups
-                    ? $" · 分组×{unit.Groups.Count}（{string.Join("、", unit.Groups.Select(g => $"{g.Name}: PCS×{g.PcsCount}"))}）"
+                    ? $" · 分组×{unit.Groups.Count}（{string.Join("、", unit.Groups.Select(g => $"{g.Name}: 支路×{g.PcsCount}"))}）"
                     : string.Empty;
-                overlay.Notes.Add($"{unit.Name}: PCS×{unit.Pcs.Count + unit.Groups.Sum(g => g.Pcs.Count)} · BMS×{linkedBms}（每台 PCS 对齐 1 路 BMS，未连线时用默认补齐）"
+                overlay.Notes.Add($"{unit.Name}: 支路×{unit.Pcs.Count + unit.Groups.Sum(g => g.Pcs.Count)} · BMS×{linkedBms}（每条支路对齐 1 路 BMS，未连线时用默认补齐）"
                     + $" · 单元断路器：{unit.UnitBreakerName ?? "未绑定"} · 单元电表：{unit.UnitMeterName ?? "未绑定"}{groupSummary}");
             }
 
@@ -355,6 +379,74 @@ namespace EssSimulator.Web.Topology
             return !string.IsNullOrWhiteSpace(node.Label) ? node.Label
                 : !string.IsNullOrWhiteSpace(name) ? name
                 : node.Id;
+        }
+
+        private static SplitTransformerRuntimeConfig ToSplitRuntime(
+            TopologyProject project, TopologyNode split, List<TopologyNode> unitPcs)
+        {
+            var leftBus = FindBusOnEar(project, split.Id, left: true);
+            var rightBus = FindBusOnEar(project, split.Id, left: false);
+            var leftPcs = PcsIndicesOnBus(project, leftBus, unitPcs);
+            var rightPcs = PcsIndicesOnBus(project, rightBus, unitPcs);
+            var rightSet = rightPcs.ToHashSet();
+            var assigned = leftPcs.Concat(rightPcs).ToHashSet();
+            for (int i = 0; i < unitPcs.Count; i++)
+            {
+                if (assigned.Contains(i)) continue;
+                if (rightSet.Contains(i)) continue;
+                leftPcs.Add(i);
+            }
+
+            return new SplitTransformerRuntimeConfig
+            {
+                Present = true,
+                Name = NodeDisplayName(split),
+                PrimaryVoltage = TopologyParamHelper.GetDouble(split.Parameters, "primaryVoltage", 35000),
+                SecondaryVoltage = TopologyParamHelper.GetDouble(split.Parameters, "secondaryVoltage", 690),
+                RatedPowerKva = TopologyParamHelper.GetDouble(split.Parameters, "ratedPowerKva", 6300),
+                ImpedancePercent = TopologyParamHelper.GetDouble(split.Parameters, "impedancePercent", 6),
+                SplitImpedancePercent = TopologyParamHelper.GetDouble(split.Parameters, "splitImpedancePercent", 8),
+                SplitRatio = TopologyParamHelper.GetDouble(split.Parameters, "splitRatio", 0.5),
+                NoLoadLoss = TopologyParamHelper.GetDouble(split.Parameters, "noLoadLossW", 80),
+                LoadLoss = TopologyParamHelper.GetDouble(split.Parameters, "loadLossW", 400),
+                LeftEarPcsIndices = leftPcs,
+                RightEarPcsIndices = rightPcs
+            };
+        }
+
+        private static TopologyNode? FindBusOnEar(TopologyProject project, string xfmrId, bool left)
+        {
+            foreach (var e in project.Edges)
+            {
+                string? xfmrPort;
+                string otherId;
+                if (e.FromNodeId == xfmrId) { xfmrPort = e.FromPortId; otherId = e.ToNodeId; }
+                else if (e.ToNodeId == xfmrId) { xfmrPort = e.ToPortId; otherId = e.FromNodeId; }
+                else continue;
+
+                bool match = left
+                    ? TopologyTemplates.IsSplitLeftEarPort(xfmrPort)
+                    : TopologyTemplates.IsSplitRightEarPort(xfmrPort);
+                if (!match) continue;
+                var other = project.Nodes.FirstOrDefault(n => n.Id == otherId);
+                if (other?.TemplateId == "ac_bus")
+                    return other;
+            }
+            return null;
+        }
+
+        private static List<int> PcsIndicesOnBus(
+            TopologyProject project, TopologyNode? bus, List<TopologyNode> unitPcs)
+        {
+            var result = new List<int>();
+            if (bus == null) return result;
+            var neighborIds = Neighbors(project, bus.Id).ToHashSet(StringComparer.Ordinal);
+            for (int i = 0; i < unitPcs.Count; i++)
+            {
+                if (neighborIds.Contains(unitPcs[i].Id))
+                    result.Add(i);
+            }
+            return result;
         }
 
         private static List<TopologyNode> FindBmsForPcs(TopologyProject project, string pcsId)

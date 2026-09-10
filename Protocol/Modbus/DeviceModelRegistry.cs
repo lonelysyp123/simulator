@@ -32,9 +32,14 @@ namespace EssSimulator.Protocol.Modbus
         public string? Role { get; set; }
         /// <summary>
         /// 该片段适用的组内最大 PCS 支路数；0 表示不限。
-        /// 实际组内支路数更大时拼装跳过该片段（如 10MW 单元段仅覆盖模块 1/2，上限 4 条支路）。
+        /// 实际组内支路数更大时拼装跳过该片段。
         /// </summary>
         public int MaxPcsPerGroup { get; set; }
+        /// <summary>
+        /// 片段按 n 展开的次数；0 表示跟随拼装传入的组数。
+        /// <c>unit_10MW=2</c>、<c>unit_5.5MW=1</c>。
+        /// </summary>
+        public int PairCount { get; set; }
         /// <summary>型号点表所在目录（绝对路径）。</summary>
         [JsonIgnore]
         public string Directory { get; set; } = string.Empty;

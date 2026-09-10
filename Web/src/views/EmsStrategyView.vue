@@ -286,13 +286,13 @@
               <el-switch v-model="droopEnabled" active-text="下垂使能" :disabled="paramsLocked" @change="onPatchStrategy" />
             </span>
           </template>
-          <p class="hint">下垂仅在无功闭环固定时叠加 ΔQ；PF / 恒压 / 开环可开开关但本拍不叠加。恒压 Kp/K 在无功选恒压时作为基值算法。</p>
+          <p class="hint">下垂仅在无功闭环固定时叠加 ΔQ；测点按额定电压就近选 PCC 或 35kV 母线。k 为下垂百分数，与一次调频同口径。PF / 恒压 / 开环可开开关但本拍不叠加。恒压 Kp/K 在无功选恒压时作为基值算法。</p>
           <div class="ems-param-grid">
             <label class="ems-param">额定电压 V<el-input-number v-model="drafts.droop.ratedVoltageV" size="small" :step="100" :disabled="paramsLocked" /></label>
             <label class="ems-param">死区1 %<el-input-number v-model="drafts.droop.deadband1Percent" size="small" :step="0.1" :disabled="paramsLocked" /></label>
             <label class="ems-param">死区2 %<el-input-number v-model="drafts.droop.deadband2Percent" size="small" :step="0.1" :disabled="paramsLocked" /></label>
-            <label class="ems-param">k1 kvar/V<el-input-number v-model="drafts.droop.k1Percent" size="small" :step="0.1" :disabled="paramsLocked" /></label>
-            <label class="ems-param">k2 kvar/V<el-input-number v-model="drafts.droop.k2Percent" size="small" :step="0.1" :disabled="paramsLocked" /></label>
+            <label class="ems-param">k1 %<el-input-number v-model="drafts.droop.k1Percent" size="small" :step="0.1" :disabled="paramsLocked" /></label>
+            <label class="ems-param">k2 %<el-input-number v-model="drafts.droop.k2Percent" size="small" :step="0.1" :disabled="paramsLocked" /></label>
             <label class="ems-param">曲线类型
               <el-select v-model="drafts.droop.voltageCurveType" size="small" :disabled="paramsLocked">
                 <el-option :value="0" label="从死区边沿" />
@@ -328,6 +328,7 @@
         <div class="metric-item"><div class="label">电网频率</div><div class="value">{{ fmt(snap.frequencyHz, 3) }} Hz</div></div>
         <div class="metric-item"><div class="label">并网点 P/Q</div><div class="value">{{ fmt(snap.pccActivePowerKw, 1) }} / {{ fmt(snap.pccReactivePowerKvar, 1) }}</div></div>
         <div class="metric-item"><div class="label">PCC 电压</div><div class="value">{{ fmt(snap.pccLineVoltageV, 0) }} V</div></div>
+        <div class="metric-item"><div class="label">35kV 母线</div><div class="value">{{ fmt(snap.stationBus35LineVoltageV, 0) }} V</div></div>
         <div class="metric-item"><div class="label">ΔP 调频</div><div class="value">{{ fmt(snap.frequencyDeltaKw, 1) }} · {{ actionLabel(snap.frequencyAction) }}</div></div>
         <div class="metric-item"><div class="label">ΔP 惯量</div><div class="value">{{ fmt(snap.inertiaDeltaKw, 1) }} · {{ actionLabel(snap.inertiaAction) }}</div></div>
         <div class="metric-item"><div class="label">ΔQ 下垂</div><div class="value">{{ fmt(snap.droopDeltaKvar, 1) }} · {{ actionLabel(snap.droopAction) }}</div></div>

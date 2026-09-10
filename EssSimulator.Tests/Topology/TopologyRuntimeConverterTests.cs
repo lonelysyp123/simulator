@@ -184,7 +184,7 @@ public class TopologyRuntimeConverterTests
         Assert.False(u1.HasUnitMeter);
 
         // Notes 输出组结构摘要
-        Assert.Contains(overlay.Notes, n => n.Contains("分组×2") && n.Contains("分组A: PCS×2") && n.Contains("分组B: PCS×1"));
+        Assert.Contains(overlay.Notes, n => n.Contains("分组×2") && n.Contains("分组A: 支路×2") && n.Contains("分组B: 支路×1"));
     }
 
     /// <summary>EMU 有分组时，未选组的 PCS 归入合成「直挂」组，保证扁平展开不丢 PCS。</summary>
@@ -348,5 +348,44 @@ public class TopologyRuntimeConverterTests
         Assert.Equal(RuntimeBusIds.AfterMainBreaker, overlay.Meter!.PccMeter.SourceBusId);
         Assert.True(overlay.Transformer!.Present);
         Assert.Contains(overlay.Notes, n => n.Contains("电表抽头") && n.Contains(RuntimeBusIds.AfterMainBreaker));
+    }
+
+    [Fact]
+    public void Convert_assigns_pcs_to_split_transformer_ears_by_wiring()
+    {
+        var project = new TopologyProject
+        {
+            Id = "split",
+            Name = "双耳",
+            Nodes =
+            {
+                Node("g1", "grid", "电网"),
+                Node("e1", "emu", "EMU-1", y: 600),
+                Node("split", "split_transformer", "双耳1", new Dictionary<string, object?> { ["emuId"] = "e1" }),
+                Node("busL", "ac_bus", "左690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("busR", "ac_bus", "右690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("pL", "pcs", "PCS-L", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 100, y: 720),
+                Node("pR", "pcs", "PCS-R", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 200, y: 720)
+            },
+            Edges =
+            {
+                Edge("1", "split", "ear_l_a", "busL", "a"),
+                Edge("2", "split", "ear_r_a", "busR", "a"),
+                Edge("3", "pL", "ac_a", "busL", "a2"),
+                Edge("4", "pR", "ac_a", "busR", "a2")
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        Assert.NotNull(overlay);
+        var unit = overlay!.EssUnits[0];
+        Assert.NotNull(unit.SplitTransformer);
+        Assert.True(unit.SplitTransformer!.Present);
+        Assert.Equal("双耳1", unit.SplitTransformer.Name);
+        Assert.Equal(new[] { 0 }, unit.SplitTransformer.LeftEarPcsIndices);
+        Assert.Equal(new[] { 1 }, unit.SplitTransformer.RightEarPcsIndices);
+        Assert.Equal(690d, overlay.UnitTransformer!.SecondaryVoltage);
+        Assert.Equal(690d, overlay.Pcs!.AcVoltageNominal);
     }
 }

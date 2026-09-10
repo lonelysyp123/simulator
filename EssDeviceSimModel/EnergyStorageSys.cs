@@ -192,9 +192,20 @@ namespace EssSimulator.EssDeviceSimModel
                 TransformerDeviceFactory.CreateConfig(transCfg));
 
             var unitTransformers = new List<TransformerDevice>();
+            var dualEars = new DualEarTransformerDevice?[unitCount];
             var unitTransDeviceCfg = TransformerDeviceFactory.CreateConfig(unitTransCfg);
             for (int u = 0; u < unitCount; u++)
-                unitTransformers.Add(TransformerDeviceFactory.Create($"unit_transformer_u{u}", unitTransDeviceCfg));
+            {
+                var split = u < simCfg.Devices.Count ? simCfg.Devices[u].SplitTransformer : null;
+                if (split is { Present: true })
+                {
+                    var dual = TransformerDeviceFactory.CreateDualEar($"unit_transformer_u{u}", split);
+                    dualEars[u] = dual;
+                    unitTransformers.Add(dual.Through);
+                }
+                else
+                    unitTransformers.Add(TransformerDeviceFactory.Create($"unit_transformer_u{u}", unitTransDeviceCfg));
+            }
             _unitTransformers = unitTransformers;
 
             _loadDevice = LoadDeviceFactory.Create("load_35", loadCfg);
@@ -218,6 +229,7 @@ namespace EssSimulator.EssDeviceSimModel
                 externalPcsDevices: pcsList,
                 externalMainTransformer: _mainTransformer,
                 externalUnitTransformers: unitTransformers,
+                externalDualEars: dualEars,
                 externalLoadDevice: _loadDevice,
                 legacyEss: this,
                 pcsPerUnit: _pcsPerUnit);

@@ -22,7 +22,8 @@ namespace EssSimulator.Web.Topology
             int unit690 = 0;
 
             foreach (var grid in project.Nodes.Where(n => n.TemplateId == "grid"))
-                Walk(project, grid.Id, cameFrom: null, xfmrCrossed: 0, passedMainBreaker: false);
+                Walk(project, grid.Id, cameFrom: null, xfmrCrossed: 0, passedMainBreaker: false,
+                    incomingSplitEar: null, incomingSplitUnit: 0);
 
             return new Mapping
             {
@@ -35,7 +36,9 @@ namespace EssSimulator.Web.Topology
                 string nodeId,
                 string? cameFrom,
                 int xfmrCrossed,
-                bool passedMainBreaker)
+                bool passedMainBreaker,
+                string? incomingSplitEar,
+                int incomingSplitUnit)
             {
                 if (!visited.Add(nodeId))
                     return;
@@ -47,12 +50,18 @@ namespace EssSimulator.Web.Topology
                 if (node.TemplateId == "ac_bus")
                 {
                     if (!busIds.ContainsKey(node.Id))
-                        busIds[node.Id] = AssignBusId(xfmrCrossed, passedMainBreaker, hasStationXfmr, ref unit690);
+                    {
+                        busIds[node.Id] = incomingSplitEar == "L"
+                            ? RuntimeBusIds.Unit690Left(incomingSplitUnit)
+                            : incomingSplitEar == "R"
+                                ? RuntimeBusIds.Unit690Right(incomingSplitUnit)
+                                : AssignBusId(xfmrCrossed, passedMainBreaker, hasStationXfmr, ref unit690);
+                    }
 
                     foreach (var nb in Neighbors(p, node.Id))
                     {
                         if (nb == cameFrom) continue;
-                        Walk(p, nb, node.Id, xfmrCrossed, passedMainBreaker);
+                        Walk(p, nb, node.Id, xfmrCrossed, passedMainBreaker, null, 0);
                     }
                     return;
                 }
@@ -64,14 +73,42 @@ namespace EssSimulator.Web.Topology
                 bool nextMain = passedMainBreaker
                     || (node.TemplateId == "ac_breaker"
                         && TopologyParamHelper.GetBool(node.Parameters, "isMainBreaker"));
-                int nextXfmr = xfmrCrossed + (node.TemplateId == "transformer" ? 1 : 0);
+                int nextXfmr = xfmrCrossed + (TopologyTemplates.IsTransformerLike(node.TemplateId) ? 1 : 0);
+                int splitUnit = TopologyTemplates.IsSplitTransformer(node.TemplateId)
+                    ? IndexOfEmuWithPcs(p, TopologyParamHelper.GetString(node.Parameters, "emuId"))
+                    : 0;
 
-                foreach (var nb in Neighbors(p, node.Id))
+                foreach (var (nb, localPort) in NeighborPorts(p, node.Id))
                 {
                     if (nb == cameFrom) continue;
-                    Walk(p, nb, node.Id, nextXfmr, nextMain);
+                    string? ear = null;
+                    if (TopologyTemplates.IsSplitTransformer(node.TemplateId))
+                    {
+                        if (TopologyTemplates.IsSplitLeftEarPort(localPort)) ear = "L";
+                        else if (TopologyTemplates.IsSplitRightEarPort(localPort)) ear = "R";
+                    }
+                    Walk(p, nb, node.Id, nextXfmr, nextMain, ear, splitUnit);
                 }
             }
+        }
+
+        /// <summary>含 PCS 的 EMU 按画布 Y/X 排序后的序号；找不到时返回 0。</summary>
+        public static int IndexOfEmuWithPcs(TopologyProject project, string? emuId)
+        {
+            if (string.IsNullOrWhiteSpace(emuId))
+                return 0;
+            int idx = 0;
+            foreach (var emu in project.Nodes.Where(n => n.TemplateId == "emu").OrderBy(n => n.Y).ThenBy(n => n.X))
+            {
+                bool hasPcs = project.Nodes.Any(p =>
+                    p.TemplateId == "pcs" && TopologyParamHelper.GetString(p.Parameters, "emuId") == emu.Id);
+                if (!hasPcs)
+                    continue;
+                if (string.Equals(emu.Id, emuId, StringComparison.Ordinal))
+                    return idx;
+                idx++;
+            }
+            return 0;
         }
 
         public static string? ResolveMeterSourceBusId(TopologyProject project, TopologyNode meter)
@@ -127,6 +164,16 @@ namespace EssSimulator.Web.Topology
             {
                 if (e.FromNodeId == nodeId) yield return e.ToNodeId;
                 else if (e.ToNodeId == nodeId) yield return e.FromNodeId;
+            }
+        }
+
+        private static IEnumerable<(string NodeId, string LocalPortId)> NeighborPorts(
+            TopologyProject project, string nodeId)
+        {
+            foreach (var e in project.Edges)
+            {
+                if (e.FromNodeId == nodeId) yield return (e.ToNodeId, e.FromPortId);
+                else if (e.ToNodeId == nodeId) yield return (e.FromNodeId, e.ToPortId);
             }
         }
     }

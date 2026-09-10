@@ -4,7 +4,13 @@
  * 储能支路按物理拓扑全量绘制（PCS → 直流母线 → BMS，每台设备一张静态卡片，
  * 不引入 EMU / EMU 分组等虚拟概念，暂不绑定运行时实时数据），
  * 光伏单元按设备类型展开内部图例，不按某个具体工程写死站侧骨架。
+ *
+ * 耦合器件（变压器 / 双耳 / 未来 N 绕组）一律展开为 downstreams[]：
+ * 遍历、测宽、落位必须走同一列表，禁止再为某模板单开 extra 字段。
+ * 器件如何入图由 nodeLayout.sldRole 登记；未登记的模板按 unknown 挂件画出。
  */
+
+import { isSplitTransformer, isTransformerLike, sldRole } from './nodeLayout.js'
 
 const CARD_W = 132
 const CARD_GAP = 20
@@ -110,38 +116,16 @@ function xfmrConnectedBuses(graph, xfmrId) {
   return buses
 }
 
-function classifyXfmr(graph, xf) {
-  const buses = xfmrConnectedBuses(graph, xf.id)
-  const priV = paramNum(xf, 'primaryVoltage', 0)
-  const secV = paramNum(xf, 'secondaryVoltage', 0)
-  const score = (bus, v) => {
-    const bv = paramNum(bus, 'nominalVoltage', 0)
-    if (v > 0 && bv > 0) return Math.abs(bv - v)
-    return 1e12
-  }
-  if (buses.length >= 2) {
-    let best = null
-    for (const a of buses) {
-      for (const b of buses) {
-        if (a.id === b.id) continue
-        const s = score(a, priV) + score(b, secV)
-        const yBias = (a.y || 0) - (b.y || 0)
-        const key = s + yBias * 1e-6
-        if (!best || key < best.key) best = { pri: a, sec: b, key }
-      }
-    }
-    return { pri: best.pri, sec: best.sec }
-  }
-  if (buses.length === 1) {
-    const bus = buses[0]
-    return score(bus, priV) <= score(bus, secV)
-      ? { pri: bus, sec: null }
-      : { pri: null, sec: bus }
-  }
-  return { pri: null, sec: null }
+/** 耦合器件的全部下游母线帧（两绕组 1 路，双耳 2 路，未来 N 绕组同此列表）。 */
+function couplingDownstreams(xf) {
+  return (xf?.downstreams || []).filter(Boolean)
 }
 
-const STEM_SKIP = new Set(['transformer', 'pcs', 'pv_unit', 'load', 'ac_meter', 'bms', 'dc_bus'])
+function blocksStemWalk(node) {
+  const role = sldRole(node.templateId)
+  return role === 'coupling' || role === 'feeder' || role === 'tap'
+    || role === 'dc' || role === 'virtual' || role === 'unknown'
+}
 
 function pathToFirstBus(graph, startId) {
   const q = [{ id: startId, breakers: [] }]
@@ -153,7 +137,7 @@ function pathToFirstBus(graph, startId) {
     for (const nid of neighborsOf(graph.adj, cur.id)) {
       if (seen.has(nid)) continue
       const nb = graph.byId.get(nid)
-      if (!nb || STEM_SKIP.has(nb.templateId)) continue
+      if (!nb || blocksStemWalk(nb)) continue
       seen.add(nid)
       q.push({
         id: nid,
@@ -165,7 +149,7 @@ function pathToFirstBus(graph, startId) {
 }
 
 function hangKind(node) {
-  if (node.templateId === 'pcs' || node.templateId === 'pv_unit') return 'feeder'
+  if (sldRole(node.templateId) === 'feeder') return 'feeder'
   return node.templateId
 }
 
@@ -177,21 +161,25 @@ function buildBusFrame(graph, bus, incomingXfmrId, visitedBuses, visitedXfmrs) {
   const busLinks = []
   for (const hop of acHops(graph, bus.id, skip)) {
     const n = hop.node
-    if (!n || n.templateId === 'grid' || n.templateId === 'dc_bus' || n.templateId === 'bms') continue
-    if (n.templateId === 'transformer') {
+    if (!n) continue
+    const role = sldRole(n.templateId)
+    if (role === 'source' || role === 'dc' || role === 'virtual') continue
+    if (role === 'coupling' || isTransformerLike(n.templateId)) {
       if (visitedXfmrs.has(n.id)) continue
       visitedXfmrs.add(n.id)
-      const sides = classifyXfmr(graph, n)
-      const others = xfmrConnectedBuses(graph, n.id).filter(b => b.id !== bus.id)
-      const far = (sides.pri?.id === bus.id ? sides.sec : sides.pri) || others[0] || null
-      let downstream = null
-      if (far && far.id !== bus.id && !visitedBuses.has(far.id)) {
-        downstream = buildBusFrame(graph, far, n.id, visitedBuses, visitedXfmrs)
-      }
-      xfmrs.push({ xfmr: n, downstream })
+      const others = xfmrConnectedBuses(graph, n.id)
+        .filter(b => b.id !== bus.id && !visitedBuses.has(b.id))
+        .sort((a, b) => (a.x - b.x) || (a.y - b.y) || String(a.id).localeCompare(String(b.id)))
+      const downstreams = others.map(far =>
+        buildBusFrame(graph, far, n.id, visitedBuses, visitedXfmrs))
+      xfmrs.push({
+        xfmr: n,
+        downstreams,
+        split: isSplitTransformer(n.templateId)
+      })
       continue
     }
-    if (n.templateId === 'ac_bus') {
+    if (role === 'bus' || n.templateId === 'ac_bus') {
       // 母线联络（经分段断路器透明 hop 或直接相连）：邻接母线递归为子帧，中间断路器随子帧绘制
       if (visitedBuses.has(n.id)) continue
       const downstream = buildBusFrame(graph, n, null, visitedBuses, visitedXfmrs)
@@ -199,7 +187,7 @@ function buildBusFrame(graph, bus, incomingXfmrId, visitedBuses, visitedXfmrs) {
       busLinks.push({ breaker: hop.viaBreaker || null, downstream })
       continue
     }
-    if (n.templateId === 'pcs' || n.templateId === 'pv_unit' || n.templateId === 'load' || n.templateId === 'ac_meter') {
+    if (role === 'feeder' || role === 'tap' || role === 'unknown') {
       // 已归入 EMU 的电表在单元框内绘制，不再作为母线挂件重复入图
       if (n.templateId === 'ac_meter' && paramStr(n, 'emuId')) continue
       hangs.push({ node: n })
@@ -209,9 +197,10 @@ function buildBusFrame(graph, bus, incomingXfmrId, visitedBuses, visitedXfmrs) {
 }
 
 function walkFrames(frame, visit) {
+  if (!frame) return
   visit(frame)
-  for (const xf of frame.xfmrs) {
-    if (xf.downstream) walkFrames(xf.downstream, visit)
+  for (const xf of frame.xfmrs || []) {
+    for (const d of couplingDownstreams(xf)) walkFrames(d, visit)
   }
   for (const bl of frame.busLinks || []) {
     if (bl.downstream) walkFrames(bl.downstream, visit)
@@ -567,7 +556,8 @@ export function buildTopologyMainLineLayout(topology) {
   const HANG_W = 168
   const MARGIN_X = 48
   const MARGIN_TOP = 24
-  const BAY_GAP = 48
+  const BAY_GAP = 72
+  const FEEDER_SLOT_PAD = 80
   const ISLAND_GAP = 72
   const LINK_STUB = 18
   const BRK_SPAN = 28
@@ -677,24 +667,27 @@ export function buildTopologyMainLineLayout(topology) {
         .map(hang => ({ kind: 'feeder', hang }))
     ].sort((a, b) => canvasX(a) - canvasX(b) || String(a.hang?.node?.id || a.xf?.xfmr.id || a.bl?.downstream?.node?.id).localeCompare(String(b.hang?.node?.id || b.xf?.xfmr.id || b.bl?.downstream?.node?.id)))
     frame.taps = frame.hangs.filter(hang => {
-      const k = hangKind(hang.node)
-      return k === 'ac_meter' || k === 'load'
+      const r = sldRole(hang.node.templateId)
+      return r === 'tap' || r === 'unknown'
     }).sort((a, b) => (a.node.x - b.node.x) || String(a.node.id).localeCompare(b.node.id))
     const slots = []
     for (const item of items) {
       if (item.kind === 'xfmr') {
-        if (item.xf.downstream) measure(item.xf.downstream)
-        slots.push({ item, w: Math.max(item.xf.downstream?.width || 0, UNIT_W) })
+        const downs = couplingDownstreams(item.xf)
+        downs.forEach(measure)
+        const downW = downs.reduce((s, d) => s + (d.width || 0), 0) + BAY_GAP * Math.max(0, downs.length - 1)
+        slots.push({ item, w: Math.max(downW, UNIT_W) })
       } else if (item.kind === 'buslink') {
         measure(item.bl.downstream)
         slots.push({ item, w: Math.max(item.bl.downstream.width || 0, UNIT_W) })
       } else {
-        // 光伏支路图例按 channelX 两翼展开，槽位至少占一个单元宽，避免相邻光伏单元叠板
+        // 光伏支路图例按 channelX 两翼展开，槽位至少占一个单元宽，避免相邻光伏单元叠板。
+        // 储能馈线槽宽 = 卡片行 + 边距，避免相邻 EMU 卡片贴在一起。
         slots.push({
           item,
           w: item.hang.node.templateId === 'pv_unit'
             ? UNIT_W
-            : Math.max(clusterSpan(item.hang), 180)
+            : Math.max(clusterSpan(item.hang) + FEEDER_SLOT_PAD, 240)
         })
       }
     }
@@ -721,6 +714,7 @@ export function buildTopologyMainLineLayout(topology) {
     transformers: [],
     meters: [],
     loads: [],
+    unknowns: [],
     tieBreakers: [],
     placements: []
   }
@@ -753,10 +747,12 @@ export function buildTopologyMainLineLayout(topology) {
     const hasTieBrk = slots.some(s => s.item.kind === 'buslink' && s.item.bl.breaker)
     const hasMeter = taps.some(t => t.node.templateId === 'ac_meter')
     const hasLoad = taps.some(t => t.node.templateId === 'load')
+    const hasUnknown = taps.some(t => sldRole(t.node.templateId) === 'unknown')
     const equipH = Math.max(
       hasXfmr ? XFMR_SPAN : 0,
       hasTieBrk ? BRK_SPAN : 0,
       hasMeter ? METER_H : 0,
+      hasUnknown ? METER_H : 0,
       hasLoad ? LOAD_SYMBOL_H + LINK_STUB : 0
     )
     const yEquip = yBus + LINK_STUB
@@ -770,7 +766,10 @@ export function buildTopologyMainLineLayout(topology) {
       const hasRight = idx < slots.length - 1 || taps.length > 0
       if (item.kind === 'xfmr') {
         const xf = item.xf.xfmr
-        const downstream = item.xf.downstream
+        const downs = couplingDownstreams(item.xf)
+        if (downs.length > 1) {
+          for (const d of downs) d.omit = false
+        }
         const pri = paramNum(xf, 'primaryVoltage', 0)
         const sec = paramNum(xf, 'secondaryVoltage', 0)
         scene.wires.push({ x1: cx, y1: yBus, x2: cx, y2: yEquip })
@@ -780,25 +779,42 @@ export function buildTopologyMainLineLayout(topology) {
           x: cx,
           y: yEquip,
           span: XFMR_SPAN,
+          windings: item.xf.split ? 3 : 2,
+          split: !!item.xf.split,
           label: xf.label || '变压器',
           ratioLabel: `${fmtKv(pri)}/${fmtKv(sec)}`,
           kvaLabel: paramNum(xf, 'ratedPowerKva', 0) > 0
-            ? `${paramNum(xf, 'ratedPowerKva', 0).toFixed(0)} kVA`
-            : '',
+            ? `${paramNum(xf, 'ratedPowerKva', 0).toFixed(0)} kVA${item.xf.split ? ' · 双耳' : ''}`
+            : (item.xf.split ? '双耳' : ''),
           labelSide: hasRight ? 'left' : 'right',
-          omitBusLv: downstream ? !!downstream.omit : true,
+          omitBusLv: downs.length === 1 ? !!downs[0].omit : downs.length === 0,
           busLeft: x + 40,
           busRight: x + slot.w - 40
         }
         scene.transformers.push(rec)
         structXs.push(cx)
-        if (downstream) {
-          const yChild = yEquip + equipH + LINK_STUB + (downstream.omit ? LINK_STUB : 24)
-          scene.wires.push({ x1: cx, y1: yEquip + XFMR_SPAN, x2: cx, y2: yChild })
-          placeFrame(downstream, x, yChild)
-          rec.busLeft = downstream.x1
-          rec.busRight = downstream.x2
-          rec.omitBusLv = !!downstream.omit
+        if (downs.length > 0) {
+          const yChild = yEquip + equipH + LINK_STUB + (downs.length === 1 && downs[0].omit ? LINK_STUB : 24)
+          let dx = x
+          for (const d of downs) {
+            placeFrame(d, dx, yChild)
+            dx += (d.width || UNIT_W) + BAY_GAP
+          }
+          rec.busLeft = downs[0].x1
+          rec.busRight = downs[downs.length - 1].x2
+          rec.omitBusLv = downs.length === 1 ? !!downs[0].omit : false
+          const fromY = yEquip + XFMR_SPAN
+          if (downs.length === 1) {
+            scene.wires.push({ x1: cx, y1: fromY, x2: cx, y2: yChild })
+          } else {
+            const cxs = downs.map(d => d.cx)
+            const yJoin = (fromY + yChild) / 2
+            scene.wires.push({ x1: cx, y1: fromY, x2: cx, y2: yJoin })
+            scene.wires.push({ x1: Math.min(...cxs), y1: yJoin, x2: Math.max(...cxs), y2: yJoin })
+            for (const d of downs) {
+              scene.wires.push({ x1: d.cx, y1: yJoin, x2: d.cx, y2: yChild })
+            }
+          }
         }
       } else if (item.kind === 'buslink') {
         // 母线联络：母线 → 分段断路器 → 子帧母线
@@ -876,6 +892,17 @@ export function buildTopologyMainLineLayout(topology) {
           stub: LINK_STUB,
           symbolH: LOAD_SYMBOL_H,
           label: n.label || n.parameters?.name || '负载'
+        })
+      } else {
+        scene.wires.push({ x1: tapX, y1: yBus, x2: tapX, y2: yEquip })
+        scene.unknowns.push({
+          id: n.id,
+          node: n,
+          busId: frame.node?.id || null,
+          x: tapX,
+          y: yEquip,
+          h: METER_H,
+          label: n.label || n.templateId || '设备'
         })
       }
       if (busRec) {
@@ -1009,6 +1036,10 @@ export function buildTopologyMainLineLayout(topology) {
   for (const l of scene.loads) {
     maxX = Math.max(maxX, l.x + 80)
   }
+  for (const u of scene.unknowns) {
+    maxX = Math.max(maxX, u.x + METER_HALF_W + 16)
+    maxY = Math.max(maxY, u.y + u.h + 16)
+  }
 
   const hvV = paramNum(rootBus, 'nominalVoltage', paramNum(grid, 'outputVoltage', 220000))
   const lvV = paramNum(firstLvBus, 'nominalVoltage', paramNum(firstXfmr?.node, 'secondaryVoltage', 35000))
@@ -1022,6 +1053,7 @@ export function buildTopologyMainLineLayout(topology) {
     transformers: scene.transformers,
     meters: scene.meters,
     loads: scene.loads,
+    unknowns: scene.unknowns,
     tieBreakers: scene.tieBreakers,
     stemBreakers,
     gridX,

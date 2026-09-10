@@ -83,10 +83,9 @@ namespace EssSimulator.LocalControl
                     lc.SetDataStoreByMesurePointName(LcChannelMap.Vca(n, k), snap.Vca);
                     WriteExtraChannelTelemetry(lc, n, k, snap.MeasP, snap.MeasQ);
                 }
-
-                SyncUnitFragment(lc, unit, unitId, n, pcsInGroup);
             }
 
+            SyncUnitFragments(lc, unit, unitId);
             SyncSystemFragment(lc, unitId);
             SyncMvFragment(lc, unitId);
             SyncBmsFragment(resolveEmu, lc, lcIdx);
@@ -310,27 +309,30 @@ namespace EssSimulator.LocalControl
         }
 
         /// <summary>
-        /// 10MW 单元片段：n 为组序号，模块1/2 为该组第 1/2 条 PCS 支路。
-        /// 模块母线电压由该支路 PCS 交流三线电压等效；电感电流 R/S/T 为该支路 PCS 交流三相电流幅值。
-        /// 交流电流 R/S/T、电网有功/无功为两模块 PCS 交流侧合计；电网线电压为两模块交流线电压平均。
-        /// 组内超过 4 条支路时点表不含本段，本方法写点会被忽略。
+        /// 10MW / 5.5MW 单元片段：n 为 PCS 组号；模块1/2 为该组第一台 PCS 的两条支路。
+        /// 10MW 写 n=1,2；5.5MW 只写 n=1。缺支路写 0。
         /// </summary>
-        private void SyncUnitFragment(
+        private void SyncUnitFragments(
             LocalControlModbusServer lc,
             EssSimulator.Configuration.EssUnitConfig? unit,
-            int unitId,
-            int n,
-            int pcsInGroup)
+            int unitId)
         {
-            LcUnitModuleSnap? m1 = pcsInGroup > 0
-                ? ReadUnitModule(unitId, LcPcsIndex.Flat(unit, n - 1, 0))
-                : null;
-            LcUnitModuleSnap? m2 = pcsInGroup > 1
-                ? ReadUnitModule(unitId, LcPcsIndex.Flat(unit, n - 1, 1))
-                : null;
+            foreach (var layout in LcUnitMap.Fragments)
+            {
+                for (int n = 1; n <= layout.PairCount; n++)
+                {
+                    int pcsInGroup = LcLayout.PcsCountInGroup(unit, n - 1);
+                    LcUnitModuleSnap? m1 = pcsInGroup > 0
+                        ? ReadUnitModule(unitId, LcPcsIndex.Flat(unit, n - 1, 0))
+                        : null;
+                    LcUnitModuleSnap? m2 = pcsInGroup > 1
+                        ? ReadUnitModule(unitId, LcPcsIndex.Flat(unit, n - 1, 1))
+                        : null;
 
-            foreach (var (param, value) in LcUnitTelemetry.Collect(n, m1, m2))
-                lc.SetDataStoreByMesurePointName(param, value);
+                    foreach (var (param, value) in LcUnitTelemetry.Collect(layout, n, m1, m2))
+                        lc.SetDataStoreByMesurePointName(param, value);
+                }
+            }
         }
 
         private LcUnitModuleSnap ReadUnitModule(int unitId, int flatPcsIndex) =>
@@ -813,10 +815,10 @@ namespace EssSimulator.LocalControl
         {
             try
             {
-                if (asBool)
-                    targetEmu.SetDataObjectByMesurePointName(targetParam, value != 0);
-                else
-                    targetEmu.SetDataObjectByMesurePointName(targetParam, value);
+                object published = asBool
+                    ? value != 0
+                    : LcEmuRegisterCodec.ToControlRegisterRaw(targetEmu.ControlMaps, targetParam, value);
+                targetEmu.SetDataObjectByMesurePointName(targetParam, published);
             }
             catch (Exception ex)
             {

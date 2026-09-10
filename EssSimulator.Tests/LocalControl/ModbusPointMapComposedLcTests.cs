@@ -86,6 +86,8 @@ public class ModbusPointMapComposedLcTests
             Assert.Contains(map.DataMaps, e => e.ParamName == "sysyc107");
             Assert.DoesNotContain(map.ControlMaps, e => e.ParamName == "yx0");
             Assert.Contains(map.DataMaps, e => e.ParamName == "unit_param0" && e.Address == LcUnitMap.AddressBase);
+            Assert.Contains(map.DataMaps, e => e.ParamName == "unit1_param0" && e.Address == LcUnitMap.FiveFiveMw.AddressBase);
+            Assert.Contains(map.DataMaps, e => e.ParamName == "unit_param600" && e.Address == LcUnitMap.Address(2, 0));
         }
         finally
         {

@@ -518,7 +518,7 @@ const groupOptionsForSelected = computed(() => {
 const emuBoundView = computed(() => {
   const n = selectedNode.value
   if (!n || n.templateId !== 'emu') return null
-  const roles = [['pcs', 'PCS'], ['ac_breaker', '断路器'], ['ac_meter', '电表'], ['transformer', '变压器']]
+  const roles = [['pcs', 'PCS'], ['ac_breaker', '断路器'], ['ac_meter', '电表'], ['transformer', '变压器'], ['split_transformer', '双耳变压器']]
   const unitRows = roles.map(([tid, role]) => ({
     role,
     nodes: project.nodes.filter(x => x.templateId === tid && x.parameters?.emuId === n.id && !x.parameters?.groupId)
@@ -580,7 +580,7 @@ function onBatchGroupChange(value) {
   clearValidation()
 }
 
-/** 解除该 EMU 下全部设备（pcs/ac_breaker/ac_meter/transformer）的 emuId/groupId 归属 */
+/** 解除该 EMU 下全部设备（pcs/ac_breaker/ac_meter/transformer/split_transformer）的 emuId/groupId 归属 */
 function unassignDevicesFromEmu(emuId) {
   for (const n of devicesOfEmu(emuId)) {
     n.parameters.emuId = ''

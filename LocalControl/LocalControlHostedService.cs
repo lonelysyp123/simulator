@@ -97,7 +97,7 @@ namespace EssSimulator.LocalControl
             {
                 string name = $"simLc{i + 1}";
                 int firstEmuId = i + 1;
-                int groupCount = LcLayout.GroupCountForUnit(_cfg, i);
+                int groupCount = LcLayout.ExpandGroupCountForUnit(_cfg, i);
                 var server = new LocalControlModbusServer(
                     groupCount, 0, name, firstEmuId,
                     essUnits: _cfg.ResolveEssUnitsOrFallback(),

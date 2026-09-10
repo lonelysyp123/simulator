@@ -293,6 +293,9 @@ namespace EssSimulator.Configuration
         /// <summary>组态绑定到本单元的单元变节点名称（可选，仅镜像展示）。</summary>
         public string? UnitTransformerName { get; set; }
 
+        /// <summary>本单元若绑定双耳变压器则为非空；缺省走两绕组隐式单元变。</summary>
+        public SplitTransformerRuntimeConfig? SplitTransformer { get; set; }
+
         /// <summary>本单元下属 EMU 分组（EMU → group → PCS 支路）；为空时保持扁平构成（向后兼容）。</summary>
         public List<EmuGroupConfig> Groups { get; set; } = new();
 
@@ -312,6 +315,24 @@ namespace EssSimulator.Configuration
                 return Pcs is { Count: > 0 } ? Pcs.Count : 2;
             }
         }
+    }
+
+    /// <summary>组态双耳变压器运行时补丁：每 EMU 至多 2 台，两耳 PCS 按连线归类。</summary>
+    public sealed class SplitTransformerRuntimeConfig
+    {
+        public bool Present { get; set; }
+        public string? Name { get; set; }
+        public double PrimaryVoltage { get; set; } = 35000;
+        public double SecondaryVoltage { get; set; } = 690;
+        public double RatedPowerKva { get; set; } = 6300;
+        public double ImpedancePercent { get; set; } = 6;
+        public double SplitImpedancePercent { get; set; } = 8;
+        public double SplitRatio { get; set; } = 0.5;
+        public double NoLoadLoss { get; set; } = 80;
+        public double LoadLoss { get; set; } = 400;
+        /// <summary>本单元内 PCS 序号（0 基）归入左耳；未出现在任一侧的默认左耳。</summary>
+        public List<int> LeftEarPcsIndices { get; set; } = new();
+        public List<int> RightEarPcsIndices { get; set; } = new();
     }
 
     /// <summary>储能单元列表（对应 appsettings.json: EssUnits 节，绑定到 <see cref="SimulatorConfig.Devices"/>）</summary>

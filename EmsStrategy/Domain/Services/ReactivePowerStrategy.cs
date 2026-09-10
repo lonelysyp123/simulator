@@ -110,14 +110,16 @@ public sealed class ReactivePowerStrategy
         var droopCfg = config.VoltageDroop;
         if (droopOn)
         {
-            bool outside = VoltageDroopCalculator.IsOutsideDeadband(meas.PccLineVoltageV, droopCfg);
+            double uMeas = VoltageDroopCalculator.SelectMeasuredVoltage(
+                meas.PccLineVoltageV, meas.StationBus35LineVoltageV, droopCfg.RatedVoltageV);
+            bool outside = VoltageDroopCalculator.IsOutsideDeadband(uMeas, droopCfg);
             double qRated = config.PlantRatedKw > 0 ? config.PlantRatedKw : config.ApparentRatedKva;
             droopDelta = _droop.Step(
                 outside,
                 dt,
                 droopCfg.ControlCycle,
                 droopCfg.ResetTime,
-                () => VoltageDroopCalculator.ComputeDeltaKvar(meas.PccLineVoltageV, qRated, droopCfg));
+                () => VoltageDroopCalculator.ComputeDeltaKvar(uMeas, qRated, droopCfg));
             if (_droop.State != ActionState.Action)
                 droopDelta = 0;
         }
@@ -154,8 +156,10 @@ public sealed class ReactivePowerStrategy
 
     private double VoltageFixedQ(EmsStrategyConfig config, PlantMeasurements meas)
     {
-        double uOut = _vPid.PCompute(config.VoltageSetV, meas.PccLineVoltageV);
-        return (uOut - meas.PccLineVoltageV) * config.VoltageFixedK + meas.PccReactivePowerKvar;
+        double uMeas = VoltageDroopCalculator.SelectMeasuredVoltage(
+            meas.PccLineVoltageV, meas.StationBus35LineVoltageV, config.VoltageSetV);
+        double uOut = _vPid.PCompute(config.VoltageSetV, uMeas);
+        return (uOut - uMeas) * config.VoltageFixedK + meas.PccReactivePowerKvar;
     }
 
     private static double SumMeasuredReactive(PlantMeasurements meas)

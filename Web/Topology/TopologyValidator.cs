@@ -63,7 +63,7 @@ namespace EssSimulator.Web.Topology
             // 变压器自身参数：上大下小
             foreach (var n in new[] { fromNode, toNode })
             {
-                if (n.TemplateId == "transformer")
+                if (TopologyTemplates.IsTransformerLike(n.TemplateId))
                 {
                     double pri = TopologyParamHelper.GetDouble(n.Parameters, "primaryVoltage", 0);
                     double sec = TopologyParamHelper.GetDouble(n.Parameters, "secondaryVoltage", 0);
@@ -88,6 +88,10 @@ namespace EssSimulator.Web.Topology
             // 变压器 ↔ 母线电压匹配（母线已带电或已有额定）
             var xfmrResult = ValidateTransformerBusVoltage(fromNode, fromTpl, fromPort, toNode, toTpl, toPort, newEdge);
             if (!xfmrResult.Ok) return xfmrResult;
+
+            var splitEarResult = ValidateSplitTransformerEarBuses(
+                project, fromNode, fromPort, toNode, toPort, newEdge);
+            if (!splitEarResult.Ok) return splitEarResult;
 
             // PCS / 光伏单元 AC 侧电压与母线匹配
             var emuResult = ValidateEmuBusVoltage(fromNode, fromTpl, fromPort, toNode, toTpl, toPort, newEdge);
@@ -283,9 +287,9 @@ namespace EssSimulator.Web.Topology
             TopologyNode? xfmr = null; TopologyPortDef? xfmrPort = null;
             TopologyNode? bus = null;
 
-            if (a.TemplateId == "transformer" && b.TemplateId == "ac_bus")
+            if (TopologyTemplates.IsTransformerLike(a.TemplateId) && b.TemplateId == "ac_bus")
             { xfmr = a; xfmrPort = aPort; bus = b; }
-            else if (b.TemplateId == "transformer" && a.TemplateId == "ac_bus")
+            else if (TopologyTemplates.IsTransformerLike(b.TemplateId) && a.TemplateId == "ac_bus")
             { xfmr = b; xfmrPort = bPort; bus = a; }
             else return Ok();
 
@@ -308,6 +312,65 @@ namespace EssSimulator.Web.Topology
                     "XFMR_BUS_MISMATCH",
                     $"变压器「{xfmr!.Label}」{xfmrPort!.Label} 侧 {termV:0.##} V 与母线预设 {busV:0.##} V 不匹配",
                     newEdge.Id);
+            }
+
+            return Ok();
+        }
+
+        /// <summary>双耳左右耳禁止接到同一 AC 母线；同一耳三相须接同一母线。</summary>
+        private static TopologyValidationResult ValidateSplitTransformerEarBuses(
+            TopologyProject project,
+            TopologyNode a, TopologyPortDef aPort,
+            TopologyNode b, TopologyPortDef bPort,
+            TopologyEdge newEdge)
+        {
+            TopologyNode? xfmr = null;
+            TopologyPortDef? xfmrPort = null;
+            TopologyNode? bus = null;
+
+            if (TopologyTemplates.IsSplitTransformer(a.TemplateId) && b.TemplateId == "ac_bus")
+            { xfmr = a; xfmrPort = aPort; bus = b; }
+            else if (TopologyTemplates.IsSplitTransformer(b.TemplateId) && a.TemplateId == "ac_bus")
+            { xfmr = b; xfmrPort = bPort; bus = a; }
+            else return Ok();
+
+            bool left = TopologyTemplates.IsSplitLeftEarPort(xfmrPort!.Id);
+            bool right = TopologyTemplates.IsSplitRightEarPort(xfmrPort.Id);
+            if (!left && !right)
+                return Ok();
+
+            string thisPrefix = left ? "ear_l_" : "ear_r_";
+            string otherPrefix = left ? "ear_r_" : "ear_l_";
+
+            foreach (var e in project.Edges)
+            {
+                if (e.Id == newEdge.Id) continue;
+                string? xfmrPortId = null;
+                string? otherId = null;
+                if (e.FromNodeId == xfmr!.Id) { xfmrPortId = e.FromPortId; otherId = e.ToNodeId; }
+                else if (e.ToNodeId == xfmr.Id) { xfmrPortId = e.ToPortId; otherId = e.FromNodeId; }
+                else continue;
+
+                var otherNode = FindNode(project, otherId);
+                if (otherNode?.TemplateId != "ac_bus") continue;
+
+                if (xfmrPortId!.StartsWith(otherPrefix, StringComparison.OrdinalIgnoreCase)
+                    && otherNode.Id == bus!.Id)
+                {
+                    return Fail(
+                        "SPLIT_XFMR_EARS_SAME_BUS",
+                        $"双耳变压器「{xfmr.Label}」左右耳不能接到同一母线「{bus.Label}」",
+                        newEdge.Id);
+                }
+
+                if (xfmrPortId.StartsWith(thisPrefix, StringComparison.OrdinalIgnoreCase)
+                    && otherNode.Id != bus!.Id)
+                {
+                    return Fail(
+                        "SPLIT_XFMR_EAR_MULTI_BUS",
+                        $"双耳变压器「{xfmr.Label}」同一耳的三相须接到同一母线",
+                        newEdge.Id);
+                }
             }
 
             return Ok();
@@ -623,19 +686,13 @@ namespace EssSimulator.Web.Topology
             if (fromPort == null || toPort == null)
                 return new List<TopologyEdge> { CloneEdge(seed) };
 
-            // 交流三相：按相位配对，限定在各自所选侧
+            // 交流三相：按相位配对，限定在所选侧及成组键（双耳左右耳虽同在下侧，须各自成组）
             if (fromPort.Kind == "ac_phase" && toPort.Kind == "ac_phase" &&
                 !string.IsNullOrEmpty(fromPort.Phase) && !string.IsNullOrEmpty(toPort.Phase))
             {
-                var fromGroup = fromTpl.Ports
-                    .Where(p => p.Kind == "ac_phase" &&
-                                string.Equals(p.Side, fromPort.Side, StringComparison.OrdinalIgnoreCase) &&
-                                !string.IsNullOrEmpty(p.Phase))
-                    .ToList();
+                var fromGroup = fromTpl.Ports.Where(p => SameAcPhaseBundle(fromPort, p)).ToList();
                 var toByPhase = toTpl.Ports
-                    .Where(p => p.Kind == "ac_phase" &&
-                                string.Equals(p.Side, toPort.Side, StringComparison.OrdinalIgnoreCase) &&
-                                !string.IsNullOrEmpty(p.Phase))
+                    .Where(p => SameAcPhaseBundle(toPort, p))
                     .GroupBy(p => p.Phase!, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
@@ -797,7 +854,7 @@ namespace EssSimulator.Web.Topology
             if (orphanPcs.Count > 0)
             {
                 details.Add($"以下 PCS 未选择有效的所属 EMU 储能单元：{string.Join("、", orphanPcs.Select(n => n.Label))}");
-                return Fail("PCS_EMU_UNASSIGNED", "每台 PCS 变流器须在参数中选择所属 EMU 储能单元",
+                return Fail("PCS_EMU_UNASSIGNED", "每条 PCS 变流器支路须在参数中选择所属 EMU 储能单元",
                     details: details, problemNodeIds: orphanPcs.Select(n => n.Id).ToList());
             }
 
@@ -805,6 +862,10 @@ namespace EssSimulator.Web.Topology
             var emuBindingCheck = ValidateEmuDeviceBindings(project, emuIds, details);
             if (emuBindingCheck != null)
                 return emuBindingCheck;
+
+            var splitBindingCheck = ValidateSplitTransformerBindings(project, emuIds, details);
+            if (splitBindingCheck != null)
+                return splitBindingCheck;
 
             // EMU 分组归属（可选）：已选 groupId 时须指向存在的分组，且分组与设备所属 EMU 一致；组级断路器至多 1 台（电表允许多台）
             var groupBindingCheck = ValidateEmuGroupBindings(project, emuIds, details);
@@ -912,6 +973,50 @@ namespace EssSimulator.Web.Topology
         }
 
         /// <summary>
+        /// 双耳变压器必须绑定有效 EMU，且每个 EMU 至多 2 台（含组级绑定）。
+        /// </summary>
+        private static TopologyValidationResult? ValidateSplitTransformerBindings(
+            TopologyProject project, HashSet<string> emuIds, List<string> details)
+        {
+            var splits = project.Nodes.Where(n => TopologyTemplates.IsSplitTransformer(n.TemplateId)).ToList();
+            if (splits.Count == 0)
+                return null;
+
+            var missing = splits
+                .Where(n =>
+                {
+                    string emuId = TopologyParamHelper.GetString(n.Parameters, "emuId");
+                    return string.IsNullOrWhiteSpace(emuId) || !emuIds.Contains(emuId);
+                })
+                .ToList();
+            if (missing.Count > 0)
+            {
+                details.Add($"以下双耳变压器未选择有效的所属 EMU：{string.Join("、", missing.Select(n => n.Label))}");
+                return Fail("SPLIT_XFMR_EMU_REQUIRED", "双耳变压器必须归属工程内存在的 EMU 储能单元",
+                    details: details, problemNodeIds: missing.Select(n => n.Id).ToList());
+            }
+
+            var dupGroups = splits
+                .GroupBy(n => TopologyParamHelper.GetString(n.Parameters, "emuId"))
+                .Where(g => g.Count() > TopologyTemplates.MaxSplitTransformersPerEmu)
+                .ToList();
+            if (dupGroups.Count > 0)
+            {
+                var emuLabel = project.Nodes.Where(n => n.TemplateId == "emu").ToDictionary(n => n.Id, n => n.Label);
+                foreach (var g in dupGroups)
+                {
+                    var name = emuLabel.TryGetValue(g.Key, out var l) && !string.IsNullOrWhiteSpace(l) ? l : g.Key;
+                    details.Add($"EMU「{name}」绑定了 {g.Count()} 台双耳变压器：{string.Join("、", g.Select(n => n.Label))}");
+                }
+                return Fail("SPLIT_XFMR_EMU_DUPLICATE",
+                    $"每个 EMU 储能单元至多绑定 {TopologyTemplates.MaxSplitTransformersPerEmu} 台双耳变压器",
+                    details: details, problemNodeIds: dupGroups.SelectMany(g => g.Select(n => n.Id)).ToList());
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// EMU 分组绑定校验：已选 groupId 的设备须指向存在的分组（GROUP_UNASSIGNED），
         /// 分组所属 EMU 须有效且与设备自身 emuId 一致（GROUP_EMU_MISMATCH），
         /// 每个分组下断路器至多 1 台（EMU_GROUP_BREAKER_DUPLICATE），电表/变压器不限台数。
@@ -928,7 +1033,8 @@ namespace EssSimulator.Web.Topology
                 StringComparer.Ordinal);
 
             var bound = project.Nodes
-                .Where(n => n.TemplateId is "pcs" or "ac_breaker" or "ac_meter" or "transformer")
+                .Where(n => n.TemplateId is "pcs" or "ac_breaker" or "ac_meter" or "transformer"
+                    or "split_transformer")
                 .Where(n => !string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(n.Parameters, "groupId")))
                 .ToList();
             if (bound.Count == 0)
@@ -994,6 +1100,16 @@ namespace EssSimulator.Web.Topology
                 .ThenBy(e => e.ToPortId, StringComparer.Ordinal)
                 .ThenBy(e => e.Id, StringComparer.Ordinal);
         }
+
+        /// <summary>同侧且同一成组键的交流相口才参与快捷连线（双耳左右耳互不展开）。</summary>
+        private static bool SameAcPhaseBundle(TopologyPortDef seed, TopologyPortDef candidate) =>
+            candidate.Kind == "ac_phase"
+            && !string.IsNullOrEmpty(candidate.Phase)
+            && string.Equals(candidate.Side, seed.Side, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(
+                TopologyTemplates.AcPhaseBundleKey(candidate.Id),
+                TopologyTemplates.AcPhaseBundleKey(seed.Id),
+                StringComparison.OrdinalIgnoreCase);
 
         private static int PhaseOrder(string? phase) => phase?.ToUpperInvariant() switch
         {

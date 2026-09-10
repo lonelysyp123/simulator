@@ -30,21 +30,30 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
             Bus35 = new ElectricalBusNode(RuntimeBusIds.Station35, pccCfg.StationBusNominalLineVoltage);
 
             var unitBuses = new List<ElectricalBusNode>();
-            int unitCount = network.UnitTransformers.Count;
+            var extraBuses = new List<ElectricalBusNode>();
+            int unitCount = Math.Max(network.UnitBreakers.Count, network.UnitTransformers.Count);
             for (int u = 0; u < unitCount; u++)
             {
+                bool split = DualEarAt(network, u) != null;
                 unitBuses.Add(new ElectricalBusNode(
-                    RuntimeBusIds.Unit690(u),
+                    split ? RuntimeBusIds.Unit690Left(u) : RuntimeBusIds.Unit690(u),
                     pcsCfg.AcVoltageNominal));
+                if (split)
+                {
+                    extraBuses.Add(new ElectricalBusNode(
+                        RuntimeBusIds.Unit690Right(u),
+                        pcsCfg.AcVoltageNominal));
+                }
             }
 
             UnitBuses690 = unitBuses;
+            ExtraUnitBuses690 = extraBuses;
 
             RegisterContributors(network, pvUnits);
             RegisterVoltageSources(network);
             WireCouplers(network);
             _log.Info(
-                $"[RadialGraph] 贡献者 35kV={Bus35.Contributors.Count} / 690V={UnitBuses690.Sum(b => b.Contributors.Count)}，Coupler={_couplers.Count}");
+                $"[RadialGraph] 贡献者 35kV={Bus35.Contributors.Count} / 690V={AllUnit690Buses.Sum(b => b.Contributors.Count)}，Coupler={_couplers.Count}");
         }
 
         public ElectricalNetwork Network { get; }
@@ -53,6 +62,8 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
         public ElectricalBusNode BusAfterMainBreaker { get; }
         public ElectricalBusNode Bus35 { get; }
         public IReadOnlyList<ElectricalBusNode> UnitBuses690 { get; }
+        public IReadOnlyList<ElectricalBusNode> ExtraUnitBuses690 { get; }
+        public IEnumerable<ElectricalBusNode> AllUnit690Buses => UnitBuses690.Concat(ExtraUnitBuses690);
         public ElectricalBusNode? FindBus(string busId)
         {
             busId = RuntimeBusIds.Canonicalize(busId);
@@ -62,7 +73,29 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 return BusAfterMainBreaker;
             if (string.Equals(busId, Bus35.BusId, StringComparison.Ordinal))
                 return Bus35;
-            return UnitBuses690.FirstOrDefault(b => string.Equals(b.BusId, busId, StringComparison.Ordinal));
+            return UnitBuses690.Concat(ExtraUnitBuses690)
+                .FirstOrDefault(b => string.Equals(b.BusId, busId, StringComparison.Ordinal));
+        }
+
+        public ElectricalBusNode Bus690ForPcsChannel(int channelIndex)
+        {
+            for (int u = 0; u < UnitBuses690.Count; u++)
+            {
+                var (baseChannel, pcsCount) = PcsUnitLayout.RangeOfUnit(Network.PcsPerUnit, u);
+                if (channelIndex < baseChannel || channelIndex >= baseChannel + pcsCount)
+                    continue;
+                var split = SplitAssignment(Network, u);
+                if (split != null && split.RightChannels.Contains(channelIndex))
+                {
+                    var right = ExtraUnitBuses690.FirstOrDefault(b =>
+                        string.Equals(b.BusId, RuntimeBusIds.Unit690Right(u), StringComparison.Ordinal));
+                    if (right != null)
+                        return right;
+                }
+                return UnitBuses690[u];
+            }
+
+            return UnitBuses690.Count > 0 ? UnitBuses690[0] : Bus35;
         }
 
         /// <summary>从电网母线发起电压传播（并网）。</summary>
@@ -88,7 +121,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
         /// <summary>在各 690V 母线上合并黑启动 PCS 等本地电压源。</summary>
         public void ApplyLocalVoltageSources(PropagationSweepContext sweep)
         {
-            foreach (var bus690 in UnitBuses690)
+            foreach (var bus690 in AllUnit690Buses)
                 bus690.ApplyLocalVoltageSources(sweep);
         }
 
@@ -126,7 +159,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                     if (idx >= network.PcsDevices.Count)
                         continue;
 
-                    UnitBuses690[u].RegisterContributor(new PcsBusContributor(network.PcsDevices[idx]));
+                    Bus690ForPcsChannel(idx).RegisterContributor(new PcsBusContributor(network.PcsDevices[idx]));
                 }
             }
         }
@@ -142,7 +175,7 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                     if (idx >= network.PcsDevices.Count)
                         continue;
 
-                    UnitBuses690[u].RegisterVoltageSource(new PcsBusVoltageSource(network.PcsDevices[idx]));
+                    Bus690ForPcsChannel(idx).RegisterVoltageSource(new PcsBusVoltageSource(network.PcsDevices[idx]));
                 }
             }
         }
@@ -167,7 +200,27 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
 
             for (int u = 0; u < UnitBuses690.Count; u++)
             {
-                if (u >= network.UnitBreakers.Count || u >= network.UnitTransformers.Count)
+                if (u >= network.UnitBreakers.Count)
+                    continue;
+
+                var dual = DualEarAt(network, u);
+                if (dual != null)
+                {
+                    var right = ExtraUnitBuses690.FirstOrDefault(b =>
+                        string.Equals(b.BusId, RuntimeBusIds.Unit690Right(u), StringComparison.Ordinal));
+                    if (right == null)
+                        continue;
+                    _couplers.Add(new DualEarUnitBranchCoupler(
+                        u,
+                        network.UnitBreakers[u],
+                        dual,
+                        Bus35,
+                        UnitBuses690[u],
+                        right));
+                    continue;
+                }
+
+                if (u >= network.UnitTransformers.Count)
                     continue;
 
                 _couplers.Add(new UnitBranchCoupler(
@@ -181,5 +234,15 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
             foreach (var coupler in _couplers)
                 coupler.Attach();
         }
+
+        private static DualEarTransformerDevice? DualEarAt(ElectricalNetwork network, int unit) =>
+            unit >= 0 && unit < network.DualEarTransformers.Count
+                ? network.DualEarTransformers[unit]
+                : null;
+
+        private static SplitEarAssignment? SplitAssignment(ElectricalNetwork network, int unit) =>
+            unit >= 0 && unit < network.SplitEarAssignments.Count
+                ? network.SplitEarAssignments[unit]
+                : null;
     }
 }

@@ -351,6 +351,24 @@ describe('buildTopologyMainLineLayout emu device binding', () => {
     assert.equal(uFree.pcsTop, 18)
     assert.equal(uFree.halfSpan, uBound.halfSpan)
   })
+
+  it('keeps adjacent emu feeders from sitting flush', () => {
+    const topology = {
+      nodes: [
+        node('bus', 'ac_bus', '35kV', 400, { nominalVoltage: 35000 }),
+        node('emu1', 'emu', 'EMU-1', 200),
+        node('emu2', 'emu', 'EMU-2', 600),
+        node('pcs1', 'pcs', 'PCS-1', 200, { emuId: 'emu1' }),
+        node('pcs2', 'pcs', 'PCS-2', 600, { emuId: 'emu2' })
+      ],
+      edges: [edge('pcs1', 'bus'), edge('pcs2', 'bus')]
+    }
+    const layout = buildTopologyMainLineLayout(topology, [])
+    const emus = layout.units.filter(u => u.kind === 'emu').sort((a, b) => a.cx - b.cx)
+    assert.equal(emus.length, 2)
+    const gap = emus[1].cx - emus[0].cx - emus[0].halfSpan - emus[1].halfSpan
+    assert.ok(gap >= 100, `emu card-edge gap ${gap}`)
+  })
 })
 
 describe('buildTopologyMainLineLayout sectional bus breaker', () => {
@@ -443,5 +461,101 @@ describe('buildTopologyMainLineLayout sectional bus breaker', () => {
 
     const brk1 = layout.tieBreakers.find(b => b.id === 'brk1')
     assert.equal(brk1?.unitIndex, 0)
+  })
+})
+
+describe('buildTopologyMainLineLayout coupling downstreams', () => {
+  it('forks a split transformer onto both LV buses and draws each PCS once', () => {
+    const topology = {
+      nodes: [
+        node('grid', 'grid', '电网', 400, { outputVoltage: 35000 }),
+        node('hv', 'ac_bus', '35kV', 400, { nominalVoltage: 35000 }),
+        node('split', 'split_transformer', '双耳1', 400, {
+          primaryVoltage: 35000, secondaryVoltage: 690, ratedPowerKva: 6300, emuId: 'emu1'
+        }),
+        node('busL', 'ac_bus', '左690', 200, { nominalVoltage: 690 }),
+        node('busR', 'ac_bus', '右690', 600, { nominalVoltage: 690 }),
+        node('emu1', 'emu', 'EMU-1', 400),
+        node('pcsL', 'pcs', 'PCS-L', 200, { emuId: 'emu1' }),
+        node('pcsR', 'pcs', 'PCS-R', 600, { emuId: 'emu1' })
+      ],
+      edges: [
+        edge('grid', 'hv'),
+        edge('hv', 'split'),
+        edge('split', 'busL'),
+        edge('split', 'busR'),
+        edge('busL', 'pcsL'),
+        edge('busR', 'pcsR')
+      ]
+    }
+    const layout = buildTopologyMainLineLayout(topology, [])
+    assert.equal(layout.transformers.length, 1)
+    assert.equal(layout.transformers[0].windings, 3)
+    assert.equal(layout.transformers[0].split, true)
+    const lv = layout.buses.filter(b => b.node?.id === 'busL' || b.node?.id === 'busR')
+    assert.equal(lv.length, 2)
+    assert.ok(lv.every(b => !b.omit), 'both ear buses drawn')
+    const pcsIds = layout.units.flatMap(u => (u.pcsNodes || []).map(p => p.id))
+    assert.deepEqual([...pcsIds].sort(), ['pcsL', 'pcsR'])
+    assert.equal(pcsIds.length, new Set(pcsIds).size, 'each PCS drawn once')
+    const hv = layout.buses.find(b => b.node?.id === 'hv')
+    assert.ok(hv)
+    assert.ok(layout.units.every(u => Math.abs(u.originY - hv.y) > 1), 'PCS hang from LV, not HV')
+    const uL = layout.units.find(u => u.pcsNodes.some(p => p.id === 'pcsL'))
+    const uR = layout.units.find(u => u.pcsNodes.some(p => p.id === 'pcsR'))
+    assert.ok(uL && uR)
+    assert.ok(uL.cx < uR.cx)
+    assert.equal(uL.xfmrId, 'split')
+    assert.equal(uR.xfmrId, 'split')
+  })
+
+  it('lays out two split transformers on the same HV bus independently', () => {
+    const topology = {
+      nodes: [
+        node('grid', 'grid', '电网', 400, { outputVoltage: 35000 }),
+        node('hv', 'ac_bus', '35kV', 400, { nominalVoltage: 35000 }),
+        node('s1', 'split_transformer', '双耳1', 200, { primaryVoltage: 35000, secondaryVoltage: 690, emuId: 'emu1' }),
+        node('s2', 'split_transformer', '双耳2', 800, { primaryVoltage: 35000, secondaryVoltage: 690, emuId: 'emu1' }),
+        node('l1', 'ac_bus', 'L1', 100, { nominalVoltage: 690 }),
+        node('r1', 'ac_bus', 'R1', 300, { nominalVoltage: 690 }),
+        node('l2', 'ac_bus', 'L2', 700, { nominalVoltage: 690 }),
+        node('r2', 'ac_bus', 'R2', 900, { nominalVoltage: 690 }),
+        node('emu1', 'emu', 'EMU-1', 400),
+        node('p1', 'pcs', 'P1', 100, { emuId: 'emu1' }),
+        node('p2', 'pcs', 'P2', 300, { emuId: 'emu1' }),
+        node('p3', 'pcs', 'P3', 700, { emuId: 'emu1' }),
+        node('p4', 'pcs', 'P4', 900, { emuId: 'emu1' })
+      ],
+      edges: [
+        edge('grid', 'hv'),
+        edge('hv', 's1'), edge('s1', 'l1'), edge('s1', 'r1'), edge('l1', 'p1'), edge('r1', 'p2'),
+        edge('hv', 's2'), edge('s2', 'l2'), edge('s2', 'r2'), edge('l2', 'p3'), edge('r2', 'p4')
+      ]
+    }
+    const layout = buildTopologyMainLineLayout(topology, [])
+    assert.equal(layout.transformers.length, 2)
+    assert.ok(layout.transformers[0].x < layout.transformers[1].x)
+    assert.equal(layout.buses.filter(b => Number(b.voltage) === 690).length, 4)
+    const pcsIds = layout.units.flatMap(u => (u.pcsNodes || []).map(p => p.id)).sort()
+    assert.deepEqual(pcsIds, ['p1', 'p2', 'p3', 'p4'])
+    assert.equal(layout.units.filter(u => u.xfmrId === 's1').length, 2)
+    assert.equal(layout.units.filter(u => u.xfmrId === 's2').length, 2)
+  })
+
+  it('still draws an unregistered template as a bus pendant', () => {
+    const topology = {
+      nodes: [
+        node('grid', 'grid', '电网', 0, { outputVoltage: 35000 }),
+        node('bus', 'ac_bus', '35kV', 0, { nominalVoltage: 35000 }),
+        node('arrester', 'surge_arrester', '避雷器', 120),
+        node('pv1', 'pv_unit', 'PV-1', 0, { inverterCount: 8 })
+      ],
+      edges: [edge('grid', 'bus'), edge('bus', 'pv1'), edge('bus', 'arrester')]
+    }
+    const layout = buildTopologyMainLineLayout(topology, [])
+    assert.equal(layout.unknowns.length, 1)
+    assert.equal(layout.unknowns[0].id, 'arrester')
+    assert.equal(layout.unknowns[0].busId, 'bus')
+    assert.equal(layout.units.length, 1)
   })
 })

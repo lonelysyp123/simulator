@@ -10,6 +10,7 @@ import {
 } from './project3dLayout.js'
 import { pvArrayFieldSize } from './pvArrayLayout.js'
 import { createPvStringLeads, createStaticCable } from './buildMeshes.js'
+import { SLD_ROLES } from '../topology/nodeLayout.js'
 
 function node(id, templateId, label, x, parameters = {}) {
   return { id, templateId, label, x, y: 0, parameters }
@@ -544,13 +545,14 @@ describe('bus is drawn as a node (star wiring rule)', () => {
 
 describe('TOPOLOGY_TEMPLATE_3D', () => {
   it('covers every topology editor template as primitive or composite', () => {
-    // EMU 为虚拟节点：不进 3D 布局映射
-    assert.deepEqual(Object.keys(TOPOLOGY_TEMPLATE_3D).sort(), [
-      'ac_breaker', 'ac_bus', 'ac_meter', 'bms', 'dc_bus',
-      'grid', 'load', 'pcs', 'pv_unit', 'transformer'
-    ].sort())
+    const visible = Object.entries(SLD_ROLES)
+      .filter(([, role]) => role !== 'virtual')
+      .map(([id]) => id)
+      .sort()
+    assert.deepEqual(Object.keys(TOPOLOGY_TEMPLATE_3D).sort(), visible)
     assert.equal(TOPOLOGY_TEMPLATE_3D.pcs, 'primitive')
     assert.equal(TOPOLOGY_TEMPLATE_3D.pv_unit, 'composite')
+    assert.equal(TOPOLOGY_TEMPLATE_3D.split_transformer, 'primitive')
     assert.equal(TOPOLOGY_TEMPLATE_3D.dc_bus, 'primitive')
     assert.equal(TOPOLOGY_TEMPLATE_3D.emu, undefined)
   })

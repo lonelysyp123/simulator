@@ -42,6 +42,7 @@ export const TOPOLOGY_TEMPLATE_3D = {
   ac_bus: 'primitive',
   ac_breaker: 'primitive',
   transformer: 'primitive',
+  split_transformer: 'primitive',
   ac_meter: 'primitive',
   load: 'primitive',
   bms: 'primitive',
@@ -159,6 +160,7 @@ export const DEVICE_PORTS = {
   grid: { front: 1.4, back: 1.4 },
   ac_breaker: { front: 1.5, back: 0.9 },
   transformer: { front: 1.6, back: 1.6, boxFront: 1.25, boxBack: 1.25, scaled: true },
+  split_transformer: { front: 1.6, back: 1.6, boxFront: 1.25, boxBack: 1.25, scaled: true },
   pcs: { front: 1.05, back: 1.0 },
   bms: { only: -1.45 },
   load: { front: 0.75, back: 0.75 }
@@ -1137,7 +1139,7 @@ function fromTopology(topology, unitsSnap, pvSnap) {
   for (const xf of sld.transformers || []) {
     addItem(items, {
       key: `node-${xf.id}`,
-      templateId: 'transformer',
+      templateId: xf.node?.templateId || 'transformer',
       kind: 'station-xf',
       x: toX(xf.x, origin),
       z: toZ(xf.y + xf.span / 2, origin),

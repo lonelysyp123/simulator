@@ -8,6 +8,7 @@ public sealed class PlantMeasurements
     public double PccActivePowerKw { get; init; }
     public double PccReactivePowerKvar { get; init; }
     public double PccLineVoltageV { get; init; }
+    public double StationBus35LineVoltageV { get; init; }
     public IReadOnlyList<PcsBranchState> Branches { get; init; } = Array.Empty<PcsBranchState>();
 }
 
@@ -71,6 +72,7 @@ public sealed class EmsStrategySnapshot
     public double PccActivePowerKw { get; init; }
     public double PccReactivePowerKvar { get; init; }
     public double PccLineVoltageV { get; init; }
+    public double StationBus35LineVoltageV { get; init; }
     public double PBaseKw { get; init; }
     public double FrequencyDeltaKw { get; init; }
     public ActionState FrequencyAction { get; init; }

@@ -64,6 +64,7 @@ public static class PlantMeasurementSampler
             PccActivePowerKw = pcc.ActivePowerKw,
             PccReactivePowerKvar = pcc.ReactivePowerKvar,
             PccLineVoltageV = pcc.LineVoltageV,
+            StationBus35LineVoltageV = net.StationBus35LineVoltageV,
             Branches = branches
         };
     }
