@@ -89,6 +89,59 @@ public class TopologyOverlayLoaderTests
     }
 
     [Fact]
+    public void IsUsable_true_when_grouped_units_have_pcs_and_bms()
+    {
+        Assert.True(TopologyOverlayLoader.IsUsable(new TopologyRuntimeOverlay
+        {
+            EssUnits =
+            {
+                new EssUnitConfig
+                {
+                    Name = "U1",
+                    Groups =
+                    {
+                        new EmuGroupConfig
+                        {
+                            Name = "A",
+                            Pcs = { new PcsDeviceConfig { Name = "PCS-A" } },
+                            Bms = { new BmsDeviceConfig { Name = "BMS-A" } }
+                        },
+                        new EmuGroupConfig
+                        {
+                            Name = "B",
+                            Pcs = { new PcsDeviceConfig { Name = "PCS-B" } },
+                            Bms = { new BmsDeviceConfig { Name = "BMS-B" } }
+                        }
+                    }
+                }
+            }
+        }));
+    }
+
+    [Fact]
+    public void IsUsable_false_when_a_group_is_missing_pcs()
+    {
+        Assert.False(TopologyOverlayLoader.IsUsable(new TopologyRuntimeOverlay
+        {
+            EssUnits =
+            {
+                new EssUnitConfig
+                {
+                    Name = "U1",
+                    Groups =
+                    {
+                        new EmuGroupConfig
+                        {
+                            Name = "空组",
+                            Bms = { new BmsDeviceConfig { Name = "BMS-A" } }
+                        }
+                    }
+                }
+            }
+        }));
+    }
+
+    [Fact]
     public void TryLoad_returns_overlay_when_only_pv_units()
     {
         var expected = new TopologyRuntimeOverlay

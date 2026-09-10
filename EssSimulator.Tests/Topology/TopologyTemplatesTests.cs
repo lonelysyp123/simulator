@@ -79,6 +79,14 @@ public class TopologyTemplatesTests
     }
 
     [Fact]
+    public void All_lists_split_transformer_in_substation_category()
+    {
+        Assert.Contains(TopologyTemplates.All, t => t.Id == "split_transformer" && t.Category == "变电");
+        Assert.Equal(2, TopologyTemplates.MaxSplitTransformersPerEmu);
+        Assert.Equal("split_transformer", TopologyTemplates.SplitTransformerId);
+    }
+
+    [Fact]
     public void Original_transformer_ports_and_defaults_unchanged()
     {
         var t = TopologyTemplates.Get("transformer");

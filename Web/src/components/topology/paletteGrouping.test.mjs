@@ -12,6 +12,7 @@ const builtins = [
   tpl('dc_bus', 'DC母线', '母线'),
   tpl('ac_breaker', '三相断路器', '开关'),
   tpl('transformer', '变压器', '变电'),
+  tpl('split_transformer', '双耳变压器', '变电'),
   tpl('ac_meter', '电表', '测量'),
   tpl('load', '站用负载', '负荷'),
   tpl('emu', 'EMU储能单元', '储能'),
@@ -27,9 +28,20 @@ describe('groupTemplatesByCategory', () => {
     assert.deepEqual(groups.map(g => g.category), PALETTE_CATEGORY_ORDER)
     assert.deepEqual(groups.find(g => g.category === '母线').items.map(t => t.id), ['ac_bus', 'dc_bus'])
     assert.deepEqual(
+      groups.find(g => g.category === '变电').items.map(t => t.id),
+      ['transformer', 'split_transformer']
+    )
+    assert.deepEqual(
       groups.find(g => g.category === '储能').items.map(t => t.id),
       ['emu', 'emu_group', 'pcs', 'bms']
     )
+  })
+
+  it('search 双耳 hits the split transformer only', () => {
+    const groups = groupTemplatesByCategory(builtins, '双耳')
+    assert.equal(groups.length, 1)
+    assert.equal(groups[0].category, '变电')
+    assert.deepEqual(groups[0].items.map(t => t.id), ['split_transformer'])
   })
 
   it('search pcs hits the PCS template only', () => {

@@ -112,16 +112,17 @@ describe('libraryPayloadsFromNodes', () => {
 })
 
 describe('batch unit/group assignment', () => {
-  it('assignableNodes only keeps PCS / breaker / meter / transformer', () => {
+  it('assignableNodes only keeps PCS / breaker / meter / transformer / split transformer', () => {
     const nodes = [
       node('p1', 'pcs'),
       node('br', 'ac_breaker'),
       node('m', 'ac_meter'),
       node('xf', 'transformer'),
+      node('split', 'split_transformer'),
       node('grid', 'grid'),
       node('bus', 'ac_bus')
     ]
-    assert.deepEqual(assignableNodes(nodes).map(n => n.id), ['p1', 'br', 'm', 'xf'])
+    assert.deepEqual(assignableNodes(nodes).map(n => n.id), ['p1', 'br', 'm', 'xf', 'split'])
   })
 
   it('mixedParam reports a common value or mixed', () => {
@@ -129,6 +130,13 @@ describe('batch unit/group assignment', () => {
     assert.deepEqual(mixedParam(same, 'emuId'), { value: 'e1', mixed: false })
     const mixed = [node('a', 'pcs', { parameters: { emuId: 'e1' } }), node('b', 'pcs', { parameters: { emuId: 'e2' } })]
     assert.deepEqual(mixedParam(mixed, 'emuId'), { value: '', mixed: true })
+  })
+
+  it('applyEmuId writes emuId on split transformers and clears groupId', () => {
+    const split = node('s1', 'split_transformer', { parameters: { emuId: 'old', groupId: 'g1' } })
+    applyEmuId([split], 'e2')
+    assert.equal(split.parameters.emuId, 'e2')
+    assert.equal(split.parameters.groupId, '')
   })
 
   it('applyEmuId writes emuId and clears groupId on assignable nodes only', () => {
