@@ -143,27 +143,35 @@ public class TopologyValidatorEditorWorkflowTests
     }
 
     [Fact]
-    public void Save_rejects_meter_not_on_bus_pt_mismatch_and_multi_bus()
+    public void Save_rejects_meter_not_connected_to_bus()
     {
         var notBus = PlantWithRoles();
         Assert.True(Connect(notBus, Edge("mPcc", "pt_a", "brkMain", "a2")).Ok);
         var save = TopologyValidator.ValidateProjectForSave(notBus);
         Assert.False(save.Ok);
         Assert.Equal("METER_NOT_BUS", save.Code);
+    }
 
+    [Fact]
+    public void Save_rejects_meter_pt_voltage_mismatch()
+    {
         var ptBad = Energized35kV(Node("m1", "ac_meter", "错PT",
             new Dictionary<string, object?> { ["ptPrimaryVoltage"] = 220000d }));
         Assert.True(Connect(ptBad, Edge("m1", "pt_a", "bus35", "a2")).Ok);
-        save = TopologyValidator.ValidateProjectForSave(ptBad);
+        var save = TopologyValidator.ValidateProjectForSave(ptBad);
         Assert.False(save.Ok);
         Assert.Equal("METER_PT_MISMATCH", save.Code);
+    }
 
+    [Fact]
+    public void Save_rejects_meter_phases_on_two_buses()
+    {
         var multi = Energized35kV(
-            Node("bus690", "ac_bus", "690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
-            Node("m1", "ac_meter", "跨母线", new Dictionary<string, object?> { ["ptPrimaryVoltage"] = 35000d }));
+            Node("bus35b", "ac_bus", "35kV-B", new Dictionary<string, object?> { ["nominalVoltage"] = 35000d }, x: 400, y: 80),
+            Node("m1", "ac_meter", "跨母线", new Dictionary<string, object?> { ["ptPrimaryVoltage"] = 35000d }, y: 200));
         Assert.True(Connect(multi, Edge("m1", "pt_a", "bus35", "a2")).Ok);
-        Assert.True(Connect(multi, Edge("m1", "pt_b", "bus690", "b")).Ok);
-        save = TopologyValidator.ValidateProjectForSave(multi);
+        Assert.True(Connect(multi, Edge("m1", "pt_b", "bus35b", "b2")).Ok);
+        var save = TopologyValidator.ValidateProjectForSave(multi);
         Assert.False(save.Ok);
         Assert.Equal("METER_MULTI_BUS", save.Code);
     }
