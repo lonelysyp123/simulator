@@ -877,6 +877,32 @@ public class TopologyValidatorTests
         Assert.True(save.Ok, save.Message);
     }
 
+    [Fact]
+    public void Split_transformers_reject_shared_pcs_on_same_emu()
+    {
+        var p = Energized35kVPlant(
+            Node("split1", "split_transformer", "双耳1",
+                new Dictionary<string, object?> { ["emuId"] = "role_emu" }),
+            Node("split2", "split_transformer", "双耳2",
+                new Dictionary<string, object?> { ["emuId"] = "role_emu" }),
+            Node("busL", "ac_bus", "左耳690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+            Node("busR", "ac_bus", "右耳690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+            Node("busR2", "ac_bus", "右耳2", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+            Node("p1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "role_emu", ["acVoltage"] = 690d }));
+
+        Assert.True(Connect(p, Edge("split1", "pri_a", "bus35", "a2")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_l_a", "busL", "a")).Ok);
+        Assert.True(Connect(p, Edge("split1", "ear_r_a", "busR", "a")).Ok);
+        Assert.True(Connect(p, Edge("split2", "pri_a", "bus35", "b2")).Ok);
+        Assert.True(Connect(p, Edge("split2", "ear_l_a", "busL", "b")).Ok);
+        Assert.True(Connect(p, Edge("split2", "ear_r_a", "busR2", "a")).Ok);
+        Assert.True(Connect(p, Edge("p1", "ac_a", "busL", "a2")).Ok);
+
+        var save = Save(p);
+        Assert.False(save.Ok);
+        Assert.Equal("SPLIT_XFMR_PCS_OVERLAP", save.Code);
+    }
+
     private static TopologyProject Energized35kVPlant(params TopologyNode[] extra)
     {
         var p = new TopologyProject

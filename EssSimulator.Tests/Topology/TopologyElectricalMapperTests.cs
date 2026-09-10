@@ -172,4 +172,47 @@ public class TopologyElectricalMapperTests
         Assert.NotEqual(mapping.BusRuntimeIds["busL"], mapping.BusRuntimeIds["busR"]);
         Assert.True(mapping.HasStationTransformer);
     }
+
+    [Fact]
+    public void Map_two_split_transformers_on_same_emu_use_distinct_ear_buses()
+    {
+        var project = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("g1", "grid", "电网"),
+                Node("brk", "ac_breaker", "主断", new Dictionary<string, object?> { ["isMainBreaker"] = true }),
+                Node("hv", "ac_bus", "220kV", new Dictionary<string, object?> { ["nominalVoltage"] = 220000d }),
+                Node("xf", "transformer", "主变"),
+                Node("lv", "ac_bus", "35kV", new Dictionary<string, object?> { ["nominalVoltage"] = 35000d }),
+                Node("e1", "emu", "EMU-1", y: 600),
+                Node("s0", "split_transformer", "箱变0", new Dictionary<string, object?> { ["emuId"] = "e1" }, y: 100),
+                Node("s1", "split_transformer", "箱变1", new Dictionary<string, object?> { ["emuId"] = "e1" }, y: 200),
+                Node("b0L", "ac_bus", "0左", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("b0R", "ac_bus", "0右", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("b1L", "ac_bus", "1左", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("b1R", "ac_bus", "1右", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("p0", "pcs", "PCS-0", new Dictionary<string, object?> { ["emuId"] = "e1" }, y: 720)
+            },
+            Edges =
+            {
+                Edge("e1", "g1", "a", "brk", "a"),
+                Edge("e2", "brk", "a2", "hv", "a"),
+                Edge("e3", "xf", "pri_a", "hv", "a2"),
+                Edge("e4", "xf", "sec_a", "lv", "a"),
+                Edge("e5", "s0", "pri_a", "lv", "a2"),
+                Edge("e6", "s1", "pri_a", "lv", "b2"),
+                Edge("e7", "s0", "ear_l_a", "b0L", "a"),
+                Edge("e8", "s0", "ear_r_a", "b0R", "a"),
+                Edge("e9", "s1", "ear_l_a", "b1L", "a"),
+                Edge("e10", "s1", "ear_r_a", "b1R", "a")
+            }
+        };
+
+        var mapping = TopologyElectricalMapper.Map(project);
+        Assert.Equal(RuntimeBusIds.Unit690Ear(0, 0, false), mapping.BusRuntimeIds["b0L"]);
+        Assert.Equal(RuntimeBusIds.Unit690Ear(0, 0, true), mapping.BusRuntimeIds["b0R"]);
+        Assert.Equal(RuntimeBusIds.Unit690Ear(0, 1, false), mapping.BusRuntimeIds["b1L"]);
+        Assert.Equal(RuntimeBusIds.Unit690Ear(0, 1, true), mapping.BusRuntimeIds["b1R"]);
+    }
 }

@@ -293,8 +293,21 @@ namespace EssSimulator.Configuration
         /// <summary>组态绑定到本单元的单元变节点名称（可选，仅镜像展示）。</summary>
         public string? UnitTransformerName { get; set; }
 
-        /// <summary>本单元若绑定双耳变压器则为非空；缺省走两绕组隐式单元变。</summary>
+        /// <summary>本单元绑定的双耳变压器（1～2 台，按画布 Y/X）；空则走两绕组隐式单元变。</summary>
+        public List<SplitTransformerRuntimeConfig> SplitTransformers { get; set; } = new();
+
+        /// <summary>第一台双耳箱变；兼容只写单对象的旧 overlay。</summary>
         public SplitTransformerRuntimeConfig? SplitTransformer { get; set; }
+
+        /// <summary>解析本单元生效的双耳箱变列表（优先 <see cref="SplitTransformers"/>）。</summary>
+        public IReadOnlyList<SplitTransformerRuntimeConfig> ResolveSplitTransformers()
+        {
+            if (SplitTransformers is { Count: > 0 })
+                return SplitTransformers.Where(s => s is { Present: true }).Take(2).ToList();
+            if (SplitTransformer is { Present: true })
+                return new[] { SplitTransformer };
+            return Array.Empty<SplitTransformerRuntimeConfig>();
+        }
 
         /// <summary>本单元下属 EMU 分组（EMU → group → PCS 支路）；为空时保持扁平构成（向后兼容）。</summary>
         public List<EmuGroupConfig> Groups { get; set; } = new();

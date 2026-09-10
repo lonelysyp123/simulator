@@ -23,7 +23,7 @@ namespace EssSimulator.Web.Topology
 
             foreach (var grid in project.Nodes.Where(n => n.TemplateId == "grid"))
                 Walk(project, grid.Id, cameFrom: null, xfmrCrossed: 0, passedMainBreaker: false,
-                    incomingSplitEar: null, incomingSplitUnit: 0);
+                    incomingSplitEar: null, incomingSplitUnit: 0, incomingSplitXfmr: 0);
 
             return new Mapping
             {
@@ -38,7 +38,8 @@ namespace EssSimulator.Web.Topology
                 int xfmrCrossed,
                 bool passedMainBreaker,
                 string? incomingSplitEar,
-                int incomingSplitUnit)
+                int incomingSplitUnit,
+                int incomingSplitXfmr)
             {
                 if (!visited.Add(nodeId))
                     return;
@@ -52,16 +53,16 @@ namespace EssSimulator.Web.Topology
                     if (!busIds.ContainsKey(node.Id))
                     {
                         busIds[node.Id] = incomingSplitEar == "L"
-                            ? RuntimeBusIds.Unit690Left(incomingSplitUnit)
+                            ? RuntimeBusIds.Unit690Ear(incomingSplitUnit, incomingSplitXfmr, right: false)
                             : incomingSplitEar == "R"
-                                ? RuntimeBusIds.Unit690Right(incomingSplitUnit)
+                                ? RuntimeBusIds.Unit690Ear(incomingSplitUnit, incomingSplitXfmr, right: true)
                                 : AssignBusId(xfmrCrossed, passedMainBreaker, hasStationXfmr, ref unit690);
                     }
 
                     foreach (var nb in Neighbors(p, node.Id))
                     {
                         if (nb == cameFrom) continue;
-                        Walk(p, nb, node.Id, xfmrCrossed, passedMainBreaker, null, 0);
+                        Walk(p, nb, node.Id, xfmrCrossed, passedMainBreaker, null, 0, 0);
                     }
                     return;
                 }
@@ -77,6 +78,9 @@ namespace EssSimulator.Web.Topology
                 int splitUnit = TopologyTemplates.IsSplitTransformer(node.TemplateId)
                     ? IndexOfEmuWithPcs(p, TopologyParamHelper.GetString(node.Parameters, "emuId"))
                     : 0;
+                int splitXfmr = TopologyTemplates.IsSplitTransformer(node.TemplateId)
+                    ? IndexOfSplitOnEmu(p, TopologyParamHelper.GetString(node.Parameters, "emuId"), node.Id)
+                    : 0;
 
                 foreach (var (nb, localPort) in NeighborPorts(p, node.Id))
                 {
@@ -87,7 +91,7 @@ namespace EssSimulator.Web.Topology
                         if (TopologyTemplates.IsSplitLeftEarPort(localPort)) ear = "L";
                         else if (TopologyTemplates.IsSplitRightEarPort(localPort)) ear = "R";
                     }
-                    Walk(p, nb, node.Id, nextXfmr, nextMain, ear, splitUnit);
+                    Walk(p, nb, node.Id, nextXfmr, nextMain, ear, splitUnit, splitXfmr);
                 }
             }
         }
@@ -108,6 +112,23 @@ namespace EssSimulator.Web.Topology
                     return idx;
                 idx++;
             }
+            return 0;
+        }
+
+        /// <summary>同一 EMU 下双耳变压器按画布 Y/X 的序号；找不到时返回 0。</summary>
+        public static int IndexOfSplitOnEmu(TopologyProject project, string? emuId, string xfmrId)
+        {
+            int idx = 0;
+            foreach (var node in project.Nodes
+                .Where(n => TopologyTemplates.IsSplitTransformer(n.TemplateId)
+                    && string.Equals(TopologyParamHelper.GetString(n.Parameters, "emuId"), emuId, StringComparison.Ordinal))
+                .OrderBy(n => n.Y).ThenBy(n => n.X))
+            {
+                if (string.Equals(node.Id, xfmrId, StringComparison.Ordinal))
+                    return idx;
+                idx++;
+            }
+
             return 0;
         }
 

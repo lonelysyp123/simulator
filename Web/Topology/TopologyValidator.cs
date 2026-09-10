@@ -867,6 +867,10 @@ namespace EssSimulator.Web.Topology
             if (splitBindingCheck != null)
                 return splitBindingCheck;
 
+            var splitOverlapCheck = ValidateSplitTransformerPcsOverlap(project, details);
+            if (splitOverlapCheck != null)
+                return splitOverlapCheck;
+
             // EMU 分组归属（可选）：已选 groupId 时须指向存在的分组，且分组与设备所属 EMU 一致；组级断路器至多 1 台（电表允许多台）
             var groupBindingCheck = ValidateEmuGroupBindings(project, emuIds, details);
             if (groupBindingCheck != null)
@@ -1014,6 +1018,96 @@ namespace EssSimulator.Web.Topology
             }
 
             return null;
+        }
+
+        /// <summary>同一 EMU 下两台双耳变压器不得共用同一 PCS 支路。</summary>
+        private static TopologyValidationResult? ValidateSplitTransformerPcsOverlap(
+            TopologyProject project, List<string> details)
+        {
+            var splits = project.Nodes
+                .Where(n => TopologyTemplates.IsSplitTransformer(n.TemplateId))
+                .GroupBy(n => TopologyParamHelper.GetString(n.Parameters, "emuId"), StringComparer.Ordinal)
+                .Where(g => g.Count() >= 2)
+                .ToList();
+            if (splits.Count == 0)
+                return null;
+
+            foreach (var emuGroup in splits)
+            {
+                var xfmrs = emuGroup.OrderBy(n => n.Y).ThenBy(n => n.X).ToList();
+                var pcsSets = xfmrs.Select(x => PcsIdsOnSplitEars(project, x)).ToList();
+                for (int i = 0; i < xfmrs.Count; i++)
+                {
+                    for (int j = i + 1; j < xfmrs.Count; j++)
+                    {
+                        var overlap = pcsSets[i].Intersect(pcsSets[j], StringComparer.Ordinal).ToList();
+                        if (overlap.Count == 0)
+                            continue;
+
+                        var labels = overlap
+                            .Select(id => project.Nodes.FirstOrDefault(n => n.Id == id)?.Label ?? id)
+                            .ToList();
+                        details.Add(
+                            $"双耳变压器「{xfmrs[i].Label}」与「{xfmrs[j].Label}」共用 PCS：{string.Join("、", labels)}");
+                        return Fail("SPLIT_XFMR_PCS_OVERLAP",
+                            "同一 EMU 下两台双耳变压器不得接到同一 PCS 支路",
+                            details: details,
+                            problemNodeIds: xfmrs.Select(x => x.Id).Concat(overlap).Distinct().ToList());
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static HashSet<string> PcsIdsOnSplitEars(TopologyProject project, TopologyNode split)
+        {
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (bool left in new[] { true, false })
+            {
+                var bus = FindSplitEarBus(project, split.Id, left);
+                if (bus == null)
+                    continue;
+                foreach (var nbId in SplitNeighbors(project, bus.Id))
+                {
+                    var nb = project.Nodes.FirstOrDefault(n => n.Id == nbId);
+                    if (nb?.TemplateId == "pcs")
+                        ids.Add(nb.Id);
+                }
+            }
+
+            return ids;
+        }
+
+        private static TopologyNode? FindSplitEarBus(TopologyProject project, string xfmrId, bool left)
+        {
+            foreach (var e in project.Edges)
+            {
+                string? xfmrPort;
+                string otherId;
+                if (e.FromNodeId == xfmrId) { xfmrPort = e.FromPortId; otherId = e.ToNodeId; }
+                else if (e.ToNodeId == xfmrId) { xfmrPort = e.ToPortId; otherId = e.FromNodeId; }
+                else continue;
+
+                bool match = left
+                    ? TopologyTemplates.IsSplitLeftEarPort(xfmrPort)
+                    : TopologyTemplates.IsSplitRightEarPort(xfmrPort);
+                if (!match) continue;
+                var other = project.Nodes.FirstOrDefault(n => n.Id == otherId);
+                if (other?.TemplateId == "ac_bus")
+                    return other;
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<string> SplitNeighbors(TopologyProject project, string nodeId)
+        {
+            foreach (var e in project.Edges)
+            {
+                if (e.FromNodeId == nodeId) yield return e.ToNodeId;
+                else if (e.ToNodeId == nodeId) yield return e.FromNodeId;
+            }
         }
 
         /// <summary>

@@ -136,13 +136,15 @@ namespace EssSimulator.EssDeviceSimModel.Solver
 
         private static AcInternalQuantities? Unit690Port(ElectricalNetwork network, string busId)
         {
-            if (RuntimeBusIds.TryParseUnit690Ear(busId, out int earUnit, out bool rightEar)
-                && earUnit >= 0 && earUnit < network.DualEarTransformers.Count
-                && network.DualEarTransformers[earUnit] != null)
+            if (RuntimeBusIds.TryParseUnit690Ear(busId, out int earUnit, out int xfmrIndex, out bool rightEar))
             {
-                var dual = network.DualEarTransformers[earUnit]!;
-                return (rightEar ? dual.SecondaryRight : dual.SecondaryLeft).Output.Ac?.Internal
-                    ?? new AcInternalQuantities();
+                var duals = network.DualEarsOfUnit(earUnit);
+                if (xfmrIndex >= 0 && xfmrIndex < duals.Count)
+                {
+                    var dual = duals[xfmrIndex];
+                    return (rightEar ? dual.SecondaryRight : dual.SecondaryLeft).Output.Ac?.Internal
+                        ?? new AcInternalQuantities();
+                }
             }
 
             if (RuntimeBusIds.TryParseUnit690(busId, out int unit)

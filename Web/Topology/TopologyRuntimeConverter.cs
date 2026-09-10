@@ -139,9 +139,12 @@ namespace EssSimulator.Web.Topology
             {
                 var emuSource = emusWithPcs[0].Emu;
                 var pcsSource = firstPcs!;
-                var firstSplit = project.Nodes.FirstOrDefault(n =>
-                    TopologyTemplates.IsSplitTransformer(n.TemplateId) &&
-                    TopologyParamHelper.GetString(n.Parameters, "emuId") == emuSource.Id);
+                var firstSplit = project.Nodes
+                    .Where(n =>
+                        TopologyTemplates.IsSplitTransformer(n.TemplateId) &&
+                        TopologyParamHelper.GetString(n.Parameters, "emuId") == emuSource.Id)
+                    .OrderBy(n => n.Y).ThenBy(n => n.X)
+                    .FirstOrDefault();
                 overlay.UnitTransformer = firstSplit != null
                     ? new UnitTransformerConfig
                     {
@@ -245,16 +248,7 @@ namespace EssSimulator.Web.Topology
                     ? null
                     : TopologyElectricalMapper.ResolveMeterSourceBusId(project, unitMeter);
 
-                var splitXfmr = project.Nodes.FirstOrDefault(n =>
-                    TopologyTemplates.IsSplitTransformer(n.TemplateId) &&
-                    TopologyParamHelper.GetString(n.Parameters, "emuId") == emu.Id);
-                if (splitXfmr != null)
-                {
-                    unit.UnitTransformerName = NodeDisplayName(splitXfmr);
-                    unit.SplitTransformer = ToSplitRuntime(project, splitXfmr, group.Pcs);
-                    overlay.Notes.Add(
-                        $"{unit.Name}: 双耳变压器「{unit.UnitTransformerName}」· 左耳 支路×{unit.SplitTransformer.LeftEarPcsIndices.Count} · 右耳 支路×{unit.SplitTransformer.RightEarPcsIndices.Count}");
-                }
+                var runtimePcs = PcsInRuntimeOrder(project, emu, group.Pcs);
 
                 var usedBms = new HashSet<string>(StringComparer.Ordinal);
                 int linkedBms = 0;
@@ -286,7 +280,7 @@ namespace EssSimulator.Web.Topology
                         groupCfg.BreakerName = NodeDisplayName(groupBreaker);
                         groupCfg.MeterNames = groupMeters;
 
-                        foreach (var pcs in group.Pcs.Where(p =>
+                        foreach (var pcs in runtimePcs.Where(p =>
                             TopologyParamHelper.GetString(p.Parameters, "groupId") == groupNode.Id))
                         {
                             pcsSeq++;
@@ -296,7 +290,7 @@ namespace EssSimulator.Web.Topology
                     }
 
                     // 未选分组的 PCS 归入合成「直挂」组，保证扁平展开不丢 PCS
-                    var ungrouped = group.Pcs
+                    var ungrouped = runtimePcs
                         .Where(p => string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(p.Parameters, "groupId")))
                         .ToList();
                     if (ungrouped.Count > 0)
@@ -312,10 +306,45 @@ namespace EssSimulator.Web.Topology
                 }
                 else
                 {
-                    foreach (var pcs in group.Pcs)
+                    foreach (var pcs in runtimePcs)
                     {
                         pcsSeq++;
                         AddPcsWithBms(project, unit.Pcs, unit.Bms, pcs, unitIndex, pcsSeq, usedBms, ref linkedBms);
+                    }
+                }
+
+                var splitXfmrs = project.Nodes
+                    .Where(n =>
+                        TopologyTemplates.IsSplitTransformer(n.TemplateId) &&
+                        TopologyParamHelper.GetString(n.Parameters, "emuId") == emu.Id)
+                    .OrderBy(n => n.Y).ThenBy(n => n.X)
+                    .Take(TopologyTemplates.MaxSplitTransformersPerEmu)
+                    .ToList();
+                if (splitXfmrs.Count > 0)
+                {
+                    var claimed = new HashSet<int>();
+                    var splitCfgs = new List<SplitTransformerRuntimeConfig>();
+                    foreach (var splitXfmr in splitXfmrs)
+                    {
+                        var cfg = ToSplitRuntime(project, splitXfmr, runtimePcs, claimed);
+                        splitCfgs.Add(cfg);
+                        foreach (var i in cfg.LeftEarPcsIndices.Concat(cfg.RightEarPcsIndices))
+                            claimed.Add(i);
+                    }
+
+                    for (int i = 0; i < runtimePcs.Count; i++)
+                    {
+                        if (claimed.Add(i))
+                            splitCfgs[0].LeftEarPcsIndices.Add(i);
+                    }
+
+                    unit.SplitTransformers = splitCfgs;
+                    unit.SplitTransformer = splitCfgs[0];
+                    unit.UnitTransformerName = splitCfgs[0].Name;
+                    foreach (var cfg in splitCfgs)
+                    {
+                        overlay.Notes.Add(
+                            $"{unit.Name}: 双耳变压器「{cfg.Name}」· 左耳 支路×{cfg.LeftEarPcsIndices.Count} · 右耳 支路×{cfg.RightEarPcsIndices.Count}");
                     }
                 }
 
@@ -381,21 +410,55 @@ namespace EssSimulator.Web.Topology
                 : node.Id;
         }
 
+        /// <summary>
+        /// 与 <see cref="Configuration.SimulatorConfig.GetPcsDeviceConfigs"/> 相同：分组按 Y/X，组内保持传入列表顺序。
+        /// </summary>
+        internal static List<TopologyNode> PcsInRuntimeOrder(
+            TopologyProject project, TopologyNode emu, List<TopologyNode> unitPcs)
+        {
+            var unitGroups = project.Nodes
+                .Where(n => n.TemplateId == "emu_group" && TopologyParamHelper.GetString(n.Parameters, "emuId") == emu.Id)
+                .OrderBy(n => n.Y).ThenBy(n => n.X)
+                .ToList();
+            if (unitGroups.Count == 0)
+                return unitPcs.ToList();
+
+            var ordered = new List<TopologyNode>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var groupNode in unitGroups)
+            {
+                foreach (var pcs in unitPcs.Where(p =>
+                    TopologyParamHelper.GetString(p.Parameters, "groupId") == groupNode.Id))
+                {
+                    if (seen.Add(pcs.Id))
+                        ordered.Add(pcs);
+                }
+            }
+
+            foreach (var pcs in unitPcs)
+            {
+                if (string.IsNullOrWhiteSpace(TopologyParamHelper.GetString(pcs.Parameters, "groupId"))
+                    && seen.Add(pcs.Id))
+                    ordered.Add(pcs);
+            }
+
+            return ordered;
+        }
+
         private static SplitTransformerRuntimeConfig ToSplitRuntime(
-            TopologyProject project, TopologyNode split, List<TopologyNode> unitPcs)
+            TopologyProject project,
+            TopologyNode split,
+            List<TopologyNode> unitPcs,
+            HashSet<int> claimed)
         {
             var leftBus = FindBusOnEar(project, split.Id, left: true);
             var rightBus = FindBusOnEar(project, split.Id, left: false);
-            var leftPcs = PcsIndicesOnBus(project, leftBus, unitPcs);
-            var rightPcs = PcsIndicesOnBus(project, rightBus, unitPcs);
-            var rightSet = rightPcs.ToHashSet();
-            var assigned = leftPcs.Concat(rightPcs).ToHashSet();
-            for (int i = 0; i < unitPcs.Count; i++)
-            {
-                if (assigned.Contains(i)) continue;
-                if (rightSet.Contains(i)) continue;
-                leftPcs.Add(i);
-            }
+            var leftPcs = PcsIndicesOnBus(project, leftBus, unitPcs)
+                .Where(i => !claimed.Contains(i))
+                .ToList();
+            var rightPcs = PcsIndicesOnBus(project, rightBus, unitPcs)
+                .Where(i => !claimed.Contains(i) && !leftPcs.Contains(i))
+                .ToList();
 
             return new SplitTransformerRuntimeConfig
             {

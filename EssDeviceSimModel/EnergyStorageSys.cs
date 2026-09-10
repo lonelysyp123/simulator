@@ -192,19 +192,30 @@ namespace EssSimulator.EssDeviceSimModel
                 TransformerDeviceFactory.CreateConfig(transCfg));
 
             var unitTransformers = new List<TransformerDevice>();
-            var dualEars = new DualEarTransformerDevice?[unitCount];
+            var dualEars = new List<IReadOnlyList<DualEarTransformerDevice>>();
             var unitTransDeviceCfg = TransformerDeviceFactory.CreateConfig(unitTransCfg);
             for (int u = 0; u < unitCount; u++)
             {
-                var split = u < simCfg.Devices.Count ? simCfg.Devices[u].SplitTransformer : null;
-                if (split is { Present: true })
+                var splits = u < simCfg.Devices.Count
+                    ? simCfg.Devices[u].ResolveSplitTransformers()
+                    : Array.Empty<SplitTransformerRuntimeConfig>();
+                if (splits.Count > 0)
                 {
-                    var dual = TransformerDeviceFactory.CreateDualEar($"unit_transformer_u{u}", split);
-                    dualEars[u] = dual;
-                    unitTransformers.Add(dual.Through);
+                    var list = new List<DualEarTransformerDevice>();
+                    for (int t = 0; t < splits.Count; t++)
+                    {
+                        string id = t == 0 ? $"unit_transformer_u{u}" : $"unit_transformer_u{u}_t{t}";
+                        list.Add(TransformerDeviceFactory.CreateDualEar(id, splits[t]));
+                    }
+
+                    dualEars.Add(list);
+                    unitTransformers.Add(list[0].Through);
                 }
                 else
+                {
+                    dualEars.Add(Array.Empty<DualEarTransformerDevice>());
                     unitTransformers.Add(TransformerDeviceFactory.Create($"unit_transformer_u{u}", unitTransDeviceCfg));
+                }
             }
             _unitTransformers = unitTransformers;
 

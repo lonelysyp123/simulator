@@ -20,7 +20,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             IReadOnlyList<PcsDevice>? externalPcsDevices = null,
             TransformerDevice? externalMainTransformer = null,
             IReadOnlyList<TransformerDevice>? externalUnitTransformers = null,
-            IReadOnlyList<DualEarTransformerDevice?>? externalDualEars = null,
+            IReadOnlyList<IReadOnlyList<DualEarTransformerDevice>>? externalDualEars = null,
             LoadDevice? externalLoadDevice = null,
             MeterSimulator? externalPccMeter = null,
             EnergyStorageSystem? legacyEss = null,
@@ -63,7 +63,7 @@ namespace EssSimulator.EssDeviceSimModel.Solver
 
             var unitBreakers = new List<BreakerSimulator>();
             var unitTransformers = new List<TransformerDevice>();
-            var dualEars = new List<DualEarTransformerDevice?>();
+            var dualEars = new List<IReadOnlyList<DualEarTransformerDevice>>();
             var splitAssignments = new List<SplitEarAssignment?>();
             var networkPcsDevices = new List<PcsDevice>();
             var bmsDevices = new List<BmsRackDevice>();
@@ -72,25 +72,26 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             {
                 unitBreakers.Add(new BreakerSimulator($"unit_breaker_u{u}", breakerCfg.Unit));
                 var (baseIdx, pcsCount) = PcsUnitLayout.RangeOfUnit(pcsPerUnit, u);
-                var splitCfg = u < simCfg.Devices.Count ? simCfg.Devices[u].SplitTransformer : null;
-                DualEarTransformerDevice? dual = null;
-                if (externalDualEars != null && u < externalDualEars.Count)
-                    dual = externalDualEars[u];
-                else if (splitCfg is { Present: true })
-                    dual = TransformerDeviceFactory.CreateDualEar($"unit_transformer_u{u}", splitCfg);
+                var splitCfgs = u < simCfg.Devices.Count
+                    ? simCfg.Devices[u].ResolveSplitTransformers()
+                    : Array.Empty<SplitTransformerRuntimeConfig>();
+                IReadOnlyList<DualEarTransformerDevice> duals =
+                    externalDualEars != null && u < externalDualEars.Count
+                        ? externalDualEars[u]
+                        : CreateDualEars(u, splitCfgs);
 
-                if (dual != null)
+                if (duals.Count > 0)
                 {
-                    dualEars.Add(dual);
+                    dualEars.Add(duals);
                     if (externalUnitTransformers != null && u < externalUnitTransformers.Count)
                         unitTransformers.Add(externalUnitTransformers[u]);
                     else
-                        unitTransformers.Add(dual.Through);
-                    splitAssignments.Add(ToSplitAssignment(splitCfg, baseIdx, pcsCount));
+                        unitTransformers.Add(duals[0].Through);
+                    splitAssignments.Add(ToSplitAssignment(splitCfgs, baseIdx, pcsCount));
                 }
                 else
                 {
-                    dualEars.Add(null);
+                    dualEars.Add(Array.Empty<DualEarTransformerDevice>());
                     splitAssignments.Add(null);
                     if (externalUnitTransformers != null && u < externalUnitTransformers.Count)
                         unitTransformers.Add(externalUnitTransformers[u]);
@@ -270,38 +271,65 @@ namespace EssSimulator.EssDeviceSimModel.Solver
             return links;
         }
 
-        private static SplitEarAssignment ToSplitAssignment(
-            SplitTransformerRuntimeConfig? splitCfg, int baseIdx, int pcsCount)
+        private static IReadOnlyList<DualEarTransformerDevice> CreateDualEars(
+            int unitIndex, IReadOnlyList<SplitTransformerRuntimeConfig> splitCfgs)
         {
-            var left = new List<int>();
-            var right = new HashSet<int>();
-            if (splitCfg != null)
+            var list = new List<DualEarTransformerDevice>();
+            for (int t = 0; t < splitCfgs.Count; t++)
             {
+                string id = t == 0 ? $"unit_transformer_u{unitIndex}" : $"unit_transformer_u{unitIndex}_t{t}";
+                list.Add(TransformerDeviceFactory.CreateDualEar(id, splitCfgs[t]));
+            }
+
+            return list;
+        }
+
+        private static SplitEarAssignment ToSplitAssignment(
+            IReadOnlyList<SplitTransformerRuntimeConfig> splitCfgs, int baseIdx, int pcsCount)
+        {
+            var taken = new HashSet<int>();
+            var transformers = new List<SplitXfmrEarChannels>();
+            foreach (var splitCfg in splitCfgs)
+            {
+                var left = new List<int>();
+                var right = new List<int>();
                 foreach (var i in splitCfg.RightEarPcsIndices)
                 {
-                    if (i >= 0 && i < pcsCount)
-                        right.Add(baseIdx + i);
+                    int global = baseIdx + i;
+                    if (i < 0 || i >= pcsCount || !taken.Add(global))
+                        continue;
+                    right.Add(global);
                 }
+
                 foreach (var i in splitCfg.LeftEarPcsIndices)
                 {
-                    if (i >= 0 && i < pcsCount)
-                        left.Add(baseIdx + i);
+                    int global = baseIdx + i;
+                    if (i < 0 || i >= pcsCount || !taken.Add(global))
+                        continue;
+                    left.Add(global);
                 }
+
+                transformers.Add(new SplitXfmrEarChannels { LeftChannels = left, RightChannels = right });
             }
 
-            for (int ch = 0; ch < pcsCount; ch++)
+            if (transformers.Count > 0)
             {
-                int global = baseIdx + ch;
-                if (right.Contains(global) || left.Contains(global))
-                    continue;
-                left.Add(global);
+                var firstLeft = transformers[0].LeftChannels.ToList();
+                for (int ch = 0; ch < pcsCount; ch++)
+                {
+                    int global = baseIdx + ch;
+                    if (taken.Add(global))
+                        firstLeft.Add(global);
+                }
+
+                transformers[0] = new SplitXfmrEarChannels
+                {
+                    LeftChannels = firstLeft,
+                    RightChannels = transformers[0].RightChannels
+                };
             }
 
-            return new SplitEarAssignment
-            {
-                LeftChannels = left,
-                RightChannels = right.ToList()
-            };
+            return new SplitEarAssignment { Transformers = transformers };
         }
     }
 }

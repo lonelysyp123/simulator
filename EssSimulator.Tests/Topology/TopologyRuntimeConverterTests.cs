@@ -385,7 +385,95 @@ public class TopologyRuntimeConverterTests
         Assert.Equal("双耳1", unit.SplitTransformer.Name);
         Assert.Equal(new[] { 0 }, unit.SplitTransformer.LeftEarPcsIndices);
         Assert.Equal(new[] { 1 }, unit.SplitTransformer.RightEarPcsIndices);
+        Assert.Single(unit.SplitTransformers);
         Assert.Equal(690d, overlay.UnitTransformer!.SecondaryVoltage);
         Assert.Equal(690d, overlay.Pcs!.AcVoltageNominal);
+    }
+
+    [Fact]
+    public void Convert_split_ear_indices_follow_group_flatten_order_not_canvas_xy()
+    {
+        var project = new TopologyProject
+        {
+            Id = "split-groups",
+            Name = "分组双耳",
+            Nodes =
+            {
+                Node("g1", "grid", "电网"),
+                Node("e1", "emu", "EMU-1", y: 600),
+                Node("grp1", "emu_group", "组1", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 0, y: 100),
+                Node("grp2", "emu_group", "组2", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 0, y: 200),
+                Node("split", "split_transformer", "双耳1", new Dictionary<string, object?> { ["emuId"] = "e1" }),
+                Node("busL", "ac_bus", "左690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("busR", "ac_bus", "右690", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("p1L", "pcs", "G1-L", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grp1" }, x: 100, y: 100),
+                Node("p2L", "pcs", "G2-L", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grp2" }, x: 100, y: 200),
+                Node("p1R", "pcs", "G1-R", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grp1" }, x: 200, y: 100),
+                Node("p2R", "pcs", "G2-R", new Dictionary<string, object?> { ["emuId"] = "e1", ["groupId"] = "grp2" }, x: 200, y: 200)
+            },
+            Edges =
+            {
+                Edge("1", "split", "ear_l_a", "busL", "a"),
+                Edge("2", "split", "ear_r_a", "busR", "a"),
+                Edge("3", "p1L", "ac_a", "busL", "a2"),
+                Edge("4", "p1R", "ac_a", "busL", "b2"),
+                Edge("5", "p2L", "ac_a", "busR", "a2"),
+                Edge("6", "p2R", "ac_a", "busR", "b2")
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        var unit = overlay!.EssUnits[0];
+        Assert.Equal(new[] { "G1-L", "G1-R" }, unit.Groups[0].Pcs.Select(p => p.Name).ToArray());
+        Assert.Equal(new[] { "G2-L", "G2-R" }, unit.Groups[1].Pcs.Select(p => p.Name).ToArray());
+        Assert.Equal(new[] { 0, 1 }, unit.SplitTransformer!.LeftEarPcsIndices);
+        Assert.Equal(new[] { 2, 3 }, unit.SplitTransformer.RightEarPcsIndices);
+    }
+
+    [Fact]
+    public void Convert_two_split_transformers_on_same_emu_keep_separate_pcs()
+    {
+        var project = new TopologyProject
+        {
+            Id = "two-split",
+            Name = "两台双耳",
+            Nodes =
+            {
+                Node("g1", "grid", "电网"),
+                Node("e1", "emu", "EMU-1", y: 600),
+                Node("s0", "split_transformer", "箱变0", new Dictionary<string, object?> { ["emuId"] = "e1" }, y: 100),
+                Node("s1", "split_transformer", "箱变1", new Dictionary<string, object?> { ["emuId"] = "e1" }, y: 200),
+                Node("b0L", "ac_bus", "0左", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("b0R", "ac_bus", "0右", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("b1L", "ac_bus", "1左", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("b1R", "ac_bus", "1右", new Dictionary<string, object?> { ["nominalVoltage"] = 690d }),
+                Node("p0", "pcs", "PCS-0", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 100),
+                Node("p1", "pcs", "PCS-1", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 200),
+                Node("p2", "pcs", "PCS-2", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 300),
+                Node("p3", "pcs", "PCS-3", new Dictionary<string, object?> { ["emuId"] = "e1" }, x: 400)
+            },
+            Edges =
+            {
+                Edge("1", "s0", "ear_l_a", "b0L", "a"),
+                Edge("2", "s0", "ear_r_a", "b0R", "a"),
+                Edge("3", "s1", "ear_l_a", "b1L", "a"),
+                Edge("4", "s1", "ear_r_a", "b1R", "a"),
+                Edge("5", "p0", "ac_a", "b0L", "a2"),
+                Edge("6", "p1", "ac_a", "b0R", "a2"),
+                Edge("7", "p2", "ac_a", "b1L", "a2"),
+                Edge("8", "p3", "ac_a", "b1R", "a2")
+            }
+        };
+
+        var (overlay, validation) = TopologyRuntimeConverter.Convert(project);
+        Assert.True(validation.Ok, validation.Message);
+        var unit = overlay!.EssUnits[0];
+        Assert.Equal(2, unit.SplitTransformers.Count);
+        Assert.Equal("箱变0", unit.SplitTransformer!.Name);
+        Assert.Equal(new[] { 0 }, unit.SplitTransformers[0].LeftEarPcsIndices);
+        Assert.Equal(new[] { 1 }, unit.SplitTransformers[0].RightEarPcsIndices);
+        Assert.Equal(new[] { 2 }, unit.SplitTransformers[1].LeftEarPcsIndices);
+        Assert.Equal(new[] { 3 }, unit.SplitTransformers[1].RightEarPcsIndices);
     }
 }

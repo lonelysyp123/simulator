@@ -34,14 +34,26 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
             int unitCount = Math.Max(network.UnitBreakers.Count, network.UnitTransformers.Count);
             for (int u = 0; u < unitCount; u++)
             {
-                bool split = DualEarAt(network, u) != null;
+                int xfmrCount = DualEarsAt(network, u).Count;
+                if (xfmrCount <= 0)
+                {
+                    unitBuses.Add(new ElectricalBusNode(RuntimeBusIds.Unit690(u), pcsCfg.AcVoltageNominal));
+                    continue;
+                }
+
                 unitBuses.Add(new ElectricalBusNode(
-                    split ? RuntimeBusIds.Unit690Left(u) : RuntimeBusIds.Unit690(u),
+                    RuntimeBusIds.Unit690Ear(u, 0, right: false),
                     pcsCfg.AcVoltageNominal));
-                if (split)
+                extraBuses.Add(new ElectricalBusNode(
+                    RuntimeBusIds.Unit690Ear(u, 0, right: true),
+                    pcsCfg.AcVoltageNominal));
+                for (int t = 1; t < xfmrCount; t++)
                 {
                     extraBuses.Add(new ElectricalBusNode(
-                        RuntimeBusIds.Unit690Right(u),
+                        RuntimeBusIds.Unit690Ear(u, t, right: false),
+                        pcsCfg.AcVoltageNominal));
+                    extraBuses.Add(new ElectricalBusNode(
+                        RuntimeBusIds.Unit690Ear(u, t, right: true),
                         pcsCfg.AcVoltageNominal));
                 }
             }
@@ -85,12 +97,11 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 if (channelIndex < baseChannel || channelIndex >= baseChannel + pcsCount)
                     continue;
                 var split = SplitAssignment(Network, u);
-                if (split != null && split.RightChannels.Contains(channelIndex))
+                if (split != null && split.TryGetEar(channelIndex, out int xfmrIndex, out bool right))
                 {
-                    var right = ExtraUnitBuses690.FirstOrDefault(b =>
-                        string.Equals(b.BusId, RuntimeBusIds.Unit690Right(u), StringComparison.Ordinal));
-                    if (right != null)
-                        return right;
+                    var ear = FindBus(RuntimeBusIds.Unit690Ear(u, xfmrIndex, right));
+                    if (ear != null)
+                        return ear;
                 }
                 return UnitBuses690[u];
             }
@@ -203,20 +214,28 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 if (u >= network.UnitBreakers.Count)
                     continue;
 
-                var dual = DualEarAt(network, u);
-                if (dual != null)
+                var duals = DualEarsAt(network, u);
+                if (duals.Count > 0)
                 {
-                    var right = ExtraUnitBuses690.FirstOrDefault(b =>
-                        string.Equals(b.BusId, RuntimeBusIds.Unit690Right(u), StringComparison.Ordinal));
-                    if (right == null)
-                        continue;
-                    _couplers.Add(new DualEarUnitBranchCoupler(
-                        u,
-                        network.UnitBreakers[u],
-                        dual,
-                        Bus35,
-                        UnitBuses690[u],
-                        right));
+                    var pairs = new List<(DualEarTransformerDevice Dual, ElectricalBusNode Left, ElectricalBusNode Right)>();
+                    for (int t = 0; t < duals.Count; t++)
+                    {
+                        var left = FindBus(RuntimeBusIds.Unit690Ear(u, t, right: false));
+                        var right = FindBus(RuntimeBusIds.Unit690Ear(u, t, right: true));
+                        if (left == null || right == null)
+                            continue;
+                        pairs.Add((duals[t], left, right));
+                    }
+
+                    if (pairs.Count > 0)
+                    {
+                        _couplers.Add(new DualEarUnitBankCoupler(
+                            u,
+                            network.UnitBreakers[u],
+                            Bus35,
+                            pairs));
+                    }
+
                     continue;
                 }
 
@@ -235,10 +254,8 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
                 coupler.Attach();
         }
 
-        private static DualEarTransformerDevice? DualEarAt(ElectricalNetwork network, int unit) =>
-            unit >= 0 && unit < network.DualEarTransformers.Count
-                ? network.DualEarTransformers[unit]
-                : null;
+        private static IReadOnlyList<DualEarTransformerDevice> DualEarsAt(ElectricalNetwork network, int unit) =>
+            network.DualEarsOfUnit(unit);
 
         private static SplitEarAssignment? SplitAssignment(ElectricalNetwork network, int unit) =>
             unit >= 0 && unit < network.SplitEarAssignments.Count

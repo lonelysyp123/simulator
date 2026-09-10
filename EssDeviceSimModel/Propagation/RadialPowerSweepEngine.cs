@@ -241,26 +241,31 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
 
                 bool unitClosed = _network.UnitBreakers[u].SwitchState.IsClosed
                     && !_network.UnitBreakers[u].SwitchState.IsTripped;
-                var dual = u < _network.DualEarTransformers.Count ? _network.DualEarTransformers[u] : null;
-                if (dual != null)
+                var duals = _network.DualEarsOfUnit(u);
+                if (duals.Count > 0)
                 {
-                    var left = _graph.UnitBuses690[u];
-                    var right = _graph.FindBus(RuntimeBusIds.Unit690Right(u));
-                    var leftCurrent = unitClosed && bus35V > 1.0
-                        ? AcQuantityConverter.FromLineVoltageAndPower(
-                            left.LineVoltageV, left.TotalActivePowerKw, left.TotalReactivePowerKvar,
-                            ThreePhaseConnection.Star, _network.SystemFrequencyHz)
-                        : new AcInternalQuantities();
-                    var rightCurrent = unitClosed && bus35V > 1.0 && right != null
-                        ? AcQuantityConverter.FromLineVoltageAndPower(
-                            right.LineVoltageV, right.TotalActivePowerKw, right.TotalReactivePowerKvar,
-                            ThreePhaseConnection.Star, _network.SystemFrequencyHz)
-                        : new AcInternalQuantities();
+                    for (int t = 0; t < duals.Count; t++)
+                    {
+                        var dual = duals[t];
+                        var left = _graph.FindBus(RuntimeBusIds.Unit690Ear(u, t, right: false));
+                        var right = _graph.FindBus(RuntimeBusIds.Unit690Ear(u, t, right: true));
+                        var leftCurrent = unitClosed && bus35V > 1.0 && left != null
+                            ? AcQuantityConverter.FromLineVoltageAndPower(
+                                left.LineVoltageV, left.TotalActivePowerKw, left.TotalReactivePowerKvar,
+                                ThreePhaseConnection.Star, _network.SystemFrequencyHz)
+                            : new AcInternalQuantities();
+                        var rightCurrent = unitClosed && bus35V > 1.0 && right != null
+                            ? AcQuantityConverter.FromLineVoltageAndPower(
+                                right.LineVoltageV, right.TotalActivePowerKw, right.TotalReactivePowerKvar,
+                                ThreePhaseConnection.Star, _network.SystemFrequencyHz)
+                            : new AcInternalQuantities();
 
-                    PropagationPortBinding.SetAcVoltageInput(dual.Primary, unitClosed ? bus35V : 0, ThreePhaseConnection.Star);
-                    PropagationPortBinding.SetAcQuantitiesInput(dual.SecondaryLeft, leftCurrent);
-                    PropagationPortBinding.SetAcQuantitiesInput(dual.SecondaryRight, rightCurrent);
-                    dual.Step(context, step);
+                        PropagationPortBinding.SetAcVoltageInput(dual.Primary, unitClosed ? bus35V : 0, ThreePhaseConnection.Star);
+                        PropagationPortBinding.SetAcQuantitiesInput(dual.SecondaryLeft, leftCurrent);
+                        PropagationPortBinding.SetAcQuantitiesInput(dual.SecondaryRight, rightCurrent);
+                        dual.Step(context, step);
+                    }
+
                     continue;
                 }
 

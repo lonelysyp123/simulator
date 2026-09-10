@@ -4,28 +4,24 @@ using EssSimulator.EssDeviceSimModel.Solver;
 
 namespace EssSimulator.EssDeviceSimModel.Propagation
 {
-    /// <summary>双耳单元支路：35kV → 一次 Step → 左右 690V 母线。</summary>
-    internal sealed class DualEarUnitBranchCoupler : IBusCoupler
+    /// <summary>
+    /// 单元双耳箱变组：共用单元断路器 Step 一次，再分别 Step 各台双耳变压器并写左右 690V 母线。
+    /// </summary>
+    internal sealed class DualEarUnitBankCoupler : IBusCoupler
     {
         private readonly BreakerSimulator _unitBreaker;
-        private readonly DualEarTransformerDevice _dualEar;
-        private readonly ElectricalBusNode _busLeft;
-        private readonly ElectricalBusNode _busRight;
+        private readonly IReadOnlyList<(DualEarTransformerDevice Dual, ElectricalBusNode Left, ElectricalBusNode Right)> _xfmrs;
 
-        public DualEarUnitBranchCoupler(
+        public DualEarUnitBankCoupler(
             int unitIndex,
             BreakerSimulator unitBreaker,
-            DualEarTransformerDevice dualEar,
             ElectricalBusNode upstreamBus35,
-            ElectricalBusNode busLeft,
-            ElectricalBusNode busRight)
+            IReadOnlyList<(DualEarTransformerDevice Dual, ElectricalBusNode Left, ElectricalBusNode Right)> xfmrs)
         {
             _unitBreaker = unitBreaker;
-            _dualEar = dualEar;
+            _xfmrs = xfmrs;
             UpstreamBus = upstreamBus35;
-            DownstreamBus = busLeft;
-            _busLeft = busLeft;
-            _busRight = busRight;
+            DownstreamBus = xfmrs[0].Left;
             CouplerId = $"unit_branch_dual_u{unitIndex}";
         }
 
@@ -43,15 +39,21 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
             double primaryV = unitClosed ? bus35V : 0;
             double freq = args.Sweep.SystemFrequencyHz;
 
-            var leftCurrent = EarCurrent(_busLeft, primaryV, freq);
-            var rightCurrent = EarCurrent(_busRight, primaryV, freq);
+            double sumP = 0;
+            double sumQ = 0;
+            double vRef = 0;
+            foreach (var xfmr in _xfmrs)
+            {
+                sumP += xfmr.Left.TotalActivePowerKw + xfmr.Right.TotalActivePowerKw;
+                sumQ += xfmr.Left.TotalReactivePowerKvar + xfmr.Right.TotalReactivePowerKvar;
+                if (vRef <= 1.0 && xfmr.Left.LineVoltageV > 1.0)
+                    vRef = xfmr.Left.LineVoltageV;
+                if (vRef <= 1.0 && xfmr.Right.LineVoltageV > 1.0)
+                    vRef = xfmr.Right.LineVoltageV;
+            }
+
             var combined = AcQuantityConverter.FromLineVoltageAndPower(
-                _busLeft.LineVoltageV > 1.0 ? _busLeft.LineVoltageV
-                    : (_busRight.LineVoltageV > 1.0 ? _busRight.LineVoltageV : 0),
-                _busLeft.TotalActivePowerKw + _busRight.TotalActivePowerKw,
-                _busLeft.TotalReactivePowerKvar + _busRight.TotalReactivePowerKvar,
-                ThreePhaseConnection.Star,
-                freq);
+                vRef, sumP, sumQ, ThreePhaseConnection.Star, freq);
 
             PropagationPortBinding.SetAcVoltageInput(_unitBreaker.Primary, bus35V, ThreePhaseConnection.Star);
             if (unitClosed)
@@ -65,15 +67,20 @@ namespace EssSimulator.EssDeviceSimModel.Propagation
 
             _unitBreaker.Step(args.Sweep.DeviceContext, args.Sweep.Step);
 
-            PropagationPortBinding.SetAcVoltageInput(_dualEar.Primary, primaryV, ThreePhaseConnection.Star);
-            PropagationPortBinding.SetAcQuantitiesInput(_dualEar.SecondaryLeft, leftCurrent);
-            PropagationPortBinding.SetAcQuantitiesInput(_dualEar.SecondaryRight, rightCurrent);
-            _dualEar.Step(args.Sweep.DeviceContext, args.Sweep.Step);
+            foreach (var xfmr in _xfmrs)
+            {
+                var leftCurrent = EarCurrent(xfmr.Left, primaryV, freq);
+                var rightCurrent = EarCurrent(xfmr.Right, primaryV, freq);
+                PropagationPortBinding.SetAcVoltageInput(xfmr.Dual.Primary, primaryV, ThreePhaseConnection.Star);
+                PropagationPortBinding.SetAcQuantitiesInput(xfmr.Dual.SecondaryLeft, leftCurrent);
+                PropagationPortBinding.SetAcQuantitiesInput(xfmr.Dual.SecondaryRight, rightCurrent);
+                xfmr.Dual.Step(args.Sweep.DeviceContext, args.Sweep.Step);
 
-            double leftV = unitClosed ? _dualEar.SecondaryLeft.Output.Ac?.Internal.LineVoltageV ?? 0 : 0;
-            double rightV = unitClosed ? _dualEar.SecondaryRight.Output.Ac?.Internal.LineVoltageV ?? 0 : 0;
-            _busLeft.SetVoltage(leftV, leftV > 1.0 ? args.FrequencyHz : 0, args.Sweep, notifyCouplers: false);
-            _busRight.SetVoltage(rightV, rightV > 1.0 ? args.FrequencyHz : 0, args.Sweep, notifyCouplers: false);
+                double leftV = unitClosed ? xfmr.Dual.SecondaryLeft.Output.Ac?.Internal.LineVoltageV ?? 0 : 0;
+                double rightV = unitClosed ? xfmr.Dual.SecondaryRight.Output.Ac?.Internal.LineVoltageV ?? 0 : 0;
+                xfmr.Left.SetVoltage(leftV, leftV > 1.0 ? args.FrequencyHz : 0, args.Sweep, notifyCouplers: false);
+                xfmr.Right.SetVoltage(rightV, rightV > 1.0 ? args.FrequencyHz : 0, args.Sweep, notifyCouplers: false);
+            }
         }
 
         private static AcInternalQuantities EarCurrent(ElectricalBusNode bus, double primaryV, double freq)
