@@ -57,7 +57,7 @@ public class Iec61850IedServerTests
             WritePoints(new Dictionary<string, object> { [paramName] = value });
     }
 
-    [Fact]
+    [NativeLibraryFact]
     public void GetSetOperate_UseParamNameShadow()
     {
         var mapping = Iec61850Mapping.Load(MappingPath());
@@ -89,7 +89,7 @@ public class Iec61850IedServerTests
         Assert.Equal("yt0", writes.Last().Name);
     }
 
-    [Fact]
+    [NativeLibraryFact]
     public void TcpClient_AssociateGetOperateAndUrcb()
     {
         var mapping = Iec61850Mapping.Load(MappingPath());
@@ -153,7 +153,7 @@ public class Iec61850IedServerTests
         client.Abort();
     }
 
-    [Fact]
+    [NativeLibraryFact]
     public void TcpClient_DeviceHasNoGooseControlBlock()
     {
         var mapping = Iec61850Mapping.Load(MappingPath());
@@ -174,7 +174,7 @@ public class Iec61850IedServerTests
         client.Abort();
     }
 
-    [Fact]
+    [NativeLibraryFact]
     public void ApplyGoose_WritesYkAndYtThroughControlCallback()
     {
         var mapping = Iec61850Mapping.Load(MappingPath());

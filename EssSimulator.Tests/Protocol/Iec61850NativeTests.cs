@@ -9,9 +9,11 @@ public class Iec61850NativeTests
     {
         var paths = Iec61850Native.ListCandidatePaths();
         Assert.NotEmpty(paths);
-        string fileName = OperatingSystem.IsWindows() ? "iec61850.dll" : "libiec61850.dylib";
+        string fileName = Iec61850Native.NativeFileName();
         Assert.Contains(paths, p => p.EndsWith(fileName, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(paths, p => p.Contains(Path.Combine("runtimes"), StringComparison.OrdinalIgnoreCase));
+        if (OperatingSystem.IsLinux())
+            Assert.Contains(paths, p => p.Contains("linux-x64") || p.Contains("linux-arm64"));
     }
 
     [Fact]
@@ -32,7 +34,7 @@ public class Iec61850NativeTests
         }
     }
 
-    [Fact]
+    [NativeLibraryFact]
     public void TryEnsureNativeLibrary_SucceedsInRepo()
     {
         Assert.True(Iec61850Native.TryEnsureNativeLibrary(out var detail), detail);
@@ -49,7 +51,7 @@ public class Iec61850NativeTests
         Assert.False(Iec61850GooseEthernet.CanUseRawEthernet("", out _));
     }
 
-    [Fact]
+    [NativeLibraryFact]
     public void HasGooseSubscriberDestroy_MatchesLoadedNativeLibrary()
     {
         Assert.True(Iec61850Native.TryEnsureNativeLibrary(out var path), path);

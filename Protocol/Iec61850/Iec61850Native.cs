@@ -7,7 +7,7 @@ namespace EssSimulator.Protocol.Iec61850
 {
     /// <summary>
     /// 解析 libiec61850 原生库。C# 包装的 DllImport 名为 <c>iec61850</c>
-    ///（macOS 找 <c>libiec61850.dylib</c>，Windows 找 <c>iec61850.dll</c>）。
+    ///（macOS 找 <c>libiec61850.dylib</c>，Linux 找 <c>libiec61850.so</c>，Windows 找 <c>iec61850.dll</c>）。
     /// </summary>
     internal static class Iec61850Native
     {
@@ -129,10 +129,13 @@ namespace EssSimulator.Protocol.Iec61850
             libraryName.Equals(DllImportName, StringComparison.OrdinalIgnoreCase)
             || libraryName.Equals("libiec61850", StringComparison.OrdinalIgnoreCase)
             || libraryName.Equals("libiec61850.dylib", StringComparison.OrdinalIgnoreCase)
+            || libraryName.Equals("libiec61850.so", StringComparison.OrdinalIgnoreCase)
             || libraryName.Equals("iec61850.dll", StringComparison.OrdinalIgnoreCase);
 
-        private static string NativeFileName() =>
-            OperatingSystem.IsWindows() ? "iec61850.dll" : "libiec61850.dylib";
+        internal static string NativeFileName() =>
+            OperatingSystem.IsWindows() ? "iec61850.dll"
+            : OperatingSystem.IsLinux() ? "libiec61850.so"
+            : "libiec61850.dylib";
 
         private static IEnumerable<string> CandidatePaths()
         {
@@ -214,6 +217,16 @@ namespace EssSimulator.Protocol.Iec61850
                 else
                     yield return "osx-x64";
                 yield return "osx-universal";
+                yield return RuntimeInformation.RuntimeIdentifier;
+                yield break;
+            }
+
+            if (OperatingSystem.IsLinux())
+            {
+                if (RuntimeInformation.OSArchitecture == Architecture.Arm64)
+                    yield return "linux-arm64";
+                else
+                    yield return "linux-x64";
                 yield return RuntimeInformation.RuntimeIdentifier;
             }
         }
