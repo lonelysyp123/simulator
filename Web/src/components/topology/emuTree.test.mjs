@@ -26,6 +26,7 @@ function plant() {
     node('cb1', 'ac_breaker', { label: 'CB-1', parameters: { emuId: 'e1' } }),
     node('m1', 'ac_meter', { label: 'M-1', parameters: { emuId: 'e1', groupId: 'g1' } }),
     node('t1', 'transformer', { label: 'T-1', parameters: { emuId: 'e1' } }),
+    node('s1', 'split_transformer', { label: '双耳1', parameters: { emuId: 'e1' } }),
     node('grid', 'grid', { label: '电网' })
   ]
 }
@@ -42,6 +43,7 @@ describe('buildEmuTree', () => {
     assert.equal(byRole['断路器'], 'CB-1')
     assert.equal(byRole['电表'], 'M-1')
     assert.equal(byRole['变压器'], 'T-1')
+    assert.equal(byRole['双耳变压器'], '双耳1')
   })
 
   it('prefers unit-level breaker over group-only binding', () => {
@@ -73,7 +75,7 @@ describe('buildEmuTree', () => {
 describe('highlightIdsForSelection', () => {
   it('highlights every assignable device of the selected EMU', () => {
     const ids = highlightIdsForSelection(plant(), 'e1')
-    assert.deepEqual(ids.sort(), ['cb1', 'm1', 'p1', 'p2', 'p3', 't1'])
+    assert.deepEqual(ids.sort(), ['cb1', 'm1', 'p1', 'p2', 'p3', 's1', 't1'])
   })
 
   it('highlights only devices of the selected group', () => {

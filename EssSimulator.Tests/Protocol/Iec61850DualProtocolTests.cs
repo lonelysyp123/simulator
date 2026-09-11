@@ -56,7 +56,7 @@ public class Iec61850DualProtocolTests
             _registers.TryGetValue(paramName, out var val) ? val : null;
     }
 
-    [Fact]
+    [NativeLibraryFact]
     public void OperateAndModbusWrite_SharePointShadowAndSimulation()
     {
         var path = Path.Combine(FindRepoRoot(), "pointmaps", "models", "emu", "standard", "emu.csv");

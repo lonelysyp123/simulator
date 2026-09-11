@@ -215,4 +215,39 @@ public class TopologyElectricalMapperTests
         Assert.Equal(RuntimeBusIds.Unit690Ear(0, 1, false), mapping.BusRuntimeIds["b1L"]);
         Assert.Equal(RuntimeBusIds.Unit690Ear(0, 1, true), mapping.BusRuntimeIds["b1R"]);
     }
+
+    [Fact]
+    public void Map_two_emus_with_split_transformers_use_distinct_unit_indices()
+    {
+        var project = TopologyRuntimeApplyTests.TwoEmuSplitPlant();
+        project.Nodes.Add(Node("empty", "emu", "空闲", y: 700));
+
+        var mapping = TopologyElectricalMapper.Map(project);
+        Assert.Equal(RuntimeBusIds.Unit690Ear(0, 0, false), mapping.BusRuntimeIds["b1L"]);
+        Assert.Equal(RuntimeBusIds.Unit690Ear(0, 0, true), mapping.BusRuntimeIds["b1R"]);
+        Assert.Equal(RuntimeBusIds.Unit690Ear(1, 0, false), mapping.BusRuntimeIds["b2L"]);
+        Assert.Equal(RuntimeBusIds.Unit690Ear(1, 0, true), mapping.BusRuntimeIds["b2R"]);
+        Assert.Equal(0, TopologyElectricalMapper.IndexOfEmuWithPcs(project, "e1"));
+        Assert.Equal(1, TopologyElectricalMapper.IndexOfEmuWithPcs(project, "e2"));
+        Assert.Equal(0, TopologyElectricalMapper.IndexOfEmuWithPcs(project, "empty"));
+        Assert.Equal(0, TopologyElectricalMapper.IndexOfSplitOnEmu(project, "e1", "s1"));
+        Assert.Equal(0, TopologyElectricalMapper.IndexOfSplitOnEmu(project, "e2", "s2"));
+    }
+
+    [Fact]
+    public void ResolveMeter_returns_null_when_meter_is_not_on_a_bus()
+    {
+        var project = new TopologyProject
+        {
+            Nodes =
+            {
+                Node("m1", "ac_meter", "PCC", new Dictionary<string, object?> { ["isPccMeter"] = true }),
+                Node("brk", "ac_breaker", "主断")
+            },
+            Edges = { Edge("e1", "m1", "pt_a", "brk", "a") }
+        };
+
+        Assert.Null(TopologyElectricalMapper.FindConnectedAcBus(project, "m1"));
+        Assert.Null(TopologyElectricalMapper.ResolveMeterSourceBusId(project, project.Nodes.First(n => n.Id == "m1")));
+    }
 }
